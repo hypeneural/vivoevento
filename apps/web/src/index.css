@@ -1,0 +1,280 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════
+   LIGHT THEME (default)
+   Premium SaaS — clean, airy, professional
+   ═══════════════════════════════════════════════════════════ */
+
+@layer base {
+  :root {
+    --background: 220 20% 98%;
+    --foreground: 230 25% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 230 25% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 230 25% 12%;
+
+    --primary: 258 65% 52%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 94%;
+    --secondary-foreground: 230 20% 30%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 10% 46%;
+
+    --accent: 215 75% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 60% 38%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 10%;
+
+    --border: 220 13% 90%;
+    --input: 220 13% 90%;
+    --ring: 258 65% 52%;
+
+    --radius: 0.625rem;
+
+    /* Sidebar — light */
+    --sidebar-background: 220 16% 97%;
+    --sidebar-foreground: 220 10% 40%;
+    --sidebar-primary: 258 65% 52%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 93%;
+    --sidebar-accent-foreground: 230 25% 12%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 258 65% 52%;
+
+    /* Brand gradients */
+    --glow-primary: 258 65% 52%;
+    --glow-accent: 215 75% 50%;
+    --gradient-start: 258 65% 52%;
+    --gradient-end: 215 75% 50%;
+
+    /* Chart theming */
+    --chart-grid: 220 13% 90%;
+    --chart-text: 220 10% 46%;
+    --chart-tooltip-bg: 0 0% 100%;
+    --chart-tooltip-border: 220 13% 90%;
+
+    /* Shadows for light mode */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+    --shadow-md: 0 2px 8px -2px rgb(0 0 0 / 0.06), 0 1px 3px -1px rgb(0 0 0 / 0.04);
+    --shadow-lg: 0 4px 16px -4px rgb(0 0 0 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.04);
+    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.03);
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     DARK THEME
+     Refined dark — reduced glow, better contrast
+     ═══════════════════════════════════════════════════════════ */
+
+  .dark {
+    --background: 230 15% 8%;
+    --foreground: 220 20% 92%;
+
+    --card: 230 14% 11%;
+    --card-foreground: 220 20% 92%;
+
+    --popover: 230 14% 11%;
+    --popover-foreground: 220 20% 92%;
+
+    --primary: 258 70% 58%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 230 14% 16%;
+    --secondary-foreground: 220 20% 85%;
+
+    --muted: 230 12% 14%;
+    --muted-foreground: 220 10% 58%;
+
+    --accent: 215 80% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 70% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 10%;
+
+    --border: 230 12% 18%;
+    --input: 230 12% 18%;
+    --ring: 258 70% 58%;
+
+    /* Sidebar — dark */
+    --sidebar-background: 230 15% 6%;
+    --sidebar-foreground: 220 10% 65%;
+    --sidebar-primary: 258 70% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 230 14% 12%;
+    --sidebar-accent-foreground: 220 20% 92%;
+    --sidebar-border: 230 12% 14%;
+    --sidebar-ring: 258 70% 58%;
+
+    /* Brand gradients */
+    --glow-primary: 258 70% 58%;
+    --glow-accent: 215 80% 55%;
+    --gradient-start: 258 70% 58%;
+    --gradient-end: 215 80% 55%;
+
+    /* Chart theming — dark */
+    --chart-grid: 230 12% 18%;
+    --chart-text: 220 10% 55%;
+    --chart-tooltip-bg: 230 14% 11%;
+    --chart-tooltip-border: 230 12% 18%;
+
+    /* Shadows — dark (subtle) */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.2);
+    --shadow-md: 0 2px 8px -2px rgb(0 0 0 / 0.3);
+    --shadow-lg: 0 4px 16px -4px rgb(0 0 0 / 0.4);
+    --shadow-card: 0 0 0 1px hsl(230 12% 18%);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BASE STYLES
+   ═══════════════════════════════════════════════════════════ */
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  code, pre {
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Improved focus rings */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Better selection colors */
+  ::selection {
+    background: hsl(var(--primary) / 0.15);
+    color: hsl(var(--foreground));
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   UTILITY CLASSES
+   Theme-aware: adapt to light/dark automatically
+   ═══════════════════════════════════════════════════════════ */
+
+@layer utilities {
+  /* Cards — shadow in light, border glow in dark */
+  .glass {
+    @apply bg-card border border-border/50;
+    box-shadow: var(--shadow-card);
+  }
+
+  .dark .glass {
+    @apply bg-card/60 backdrop-blur-xl;
+    box-shadow: none;
+  }
+
+  .glass-strong {
+    @apply bg-card border border-border/60;
+    box-shadow: var(--shadow-md);
+  }
+
+  .dark .glass-strong {
+    @apply bg-card/80 backdrop-blur-2xl;
+    box-shadow: none;
+  }
+
+  /* Glows — subtle in light, visible in dark */
+  .glow-primary {
+    box-shadow: var(--shadow-lg);
+  }
+
+  .dark .glow-primary {
+    box-shadow: 0 0 15px -5px hsl(var(--primary) / 0.25),
+                0 0 30px -10px hsl(var(--primary) / 0.1);
+  }
+
+  .glow-accent {
+    box-shadow: var(--shadow-lg);
+  }
+
+  .dark .glow-accent {
+    box-shadow: 0 0 15px -5px hsl(var(--accent) / 0.25),
+                0 0 30px -10px hsl(var(--accent) / 0.1);
+  }
+
+  /* Gradients */
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--gradient-start)), hsl(var(--gradient-end)));
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, hsl(var(--gradient-start)), hsl(var(--gradient-end)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Card hover — shadow lift in light, border glow in dark */
+  .card-hover {
+    @apply transition-all duration-200;
+  }
+
+  .card-hover:hover {
+    box-shadow: var(--shadow-lg);
+    @apply border-border;
+  }
+
+  .dark .card-hover:hover {
+    @apply border-primary/25;
+    box-shadow: 0 0 15px -5px hsl(var(--primary) / 0.12);
+  }
+
+  /* Scrollbar */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 5px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.3);
+  }
+
+  /* Page transition */
+  .page-enter {
+    animation: fade-in 0.3s ease-out;
+  }
+}

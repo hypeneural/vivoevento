@@ -1,0 +1,27 @@
+# Dependencies
+/node_modules
+**/node_modules
+/vendor
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Docker volumes
+docker/postgres/data/
+docker/redis/data/
+docker/minio/data/
