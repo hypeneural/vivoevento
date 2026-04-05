@@ -1,0 +1,29 @@
+﻿$font-display: 'Space Grotesk', 'Segoe UI', sans-serif;
+$font-body: 'Manrope', 'Segoe UI', sans-serif;
+
+$c-bg-dark: #050913;
+$c-bg-soft: #0a1220;
+$c-bg-panel: rgba(12, 20, 34, 0.74);
+$c-bg-panel-strong: rgba(11, 18, 31, 0.92);
+$c-white: #f4f7ff;
+$c-white-80: rgba(244, 247, 255, 0.82);
+$c-white-64: rgba(244, 247, 255, 0.64);
+$c-white-48: rgba(244, 247, 255, 0.48);
+
+$c-accent: #73ecff;
+$c-accent-secondary: #89a5ff;
+$c-accent-warm: #ffbf72;
+$c-accent-green: #79f1ba;
+$c-accent-coral: #ff6f87;
+
+$header-height: 84px;
+$container-max: 1240px;
+$container-padding: clamp(1.1rem, 2.4vw, 2rem);
+$radius-sm: 16px;
+$radius-md: 24px;
+$radius-lg: 32px;
+$border-subtle: 1px solid rgba(137, 165, 255, 0.12);
+$border-strong: 1px solid rgba(115, 236, 255, 0.18);
+$shadow-soft: 0 24px 80px rgba(0, 0, 0, 0.34);
+$shadow-glow: 0 0 56px rgba(115, 236, 255, 0.18);
+$shadow-warm: 0 0 48px rgba(255, 191, 114, 0.18);

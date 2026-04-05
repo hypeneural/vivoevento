@@ -1,0 +1,12 @@
+[Unit]
+Description=Eventovivo Laravel Scheduler
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+UMask=0002
+WorkingDirectory=/var/www/eventovivo/current/apps/api
+ExecStart=/usr/bin/php artisan schedule:run
+StandardOutput=append:/var/log/eventovivo-scheduler.log
+StandardError=append:/var/log/eventovivo-scheduler-error.log

@@ -4,8 +4,10 @@ import { EVENT_STATUS_LABELS, MEDIA_STATUS_LABELS, CHANNEL_LABELS } from '@/shar
 
 const eventStatusColors: Record<EventStatus, string> = {
   draft: 'bg-muted text-muted-foreground',
+  scheduled: 'bg-primary/10 text-primary border-primary/20',
   active: 'bg-success/15 text-success border-success/20',
   paused: 'bg-warning/15 text-warning border-warning/20',
+  ended: 'bg-primary/15 text-primary border-primary/20',
   finished: 'bg-primary/15 text-primary border-primary/20',
   archived: 'bg-muted text-muted-foreground',
 };

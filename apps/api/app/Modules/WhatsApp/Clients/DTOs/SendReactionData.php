@@ -12,5 +12,6 @@ final readonly class SendReactionData
         public string $reaction,
         public string $messageId,
         public ?int $delayMessage = null,
+        public bool $fromMe = false,
     ) {}
 }

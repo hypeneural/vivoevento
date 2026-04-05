@@ -27,12 +27,16 @@ return [
         'Clients'       => App\Modules\Clients\Providers\ClientsServiceProvider::class,
         'Events'        => App\Modules\Events\Providers\EventsServiceProvider::class,
         'EventTeam'     => App\Modules\EventTeam\Providers\EventTeamServiceProvider::class,
+        'Dashboard'     => App\Modules\Dashboard\Providers\DashboardServiceProvider::class,
 
         // Etapa 2 — Ingestão
         'Channels'        => App\Modules\Channels\Providers\ChannelsServiceProvider::class,
         'InboundMedia'    => App\Modules\InboundMedia\Providers\InboundMediaServiceProvider::class,
         'WhatsApp'        => App\Modules\WhatsApp\Providers\WhatsAppServiceProvider::class,
         'MediaProcessing' => App\Modules\MediaProcessing\Providers\MediaProcessingServiceProvider::class,
+        'ContentModeration' => App\Modules\ContentModeration\Providers\ContentModerationServiceProvider::class,
+        'FaceSearch' => App\Modules\FaceSearch\Providers\FaceSearchServiceProvider::class,
+        'MediaIntelligence' => App\Modules\MediaIntelligence\Providers\MediaIntelligenceServiceProvider::class,
 
         // Etapa 3 — Experiência
         'Gallery' => App\Modules\Gallery\Providers\GalleryServiceProvider::class,

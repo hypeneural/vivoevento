@@ -16,6 +16,8 @@ class Organization extends Model
 {
     use HasFactory, SoftDeletes, HasAudit;
 
+    protected $appends = ['name'];
+
     protected static function newFactory(): \Database\Factories\OrganizationFactory
     {
         return \Database\Factories\OrganizationFactory::new();
@@ -24,6 +26,7 @@ class Organization extends Model
     protected $fillable = [
         'uuid',
         'type',
+        'name',
         'legal_name',
         'trade_name',
         'document_number',
@@ -95,10 +98,37 @@ class Organization extends Model
         return $this->hasMany(\App\Modules\Billing\Models\EventPurchase::class);
     }
 
+    public function eventAccessGrants(): HasMany
+    {
+        return $this->hasMany(\App\Modules\Billing\Models\EventAccessGrant::class);
+    }
+
+    public function billingOrders(): HasMany
+    {
+        return $this->hasMany(\App\Modules\Billing\Models\BillingOrder::class);
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(\App\Modules\Billing\Models\Invoice::class);
+    }
+
     // ─── Helpers ──────────────────────────────────────────
 
     public function displayName(): string
     {
         return $this->trade_name ?: $this->legal_name ?: $this->slug;
+    }
+
+    public function getNameAttribute(): string
+    {
+        return $this->displayName();
+    }
+
+    public function setNameAttribute(?string $value): void
+    {
+        if ($value !== null && $value !== '') {
+            $this->attributes['trade_name'] = $value;
+        }
     }
 }

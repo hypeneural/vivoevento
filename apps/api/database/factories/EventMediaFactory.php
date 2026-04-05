@@ -20,6 +20,9 @@ class EventMediaFactory extends Factory
             'source_type' => 'channel',
             'source_label' => 'WhatsApp',
             'original_filename' => fake()->lexify('IMG_??????.jpg'),
+            'client_filename' => fake()->lexify('IMG_??????.jpg'),
+            'perceptual_hash' => null,
+            'duplicate_group_key' => null,
             'mime_type' => 'image/jpeg',
             'size_bytes' => fake()->numberBetween(100000, 5000000),
             'width' => fake()->randomElement([1920, 1080, 3840]),
@@ -27,6 +30,11 @@ class EventMediaFactory extends Factory
             'processing_status' => MediaProcessingStatus::Received->value,
             'moderation_status' => ModerationStatus::Pending->value,
             'publication_status' => PublicationStatus::Draft->value,
+            'decision_source' => null,
+            'decision_overridden_at' => null,
+            'decision_overridden_by_user_id' => null,
+            'decision_override_reason' => null,
+            'pipeline_version' => 'media_pipeline_v1',
         ];
     }
 

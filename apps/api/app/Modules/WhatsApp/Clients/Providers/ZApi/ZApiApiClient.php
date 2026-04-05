@@ -53,6 +53,11 @@ class ZApiApiClient
         return $this->get($instance, '/status');
     }
 
+    public function getDevice(WhatsAppInstance $instance): array
+    {
+        return $this->get($instance, '/device');
+    }
+
     public function disconnect(WhatsAppInstance $instance): array
     {
         return $this->get($instance, '/disconnect');
@@ -197,10 +202,10 @@ class ZApiApiClient
 
     private function makeRequest(WhatsAppInstance $instance): PendingRequest
     {
-        return Http::withHeaders([
+        return Http::withHeaders(array_filter([
             'Client-Token' => $instance->provider_client_token,
             'Content-Type' => 'application/json',
-        ])
+        ], fn ($value) => $value !== null && $value !== ''))
             ->timeout($this->timeout)
             ->retry($this->retries, 1000, function (\Exception $e, PendingRequest $request) {
                 // Retry only on 429 (rate limit) and 5xx errors
@@ -214,9 +219,12 @@ class ZApiApiClient
 
     private function buildUrl(WhatsAppInstance $instance, string $endpoint): string
     {
+        $config = $instance->providerConfig();
+        $baseUrl = rtrim((string) ($config['base_url'] ?? $this->baseUrl), '/');
+
         return sprintf(
             '%s/instances/%s/token/%s%s',
-            $this->baseUrl,
+            $baseUrl,
             $instance->external_instance_id,
             $instance->provider_token,
             $endpoint

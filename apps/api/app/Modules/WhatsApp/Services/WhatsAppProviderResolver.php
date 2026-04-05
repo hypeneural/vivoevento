@@ -3,6 +3,7 @@
 namespace App\Modules\WhatsApp\Services;
 
 use App\Modules\WhatsApp\Clients\Contracts\WhatsAppProviderInterface;
+use App\Modules\WhatsApp\Clients\Providers\Evolution\EvolutionWhatsAppProvider;
 use App\Modules\WhatsApp\Clients\Providers\ZApi\ZApiWhatsAppProvider;
 use App\Modules\WhatsApp\Exceptions\ProviderNotSupportedException;
 use App\Modules\WhatsApp\Models\WhatsAppInstance;
@@ -31,7 +32,7 @@ class WhatsAppProviderResolver
     {
         return match ($key) {
             'zapi' => app(ZApiWhatsAppProvider::class),
-            // 'evolution' => app(EvolutionWhatsAppProvider::class),
+            'evolution' => app(EvolutionWhatsAppProvider::class),
             default => throw new ProviderNotSupportedException("WhatsApp provider '{$key}' is not supported."),
         };
     }

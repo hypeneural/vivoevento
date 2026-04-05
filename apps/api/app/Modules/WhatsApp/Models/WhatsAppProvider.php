@@ -11,6 +11,13 @@ class WhatsAppProvider extends Model
 {
     use HasFactory;
 
+    protected static function newFactory(): \Database\Factories\WhatsAppProviderFactory
+    {
+        return \Database\Factories\WhatsAppProviderFactory::new();
+    }
+
+    protected $table = 'whatsapp_providers';
+
     protected $fillable = [
         'key',
         'name',

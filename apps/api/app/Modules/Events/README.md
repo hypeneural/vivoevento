@@ -27,6 +27,9 @@ Gerenciar eventos do Evento Vivo — o núcleo do produto.
 | DELETE | /api/v1/events/{id} | EventController@destroy | Remover |
 | POST | /api/v1/events/{id}/publish | EventStatusController@publish | Publicar |
 | POST | /api/v1/events/{id}/archive | EventStatusController@archive | Arquivar |
+| GET | /api/v1/events/{id}/share-links | EventQrController@shareLinks | Links publicos e identificadores |
+| PATCH | /api/v1/events/{id}/public-links | EventQrController@updateIdentifiers | Atualizar slug/slug de envio |
+| POST | /api/v1/events/{id}/public-links/regenerate | EventQrController@regenerateIdentifiers | Regenerar slug/upload slug/wall code |
 
 ## Dependências
 - Organizations

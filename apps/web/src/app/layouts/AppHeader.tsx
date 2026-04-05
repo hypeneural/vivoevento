@@ -1,17 +1,19 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, Bell, Plus, LogOut, Menu, Sun, Moon, Monitor, User, Settings, Shield } from 'lucide-react';
+import { Search, Bell, Plus, LogOut, Menu, Sun, Moon, Monitor, User, Settings, Shield, X } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { useTheme } from '@/app/providers/ThemeProvider';
 import type { ThemeMode } from '@/app/providers/ThemeProvider';
 import { mockNotifications } from '@/shared/mock/data';
+import { formatRoleLabel } from '@/shared/auth/labels';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { UserAvatar } from '@/shared/components/UserAvatar';
+import { GlobalSearch } from '@/shared/components/GlobalSearch';
 
 interface AppHeaderProps {
   onMenuToggle?: () => void;
@@ -30,10 +32,12 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const navigate = useNavigate();
   const unreadCount = mockNotifications.filter(n => !n.read).length;
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   if (!user) return null;
 
   const CurrentThemeIcon = resolvedTheme === 'dark' ? Moon : Sun;
+  const roleLabel = formatRoleLabel(user.role.key, user.role.name);
   const orgDisplay = organization?.name?.[0] || '🏢';
 
   const handleLogout = async () => {
@@ -42,6 +46,7 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
   };
 
   return (
+    <>
     <header className="sticky top-0 z-20 flex h-14 sm:h-16 items-center gap-2 sm:gap-3 border-b border-border bg-background/80 backdrop-blur-xl px-3 sm:px-4 lg:px-6 shrink-0">
       {/* Mobile menu toggle */}
       <button
@@ -52,19 +57,16 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
         <Menu className="h-5 w-5" />
       </button>
 
-      {/* Search */}
-      <div className="hidden sm:flex flex-1 max-w-md">
-        <div className="relative w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar eventos, mídias..."
-            className="pl-9 h-9 sm:h-10 bg-muted/50 border-border/50 focus:bg-background text-sm"
-          />
-        </div>
-      </div>
+      {/* Search — Desktop */}
+      <GlobalSearch className="hidden sm:flex flex-1 max-w-md" />
 
-      <button className="sm:hidden rounded-md p-2 text-muted-foreground hover:text-foreground transition-colors" aria-label="Buscar">
-        <Search className="h-[18px] w-[18px]" />
+      {/* Search — Mobile toggle */}
+      <button
+        onClick={() => setMobileSearchOpen(prev => !prev)}
+        className="sm:hidden rounded-md p-2 text-muted-foreground hover:text-foreground transition-colors"
+        aria-label="Buscar"
+      >
+        {mobileSearchOpen ? <X className="h-[18px] w-[18px]" /> : <Search className="h-[18px] w-[18px]" />}
       </button>
 
       <div className="flex-1" />
@@ -142,7 +144,7 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
               <UserAvatar name={user.name} avatarUrl={user.avatar_url} size="xs" />
               <div className="hidden md:flex flex-col items-start">
                 <span className="text-xs sm:text-sm font-medium leading-none truncate max-w-[100px]">{user.name}</span>
-                <span className="text-[9px] sm:text-[10px] text-muted-foreground">{user.role.name}</span>
+                <span className="text-[9px] sm:text-[10px] text-muted-foreground">{roleLabel}</span>
               </div>
             </Button>
           </DropdownMenuTrigger>
@@ -156,7 +158,7 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
                   <p className="text-[10px] text-muted-foreground truncate">{user.email}</p>
                   <Badge variant="outline" className="mt-1 text-[9px] px-1.5 py-0 h-4 gap-0.5">
                     <Shield className="h-2 w-2" />
-                    {user.role.name}
+                    {roleLabel}
                   </Badge>
                 </div>
               </div>
@@ -208,5 +210,13 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
         </DropdownMenu>
       </div>
     </header>
+
+    {/* Mobile search overlay */}
+    {mobileSearchOpen && (
+      <div className="sm:hidden sticky top-14 z-20 border-b border-border bg-background/95 backdrop-blur-xl px-3 py-2 animate-in slide-in-from-top-1 duration-150">
+        <GlobalSearch className="w-full" />
+      </div>
+    )}
+    </>
   );
 }

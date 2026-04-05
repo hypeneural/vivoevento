@@ -7,7 +7,7 @@ namespace App\Modules\Wall\Events;
  * The wall player should show an expired/ended screen.
  * Payload: {reason, expired_at}
  */
-class WallExpired extends AbstractWallBroadcastEvent
+class WallExpired extends AbstractWallImmediateBroadcastEvent
 {
     public function broadcastAs(): string
     {

@@ -21,6 +21,7 @@ use App\Modules\WhatsApp\Models\WhatsAppInstance;
 use App\Modules\WhatsApp\Models\WhatsAppMessage;
 use App\Modules\WhatsApp\Services\WhatsAppMessagingService;
 use App\Shared\Http\BaseController;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -32,8 +33,22 @@ class WhatsAppMessageController extends BaseController
 
     public function index(Request $request): JsonResponse
     {
+        $this->ensureCanViewModule($request);
+
+        $instance = null;
+
+        if ($request->filled('instance_id')) {
+            $instance = $this->resolveInstanceForView((int) $request->input('instance_id'));
+        }
+
         $messages = WhatsAppMessage::query()
-            ->when($request->input('instance_id'), fn ($q, $v) => $q->where('instance_id', $v))
+            ->when($instance, fn (Builder $q) => $q->where('instance_id', $instance->id))
+            ->when(! $this->isPlatformAdmin($request), function (Builder $query) use ($request) {
+                $organizationId = $this->currentOrganizationId($request);
+
+                $query->whereHas('instance', fn (Builder $instanceQuery) => $instanceQuery
+                    ->where('organization_id', $organizationId));
+            })
             ->when($request->input('direction'), fn ($q, $v) => $q->where('direction', $v))
             ->when($request->input('type'), fn ($q, $v) => $q->where('type', $v))
             ->with('chat')
@@ -45,12 +60,15 @@ class WhatsAppMessageController extends BaseController
 
     public function show(WhatsAppMessage $message): JsonResponse
     {
+        $this->ensureCanViewModule(request());
+        $this->authorize('view', $message->instance()->firstOrFail());
+
         return $this->success(new WhatsAppMessageResource($message->load('chat', 'instance')));
     }
 
     public function sendText(SendTextRequest $request): JsonResponse
     {
-        $instance = WhatsAppInstance::findOrFail($request->validated('instance_id'));
+        $instance = $this->resolveInstanceForUpdate((int) $request->validated('instance_id'));
 
         $data = new SendTextData(
             phone: $request->validated('phone'),
@@ -71,7 +89,7 @@ class WhatsAppMessageController extends BaseController
 
     public function sendImage(SendImageRequest $request): JsonResponse
     {
-        $instance = WhatsAppInstance::findOrFail($request->validated('instance_id'));
+        $instance = $this->resolveInstanceForUpdate((int) $request->validated('instance_id'));
 
         $data = new SendImageData(
             phone: $request->validated('phone'),
@@ -91,7 +109,7 @@ class WhatsAppMessageController extends BaseController
 
     public function sendAudio(SendAudioRequest $request): JsonResponse
     {
-        $instance = WhatsAppInstance::findOrFail($request->validated('instance_id'));
+        $instance = $this->resolveInstanceForUpdate((int) $request->validated('instance_id'));
 
         $data = new SendAudioData(
             phone: $request->validated('phone'),
@@ -110,13 +128,14 @@ class WhatsAppMessageController extends BaseController
 
     public function sendReaction(SendReactionRequest $request): JsonResponse
     {
-        $instance = WhatsAppInstance::findOrFail($request->validated('instance_id'));
+        $instance = $this->resolveInstanceForUpdate((int) $request->validated('instance_id'));
 
         $data = new SendReactionData(
             phone: $request->validated('phone'),
             reaction: $request->validated('reaction'),
             messageId: $request->validated('message_id'),
             delayMessage: $request->validated('delay_message'),
+            fromMe: (bool) $request->validated('from_me', false),
         );
 
         $message = $this->messagingService->sendReaction($instance, $data);
@@ -129,12 +148,13 @@ class WhatsAppMessageController extends BaseController
 
     public function removeReaction(RemoveReactionRequest $request): JsonResponse
     {
-        $instance = WhatsAppInstance::findOrFail($request->validated('instance_id'));
+        $instance = $this->resolveInstanceForUpdate((int) $request->validated('instance_id'));
 
         $data = new RemoveReactionData(
             phone: $request->validated('phone'),
             messageId: $request->validated('message_id'),
             delayMessage: $request->validated('delay_message'),
+            fromMe: (bool) $request->validated('from_me', false),
         );
 
         $message = $this->messagingService->removeReaction($instance, $data);
@@ -147,7 +167,7 @@ class WhatsAppMessageController extends BaseController
 
     public function sendCarousel(SendCarouselRequest $request): JsonResponse
     {
-        $instance = WhatsAppInstance::findOrFail($request->validated('instance_id'));
+        $instance = $this->resolveInstanceForUpdate((int) $request->validated('instance_id'));
 
         $data = new SendCarouselData(
             phone: $request->validated('phone'),
@@ -166,7 +186,7 @@ class WhatsAppMessageController extends BaseController
 
     public function sendPixButton(SendPixButtonRequest $request): JsonResponse
     {
-        $instance = WhatsAppInstance::findOrFail($request->validated('instance_id'));
+        $instance = $this->resolveInstanceForUpdate((int) $request->validated('instance_id'));
 
         $data = new SendPixButtonData(
             phone: $request->validated('phone'),
@@ -181,5 +201,39 @@ class WhatsAppMessageController extends BaseController
             'success' => true,
             'data' => new WhatsAppMessageResource($message),
         ], 202);
+    }
+
+    private function resolveInstanceForView(int $instanceId): WhatsAppInstance
+    {
+        $instance = WhatsAppInstance::findOrFail($instanceId);
+        $this->authorize('view', $instance);
+
+        return $instance;
+    }
+
+    private function resolveInstanceForUpdate(int $instanceId): WhatsAppInstance
+    {
+        $instance = WhatsAppInstance::findOrFail($instanceId);
+        $this->authorize('update', $instance);
+
+        return $instance;
+    }
+
+    private function ensureCanViewModule(Request $request): void
+    {
+        abort_unless(
+            $request->user()?->can('channels.view') || $request->user()?->can('channels.manage'),
+            403,
+        );
+    }
+
+    private function isPlatformAdmin(Request $request): bool
+    {
+        return $request->user()?->hasAnyRole(['super-admin', 'platform-admin']) ?? false;
+    }
+
+    private function currentOrganizationId(Request $request): int
+    {
+        return (int) ($request->user()?->currentOrganization()?->id ?? $request->user()?->current_organization_id ?? 0);
     }
 }

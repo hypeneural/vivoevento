@@ -1,0 +1,78 @@
+﻿@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.header {
+  margin-bottom: 1.5rem;
+
+  :global(.section-title) {
+    margin-top: 1rem;
+    max-width: 16ch;
+  }
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.card {
+  @include surface(rgba(10, 16, 29, 0.82), $border-subtle, 18px);
+  display: grid;
+  gap: 1rem;
+  border-radius: $radius-lg;
+  padding: 1rem;
+}
+
+.featured {
+  border-color: rgba($c-accent, 0.22);
+  box-shadow: $shadow-soft, $shadow-glow;
+}
+
+.badge {
+  justify-self: start;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  background: rgba($c-accent-warm, 0.12);
+  color: $c-accent-warm;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.card h3 {
+  font-size: 1.3rem;
+  letter-spacing: -0.03em;
+}
+
+.audience {
+  color: $c-white-64;
+}
+
+.price {
+  font-family: $font-display;
+  font-size: 1.6rem;
+  letter-spacing: -0.04em;
+}
+
+.features {
+  display: grid;
+  gap: 0.65rem;
+
+  li {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.6rem;
+    color: $c-white-80;
+  }
+
+  svg {
+    color: $c-accent-green;
+  }
+}
+
+@media (min-width: 980px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

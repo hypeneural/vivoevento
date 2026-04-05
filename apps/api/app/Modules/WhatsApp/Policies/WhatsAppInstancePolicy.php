@@ -7,31 +7,40 @@ use App\Modules\WhatsApp\Models\WhatsAppInstance;
 
 class WhatsAppInstancePolicy
 {
-    /**
-     * Instances belong to an organization — user must be a member.
-     */
     public function viewAny(User $user): bool
     {
-        return true; // Scoped by organization in controller
+        return $user->can('channels.view') || $user->can('channels.manage');
     }
 
     public function view(User $user, WhatsAppInstance $instance): bool
     {
-        return $user->current_organization_id === $instance->organization_id;
+        return ($user->can('channels.view') || $user->can('channels.manage'))
+            && $this->withinOrganization($user, $instance);
     }
 
     public function create(User $user): bool
     {
-        return true; // Permission check: whatsapp.manage
+        return $user->can('channels.manage');
     }
 
     public function update(User $user, WhatsAppInstance $instance): bool
     {
-        return $user->current_organization_id === $instance->organization_id;
+        return $user->can('channels.manage')
+            && $this->withinOrganization($user, $instance);
     }
 
     public function delete(User $user, WhatsAppInstance $instance): bool
     {
-        return $user->current_organization_id === $instance->organization_id;
+        return $user->can('channels.manage')
+            && $this->withinOrganization($user, $instance);
+    }
+
+    private function withinOrganization(User $user, WhatsAppInstance $instance): bool
+    {
+        if ($user->hasAnyRole(['super-admin', 'platform-admin'])) {
+            return true;
+        }
+
+        return ($user->currentOrganization()?->id ?? $user->current_organization_id) === $instance->organization_id;
     }
 }

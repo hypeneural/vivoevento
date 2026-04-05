@@ -4,6 +4,7 @@ namespace App\Modules\Organizations\Http\Controllers;
 
 use App\Modules\Organizations\Actions\CreateOrganizationAction;
 use App\Modules\Organizations\Actions\UpdateOrganizationAction;
+use App\Modules\Organizations\Enums\OrganizationType;
 use App\Modules\Organizations\Http\Requests\StoreOrganizationRequest;
 use App\Modules\Organizations\Http\Requests\UpdateOrganizationRequest;
 use App\Modules\Organizations\Http\Resources\OrganizationResource;
@@ -12,7 +13,9 @@ use App\Modules\Organizations\Models\OrganizationMember;
 use App\Shared\Http\BaseController;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Validation\Rule;
 
 class OrganizationController extends BaseController
 {
@@ -145,11 +148,30 @@ class OrganizationController extends BaseController
 
     // ─── Admin CRUD ───────────────────────────────────────
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:180'],
+            'type' => ['nullable', Rule::enum(OrganizationType::class)],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        $like = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+
         $organizations = Organization::query()
+            ->when($validated['search'] ?? null, function ($query, $search) use ($like) {
+                $query->where(function ($builder) use ($search, $like) {
+                    $builder
+                        ->where('trade_name', $like, "%{$search}%")
+                        ->orWhere('legal_name', $like, "%{$search}%")
+                        ->orWhere('slug', $like, "%{$search}%")
+                        ->orWhere('email', $like, "%{$search}%");
+                });
+            })
+            ->when($validated['type'] ?? null, fn ($query, $type) => $query->where('type', $type))
             ->latest()
-            ->paginate(20);
+            ->paginate($validated['per_page'] ?? 20);
 
         return $this->paginated(OrganizationResource::collection($organizations));
     }

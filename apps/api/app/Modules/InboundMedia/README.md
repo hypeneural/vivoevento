@@ -15,8 +15,12 @@ Recepção, normalização e rastreamento de mídia recebida via webhooks.
 ## Rotas
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| POST | /api/v1/webhooks/zapi | Webhook Z-API |
 | POST | /api/v1/webhooks/telegram | Webhook Telegram |
+
+Observacao:
+
+- o webhook Z-API foi migrado para o modulo `WhatsApp`;
+- rota atual: `/api/v1/webhooks/whatsapp/{provider}/{instanceKey}/inbound`.
 
 ## Dependências
 - Channels (resolver evento pelo canal)

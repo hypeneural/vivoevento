@@ -1,0 +1,80 @@
+﻿@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.header {
+  margin-bottom: 1.5rem;
+
+  :global(.section-title) {
+    margin-top: 1rem;
+    max-width: 15ch;
+  }
+}
+
+.table {
+  display: grid;
+  gap: 1rem;
+}
+
+.column {
+  @include surface(rgba(10, 16, 29, 0.82), $border-subtle, 18px);
+  border-radius: $radius-lg;
+  padding: 1rem;
+}
+
+.columnHeader {
+  strong {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.2rem;
+    letter-spacing: -0.03em;
+  }
+
+  span {
+    display: block;
+    margin-top: 0.45rem;
+    color: $c-white-64;
+  }
+}
+
+.rows {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 1rem;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 3.4rem;
+  padding: 0 0.95rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+
+  span:first-child {
+    color: $c-white-80;
+    font-weight: 700;
+  }
+}
+
+.common .row span:last-child {
+  color: $c-white-48;
+}
+
+.premium {
+  border-color: rgba($c-accent, 0.18);
+  box-shadow: $shadow-soft, $shadow-glow;
+}
+
+.premium .columnHeader strong,
+.premium .row span:last-child {
+  color: $c-accent;
+}
+
+@media (min-width: 980px) {
+  .table {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

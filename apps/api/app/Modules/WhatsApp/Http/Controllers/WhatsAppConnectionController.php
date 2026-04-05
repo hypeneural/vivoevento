@@ -2,130 +2,104 @@
 
 namespace App\Modules\WhatsApp\Http\Controllers;
 
-use App\Modules\WhatsApp\Jobs\RefreshQrCodeJob;
+use App\Modules\WhatsApp\Http\Requests\RequestPhoneCodeRequest;
 use App\Modules\WhatsApp\Jobs\SyncInstanceStatusJob;
 use App\Modules\WhatsApp\Models\WhatsAppInstance;
+use App\Modules\WhatsApp\Services\WhatsAppConnectionStateService;
 use App\Modules\WhatsApp\Services\WhatsAppProviderResolver;
 use App\Shared\Http\BaseController;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 
 class WhatsAppConnectionController extends BaseController
 {
     public function __construct(
         private readonly WhatsAppProviderResolver $providerResolver,
+        private readonly WhatsAppConnectionStateService $connectionStateService,
     ) {}
 
-    /**
-     * GET /instances/{instance}/status
-     */
     public function status(WhatsAppInstance $instance): JsonResponse
     {
+        $this->authorize('view', $instance);
+
         $provider = $this->providerResolver->forInstance($instance);
-        $statusData = $provider->getStatus($instance);
+        $status = $provider->getStatus($instance);
 
         return $this->success([
-            'connected' => $statusData->connected,
-            'smartphone_connected' => $statusData->smartphoneConnected,
-            'error' => $statusData->error,
-            'instance_status' => $instance->status->value,
+            'connected' => $status->connected,
+            'smartphone_connected' => $status->smartphoneConnected,
+            'error' => $status->error,
+            'instance_status' => $instance->normalizedStatus()->value,
             'last_sync_at' => $instance->last_status_sync_at?->toISOString(),
         ]);
     }
 
-    /**
-     * GET /instances/{instance}/qr-code
-     */
+    public function connectionState(WhatsAppInstance $instance): JsonResponse
+    {
+        $this->authorize('view', $instance);
+
+        return $this->success($this->connectionStateService->build($instance));
+    }
+
     public function qrCode(WhatsAppInstance $instance): JsonResponse
     {
+        $this->authorize('view', $instance);
+
         $provider = $this->providerResolver->forInstance($instance);
         $qrData = $provider->getQrCode($instance);
 
-        if ($qrData->alreadyConnected) {
-            return $this->success([
-                'already_connected' => true,
-                'qr_code' => null,
-            ]);
-        }
-
         return $this->success([
-            'already_connected' => false,
-            'qr_code' => $qrData->qrCodeBytes,
+            'already_connected' => $qrData->alreadyConnected,
+            'qr_code' => $qrData->payload(),
+            'qr_render_mode' => $qrData->renderMode(),
+            'error' => $qrData->error,
         ]);
     }
 
-    /**
-     * GET /instances/{instance}/qr-code/image
-     *
-     * Also starts the background QR refresh polling.
-     */
     public function qrCodeImage(WhatsAppInstance $instance): JsonResponse
     {
-        // Check cache first (from background polling)
-        $cached = Cache::get("whatsapp:qr:{$instance->id}");
+        $this->authorize('view', $instance);
 
-        if ($cached) {
-            return $this->success([
-                'already_connected' => false,
-                'qr_code_base64' => $cached['image'],
-                'attempt' => $cached['attempt'],
-                'refreshed_at' => $cached['refreshed_at'],
-            ]);
-        }
-
-        // Fetch fresh QR and start background polling
-        $provider = $this->providerResolver->forInstance($instance);
-        $qrData = $provider->getQrCodeImage($instance);
-
-        if ($qrData->alreadyConnected) {
-            return $this->success([
-                'already_connected' => true,
-                'qr_code_base64' => null,
-            ]);
-        }
-
-        // Start background QR refresh
-        RefreshQrCodeJob::dispatch($instance->id, 2)
-            ->delay(now()->addSeconds(config('whatsapp.qr_code.poll_interval_seconds', 15)));
+        $state = $this->connectionStateService->build($instance);
 
         return $this->success([
-            'already_connected' => false,
-            'qr_code_base64' => $qrData->qrCodeBase64Image,
-            'attempt' => 1,
-            'refreshed_at' => now()->toISOString(),
-            'poll_interval_seconds' => config('whatsapp.qr_code.poll_interval_seconds', 15),
-            'max_attempts' => config('whatsapp.qr_code.max_attempts', 3),
+            'already_connected' => $state['connected'],
+            'qr_code' => $state['qr_code'],
+            'qr_render_mode' => $state['qr_render_mode'],
+            'qr_available' => $state['qr_available'],
+            'qr_expires_in_sec' => $state['qr_expires_in_sec'],
+            'qr_error' => $state['qr_error'],
+            'checked_at' => $state['checked_at'],
         ]);
     }
 
-    /**
-     * POST /instances/{instance}/phone-code
-     */
-    public function phoneCode(Request $request, WhatsAppInstance $instance): JsonResponse
+    public function phoneCode(RequestPhoneCodeRequest $request, WhatsAppInstance $instance): JsonResponse
     {
-        $request->validate(['phone' => 'required|string|min:10']);
+        $this->authorize('update', $instance);
 
         $provider = $this->providerResolver->forInstance($instance);
-        $result = $provider->requestPhoneCode($instance, $request->input('phone'));
+        $result = $provider->requestPhoneCode($instance, $request->validated('phone'));
 
         return $this->success([
             'success' => $result->success,
             'message' => $result->message,
+            'raw' => $result->rawResponse,
         ]);
     }
 
-    /**
-     * POST /instances/{instance}/disconnect
-     */
     public function disconnect(WhatsAppInstance $instance): JsonResponse
     {
+        $this->authorize('update', $instance);
+
         $provider = $this->providerResolver->forInstance($instance);
         $result = $provider->disconnect($instance);
 
         if ($result->success) {
             $instance->update([
                 'status' => 'disconnected',
+                'last_status_sync_at' => now(),
+                'last_health_check_at' => now(),
+                'last_health_status' => 'disconnected',
+                'last_error' => null,
                 'disconnected_at' => now(),
             ]);
         }
@@ -136,11 +110,10 @@ class WhatsAppConnectionController extends BaseController
         ]);
     }
 
-    /**
-     * POST /instances/{instance}/sync-status
-     */
     public function syncStatus(WhatsAppInstance $instance): JsonResponse
     {
+        $this->authorize('update', $instance);
+
         SyncInstanceStatusJob::dispatch($instance->id);
 
         return $this->success(['message' => 'Status sync queued']);

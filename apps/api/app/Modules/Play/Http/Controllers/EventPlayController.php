@@ -1,47 +1,70 @@
 <?php
+
 namespace App\Modules\Play\Http\Controllers;
+
+use App\Modules\Events\Models\Event;
+use App\Modules\Play\Http\Requests\UpdateEventPlaySettingsRequest;
+use App\Modules\Play\Http\Resources\EventPlayManagerResource;
 use App\Modules\Play\Models\EventPlaySetting;
+use App\Modules\Play\Services\GameCatalogService;
 use App\Shared\Http\BaseController;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class EventPlayController extends BaseController
 {
-    public function show(int $event): JsonResponse
+    public function manager(Event $event, GameCatalogService $catalog): JsonResponse
     {
-        $settings = EventPlaySetting::firstOrCreate(['event_id' => $event]);
+        $this->authorize('viewPlay', $event);
+
+        $event->load([
+            'playSettings',
+            'playGames.gameType',
+            'playGames.assets.media.variants',
+        ]);
+        $event->loadCount(['playGames', 'playGames as active_play_games_count' => fn ($query) => $query->where('is_active', true)]);
+
+        return $this->success(new EventPlayManagerResource($event, $catalog->catalog()));
+    }
+
+    public function show(Event $event): JsonResponse
+    {
+        $this->authorize('viewPlay', $event);
+
+        $settings = EventPlaySetting::firstOrCreate(['event_id' => $event->id]);
+
         return $this->success($settings);
     }
 
-    public function update(Request $request, int $event): JsonResponse
+    public function update(UpdateEventPlaySettingsRequest $request, Event $event): JsonResponse
     {
-        $settings = EventPlaySetting::firstOrCreate(['event_id' => $event]);
-        $settings->update($request->all());
+        $this->authorize('managePlay', $event);
+
+        $settings = EventPlaySetting::firstOrCreate(['event_id' => $event->id]);
+        $settings->update($request->validated());
+
         return $this->success($settings->fresh());
     }
 
-    public function generateMemory(int $event): JsonResponse
+    public function generateMemory(Event $event): JsonResponse
     {
-        $settings = EventPlaySetting::firstOrCreate(['event_id' => $event]);
+        $this->authorize('managePlay', $event);
 
-        // TODO: dispatch job to generate memory card images from approved media
-        // GenerateMemoryAssetsJob::dispatch($event, $settings->memory_card_count);
+        $settings = EventPlaySetting::firstOrCreate(['event_id' => $event->id]);
 
         return $this->success([
-            'message' => 'Geração do jogo da memória iniciada',
+            'message' => 'Estrutura de geracao de assets do memory pronta para receber job dedicado.',
             'card_count' => $settings->memory_card_count,
         ]);
     }
 
-    public function generatePuzzle(int $event): JsonResponse
+    public function generatePuzzle(Event $event): JsonResponse
     {
-        $settings = EventPlaySetting::firstOrCreate(['event_id' => $event]);
+        $this->authorize('managePlay', $event);
 
-        // TODO: dispatch job to generate puzzle pieces from featured media
-        // GeneratePuzzleAssetsJob::dispatch($event, $settings->puzzle_piece_count);
+        $settings = EventPlaySetting::firstOrCreate(['event_id' => $event->id]);
 
         return $this->success([
-            'message' => 'Geração do puzzle iniciada',
+            'message' => 'Estrutura de geracao de assets do puzzle pronta para receber job dedicado.',
             'piece_count' => $settings->puzzle_piece_count,
         ]);
     }

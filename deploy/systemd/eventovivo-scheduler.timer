@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Eventovivo Scheduler every minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+Persistent=true
+Unit=eventovivo-scheduler.service
+
+[Install]
+WantedBy=timers.target

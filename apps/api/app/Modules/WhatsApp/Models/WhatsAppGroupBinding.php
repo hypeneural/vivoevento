@@ -12,6 +12,8 @@ class WhatsAppGroupBinding extends Model
 {
     use HasFactory, HasOrganization;
 
+    protected $table = 'whatsapp_group_bindings';
+
     protected $fillable = [
         'organization_id',
         'event_id',

@@ -2,54 +2,106 @@
 
 namespace App\Modules\Hub\Http\Controllers;
 
+use App\Modules\Analytics\Services\AnalyticsTracker;
+use App\Modules\Hub\Actions\TrackPublicHubButtonClickAction;
 use App\Modules\Events\Models\Event;
+use App\Modules\Hub\Http\Requests\TrackPublicHubClickRequest;
+use App\Modules\Hub\Http\Resources\PublicHubResource;
 use App\Modules\Hub\Models\EventHubSetting;
+use App\Modules\Hub\Support\HubPayloadFactory;
 use App\Shared\Http\BaseController;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class PublicHubController extends BaseController
 {
-    public function index(string $event): JsonResponse
+    public function index(
+        Request $request,
+        string $event,
+        HubPayloadFactory $payloads,
+        AnalyticsTracker $analytics,
+    ): JsonResponse
+    {
+        [$eventModel, $settings] = $this->resolvePublicHubOrFail($event, $payloads);
+
+        $analytics->trackEvent(
+            $eventModel,
+            'hub.page_view',
+            $request,
+            ['surface' => 'hub'],
+            channel: 'hub',
+        );
+
+        return $this->success(
+            (new PublicHubResource($settings, $eventModel))->resolve(),
+        );
+    }
+
+    public function click(
+        TrackPublicHubClickRequest $request,
+        string $event,
+        HubPayloadFactory $payloads,
+        TrackPublicHubButtonClickAction $action,
+    ): JsonResponse {
+        [$eventModel, $settings] = $this->resolvePublicHub($event, $payloads);
+
+        if (! $eventModel || ! $settings) {
+            return $this->noContent();
+        }
+
+        $buttons = $payloads->clickTargets($eventModel, $settings);
+
+        $action->execute(
+            $eventModel,
+            $request,
+            is_array($buttons) ? $buttons : [],
+            $request->validated('button_id'),
+        );
+
+        return $this->noContent();
+    }
+
+    /**
+     * @return array{0: Event, 1: EventHubSetting}
+     */
+    private function resolvePublicHubOrFail(string $slug, HubPayloadFactory $payloads): array
     {
         $eventModel = Event::with(['modules', 'wallSettings'])
-            ->where('slug', $event)
+            ->where('slug', $slug)
             ->firstOrFail();
 
-        $settings = EventHubSetting::firstOrCreate(['event_id' => $eventModel->id]);
+        if (! $eventModel->isModuleEnabled('hub')) {
+            abort(404, 'Hub publico indisponivel para este evento.');
+        }
 
-        $liveEnabled = $eventModel->isActive() && $eventModel->isModuleEnabled('live');
-        $wallEnabled = $eventModel->isActive()
-            && $eventModel->isModuleEnabled('wall')
-            && $eventModel->wallSettings?->isAvailable();
+        $settings = $payloads->ensureSettings($eventModel);
 
-        return $this->success([
-            'event' => [
-                'id' => $eventModel->id,
-                'title' => $eventModel->title,
-                'slug' => $eventModel->slug,
-                'cover_image_path' => $eventModel->cover_image_path,
-            ],
-            'settings' => $settings,
-            'modules' => [
-                'live' => $eventModel->isModuleEnabled('live'),
-                'wall' => $eventModel->isModuleEnabled('wall'),
-                'play' => $eventModel->isModuleEnabled('play'),
-                'hub' => $eventModel->isModuleEnabled('hub'),
-            ],
-            'links' => [
-                'upload_url' => $settings->show_upload_button && $liveEnabled
-                    ? $eventModel->publicUploadUrl()
-                    : null,
-                'upload_api_url' => $settings->show_upload_button && $liveEnabled
-                    ? $eventModel->publicUploadApiUrl()
-                    : null,
-                'gallery_url' => $settings->show_gallery_button
-                    ? url("/api/v1/public/events/{$eventModel->slug}/gallery")
-                    : null,
-                'wall_url' => $settings->show_wall_button && $wallEnabled
-                    ? $eventModel->wallSettings?->publicUrl()
-                    : null,
-            ],
-        ]);
+        if (! $settings->is_enabled) {
+            abort(404, 'Hub publico indisponivel para este evento.');
+        }
+
+        return [$eventModel, $settings];
+    }
+
+    /**
+     * @return array{0: Event|null, 1: EventHubSetting|null}
+     */
+    private function resolvePublicHub(string $slug, HubPayloadFactory $payloads): array
+    {
+        $eventModel = Event::with(['modules', 'wallSettings'])
+            ->where('slug', $slug)
+            ->first();
+
+        if (! $eventModel || ! $eventModel->isModuleEnabled('hub')) {
+            return [null, null];
+        }
+
+        $settings = $payloads->ensureSettings($eventModel);
+
+        if (! $settings->is_enabled) {
+            return [null, null];
+        }
+
+        return [$eventModel, $settings];
     }
 }

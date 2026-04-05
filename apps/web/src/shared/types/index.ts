@@ -76,8 +76,18 @@ export interface Organization {
 
 // ─── Events ────────────────────────────────────────────────
 
-export type EventStatus = 'draft' | 'active' | 'paused' | 'finished' | 'archived';
-export type EventType = 'wedding' | 'corporate' | 'birthday' | 'conference' | 'party' | 'festival' | 'other';
+export type EventStatus = 'draft' | 'scheduled' | 'active' | 'paused' | 'ended' | 'finished' | 'archived';
+export type EventType =
+  | 'wedding'
+  | 'corporate'
+  | 'birthday'
+  | 'fifteen'
+  | 'fair'
+  | 'graduation'
+  | 'conference'
+  | 'party'
+  | 'festival'
+  | 'other';
 
 export interface EventItem {
   id: string;
@@ -203,8 +213,10 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 
 export const EVENT_STATUS_LABELS: Record<EventStatus, string> = {
   draft: 'Rascunho',
+  scheduled: 'Agendado',
   active: 'Ativo',
   paused: 'Pausado',
+  ended: 'Encerrado',
   finished: 'Encerrado',
   archived: 'Arquivado',
 };
@@ -231,6 +243,9 @@ export const EVENT_TYPE_LABELS: Record<EventType, string> = {
   wedding: 'Casamento',
   corporate: 'Corporativo',
   birthday: 'Aniversário',
+  fifteen: '15 Anos',
+  fair: 'Feira',
+  graduation: 'Formatura',
   conference: 'Conferência',
   party: 'Festa',
   festival: 'Festival',

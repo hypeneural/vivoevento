@@ -14,13 +14,19 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('auth')->group(function () {
     // Public
     Route::post('login', [LoginController::class, 'login']);
+    Route::post('register/request-otp', [LoginController::class, 'requestRegisterOtp']);
+    Route::post('register/resend-otp', [LoginController::class, 'resendRegisterOtp']);
+    Route::post('register/verify-otp', [LoginController::class, 'verifyRegisterOtp']);
     Route::post('forgot-password', [LoginController::class, 'forgotPassword']);
+    Route::post('forgot-password/resend-otp', [LoginController::class, 'resendForgotPasswordOtp']);
+    Route::post('forgot-password/verify-otp', [LoginController::class, 'verifyForgotPasswordOtp']);
     Route::post('reset-password', [LoginController::class, 'resetPassword']);
 
     // Authenticated
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('me', [MeController::class, 'show']);
         Route::patch('me', [MeController::class, 'update']);
+        Route::patch('me/password', [MeController::class, 'updatePassword']);
         Route::post('me/avatar', [MeController::class, 'uploadAvatar']);
         Route::delete('me/avatar', [MeController::class, 'deleteAvatar']);
         Route::post('logout', [LoginController::class, 'logout']);

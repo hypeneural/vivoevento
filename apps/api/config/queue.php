@@ -68,9 +68,14 @@ return [
             'driver' => 'redis',
             'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
             'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
-            'block_for' => null,
-            'after_commit' => false,
+            /*
+             * retry_after is scoped to the Redis queue connection, not to the
+             * logical queue name. Keep it above the slowest worker timeout
+             * served by this connection until the topology is split.
+             */
+            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 240),
+            'block_for' => (int) env('REDIS_QUEUE_BLOCK_FOR', 5),
+            'after_commit' => filter_var(env('REDIS_QUEUE_AFTER_COMMIT', true), FILTER_VALIDATE_BOOL),
         ],
 
         'deferred' => [

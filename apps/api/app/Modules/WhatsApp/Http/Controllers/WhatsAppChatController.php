@@ -3,6 +3,8 @@
 namespace App\Modules\WhatsApp\Http\Controllers;
 
 use App\Modules\WhatsApp\Clients\DTOs\ModifyChatData;
+use App\Modules\WhatsApp\Http\Requests\FindChatMessagesRequest;
+use App\Modules\WhatsApp\Http\Resources\WhatsAppRemoteMessageResource;
 use App\Modules\WhatsApp\Models\WhatsAppInstance;
 use App\Modules\WhatsApp\Services\WhatsAppProviderResolver;
 use App\Shared\Http\BaseController;
@@ -28,6 +30,7 @@ class WhatsAppChatController extends BaseController
         ]);
 
         $instance = WhatsAppInstance::findOrFail($request->input('instance_id'));
+        $this->authorize('view', $instance);
         $provider = $this->providerResolver->forInstance($instance);
 
         $result = $provider->getChats(
@@ -60,6 +63,7 @@ class WhatsAppChatController extends BaseController
         ]);
 
         $instance = WhatsAppInstance::findOrFail($request->input('instance_id'));
+        $this->authorize('update', $instance);
         $provider = $this->providerResolver->forInstance($instance);
 
         $result = $provider->modifyChat($instance, new ModifyChatData(
@@ -68,5 +72,35 @@ class WhatsAppChatController extends BaseController
         ));
 
         return $this->success(['success' => $result->success]);
+    }
+
+    /**
+     * POST /whatsapp/chats/find-messages
+     * Search remote provider messages within a chat.
+     */
+    public function findMessages(FindChatMessagesRequest $request): JsonResponse
+    {
+        $instance = WhatsAppInstance::findOrFail($request->validated('instance_id'));
+        $this->authorize('view', $instance);
+
+        $provider = $this->providerResolver->forInstance($instance);
+        $result = $provider->findMessages(
+            $instance,
+            $request->validated('remote_jid'),
+            array_filter([
+                'limit' => $request->validated('limit'),
+                'before_message_id' => $request->validated('before_message_id'),
+                'from_me' => $request->validated('from_me'),
+            ], static fn ($value) => $value !== null),
+        );
+
+        if (! $result->success) {
+            return $this->error($result->error ?? 'Failed to fetch messages', 422);
+        }
+
+        return $this->success([
+            'remote_jid' => $result->remoteJid,
+            'messages' => WhatsAppRemoteMessageResource::collection(collect($result->messages))->resolve(),
+        ]);
     }
 }

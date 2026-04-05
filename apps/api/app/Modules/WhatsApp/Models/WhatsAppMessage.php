@@ -14,6 +14,8 @@ class WhatsAppMessage extends Model
 {
     use HasFactory;
 
+    protected $table = 'whatsapp_messages';
+
     protected $fillable = [
         'instance_id',
         'chat_id',

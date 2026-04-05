@@ -15,13 +15,13 @@ class EventStatusController extends BaseController
     {
         $event = $action->execute($event);
 
-        return $this->success(new EventResource($event), 'Event published');
+        return $this->success(new EventResource($event));
     }
 
     public function archive(Event $event, ArchiveEventAction $action): JsonResponse
     {
         $event = $action->execute($event);
 
-        return $this->success(new EventResource($event), 'Event archived');
+        return $this->success(new EventResource($event));
     }
 }

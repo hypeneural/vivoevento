@@ -1,0 +1,80 @@
+﻿@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.header {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+
+  :global(.section-title) {
+    margin-top: 1rem;
+    max-width: 14ch;
+  }
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.card {
+  @include surface(rgba(10, 16, 29, 0.8), $border-subtle, 18px);
+  display: grid;
+  gap: 0.8rem;
+  border-radius: $radius-md;
+  padding: 1rem;
+
+  h3 {
+    font-size: 1.08rem;
+    letter-spacing: -0.03em;
+  }
+
+  p {
+    color: $c-white-64;
+    font-size: 0.95rem;
+  }
+}
+
+.iconWrap {
+  @include flex-center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+  background: rgba($c-accent, 0.1);
+  border: 1px solid rgba($c-accent, 0.2);
+  color: $c-accent;
+}
+
+.banner {
+  @include surface(rgba(10, 16, 29, 0.84), $border-strong, 18px);
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 1rem;
+  border-radius: $radius-md;
+  padding: 1rem;
+
+  strong {
+    font-size: 1rem;
+    letter-spacing: -0.03em;
+  }
+
+  span {
+    color: $c-white-64;
+  }
+}
+
+@media (min-width: 980px) {
+  .header {
+    grid-template-columns: 1fr 0.9fr;
+    align-items: end;
+  }
+
+  .grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .banner {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+}

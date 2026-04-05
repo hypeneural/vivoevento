@@ -1,12 +1,21 @@
-# Evento Vivo — Shared Types
+# Evento Vivo - Shared Types
 
-Este pacote contém tipos compartilhados entre aplicações.
+Este pacote contem tipos TypeScript compartilhados entre as aplicacoes do monorepo.
 
-## Estrutura Futura
+## Estrutura
 
-```
+```text
 shared-types/
-├── enums/            # Enums compartilhados
-├── models/           # Interfaces de model
-└── api/              # Types de API
+├── src/
+│   ├── index.ts
+│   └── wall.ts
+└── README.md
 ```
+
+## Contratos Atuais
+
+- `wall.ts`
+  - payloads HTTP do player publico
+  - payloads dos eventos realtime
+  - nomes canonicos dos eventos do telao
+  - status publicos, incluindo `disabled`

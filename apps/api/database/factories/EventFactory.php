@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Modules\Events\Enums\EventCommercialMode;
 use App\Modules\Events\Enums\EventStatus;
 use App\Modules\Events\Enums\EventType;
 use App\Modules\Events\Models\Event;
@@ -23,11 +24,14 @@ class EventFactory extends Factory
             'event_type' => fake()->randomElement(EventType::cases())->value,
             'status' => EventStatus::Draft->value,
             'visibility' => 'public',
+            'moderation_mode' => 'manual',
             'starts_at' => now()->addDays(rand(1, 30)),
             'ends_at' => now()->addDays(rand(31, 60)),
             'location_name' => fake()->city(),
             'description' => fake()->paragraph(),
             'retention_days' => 30,
+            'commercial_mode' => EventCommercialMode::None->value,
+            'current_entitlements_json' => null,
         ];
     }
 
@@ -44,5 +48,20 @@ class EventFactory extends Factory
     public function archived(): static
     {
         return $this->state(fn () => ['status' => EventStatus::Archived->value]);
+    }
+
+    public function noModeration(): static
+    {
+        return $this->state(fn () => ['moderation_mode' => 'none']);
+    }
+
+    public function manualModeration(): static
+    {
+        return $this->state(fn () => ['moderation_mode' => 'manual']);
+    }
+
+    public function aiModeration(): static
+    {
+        return $this->state(fn () => ['moderation_mode' => 'ai']);
     }
 }

@@ -30,6 +30,7 @@ it('has all expected event types', function () {
 it('has all expected organization types', function () {
     $cases = OrganizationType::cases();
     expect($cases)->not->toBeEmpty();
+    expect(collect($cases)->pluck('value')->all())->toContain('direct_customer');
 
     // All values should be strings
     foreach ($cases as $case) {

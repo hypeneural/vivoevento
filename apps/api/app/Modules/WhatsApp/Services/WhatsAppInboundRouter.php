@@ -12,6 +12,7 @@ use App\Modules\WhatsApp\Models\WhatsAppChat;
 use App\Modules\WhatsApp\Models\WhatsAppGroupBinding;
 use App\Modules\WhatsApp\Models\WhatsAppInstance;
 use App\Modules\WhatsApp\Models\WhatsAppMessage;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -35,10 +36,7 @@ class WhatsAppInboundRouter
         $chat = $this->findOrCreateChat($instance, $normalized);
 
         // 2. Deduplication by provider_message_id
-        $existing = WhatsAppMessage::where('instance_id', $instance->id)
-            ->where('provider_message_id', $normalized->messageId)
-            ->where('direction', MessageDirection::Inbound)
-            ->first();
+        $existing = $this->findExistingInboundMessage($instance, $normalized);
 
         if ($existing) {
             Log::channel('whatsapp')->info('Duplicate inbound message ignored', [
@@ -49,20 +47,40 @@ class WhatsAppInboundRouter
         }
 
         // 3. Create message record
-        $message = WhatsAppMessage::create([
-            'instance_id' => $instance->id,
-            'chat_id' => $chat->id,
-            'direction' => MessageDirection::Inbound,
-            'provider_message_id' => $normalized->messageId,
-            'type' => $normalized->messageType,
-            'text_body' => $normalized->text,
-            'media_url' => $normalized->mediaUrl,
-            'mime_type' => $normalized->mimeType,
-            'status' => MessageStatus::Received,
-            'sender_phone' => $normalized->senderPhone,
-            'normalized_payload_json' => $normalized->rawPayload,
-            'received_at' => $normalized->occurredAt,
-        ]);
+        try {
+            $message = WhatsAppMessage::create([
+                'instance_id' => $instance->id,
+                'chat_id' => $chat->id,
+                'direction' => MessageDirection::Inbound,
+                'provider_message_id' => $normalized->messageId,
+                'type' => $normalized->messageType,
+                'text_body' => $normalized->text,
+                'media_url' => $normalized->mediaUrl,
+                'mime_type' => $normalized->mimeType,
+                'status' => MessageStatus::Received,
+                'sender_phone' => $normalized->senderPhone,
+                'payload_json' => $normalized->rawPayload,
+                'normalized_payload_json' => $normalized->toArray(),
+                'received_at' => $normalized->occurredAt,
+            ]);
+        } catch (QueryException $exception) {
+            if (! $this->isDuplicateInboundMessageException($exception)) {
+                throw $exception;
+            }
+
+            $existing = $this->findExistingInboundMessage($instance, $normalized);
+
+            if ($existing) {
+                Log::channel('whatsapp')->warning('Concurrent duplicate inbound message resolved from unique constraint', [
+                    'instance_id' => $instance->id,
+                    'message_id' => $normalized->messageId,
+                ]);
+
+                return $existing;
+            }
+
+            throw $exception;
+        }
 
         // 4. Update chat last_message_at
         $chat->update(['last_message_at' => $normalized->occurredAt]);
@@ -86,19 +104,49 @@ class WhatsAppInboundRouter
      */
     private function findOrCreateChat(WhatsAppInstance $instance, NormalizedInboundMessageData $normalized): WhatsAppChat
     {
-        return WhatsAppChat::firstOrCreate(
+        $chat = WhatsAppChat::firstOrCreate(
             [
                 'instance_id' => $instance->id,
                 'external_chat_id' => $normalized->chatId,
             ],
             [
                 'type' => $normalized->isFromGroup() ? ChatType::Group : ChatType::Private,
-                'phone' => $normalized->senderPhone,
+                'phone' => $normalized->isFromGroup() ? null : $normalized->senderPhone,
                 'group_id' => $normalized->groupId,
-                'display_name' => $normalized->senderName,
+                'display_name' => $normalized->chatDisplayName(),
                 'is_group' => $normalized->isFromGroup(),
             ]
         );
+
+        $updates = [];
+
+        if ($normalized->isFromGroup()) {
+            if ($chat->group_id !== $normalized->groupId) {
+                $updates['group_id'] = $normalized->groupId;
+            }
+
+            if ($chat->phone !== null) {
+                $updates['phone'] = null;
+            }
+
+            if ($normalized->chatDisplayName() && $chat->display_name !== $normalized->chatDisplayName()) {
+                $updates['display_name'] = $normalized->chatDisplayName();
+            }
+        } else {
+            if ($normalized->senderPhone && $chat->phone !== $normalized->senderPhone) {
+                $updates['phone'] = $normalized->senderPhone;
+            }
+
+            if ($normalized->chatDisplayName() && $chat->display_name !== $normalized->chatDisplayName()) {
+                $updates['display_name'] = $normalized->chatDisplayName();
+            }
+        }
+
+        if ($updates !== []) {
+            $chat->update($updates);
+        }
+
+        return $chat;
     }
 
     /**
@@ -114,5 +162,25 @@ class WhatsAppInboundRouter
             ->where('group_external_id', $normalized->groupId)
             ->where('is_active', true)
             ->first();
+    }
+
+    private function findExistingInboundMessage(
+        WhatsAppInstance $instance,
+        NormalizedInboundMessageData $normalized,
+    ): ?WhatsAppMessage {
+        return WhatsAppMessage::where('instance_id', $instance->id)
+            ->where('provider_message_id', $normalized->messageId)
+            ->where('direction', MessageDirection::Inbound)
+            ->first();
+    }
+
+    private function isDuplicateInboundMessageException(QueryException $exception): bool
+    {
+        $sqlState = $exception->errorInfo[0] ?? null;
+        $message = strtolower($exception->getMessage());
+
+        return in_array($sqlState, ['23000', '23505'], true)
+            || str_contains($message, 'wa_messages_instance_direction_provider_message_unique')
+            || str_contains($message, 'whatsapp_messages.instance_id, whatsapp_messages.direction, whatsapp_messages.provider_message_id');
     }
 }

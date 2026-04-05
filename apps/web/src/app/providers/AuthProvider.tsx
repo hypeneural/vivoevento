@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
-import type { MeResponse, MeUser, MeOrganization, MeAccess, MeSubscription, LoginPayload } from '@/lib/api-types';
+import type { MeResponse, MeUser, MeOrganization, MeAccess, MeSubscription, MeResolvedEntitlements, LoginPayload } from '@/lib/api-types';
 import { authService, clearSession } from '@/modules/auth/services/auth.service';
 import { mockUsers } from '@/shared/mock/data';
 
@@ -11,6 +11,7 @@ interface AuthContextType {
   meOrganization: MeOrganization | null;
   meAccess: MeAccess | null;
   meSubscription: MeSubscription | null;
+  meEntitlements: MeResolvedEntitlements | null;
 
   // Convenience
   isAuthenticated: boolean;
@@ -136,6 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     meOrganization: session?.organization ?? null,
     meAccess: session?.access ?? null,
     meSubscription: session?.subscription ?? null,
+    meEntitlements: session?.access.entitlements ?? null,
     isAuthenticated: !!session,
     isLoading,
     login,

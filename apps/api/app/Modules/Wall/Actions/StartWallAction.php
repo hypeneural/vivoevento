@@ -2,15 +2,18 @@
 
 namespace App\Modules\Wall\Actions;
 
+use App\Modules\Events\Models\Event;
 use App\Modules\Wall\Enums\WallStatus;
 use App\Modules\Wall\Models\EventWallSetting;
 use App\Modules\Wall\Services\WallBroadcasterService;
+use App\Modules\Wall\Services\WallEventGuardService;
 use RuntimeException;
 
 class StartWallAction
 {
     public function __construct(
         private readonly WallBroadcasterService $broadcaster,
+        private readonly WallEventGuardService $guard,
     ) {}
 
     /**
@@ -18,8 +21,12 @@ class StartWallAction
      */
     public function execute(int $eventId): EventWallSetting
     {
+        $event = Event::query()->with('modules')->findOrFail($eventId);
+
+        $this->guard->ensureCanStart($event);
+
         $settings = EventWallSetting::firstOrCreate(
-            ['event_id' => $eventId],
+            ['event_id' => $event->id],
         );
 
         $currentStatus = $settings->status;

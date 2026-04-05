@@ -1,0 +1,5 @@
+# Allow the deploy user to recycle only the services touched by deploy.sh and rollback.sh.
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl reload nginx
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl reload php8.3-fpm
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart eventovivo-horizon
+deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart eventovivo-reverb

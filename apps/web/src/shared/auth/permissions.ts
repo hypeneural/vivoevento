@@ -15,6 +15,10 @@ export const PERMISSIONS = {
   EVENTS_CREATE: 'events.create',
   EVENTS_UPDATE: 'events.update',
 
+  // Channels / WhatsApp
+  CHANNELS_VIEW: 'channels.view',
+  CHANNELS_MANAGE: 'channels.manage',
+
   // Media
   MEDIA_VIEW: 'media.view',
   MEDIA_MODERATE: 'media.moderate',
@@ -34,6 +38,7 @@ export const PERMISSIONS = {
   // Billing
   PLANS_VIEW: 'plans.view',
   BILLING_MANAGE: 'billing.manage',
+  BILLING_MANAGE_SUBSCRIPTION: 'billing.manage_subscription',
 
   // Admin
   ANALYTICS_VIEW: 'analytics.view',
@@ -61,6 +66,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, Permission[]> = {
 
   partner_owner: [
     'dashboard.view', 'events.view', 'events.create', 'events.update',
+    'channels.view', 'channels.manage',
     'media.view', 'media.moderate', 'gallery.manage', 'wall.manage',
     'play.manage', 'hub.manage', 'clients.view', 'clients.manage',
     'plans.view', 'analytics.view', 'settings.manage', 'branding.manage',
@@ -69,18 +75,19 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, Permission[]> = {
 
   partner_manager: [
     'dashboard.view', 'events.view', 'events.create', 'events.update',
+    'channels.view', 'channels.manage',
     'media.view', 'media.moderate', 'gallery.manage', 'wall.manage',
     'play.manage', 'hub.manage', 'analytics.view', 'settings.manage',
     'team.manage',
   ],
 
   event_operator: [
-    'dashboard.view', 'events.view', 'media.view', 'media.moderate',
+    'dashboard.view', 'events.view', 'channels.view', 'media.view', 'media.moderate',
     'gallery.manage', 'wall.manage', 'play.manage',
   ],
 
   financial: [
-    'dashboard.view', 'plans.view', 'billing.manage', 'analytics.view',
+    'dashboard.view', 'plans.view', 'billing.manage', 'billing.manage_subscription', 'analytics.view',
   ],
 
   partner: [
@@ -89,7 +96,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
 
   viewer: [
-    'dashboard.view', 'events.view', 'gallery.manage',
+    'dashboard.view', 'events.view', 'channels.view', 'gallery.manage',
   ],
 };
 

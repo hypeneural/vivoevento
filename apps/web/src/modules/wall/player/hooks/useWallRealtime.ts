@@ -6,12 +6,14 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { WALL_EVENT_NAMES } from '@eventovivo/shared-types/wall';
 import { createWallPusher, disconnectWallPusher } from '../pusher';
 import type {
   WallConnectionStatus,
   WallExpiredPayload,
   WallMediaItem,
   WallMediaDeletedPayload,
+  WallPlayerCommandPayload,
   WallSettings,
   WallStatusChangedPayload,
 } from '../types';
@@ -24,6 +26,7 @@ interface UseWallRealtimeOptions {
   onSettingsUpdated: (payload: WallSettings) => void;
   onStatusChanged: (payload: WallStatusChangedPayload) => void;
   onExpired: (payload: WallExpiredPayload) => void;
+  onPlayerCommand: (payload: WallPlayerCommandPayload) => void;
 }
 
 export function useWallRealtime({
@@ -34,6 +37,7 @@ export function useWallRealtime({
   onSettingsUpdated,
   onStatusChanged,
   onExpired,
+  onPlayerCommand,
 }: UseWallRealtimeOptions) {
   const [connectionStatus, setConnectionStatus] = useState<WallConnectionStatus>('idle');
 
@@ -45,6 +49,7 @@ export function useWallRealtime({
     onSettingsUpdated,
     onStatusChanged,
     onExpired,
+    onPlayerCommand,
   });
 
   useEffect(() => {
@@ -55,6 +60,7 @@ export function useWallRealtime({
       onSettingsUpdated,
       onStatusChanged,
       onExpired,
+      onPlayerCommand,
     };
   });
 
@@ -92,28 +98,32 @@ export function useWallRealtime({
     const channel = pusher.subscribe(channelName);
 
     // Bind broadcast events (prefixed with . for custom event names)
-    channel.bind('wall.media.published', (data: WallMediaItem) => {
+    channel.bind(WALL_EVENT_NAMES.mediaPublished, (data: WallMediaItem) => {
       callbacksRef.current.onNewMedia(data);
     });
 
-    channel.bind('wall.media.updated', (data: WallMediaItem) => {
+    channel.bind(WALL_EVENT_NAMES.mediaUpdated, (data: WallMediaItem) => {
       callbacksRef.current.onMediaUpdated(data);
     });
 
-    channel.bind('wall.media.deleted', (data: WallMediaDeletedPayload) => {
+    channel.bind(WALL_EVENT_NAMES.mediaDeleted, (data: WallMediaDeletedPayload) => {
       callbacksRef.current.onMediaDeleted(data);
     });
 
-    channel.bind('wall.settings.updated', (data: WallSettings) => {
+    channel.bind(WALL_EVENT_NAMES.settingsUpdated, (data: WallSettings) => {
       callbacksRef.current.onSettingsUpdated(data);
     });
 
-    channel.bind('wall.status.changed', (data: WallStatusChangedPayload) => {
+    channel.bind(WALL_EVENT_NAMES.statusChanged, (data: WallStatusChangedPayload) => {
       callbacksRef.current.onStatusChanged(data);
     });
 
-    channel.bind('wall.expired', (data: WallExpiredPayload) => {
+    channel.bind(WALL_EVENT_NAMES.expired, (data: WallExpiredPayload) => {
       callbacksRef.current.onExpired(data);
+    });
+
+    channel.bind(WALL_EVENT_NAMES.playerCommand, (data: WallPlayerCommandPayload) => {
+      callbacksRef.current.onPlayerCommand(data);
     });
 
     return () => {

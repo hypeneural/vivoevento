@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Modules\Wall\Enums\WallLayout;
+use App\Modules\Wall\Enums\WallEventPhase;
 use App\Modules\Wall\Enums\WallStatus;
 use App\Modules\Wall\Enums\WallTransition;
 use App\Modules\Wall\Models\EventWallSetting;
@@ -23,6 +24,7 @@ class EventWallSettingFactory extends Factory
             'transition_effect' => WallTransition::Fade->value,
             'interval_ms' => 8000,
             'queue_limit' => 100,
+            'event_phase' => WallEventPhase::Flow->value,
             'show_qr' => true,
             'show_branding' => true,
             'show_neon' => false,

@@ -31,6 +31,7 @@ class StoreEventRequest extends FormRequest
             'branding' => ['nullable', 'array'],
             'branding.primary_color' => ['nullable', 'string', 'max:20'],
             'branding.secondary_color' => ['nullable', 'string', 'max:20'],
+            'branding.cover_image_path' => ['nullable', 'string', 'max:255'],
             'branding.cover_media_id' => ['nullable', 'integer'],
             'branding.logo_path' => ['nullable', 'string', 'max:255'],
 
@@ -44,8 +45,13 @@ class StoreEventRequest extends FormRequest
             // Privacy & moderation (inline)
             'privacy' => ['nullable', 'array'],
             'privacy.visibility' => ['nullable', 'string', 'in:public,private,unlisted'],
-            'privacy.moderation_mode' => ['nullable', 'string', 'in:manual,auto'],
+            'privacy.moderation_mode' => ['nullable', 'string', 'in:none,manual,ai'],
             'privacy.retention_days' => ['nullable', 'integer', 'min:1', 'max:365'],
+
+            'face_search' => ['nullable', 'array'],
+            'face_search.enabled' => ['nullable', 'boolean'],
+            'face_search.allow_public_selfie_search' => ['nullable', 'boolean'],
+            'face_search.selfie_retention_hours' => ['nullable', 'integer', 'min:1', 'max:720'],
         ];
     }
 }

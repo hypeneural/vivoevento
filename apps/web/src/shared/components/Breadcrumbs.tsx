@@ -11,12 +11,14 @@ const routeLabels: Record<string, string> = {
   'wall': 'Wall',
   'play': 'Play',
   'hub': 'Hub',
+  'whatsapp': 'WhatsApp',
   'partners': 'Parceiros',
   'clients': 'Clientes',
   'plans': 'Planos & Billing',
   'analytics': 'Analytics',
   'audit': 'Auditoria',
   'settings': 'Configurações',
+  'settings/whatsapp': 'WhatsApp',
 };
 
 export function Breadcrumbs() {

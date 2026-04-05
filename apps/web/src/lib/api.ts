@@ -33,6 +33,13 @@ export interface ApiValidationErrors {
   [field: string]: string[];
 }
 
+export interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  meta?: Record<string, unknown>;
+  message?: string;
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -103,7 +110,7 @@ function buildHeaders(custom?: HeadersInit): Headers {
   return headers;
 }
 
-async function handleResponse<T>(response: Response): Promise<T> {
+async function handleResponse<T>(response: Response, unwrapData = true): Promise<T> {
   // Handle 204 No Content
   if (response.status === 204) {
     return undefined as T;
@@ -134,7 +141,24 @@ async function handleResponse<T>(response: Response): Promise<T> {
   }
 
   const json = await response.json();
-  // Laravel wraps in { data: ... }
+  if (!unwrapData) {
+    return json as T;
+  }
+
+  if (
+    json?.data !== undefined &&
+    json?.meta &&
+    typeof json.meta === 'object' &&
+    'page' in json.meta &&
+    'last_page' in json.meta
+  ) {
+    return {
+      data: json.data,
+      meta: json.meta,
+    } as T;
+  }
+
+  // Laravel wraps regular responses in { data: ... }
   return json.data !== undefined ? json.data : json;
 }
 
@@ -149,6 +173,16 @@ export const api = {
       body: undefined,
     });
     return handleResponse<T>(response);
+  },
+
+  async getRaw<T = any>(path: string, options?: RequestOptions): Promise<T> {
+    const response = await fetch(buildUrl(path, options?.params), {
+      method: 'GET',
+      headers: buildHeaders(options?.headers),
+      ...options,
+      body: undefined,
+    });
+    return handleResponse<T>(response, false);
   },
 
   async post<T = any>(path: string, options?: RequestOptions): Promise<T> {

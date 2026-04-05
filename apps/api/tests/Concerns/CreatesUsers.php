@@ -134,4 +134,29 @@ trait CreatesUsers
 
         return [$user, $organization];
     }
+
+    /**
+     * Create a super-admin with an active organization membership.
+     */
+    protected function actingAsSuperAdmin(?Organization $organization = null): array
+    {
+        $this->seedPermissions();
+
+        $organization ??= $this->createOrganization();
+        $user = $this->createUser();
+
+        OrganizationMember::create([
+            'organization_id' => $organization->id,
+            'user_id' => $user->id,
+            'role_key' => 'super-admin',
+            'is_owner' => true,
+            'status' => 'active',
+            'joined_at' => now(),
+        ]);
+
+        $user->assignRole('super-admin');
+        $this->actingAs($user);
+
+        return [$user, $organization];
+    }
 }

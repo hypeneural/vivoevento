@@ -51,7 +51,9 @@
 ## Webhooks (Público — sem auth)
 | Método | Rota | Controller | Descrição |
 |--------|------|-----------|-----------|
-| POST | `/api/v1/webhooks/zapi` | ZApiWebhookController@handle | Webhook Z-API |
+| POST | `/api/v1/webhooks/whatsapp/{provider}/{instanceKey}/inbound` | WhatsAppWebhookController@inbound | Webhook inbound de mensagens do WhatsApp, incluindo fotos |
+| POST | `/api/v1/webhooks/whatsapp/{provider}/{instanceKey}/status` | WhatsAppWebhookController@status | Webhook de status do provider/instância |
+| POST | `/api/v1/webhooks/whatsapp/{provider}/{instanceKey}/delivery` | WhatsAppWebhookController@delivery | Webhook de delivery/read receipts |
 | POST | `/api/v1/webhooks/telegram` | TelegramWebhookController@handle | Webhook Telegram |
 
 ## Media

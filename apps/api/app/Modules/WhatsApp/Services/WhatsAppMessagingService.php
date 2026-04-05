@@ -101,6 +101,7 @@ class WhatsAppMessagingService
                 'phone' => $data->phone,
                 'reaction' => $data->reaction,
                 'messageId' => $data->messageId,
+                'fromMe' => $data->fromMe,
             ],
         ]);
 
@@ -118,6 +119,7 @@ class WhatsAppMessagingService
             'payload_json' => [
                 'phone' => $data->phone,
                 'messageId' => $data->messageId,
+                'fromMe' => $data->fromMe,
             ],
         ]);
 

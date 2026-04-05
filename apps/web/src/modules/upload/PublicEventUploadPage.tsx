@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { AlertTriangle, Camera, CheckCircle2, ImagePlus, Loader2, Send, Sparkles, X } from 'lucide-react';
 import { useParams } from 'react-router-dom';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
 import api, { ApiError } from '@/lib/api';
+import { resolveAssetUrl } from '@/lib/assets';
 import type { PublicEventUploadBootstrap, PublicEventUploadResult } from '@/lib/api-types';
 import { cn } from '@/lib/utils';
 
@@ -18,23 +19,23 @@ type SelectedUpload = {
   previewUrl: string;
 };
 
-function resolveAssetUrl(path?: string | null) {
-  if (!path) return null;
-  if (/^https?:\/\//i.test(path)) return path;
-
-  const normalizedPath = path.startsWith('/storage/') || path.startsWith('/api/')
-    ? path
-    : `/storage/${path.replace(/^\/+/, '')}`;
-
-  return new URL(normalizedPath, window.location.origin).toString();
-}
-
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) {
     return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   }
 
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function moderationFlowLabel(mode: string) {
+  switch (mode) {
+    case 'none':
+      return 'Entrada sem fila';
+    case 'ai':
+      return 'Moderacao por IA';
+    default:
+      return 'Fila manual';
+  }
 }
 
 export default function PublicEventUploadPage() {
@@ -176,12 +177,12 @@ export default function PublicEventUploadPage() {
     });
   }
 
-  function handleCameraChange(event: React.ChangeEvent<HTMLInputElement>) {
+  function handleCameraChange(event: ChangeEvent<HTMLInputElement>) {
     appendFiles(event.target.files);
     event.target.value = '';
   }
 
-  function handleGalleryChange(event: React.ChangeEvent<HTMLInputElement>) {
+  function handleGalleryChange(event: ChangeEvent<HTMLInputElement>) {
     appendFiles(event.target.files);
     event.target.value = '';
   }
@@ -312,7 +313,7 @@ export default function PublicEventUploadPage() {
                 <div className="rounded-2xl bg-white/12 p-3 backdrop-blur">
                   <p className="text-[11px] uppercase tracking-[0.16em] text-white/70">Fluxo</p>
                   <p className="mt-1 text-sm font-medium">
-                    {uploadData.upload.moderation_mode === 'auto' ? 'Entrada automatica' : 'Passa por moderacao'}
+                    {moderationFlowLabel(uploadData.upload.moderation_mode)}
                   </p>
                 </div>
                 <div className="rounded-2xl bg-white/12 p-3 backdrop-blur">

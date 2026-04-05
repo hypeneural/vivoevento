@@ -2,6 +2,7 @@
 
 namespace App\Modules\Auth\Http\Controllers;
 
+use App\Modules\Auth\Services\AccessStateBuilderService;
 use App\Shared\Http\BaseController;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,88 +21,29 @@ class AccessMatrixController extends BaseController
         $user->load(['roles', 'permissions']);
 
         $organization = $user->currentOrganization();
-        $plan = $organization?->subscription?->plan;
+        $matrix = app(AccessStateBuilderService::class)->buildMatrix($user, $organization);
 
-        $permissions = $user->getAllPermissions()->pluck('name');
-
-        // Roles
         $roles = $user->roles->map(fn ($role) => [
             'key' => $role->name,
             'name' => $this->roleDisplayName($role->name),
         ])->values();
 
-        // Modules derived from permissions
-        $moduleMap = [
-            'dashboard' => true,
-            'events' => $permissions->contains('events.view'),
-            'media' => $permissions->contains('media.view'),
-            'moderation' => $permissions->contains('media.moderate'),
-            'gallery' => $permissions->contains('gallery.view'),
-            'wall' => $permissions->contains('wall.view'),
-            'play' => $permissions->contains('play.view'),
-            'hub' => $permissions->contains('hub.view'),
-            'clients' => $permissions->contains('clients.view'),
-            'plans' => $permissions->contains('plans.view') || $permissions->contains('billing.view'),
-            'analytics' => $permissions->contains('analytics.view'),
-            'audit' => $permissions->contains('audit.view'),
-            'settings' => $permissions->contains('settings.manage'),
-        ];
-
-        $modules = collect($moduleMap)->map(fn ($enabled, $key) => [
-            'key' => $key,
-            'enabled' => $enabled,
-            'visible' => $enabled,
-        ])->values();
-
-        // Feature flags from plan
-        $features = $this->buildFeatureFlags($plan);
-
         return $this->success([
             'roles' => $roles,
-            'permissions' => $permissions->values(),
-            'modules' => $modules,
-            'features' => $features,
+            'permissions' => $matrix['permissions'],
+            'modules' => $matrix['modules'],
+            'features' => $matrix['features'],
+            'entitlements' => $matrix['entitlements'],
         ]);
-    }
-
-    private function buildFeatureFlags($plan): array
-    {
-        if (!$plan) {
-            return [
-                'live_gallery' => true,
-                'wall' => false,
-                'play_memory' => false,
-                'play_puzzle' => false,
-                'hub' => true,
-                'white_label' => false,
-                'whatsapp_ingestion' => false,
-                'analytics_advanced' => false,
-                'custom_domain' => false,
-            ];
-        }
-
-        $planFeatures = $plan->features?->pluck('value', 'key')->all() ?? [];
-
-        return [
-            'live_gallery' => (bool) ($planFeatures['live_gallery'] ?? true),
-            'wall' => (bool) ($planFeatures['wall'] ?? false),
-            'play_memory' => (bool) ($planFeatures['play_memory'] ?? false),
-            'play_puzzle' => (bool) ($planFeatures['play_puzzle'] ?? false),
-            'hub' => (bool) ($planFeatures['hub'] ?? true),
-            'white_label' => (bool) ($planFeatures['white_label'] ?? false),
-            'whatsapp_ingestion' => (bool) ($planFeatures['whatsapp_ingestion'] ?? false),
-            'analytics_advanced' => (bool) ($planFeatures['analytics_advanced'] ?? false),
-            'custom_domain' => (bool) ($planFeatures['custom_domain'] ?? false),
-        ];
     }
 
     private function roleDisplayName(string $key): string
     {
         return match ($key) {
             'super-admin' => 'Super Admin',
-            'platform-admin' => 'Admin da Plataforma',
-            'partner-owner' => 'Owner da Organização',
-            'partner-manager' => 'Gerente da Organização',
+            'platform-admin' => 'Administrador da Plataforma',
+            'partner-owner' => "Propriet\u{00E1}rio",
+            'partner-manager' => "Gerente da organiza\u{00E7}\u{00E3}o",
             'event-operator' => 'Operador de Evento',
             'financeiro' => 'Financeiro',
             'client' => 'Cliente',
@@ -109,4 +51,5 @@ class AccessMatrixController extends BaseController
             default => ucfirst(str_replace(['-', '_'], ' ', $key)),
         };
     }
+
 }

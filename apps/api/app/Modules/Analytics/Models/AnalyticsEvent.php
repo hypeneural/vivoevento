@@ -1,9 +1,13 @@
 <?php
+
 namespace App\Modules\Analytics\Models;
+
 use Illuminate\Database\Eloquent\Model;
 
 class AnalyticsEvent extends Model
 {
+    public const UPDATED_AT = null;
+
     protected $fillable = [
         'organization_id', 'event_id', 'event_media_id',
         'event_name', 'actor_type', 'actor_id', 'channel',

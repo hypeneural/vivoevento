@@ -7,29 +7,41 @@
  *   POST /api/v1/auth/login           { login, password, device_name }
  *   POST /api/v1/auth/logout
  *   POST /api/v1/auth/forgot-password { login }
- *   POST /api/v1/auth/reset-password  { login, code, password, password_confirmation }
+ *   POST /api/v1/auth/forgot-password/resend-otp { session_token }
+ *   POST /api/v1/auth/forgot-password/verify-otp { session_token, code }
+ *   POST /api/v1/auth/reset-password  { session_token, password, password_confirmation }
  *   GET  /api/v1/auth/me
  *   PATCH /api/v1/auth/me             { name?, phone?, preferences? }
+ *   PATCH /api/v1/auth/me/password    { current_password, password, password_confirmation }
  *   POST /api/v1/auth/me/avatar       FormData { avatar: File }
  *   DELETE /api/v1/auth/me/avatar
  *   GET  /api/v1/access/matrix
  */
 
-import { api, setToken, removeToken, getToken, hasToken } from '@/lib/api';
+import { api, setToken, removeToken, hasToken } from '@/lib/api';
 import type {
   LoginPayload, LoginResponse,
-  ForgotPasswordPayload, ForgotPasswordResponse,
-  ResetPasswordPayload, ResetPasswordResponse,
-  MeResponse, MeUser, MeOrganization, MeAccess, MeSubscription,
+  RegisterRequestOtpPayload, RegisterRequestOtpResponse,
+  RegisterResendOtpPayload, RegisterResendOtpResponse,
+  RegisterVerifyOtpPayload, RegisterVerifyOtpResponse,
+  ForgotPasswordPayload, ForgotPasswordResponse, ForgotPasswordRequestOtpResponse,
+  ForgotPasswordResendOtpPayload, ForgotPasswordResendOtpResponse,
+  ForgotPasswordVerifyOtpPayload, ForgotPasswordVerifyOtpResponse,
+  ResetPasswordPayload, ResetPasswordResponse, ResetPasswordWithOtpPayload,
+  UpdatePasswordPayload, MessageResponse, AvatarUploadResponse,
+  MeResponse, MeUser, MeOrganization, MeAccess, MeSubscription, MeResolvedEntitlements,
   AccessMatrixResponse,
 } from '@/lib/api-types';
 import { mockUsers, mockOrganizations, buildMockSession } from '@/shared/mock/data';
+import { formatRoleLabel } from '@/shared/auth/labels';
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false';
 
 // ─── Persistence ───────────────────────────────────────────
 
 const SESSION_KEY = 'eventovivo_session';
+const MOCK_SIGNUP_OTP_KEY = 'eventovivo_mock_signup_otp';
+const MOCK_FORGOT_OTP_KEY = 'eventovivo_mock_forgot_otp';
 
 export function persistSession(session: MeResponse): void {
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
@@ -51,6 +63,26 @@ export function clearSession(): void {
   removeToken();
 }
 
+type MockSignupOtpState = {
+  session_token: string;
+  name: string;
+  phone: string;
+  journey: 'partner_signup' | 'trial_event' | 'single_event_checkout' | 'admin_assisted';
+  code: string;
+  resend_available_at: number;
+};
+
+type MockForgotOtpState = {
+  session_token: string;
+  login: string;
+  method: 'whatsapp' | 'email';
+  destination_masked: string;
+  code: string;
+  resend_available_at: number;
+  user_id: string | null;
+  verified: boolean;
+};
+
 // ─── Mock Helpers ──────────────────────────────────────────
 
 function buildMockMeResponse(userId: string): MeResponse | null {
@@ -59,6 +91,43 @@ function buildMockMeResponse(userId: string): MeResponse | null {
 
   const org = mockOrganizations.find(o => o.id === user.organizationId);
   const session = buildMockSession(user);
+
+  const entitlements: MeResolvedEntitlements = {
+    version: 1,
+    organization_type: org?.type || 'partner',
+    modules: {
+      live_gallery: true,
+      wall: session.enabledModules.includes('wall'),
+      play: session.enabledModules.includes('play'),
+      hub: session.enabledModules.includes('hub'),
+      whatsapp_ingestion: true,
+      analytics_advanced: session.enabledModules.includes('analytics'),
+    },
+    limits: {
+      max_active_events: 10,
+      retention_days: 90,
+    },
+    branding: {
+      white_label: false,
+      custom_domain: false,
+    },
+    source_summary: [{
+      source_type: 'subscription',
+      status: 'active',
+      plan_id: 1,
+      plan_key: 'pro-parceiro',
+      plan_name: 'Pro Parceiro',
+      billing_cycle: 'monthly',
+      starts_at: '2026-04-01T00:00:00.000Z',
+      trial_ends_at: null,
+      renews_at: '2026-05-01T00:00:00.000Z',
+      ends_at: null,
+      canceled_at: null,
+      cancel_at_period_end: false,
+      cancellation_effective_at: null,
+      active: true,
+    }],
+  };
 
   return {
     user: {
@@ -70,7 +139,7 @@ function buildMockMeResponse(userId: string): MeResponse | null {
       status: 'active',
       role: {
         key: user.role.replace(/_/g, '-'),
-        name: user.role,
+        name: formatRoleLabel(user.role.replace(/_/g, '-'), user.role),
       },
       permissions: session.permissions,
       preferences: {
@@ -99,16 +168,17 @@ function buildMockMeResponse(userId: string): MeResponse | null {
       accessible_modules: session.enabledModules,
       modules: session.enabledModules.map(m => ({ key: m, enabled: true, visible: true })),
       feature_flags: {
-        live_gallery: true,
-        wall: session.enabledModules.includes('wall'),
-        play_memory: session.enabledModules.includes('play'),
-        play_puzzle: session.enabledModules.includes('play'),
-        hub: session.enabledModules.includes('hub'),
-        white_label: false,
-        whatsapp_ingestion: true,
-        analytics_advanced: session.enabledModules.includes('analytics'),
-        custom_domain: false,
+        live_gallery: entitlements.modules.live_gallery,
+        wall: entitlements.modules.wall,
+        play_memory: entitlements.modules.play,
+        play_puzzle: entitlements.modules.play,
+        hub: entitlements.modules.hub,
+        white_label: entitlements.branding.white_label,
+        whatsapp_ingestion: entitlements.modules.whatsapp_ingestion,
+        analytics_advanced: entitlements.modules.analytics_advanced,
+        custom_domain: entitlements.branding.custom_domain,
       },
+      entitlements,
     },
     subscription: {
       plan_key: 'pro-parceiro',
@@ -117,8 +187,223 @@ function buildMockMeResponse(userId: string): MeResponse | null {
       status: 'active',
       trial_ends_at: null,
       renews_at: '2026-05-01T00:00:00.000Z',
+      ends_at: null,
+      canceled_at: null,
+      cancel_at_period_end: false,
+      cancellation_effective_at: null,
     },
   };
+}
+
+function resolveMockJourney(journey?: MockSignupOtpState['journey']) {
+  switch (journey) {
+    case 'single_event_checkout':
+      return {
+        organizationType: 'direct_customer',
+        nextPath: '/events/create',
+        description: 'Sua conta ja esta pronta. Agora configure o seu evento para seguir com a contratacao.',
+      };
+    case 'trial_event':
+      return {
+        organizationType: 'partner',
+        nextPath: '/events/create',
+        description: 'Sua conta ja esta pronta. Agora crie seu evento teste para validar a experiencia.',
+      };
+    case 'admin_assisted':
+      return {
+        organizationType: 'partner',
+        nextPath: '/events',
+        description: 'Seu acesso inicial ja esta pronto. Continue para revisar ou configurar o evento.',
+      };
+    case 'partner_signup':
+    default:
+      return {
+        organizationType: 'partner',
+        nextPath: '/plans',
+        description: 'Sua conta ja esta pronta. Agora escolha um plano para ativar seu primeiro evento.',
+      };
+  }
+}
+
+function buildMockSignupSession(
+  name: string,
+  phone: string,
+  journey: MockSignupOtpState['journey'] = 'partner_signup',
+): MeResponse {
+  const normalizedPhone = phone.startsWith('55') ? phone : `55${phone}`;
+  const journeyConfig = resolveMockJourney(journey);
+  const slug = name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'nova-conta';
+
+  const permissions = [
+    'organizations.view', 'organizations.update',
+    'users.view', 'users.manage',
+    'clients.view', 'clients.create', 'clients.update', 'clients.delete',
+    'events.view', 'events.create', 'events.update', 'events.publish', 'events.archive',
+    'events.activate', 'events.manage_branding', 'events.manage_team',
+    'channels.view', 'channels.manage',
+    'media.view', 'media.moderate', 'media.delete',
+    'gallery.view', 'gallery.manage',
+    'wall.view', 'wall.manage',
+    'play.view', 'play.manage',
+    'hub.view', 'hub.manage',
+    'billing.view', 'billing.manage', 'billing.purchase', 'billing.manage_subscription',
+    'analytics.view',
+    'settings.manage',
+    'white_label.manage',
+    'notifications.view', 'notifications.manage',
+  ];
+
+  const accessibleModules = [
+    'dashboard',
+    'events',
+    'media',
+    'moderation',
+    'gallery',
+    'wall',
+    'play',
+    'hub',
+    'whatsapp',
+    'clients',
+    'plans',
+    'analytics',
+    'settings',
+  ];
+
+  const entitlements: MeResolvedEntitlements = {
+    version: 1,
+    organization_type: journeyConfig.organizationType,
+    modules: {
+      live_gallery: true,
+      wall: true,
+      play: true,
+      hub: true,
+      whatsapp_ingestion: true,
+      analytics_advanced: true,
+    },
+    limits: {
+      max_active_events: journey === 'single_event_checkout' ? 1 : 10,
+      retention_days: 30,
+    },
+    branding: {
+      white_label: false,
+      custom_domain: false,
+    },
+    source_summary: [],
+  };
+
+  return {
+    user: {
+      id: Date.now(),
+      name,
+      email: `wa+${normalizedPhone}@eventovivo.local`,
+      phone: normalizedPhone,
+      avatar_url: null,
+      status: 'active',
+      role: {
+        key: 'partner-owner',
+        name: 'Proprietario',
+      },
+      permissions,
+      preferences: {
+        theme: 'light',
+        timezone: 'America/Sao_Paulo',
+        locale: 'pt-BR',
+      },
+      last_login_at: new Date().toISOString(),
+    },
+    organization: {
+      id: Date.now(),
+      uuid: `mock-org-${slug}`,
+      type: journeyConfig.organizationType,
+      name,
+      slug,
+      status: 'active',
+      logo_url: null,
+      branding: {
+        primary_color: null,
+        secondary_color: null,
+        subdomain: null,
+        custom_domain: null,
+      },
+    },
+    access: {
+      accessible_modules: accessibleModules,
+      modules: accessibleModules.map(key => ({ key, enabled: true, visible: true })),
+      feature_flags: {
+        live_gallery: entitlements.modules.live_gallery,
+        wall: entitlements.modules.wall,
+        play_memory: entitlements.modules.play,
+        play_puzzle: entitlements.modules.play,
+        hub: entitlements.modules.hub,
+        white_label: entitlements.branding.white_label,
+        whatsapp_ingestion: entitlements.modules.whatsapp_ingestion,
+        analytics_advanced: entitlements.modules.analytics_advanced,
+        custom_domain: entitlements.branding.custom_domain,
+      },
+      entitlements,
+    },
+    subscription: null,
+  };
+}
+
+function getMockSignupOtpState(): MockSignupOtpState | null {
+  try {
+    const raw = localStorage.getItem(MOCK_SIGNUP_OTP_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as MockSignupOtpState;
+  } catch {
+    localStorage.removeItem(MOCK_SIGNUP_OTP_KEY);
+    return null;
+  }
+}
+
+function persistMockSignupOtpState(state: MockSignupOtpState): void {
+  localStorage.setItem(MOCK_SIGNUP_OTP_KEY, JSON.stringify(state));
+}
+
+function clearMockSignupOtpState(): void {
+  localStorage.removeItem(MOCK_SIGNUP_OTP_KEY);
+}
+
+function getMockForgotOtpState(): MockForgotOtpState | null {
+  try {
+    const raw = localStorage.getItem(MOCK_FORGOT_OTP_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as MockForgotOtpState;
+  } catch {
+    localStorage.removeItem(MOCK_FORGOT_OTP_KEY);
+    return null;
+  }
+}
+
+function persistMockForgotOtpState(state: MockForgotOtpState): void {
+  localStorage.setItem(MOCK_FORGOT_OTP_KEY, JSON.stringify(state));
+}
+
+function clearMockForgotOtpState(): void {
+  localStorage.removeItem(MOCK_FORGOT_OTP_KEY);
+}
+
+function maskPhone(phone: string): string {
+  const normalizedPhone = phone.startsWith('55') ? phone : `55${phone}`;
+  return `+55 (${normalizedPhone.slice(2, 4)}) *****${normalizedPhone.slice(-4)}`;
+}
+
+function maskEmail(email: string): string {
+  const [localPart, domain] = email.split('@');
+  if (!localPart || !domain) return email;
+
+  const prefix = localPart.slice(0, 1);
+  const suffix = localPart.length > 2 ? localPart.slice(-1) : '';
+  const hidden = '*'.repeat(Math.max(localPart.length - prefix.length - suffix.length, 2));
+
+  return `${prefix}${hidden}${suffix}@${domain}`;
 }
 
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -170,6 +455,182 @@ export const authService = {
 
     // Now fetch the full session
     return this.getSession();
+  },
+
+  /**
+   * Start signup by requesting an OTP via WhatsApp.
+   */
+  async requestRegisterOtp(payload: RegisterRequestOtpPayload): Promise<RegisterRequestOtpResponse> {
+    if (USE_MOCK) {
+      await delay(700);
+
+      const digits = payload.phone.replace(/\D/g, '');
+      const normalizedPhone = digits.startsWith('55') ? digits : `55${digits}`;
+      const alreadyExists = mockUsers.some(user =>
+        user.phone?.replace(/\D/g, '') === normalizedPhone ||
+        user.phone?.replace(/\D/g, '') === digits
+      );
+
+      if (alreadyExists) {
+        throw {
+          status: 422,
+          message: 'Este WhatsApp ja possui cadastro.',
+          validationErrors: {
+            phone: ['Este WhatsApp ja possui cadastro.'],
+          },
+        };
+      }
+
+      const state: MockSignupOtpState = {
+        session_token: `mock_signup_${Date.now()}`,
+        name: payload.name.trim(),
+        phone: normalizedPhone,
+        journey: payload.journey ?? 'partner_signup',
+        code: '123456',
+        resend_available_at: Date.now() + 30000,
+      };
+
+      persistMockSignupOtpState(state);
+
+      return {
+        message: 'Enviamos um codigo de 6 digitos para o seu WhatsApp.',
+        session_token: state.session_token,
+        delivery: 'whatsapp',
+        phone_masked: `+55 (${normalizedPhone.slice(2, 4)}) *****${normalizedPhone.slice(-4)}`,
+        expires_in: 900,
+        resend_in: 30,
+        debug_code: state.code,
+      };
+    }
+
+    return api.post<RegisterRequestOtpResponse>('/auth/register/request-otp', {
+      body: payload,
+    });
+  },
+
+  /**
+   * Resend signup OTP after cooldown.
+   */
+  async resendRegisterOtp(payload: RegisterResendOtpPayload): Promise<RegisterResendOtpResponse> {
+    if (USE_MOCK) {
+      await delay(500);
+
+      const state = getMockSignupOtpState();
+      if (!state || state.session_token !== payload.session_token) {
+        throw {
+          status: 422,
+          message: 'Sessao expirada. Solicite um novo codigo.',
+          validationErrors: {
+            session_token: ['Sessao expirada. Solicite um novo codigo.'],
+          },
+        };
+      }
+
+      const secondsRemaining = Math.ceil((state.resend_available_at - Date.now()) / 1000);
+      if (secondsRemaining > 0) {
+        throw {
+          status: 429,
+          message: `Aguarde ${secondsRemaining}s para reenviar o codigo.`,
+        };
+      }
+
+      const nextState: MockSignupOtpState = {
+        ...state,
+        code: '123456',
+        resend_available_at: Date.now() + 30000,
+      };
+
+      persistMockSignupOtpState(nextState);
+
+      return {
+        message: 'Enviamos um codigo de 6 digitos para o seu WhatsApp.',
+        session_token: nextState.session_token,
+        delivery: 'whatsapp',
+        phone_masked: `+55 (${nextState.phone.slice(2, 4)}) *****${nextState.phone.slice(-4)}`,
+        expires_in: 900,
+        resend_in: 30,
+        debug_code: nextState.code,
+      };
+    }
+
+    return api.post<RegisterResendOtpResponse>('/auth/register/resend-otp', {
+      body: payload,
+    });
+  },
+
+  /**
+   * Verify signup OTP and store the auth token.
+   * The full session is fetched later by the caller to preserve the welcome screen.
+   */
+  async verifyRegisterOtp(payload: RegisterVerifyOtpPayload): Promise<RegisterVerifyOtpResponse> {
+    if (USE_MOCK) {
+      await delay(600);
+
+      const state = getMockSignupOtpState();
+      if (!state || state.session_token !== payload.session_token) {
+        throw {
+          status: 422,
+          message: 'Sessao expirada. Solicite um novo codigo.',
+          validationErrors: {
+            session_token: ['Sessao expirada. Solicite um novo codigo.'],
+          },
+        };
+      }
+
+      if (payload.code !== state.code) {
+        throw {
+          status: 422,
+          message: 'Codigo invalido.',
+          validationErrors: {
+            code: ['Codigo invalido.'],
+          },
+        };
+      }
+
+      const token = `mock_signup_token_${Date.now()}`;
+      const session = buildMockSignupSession(state.name, state.phone, state.journey);
+      const journeyConfig = resolveMockJourney(state.journey);
+
+      setToken(token);
+      persistSession(session);
+      clearMockSignupOtpState();
+
+      return {
+        message: 'WhatsApp validado com sucesso.',
+        user: {
+          id: session.user.id,
+          name: session.user.name,
+          email: session.user.email,
+          phone: session.user.phone,
+          avatar_path: null,
+          status: session.user.status,
+          email_verified_at: null,
+          last_login_at: session.user.last_login_at,
+          created_at: new Date().toISOString(),
+          roles: ['partner-owner'],
+          organizations: session.organization ? [{
+            id: session.organization.id,
+            name: session.organization.name,
+            slug: session.organization.slug,
+            role_key: 'partner-owner',
+            is_owner: true,
+          }] : [],
+        },
+        token,
+        onboarding: {
+          title: `Bem-vindo, ${state.name}!`,
+          description: journeyConfig.description,
+          next_path: journeyConfig.nextPath,
+        },
+      };
+    }
+
+    const result = await api.post<RegisterVerifyOtpResponse>('/auth/register/verify-otp', {
+      body: payload,
+    });
+
+    setToken(result.token);
+    return result;
   },
 
   /**
@@ -229,6 +690,27 @@ export const authService = {
         permissions: session?.user.permissions || [],
         modules: session?.access.modules || [],
         features: session?.access.feature_flags || {},
+        entitlements: session?.access.entitlements || {
+          version: 1,
+          organization_type: null,
+          modules: {
+            live_gallery: true,
+            wall: false,
+            play: false,
+            hub: true,
+            whatsapp_ingestion: false,
+            analytics_advanced: false,
+          },
+          limits: {
+            max_active_events: null,
+            retention_days: null,
+          },
+          branding: {
+            white_label: false,
+            custom_domain: false,
+          },
+          source_summary: [],
+        },
       };
     }
 
@@ -260,6 +742,31 @@ export const authService = {
     const session = await api.patch<MeResponse>('/auth/me', { body: data });
     persistSession(session);
     return session;
+  },
+
+  /**
+   * Update the password for the authenticated user.
+   */
+  async updatePassword(payload: UpdatePasswordPayload): Promise<MessageResponse> {
+    if (USE_MOCK) {
+      await delay(400);
+
+      if (payload.current_password !== 'password') {
+        throw {
+          status: 422,
+          message: 'A senha atual informada nao confere.',
+          validationErrors: {
+            current_password: ['A senha atual informada nao confere.'],
+          },
+        };
+      }
+
+      return { message: 'Senha atualizada com sucesso.' };
+    }
+
+    return api.patch<MessageResponse>('/auth/me/password', {
+      body: payload,
+    });
   },
 
   /**
@@ -321,24 +828,237 @@ export const authService = {
   },
 
   /**
-   * Upload user avatar (multipart/form-data).
+   * Start forgot-password OTP flow.
    */
-  async uploadAvatar(file: File): Promise<{ avatar_path: string; avatar_url: string }> {
+  async requestForgotPasswordOtp(payload: ForgotPasswordPayload): Promise<ForgotPasswordRequestOtpResponse> {
+    if (USE_MOCK) {
+      await delay(800);
+
+      const rawLogin = payload.login.trim();
+      const loginDigits = rawLogin.replace(/\D/g, '');
+      const isPhone = loginDigits.length >= 10 && !rawLogin.includes('@');
+      const normalizedLogin = isPhone
+        ? (loginDigits.startsWith('55') ? loginDigits : `55${loginDigits}`)
+        : rawLogin.toLowerCase();
+
+      const existingState = getMockForgotOtpState();
+      const secondsRemaining = existingState && existingState.login === normalizedLogin
+        ? Math.ceil((existingState.resend_available_at - Date.now()) / 1000)
+        : 0;
+
+      if (existingState && existingState.login === normalizedLogin && secondsRemaining > 0) {
+        return {
+          message: 'Se encontrarmos sua conta, vamos enviar um codigo de 6 digitos para confirmar sua identidade.',
+          session_token: existingState.session_token,
+          method: existingState.method,
+          destination_masked: existingState.destination_masked,
+          expires_in: 900,
+          resend_in: secondsRemaining,
+          debug_code: existingState.code,
+        };
+      }
+
+      const user = mockUsers.find(u =>
+        isPhone
+          ? (
+              u.phone?.replace(/\D/g, '') === normalizedLogin
+              || u.phone?.replace(/\D/g, '') === loginDigits
+            )
+          : u.email.toLowerCase() === normalizedLogin
+      );
+
+      const state: MockForgotOtpState = {
+        session_token: `mock_forgot_${Date.now()}`,
+        login: normalizedLogin,
+        method: isPhone ? 'whatsapp' : 'email',
+        destination_masked: isPhone ? maskPhone(normalizedLogin) : maskEmail(normalizedLogin),
+        code: '123456',
+        resend_available_at: Date.now() + 30000,
+        user_id: user?.id ?? null,
+        verified: false,
+      };
+
+      persistMockForgotOtpState(state);
+
+      return {
+        message: 'Se encontrarmos sua conta, vamos enviar um codigo de 6 digitos para confirmar sua identidade.',
+        session_token: state.session_token,
+        method: state.method,
+        destination_masked: state.destination_masked,
+        expires_in: 900,
+        resend_in: 30,
+        debug_code: state.code,
+      };
+    }
+
+    return api.post<ForgotPasswordRequestOtpResponse>('/auth/forgot-password', {
+      body: payload,
+    });
+  },
+
+  /**
+   * Resend forgot-password OTP.
+   */
+  async resendForgotPasswordOtp(payload: ForgotPasswordResendOtpPayload): Promise<ForgotPasswordResendOtpResponse> {
+    if (USE_MOCK) {
+      await delay(500);
+
+      const state = getMockForgotOtpState();
+      if (!state || state.session_token !== payload.session_token) {
+        throw {
+          status: 422,
+          message: 'Sessao expirada. Solicite um novo codigo.',
+          validationErrors: {
+            session_token: ['Sessao expirada. Solicite um novo codigo.'],
+          },
+        };
+      }
+
+      const secondsRemaining = Math.ceil((state.resend_available_at - Date.now()) / 1000);
+      if (secondsRemaining > 0) {
+        throw {
+          status: 429,
+          message: `Aguarde ${secondsRemaining}s para reenviar o codigo.`,
+        };
+      }
+
+      const nextState: MockForgotOtpState = {
+        ...state,
+        code: '123456',
+        resend_available_at: Date.now() + 30000,
+        verified: false,
+      };
+
+      persistMockForgotOtpState(nextState);
+
+      return {
+        message: 'Se encontrarmos sua conta, vamos enviar um codigo de 6 digitos para confirmar sua identidade.',
+        session_token: nextState.session_token,
+        method: nextState.method,
+        destination_masked: nextState.destination_masked,
+        expires_in: 900,
+        resend_in: 30,
+        debug_code: nextState.code,
+      };
+    }
+
+    return api.post<ForgotPasswordResendOtpResponse>('/auth/forgot-password/resend-otp', {
+      body: payload,
+    });
+  },
+
+  /**
+   * Verify forgot-password OTP before showing the new password form.
+   */
+  async verifyForgotPasswordOtp(payload: ForgotPasswordVerifyOtpPayload): Promise<ForgotPasswordVerifyOtpResponse> {
     if (USE_MOCK) {
       await delay(600);
-      // In mock mode, generate a data URL from the file
+
+      const state = getMockForgotOtpState();
+      if (!state || state.session_token !== payload.session_token) {
+        throw {
+          status: 422,
+          message: 'Sessao expirada. Solicite um novo codigo.',
+          validationErrors: {
+            session_token: ['Sessao expirada. Solicite um novo codigo.'],
+          },
+        };
+      }
+
+      if (!state.user_id || payload.code !== state.code) {
+        throw {
+          status: 422,
+          message: 'Codigo invalido.',
+          validationErrors: {
+            code: ['Codigo invalido.'],
+          },
+        };
+      }
+
+      persistMockForgotOtpState({
+        ...state,
+        verified: true,
+      });
+
+      return {
+        message: 'Codigo validado com sucesso.',
+        session_token: state.session_token,
+        method: state.method,
+        destination_masked: state.destination_masked,
+      };
+    }
+
+    return api.post<ForgotPasswordVerifyOtpResponse>('/auth/forgot-password/verify-otp', {
+      body: payload,
+    });
+  },
+
+  /**
+   * Complete forgot-password reset after OTP validation.
+   */
+  async resetPasswordWithOtp(payload: ResetPasswordWithOtpPayload): Promise<MeResponse> {
+    if (USE_MOCK) {
+      await delay(600);
+
+      const state = getMockForgotOtpState();
+      if (!state || state.session_token !== payload.session_token) {
+        throw {
+          status: 422,
+          message: 'Sessao expirada. Solicite um novo codigo.',
+          validationErrors: {
+            session_token: ['Sessao expirada. Solicite um novo codigo.'],
+          },
+        };
+      }
+
+      if (!state.verified) {
+        throw {
+          status: 422,
+          message: 'Valide o codigo antes de redefinir a senha.',
+          validationErrors: {
+            session_token: ['Valide o codigo antes de redefinir a senha.'],
+          },
+        };
+      }
+
+      const user = mockUsers.find(u => u.id === state.user_id);
+      if (!user) throw { status: 422, message: 'Sessao expirada. Solicite um novo codigo.' };
+
+      const session = buildMockMeResponse(user.id);
+      if (!session) throw { status: 500, message: 'Erro interno' };
+
+      setToken(`mock_token_${user.id}_${Date.now()}`);
+      persistSession(session);
+      clearMockForgotOtpState();
+      return session;
+    }
+
+    const result = await api.post<ResetPasswordResponse>('/auth/reset-password', {
+      body: payload,
+    });
+
+    setToken(result.token);
+    return this.getSession();
+  },
+
+  /**
+   * Upload user avatar (multipart/form-data).
+   */
+  async uploadAvatar(file: File): Promise<AvatarUploadResponse> {
+    if (USE_MOCK) {
+      await delay(600);
       const url = URL.createObjectURL(file);
       const session = getPersistedSession();
       if (session) {
         session.user.avatar_url = url;
         persistSession(session);
       }
-      return { avatar_path: 'mock/avatar.jpg', avatar_url: url };
+      return { avatar_path: 'mock/avatar.webp', avatar_url: url };
     }
 
     const formData = new FormData();
     formData.append('avatar', file);
-    return api.upload<{ avatar_path: string; avatar_url: string }>('/auth/me/avatar', formData);
+    return api.upload<AvatarUploadResponse>('/auth/me/avatar', formData);
   },
 
   /**

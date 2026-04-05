@@ -3,6 +3,7 @@
  * Positioned using TV-safe area tokens.
  */
 
+import { QRCodeSVG } from 'qrcode.react';
 import {
   WALL_LOGO_DOCK,
   WALL_NEON_PANEL,
@@ -13,6 +14,9 @@ import {
 } from '../design/tokens';
 
 interface BrandingOverlayProps {
+  showBranding: boolean;
+  showQr: boolean;
+  qrUrl?: string | null;
   showNeon: boolean;
   neonText?: string | null;
   neonColor?: string | null;
@@ -23,6 +27,9 @@ interface BrandingOverlayProps {
 }
 
 export function BrandingOverlay({
+  showBranding,
+  showQr,
+  qrUrl,
   showNeon,
   neonText,
   neonColor,
@@ -59,7 +66,7 @@ export function BrandingOverlay({
       ) : null}
 
       {/* Partner logo (bottom-left) */}
-      {partnerLogoUrl ? (
+      {showBranding && partnerLogoUrl ? (
         <div className={`pointer-events-none absolute z-30 flex h-14 w-28 items-center justify-center ${WALL_LOGO_DOCK} ${WALL_SAFE_BOTTOM} ${WALL_SAFE_LEFT}`}>
           <img src={partnerLogoUrl} alt="Logo do parceiro" className="max-h-full max-w-full object-contain" />
         </div>
@@ -75,12 +82,33 @@ export function BrandingOverlay({
         </div>
       ) : null}
 
+      {/* Upload QR (bottom-right, above branding when both are visible) */}
+      {showQr && qrUrl ? (
+        <div
+          className={`pointer-events-none absolute z-30 ${WALL_SAFE_RIGHT} ${showBranding ? 'bottom-[calc(max(16px,2vh)+72px)]' : WALL_SAFE_BOTTOM}`}
+        >
+          <div className="flex items-center gap-4 rounded-[28px] border border-white/10 bg-white/96 p-4 text-neutral-950 shadow-[0_18px_60px_rgba(0,0,0,0.35)]">
+            <QRCodeSVG value={qrUrl} size={88} bgColor="#ffffff" fgColor="#0f172a" includeMargin />
+            <div className="max-w-[170px]">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-neutral-500">
+                Envie sua foto
+              </p>
+              <p className="mt-2 text-sm font-semibold leading-tight text-neutral-950">
+                Aponte a camera para entrar no upload do evento.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {/* Evento Vivo branding (bottom-right) */}
-      <div className={`pointer-events-none absolute z-30 ${WALL_LOGO_DOCK} ${WALL_SAFE_BOTTOM} ${WALL_SAFE_RIGHT}`}>
-        <p className="text-xs font-bold uppercase tracking-[0.15em] text-white/60">
-          Evento<span className="text-orange-400">Vivo</span>
-        </p>
-      </div>
+      {showBranding ? (
+        <div className={`pointer-events-none absolute z-30 ${WALL_LOGO_DOCK} ${WALL_SAFE_BOTTOM} ${WALL_SAFE_RIGHT}`}>
+          <p className="text-xs font-bold uppercase tracking-[0.15em] text-white/60">
+            Evento<span className="text-orange-400">Vivo</span>
+          </p>
+        </div>
+      ) : null}
     </>
   );
 }

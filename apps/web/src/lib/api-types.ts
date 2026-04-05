@@ -20,6 +20,459 @@ export interface LoginResponse {
   token: string;
 }
 
+/** POST /api/v1/auth/register/request-otp — Request */
+export interface RegisterRequestOtpPayload {
+  name: string;
+  phone: string;
+  journey?: 'partner_signup' | 'trial_event' | 'single_event_checkout' | 'admin_assisted';
+}
+
+/** POST /api/v1/auth/register/request-otp — Response.data */
+export interface RegisterRequestOtpResponse {
+  message: string;
+  session_token: string;
+  delivery: 'whatsapp';
+  phone_masked: string;
+  expires_in: number;
+  resend_in: number;
+  debug_code?: string;
+}
+
+/** POST /api/v1/auth/register/resend-otp — Request */
+export interface RegisterResendOtpPayload {
+  session_token: string;
+}
+
+/** POST /api/v1/auth/register/resend-otp — Response.data */
+export interface RegisterResendOtpResponse extends RegisterRequestOtpResponse {}
+
+/** POST /api/v1/auth/register/verify-otp — Request */
+export interface RegisterVerifyOtpPayload {
+  session_token: string;
+  code: string;
+  device_name?: string;
+}
+
+/** POST /api/v1/auth/register/verify-otp — Response.data */
+export interface RegisterVerifyOtpResponse {
+  message: string;
+  user: ApiUser;
+  token: string;
+  onboarding: {
+    title: string;
+    description: string;
+    next_path: string;
+  };
+}
+
+export interface PublicTrialEventPayload {
+  responsible_name: string;
+  whatsapp: string;
+  email?: string | null;
+  organization_name?: string | null;
+  device_name?: string;
+  event: {
+    title: string;
+    event_type: 'wedding' | 'birthday' | 'fifteen' | 'corporate' | 'fair' | 'graduation' | 'other';
+    event_date?: string | null;
+    city?: string | null;
+    description?: string | null;
+  };
+}
+
+export interface PublicTrialEventResponse {
+  message: string;
+  token: string;
+  user: ApiUser;
+  organization: ApiOrganization;
+  event: ApiEvent;
+  commercial_status: ApiEventCommercialStatus;
+  trial: {
+    grant_id: number;
+    status: 'active' | 'pending' | 'expired' | 'revoked' | string | null;
+    starts_at: string | null;
+    ends_at: string | null;
+    modules: {
+      live: boolean;
+      wall: boolean;
+      play: boolean;
+      hub: boolean;
+    };
+    limits: {
+      retention_days: number;
+      max_active_events: number;
+      max_photos: number;
+    };
+    branding: {
+      watermark: boolean;
+    };
+  };
+  onboarding: {
+    title: string;
+    description: string;
+    next_path: string;
+  };
+}
+
+export interface PublicEventCheckoutPayload {
+  responsible_name: string;
+  whatsapp: string;
+  email?: string | null;
+  organization_name?: string | null;
+  device_name?: string;
+  package_id: number;
+  payer?: {
+    name?: string | null;
+    email?: string | null;
+    document?: string | null;
+    document_type?: string | null;
+    phone?: string | null;
+    address?: {
+      street?: string | null;
+      number?: string | null;
+      district?: string | null;
+      complement?: string | null;
+      zip_code?: string | null;
+      city?: string | null;
+      state?: string | null;
+      country?: string | null;
+    } | null;
+  } | null;
+  payment?: {
+    method?: 'pix' | 'credit_card';
+    pix?: {
+      expires_in?: number | null;
+    } | null;
+    credit_card?: {
+      installments?: number | null;
+      statement_descriptor?: string | null;
+      card_token?: string | null;
+      billing_address?: {
+        street?: string | null;
+        number?: string | null;
+        district?: string | null;
+        complement?: string | null;
+        zip_code?: string | null;
+        city?: string | null;
+        state?: string | null;
+        country?: string | null;
+      } | null;
+    } | null;
+  } | null;
+  event: {
+    title: string;
+    event_type: 'wedding' | 'birthday' | 'fifteen' | 'corporate' | 'fair' | 'graduation' | 'other';
+    event_date?: string | null;
+    city?: string | null;
+    description?: string | null;
+  };
+}
+
+export interface PublicEventCheckoutConfirmPayload {
+  gateway_provider?: string | null;
+  gateway_order_id?: string | null;
+  confirmed_at?: string | null;
+}
+
+export interface PublicEventCheckoutResponse {
+  message: string | null;
+  token: string | null;
+  user: ApiUser | null;
+  organization: ApiOrganization | null;
+  event: ApiEvent | null;
+  commercial_status: ApiEventCommercialStatus | null;
+  checkout: {
+    id: number;
+    uuid: string;
+    mode: 'event_package';
+    status: 'draft' | 'pending_payment' | 'paid' | 'canceled' | 'failed' | 'refunded';
+    currency: string;
+    total_cents: number;
+    created_at: string | null;
+    updated_at: string | null;
+    confirmed_at: string | null;
+    payment: {
+      provider: string | null;
+      method: 'pix' | 'credit_card' | string | null;
+      gateway_order_id: string | null;
+      gateway_charge_id: string | null;
+      gateway_transaction_id: string | null;
+      gateway_status: string | null;
+      status: 'draft' | 'pending_payment' | 'paid' | 'canceled' | 'failed' | 'refunded' | string | null;
+      checkout_url: string | null;
+      confirm_url: string | null;
+      expires_at: string | null;
+      pix: {
+        qr_code: string | null;
+        qr_code_url: string | null;
+        expires_at: string | null;
+      } | null;
+      credit_card: {
+        installments: number | null;
+        acquirer_message: string | null;
+        acquirer_return_code: string | null;
+        last_status: string | null;
+      } | null;
+    };
+    package: {
+      id: number;
+      code: string;
+      name: string;
+      description: string | null;
+      target_audience: 'direct_customer' | 'partner' | 'both' | string | null;
+    } | null;
+    items: Array<{
+      id: number;
+      item_type: string;
+      reference_id: number | null;
+      description: string | null;
+      quantity: number;
+      unit_amount_cents: number;
+      total_amount_cents: number;
+      snapshot: {
+        package?: {
+          id: number;
+          code: string;
+          name: string;
+          description: string | null;
+          target_audience: string | null;
+        };
+        price?: {
+          id: number | null;
+          billing_mode: string | null;
+          currency: string | null;
+          amount_cents: number | null;
+        } | null;
+        modules?: {
+          live: boolean;
+          wall: boolean;
+          play: boolean;
+          hub: boolean;
+        };
+        limits?: {
+          retention_days: number | null;
+          max_photos: number | null;
+        };
+        branding?: {
+          watermark: boolean;
+          white_label: boolean;
+        };
+        feature_map?: Record<string, unknown>;
+      } | Record<string, unknown> | null;
+    }>;
+  };
+  purchase: {
+    id: number;
+    status: string;
+    package_id: number | null;
+    price_snapshot_cents: number | null;
+    currency: string | null;
+    purchased_at: string | null;
+  } | null;
+  onboarding: {
+    title: string;
+    description: string;
+    next_path: string;
+  } | null;
+}
+
+export interface AdminQuickEventPayload {
+  responsible_name: string;
+  whatsapp: string;
+  email?: string | null;
+  organization_id?: number | null;
+  organization_name?: string | null;
+  organization_type?: 'partner' | 'direct_customer' | null;
+  send_access?: boolean;
+  event: {
+    title: string;
+    event_type: 'wedding' | 'birthday' | 'fifteen' | 'corporate' | 'fair' | 'graduation' | 'other';
+    event_date?: string | null;
+    city?: string | null;
+    description?: string | null;
+    visibility?: 'public' | 'private';
+    moderation_mode?: 'none' | 'manual' | 'ai';
+  };
+  grant: {
+    source_type: 'bonus' | 'manual_override';
+    package_id: number;
+    merge_strategy?: 'expand' | 'replace' | 'restrict';
+    starts_at?: string | null;
+    ends_at?: string | null;
+    reason: string;
+    origin?: string | null;
+    notes?: string | null;
+  };
+}
+
+export interface AdminQuickEventResponse {
+  message: string | null;
+  responsible_user: ApiUser | null;
+  organization: ApiOrganization | null;
+  event: ApiEvent | null;
+  commercial_status: ApiEventCommercialStatus | null;
+  grant: {
+    id: number;
+    source_type: 'bonus' | 'manual_override' | string | null;
+    status: string | null;
+    priority: number | null;
+    merge_strategy: 'expand' | 'replace' | 'restrict' | string | null;
+    package_id: number;
+    package_code: string;
+    package_name: string;
+    starts_at: string | null;
+    ends_at: string | null;
+    reason: string;
+    origin: string | null;
+    notes: string | null;
+    granted_by_user_id: number;
+    granted_by_name: string;
+  } | null;
+  setup: {
+    organization_reused: boolean;
+    responsible_user_reused: boolean;
+    membership_role_key: string;
+    membership_is_owner: boolean;
+  } | null;
+  access_delivery: {
+    requested: boolean;
+    channel: 'whatsapp' | null;
+    target: string | null;
+    status: 'not_requested' | 'pending_not_implemented' | string;
+  } | null;
+  onboarding: {
+    title: string;
+    description: string;
+    next_path: string;
+  } | null;
+}
+
+export interface ApiPaginationMeta {
+  page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+  request_id?: string;
+  [key: string]: unknown;
+}
+
+export interface ApiPlan {
+  id: number;
+  code: string;
+  name: string;
+  audience: string | null;
+  status: string;
+  description: string | null;
+  prices: ApiPlanPrice[];
+  features: ApiPlanFeature[];
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface ApiPlanPrice {
+  id: number;
+  plan_id: number;
+  billing_cycle: 'monthly' | 'yearly' | string;
+  currency: string;
+  amount_cents: number;
+  gateway_provider?: string | null;
+  gateway_price_id?: string | null;
+  is_default: boolean;
+}
+
+export interface ApiPlanFeature {
+  id: number;
+  plan_id: number;
+  feature_key: string;
+  feature_value: string | null;
+}
+
+export interface ApiBillingSubscription {
+  id: number;
+  plan_key: string | null;
+  plan_name: string | null;
+  billing_cycle: string | null;
+  status: string;
+  starts_at: string | null;
+  trial_ends_at: string | null;
+  renews_at: string | null;
+  ends_at: string | null;
+  canceled_at: string | null;
+  cancel_at_period_end: boolean;
+  cancellation_effective_at: string | null;
+  features: Record<string, string | null>;
+}
+
+export interface ApiBillingInvoice {
+  id: number;
+  invoice_number: string | null;
+  status: string | null;
+  amount_cents: number;
+  currency: string;
+  issued_at: string | null;
+  due_at: string | null;
+  paid_at: string | null;
+  order: {
+    id: number;
+    uuid: string;
+    mode: 'subscription' | 'event_package' | string;
+    status: string | null;
+  } | null;
+  event: {
+    id: number;
+    title: string;
+  } | null;
+  package: {
+    id?: number | null;
+    code?: string | null;
+    name?: string | null;
+    description?: string | null;
+  } | null;
+  plan: {
+    id?: number | null;
+    code?: string | null;
+    name?: string | null;
+    audience?: string | null;
+    description?: string | null;
+  } | null;
+  payment: {
+    id: number;
+    status: string | null;
+    amount_cents: number;
+    currency: string;
+    gateway_provider: string | null;
+    gateway_payment_id: string | null;
+    paid_at: string | null;
+  } | null;
+  snapshot: Record<string, unknown>;
+}
+
+export interface ApiBillingCheckoutResponse {
+  subscription_id: number | null;
+  plan_name: string;
+  status: string;
+  starts_at: string | null;
+  renews_at: string | null;
+  billing_order_id: number;
+  payment_id: number | null;
+  invoice_id: number | null;
+  checkout: {
+    provider: string | null;
+    gateway_order_id: string | null;
+    status: string | null;
+    checkout_url: string | null;
+    confirm_url: string | null;
+    expires_at: string | null;
+  };
+}
+
+export interface ApiBillingCancelSubscriptionResponse {
+  message: string;
+  cancel_effective: 'period_end' | 'immediately';
+  access_until: string | null;
+  subscription: ApiBillingSubscription;
+}
+
 /** POST /api/v1/auth/forgot-password — Request */
 export interface ForgotPasswordPayload {
   login: string;
@@ -28,8 +481,41 @@ export interface ForgotPasswordPayload {
 /** POST /api/v1/auth/forgot-password — Response.data */
 export interface ForgotPasswordResponse {
   message: string;
+  session_token?: string;
   method: 'whatsapp' | 'email';
+  destination_masked?: string;
   expires_in?: number;
+  resend_in?: number;
+  debug_code?: string;
+}
+
+export interface ForgotPasswordRequestOtpResponse extends ForgotPasswordResponse {
+  session_token: string;
+  destination_masked: string;
+  expires_in: number;
+  resend_in: number;
+}
+
+/** POST /api/v1/auth/forgot-password/resend-otp — Request */
+export interface ForgotPasswordResendOtpPayload {
+  session_token: string;
+}
+
+/** POST /api/v1/auth/forgot-password/resend-otp — Response.data */
+export interface ForgotPasswordResendOtpResponse extends ForgotPasswordRequestOtpResponse {}
+
+/** POST /api/v1/auth/forgot-password/verify-otp — Request */
+export interface ForgotPasswordVerifyOtpPayload {
+  session_token: string;
+  code: string;
+}
+
+/** POST /api/v1/auth/forgot-password/verify-otp — Response.data */
+export interface ForgotPasswordVerifyOtpResponse {
+  message: string;
+  session_token: string;
+  method: 'whatsapp' | 'email';
+  destination_masked: string;
 }
 
 /** POST /api/v1/auth/reset-password — Request */
@@ -38,6 +524,15 @@ export interface ResetPasswordPayload {
   code: string;
   password: string;
   password_confirmation: string;
+  device_name?: string;
+}
+
+/** POST /api/v1/auth/reset-password — Request for OTP-verified reset */
+export interface ResetPasswordWithOtpPayload {
+  session_token: string;
+  password: string;
+  password_confirmation: string;
+  device_name?: string;
 }
 
 /** POST /api/v1/auth/reset-password — Response.data */
@@ -45,6 +540,24 @@ export interface ResetPasswordResponse {
   message: string;
   user: ApiUser;
   token: string;
+}
+
+/** PATCH /api/v1/auth/me/password — Request */
+export interface UpdatePasswordPayload {
+  current_password: string;
+  password: string;
+  password_confirmation: string;
+}
+
+/** Generic success payload with a message */
+export interface MessageResponse {
+  message: string;
+}
+
+/** POST /api/v1/auth/me/avatar — Response.data */
+export interface AvatarUploadResponse {
+  avatar_path: string;
+  avatar_url: string;
 }
 
 // ─── User (UserResource) ──────────────────────────────────
@@ -122,6 +635,44 @@ export interface MeAccess {
   accessible_modules: string[];
   modules: Array<{ key: string; enabled: boolean; visible: boolean }>;
   feature_flags: Record<string, boolean>;
+  entitlements: MeResolvedEntitlements;
+}
+
+export interface MeResolvedEntitlements {
+  version: number;
+  organization_type: string | null;
+  modules: {
+    live_gallery: boolean;
+    wall: boolean;
+    play: boolean;
+    hub: boolean;
+    whatsapp_ingestion: boolean;
+    analytics_advanced: boolean;
+  };
+  limits: {
+    max_active_events: number | null;
+    retention_days: number | null;
+  };
+  branding: {
+    white_label: boolean;
+    custom_domain: boolean;
+  };
+  source_summary: Array<{
+    source_type: 'subscription';
+    status: string;
+    plan_id: number | null;
+    plan_key: string | null;
+    plan_name: string | null;
+    billing_cycle: string | null;
+    starts_at: string | null;
+    trial_ends_at: string | null;
+    renews_at: string | null;
+    ends_at: string | null;
+    canceled_at: string | null;
+    cancel_at_period_end: boolean;
+    cancellation_effective_at: string | null;
+    active: boolean;
+  }>;
 }
 
 export interface MeSubscription {
@@ -131,6 +682,48 @@ export interface MeSubscription {
   status: string;
   trial_ends_at: string | null;
   renews_at: string | null;
+  ends_at: string | null;
+  canceled_at: string | null;
+  cancel_at_period_end: boolean;
+  cancellation_effective_at: string | null;
+}
+
+export interface ApiEventPackage {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  target_audience: 'direct_customer' | 'partner' | 'both';
+  is_active: boolean;
+  sort_order: number;
+  default_price: ApiEventPackagePrice | null;
+  prices: ApiEventPackagePrice[];
+  features: ApiEventPackageFeature[];
+  feature_map: Record<string, unknown>;
+  modules: {
+    hub: boolean;
+    wall: boolean;
+    play: boolean;
+  };
+  limits: {
+    retention_days: number | null;
+    max_photos: number | null;
+  };
+}
+
+export interface ApiEventPackagePrice {
+  id: number;
+  billing_mode: 'one_time';
+  currency: string;
+  amount_cents: number;
+  is_active: boolean;
+  is_default: boolean;
+}
+
+export interface ApiEventPackageFeature {
+  id: number;
+  feature_key: string;
+  feature_value: string | null;
 }
 
 // ─── Access Matrix ─────────────────────────────────────────
@@ -140,6 +733,7 @@ export interface AccessMatrixResponse {
   permissions: string[];
   modules: Array<{ key: string; enabled: boolean; visible: boolean }>;
   features: Record<string, boolean>;
+  entitlements: MeResolvedEntitlements;
 }
 
 // ─── Organization (OrganizationResource) ───────────────────
@@ -181,13 +775,16 @@ export interface ApiEvent {
   event_type: string;
   status: string;
   visibility: string;
-  moderation_mode: string;
+  moderation_mode: 'none' | 'manual' | 'ai' | string;
+  commercial_mode?: 'none' | 'subscription_covered' | 'trial' | 'single_purchase' | 'bonus' | 'manual_override';
   starts_at: string | null;
   ends_at: string | null;
   location_name: string | null;
   description: string | null;
   cover_image_path: string | null;
+  cover_image_url?: string | null;
   logo_path: string | null;
+  logo_url?: string | null;
   qr_code_path: string | null;
   primary_color: string | null;
   secondary_color: string | null;
@@ -195,15 +792,1309 @@ export interface ApiEvent {
   upload_url: string | null;
   upload_api_url?: string | null;
   retention_days: number | null;
+  current_entitlements?: Record<string, unknown> | null;
   created_by: number;
   created_at: string;
   updated_at: string;
+  organization_name?: string | null;
+  organization_slug?: string | null;
+  client_name?: string | null;
+  content_moderation?: ApiEventContentModerationSettings | null;
+  face_search?: ApiEventFaceSearchSettings | null;
+  media_intelligence?: ApiEventMediaIntelligenceSettings | null;
+  enabled_modules?: string[];
+  module_count?: number;
+  wall?: ApiEventWallSummary | null;
   client?: any;
   modules?: Array<{ module_key: string; is_enabled: boolean }>;
   channels?: any[];
   banners?: any[];
   team_members?: any[];
   media_count?: number;
+}
+
+export interface ApiEventWallSummary {
+  id: number;
+  wall_code: string | null;
+  is_enabled: boolean;
+  status: string | null;
+  public_url: string | null;
+}
+
+export interface ApiEventFaceSearchSettings {
+  id: number | null;
+  event_id: number;
+  provider_key: 'noop' | string;
+  embedding_model_key: string;
+  vector_store_key: 'pgvector' | string;
+  enabled: boolean;
+  min_face_size_px: number;
+  min_quality_score: number;
+  search_threshold: number;
+  top_k: number;
+  allow_public_selfie_search: boolean;
+  selfie_retention_hours: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ApiEventContentModerationSettings {
+  id: number | null;
+  event_id: number;
+  enabled: boolean;
+  provider_key: 'openai' | 'noop' | string;
+  mode: 'enforced' | 'observe_only' | string | null;
+  threshold_version: string | null;
+  hard_block_thresholds: {
+    nudity: number;
+    violence: number;
+    self_harm: number;
+  };
+  review_thresholds: {
+    nudity: number;
+    violence: number;
+    self_harm: number;
+  };
+  fallback_mode: 'review' | 'block' | string;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ApiEventMediaIntelligenceSettings {
+  id: number | null;
+  event_id: number;
+  enabled: boolean;
+  provider_key: 'vllm' | 'noop' | string;
+  model_key: string;
+  mode: 'enrich_only' | 'gate' | string;
+  prompt_version: string | null;
+  approval_prompt: string | null;
+  caption_style_prompt: string | null;
+  response_schema_version: string | null;
+  timeout_ms: number;
+  fallback_mode: 'review' | 'skip' | string;
+  require_json_output: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ApiEventModuleFlags {
+  live: boolean;
+  wall: boolean;
+  play: boolean;
+  hub: boolean;
+}
+
+export interface ApiEventMenuItem {
+  key: 'overview' | 'uploads' | 'moderation' | 'gallery' | 'wall' | 'play' | 'hub' | 'analytics';
+  label: string;
+  visible: boolean;
+}
+
+export interface ApiEventStats {
+  media_total: number;
+  media_pending: number;
+  media_approved: number;
+  media_published: number;
+  active_modules: number;
+}
+
+export interface ApiEventPublicLink {
+  key: 'gallery' | 'upload' | 'wall' | 'hub' | 'play' | 'find_me';
+  label: string;
+  enabled: boolean;
+  identifier_type: 'slug' | 'upload_slug' | 'wall_code';
+  identifier: string | null;
+  url: string | null;
+  api_url: string | null;
+  qr_value: string | null;
+}
+
+export interface ApiEventPublicIdentifier {
+  value: string | null;
+  editable: boolean;
+  regenerates: Array<'gallery' | 'upload' | 'wall' | 'hub' | 'play' | 'find_me'>;
+}
+
+export interface ApiEventPublicLinksPayload {
+  links: Record<'gallery' | 'upload' | 'wall' | 'hub' | 'play' | 'find_me', ApiEventPublicLink>;
+  identifiers: Record<'slug' | 'upload_slug' | 'wall_code', ApiEventPublicIdentifier>;
+}
+
+export type ApiHubLayoutKey = 'classic-cover' | 'hero-cards' | 'minimal-center';
+
+export type ApiHubThemeKey = 'midnight' | 'sunset' | 'pearl' | 'wedding' | 'quince' | 'corporate';
+
+export type ApiHubBlockKey = 'hero' | 'meta_cards' | 'welcome' | 'countdown' | 'info_grid' | 'cta_list' | 'social_strip' | 'sponsor_strip';
+
+export type ApiHubSocialProviderKey =
+  | 'instagram'
+  | 'whatsapp'
+  | 'tiktok'
+  | 'youtube'
+  | 'spotify'
+  | 'website'
+  | 'map'
+  | 'tickets';
+
+export interface ApiHubThemeTokens {
+  page_background: string;
+  page_accent: string;
+  surface_background: string;
+  surface_border: string;
+  text_primary: string;
+  text_secondary: string;
+  hero_overlay_color: string;
+}
+
+export interface ApiHubHeroBlockConfig {
+  enabled: boolean;
+  show_logo: boolean;
+  show_badge: boolean;
+  show_meta_cards: boolean;
+  height: 'sm' | 'md' | 'lg';
+  overlay_opacity: number;
+}
+
+export interface ApiHubMetaCardsBlockConfig {
+  enabled: boolean;
+  show_date: boolean;
+  show_location: boolean;
+  style: 'glass' | 'solid' | 'minimal';
+}
+
+export interface ApiHubWelcomeBlockConfig {
+  enabled: boolean;
+  style: 'card' | 'inline' | 'bubble';
+}
+
+export interface ApiHubCtaListBlockConfig {
+  enabled: boolean;
+  style: 'solid' | 'outline' | 'soft';
+  size: 'sm' | 'md' | 'lg';
+  icon_position: 'left' | 'top';
+}
+
+export interface ApiHubCountdownBlockConfig {
+  enabled: boolean;
+  style: 'cards' | 'inline' | 'minimal';
+  target_mode: 'event_start' | 'custom';
+  target_at: string | null;
+  title: string;
+  completed_message: string;
+  hide_after_start: boolean;
+}
+
+export interface ApiHubInfoGridItem {
+  id: string;
+  title: string;
+  value: string;
+  description: string | null;
+  icon: HubButtonIconKey;
+  is_visible: boolean;
+}
+
+export interface ApiHubInfoGridBlockConfig {
+  enabled: boolean;
+  title: string;
+  style: 'cards' | 'minimal' | 'highlight';
+  columns: 2 | 3;
+  items: ApiHubInfoGridItem[];
+}
+
+export interface ApiHubSocialItem {
+  id: string;
+  provider: ApiHubSocialProviderKey;
+  label: string;
+  href: string | null;
+  icon: HubButtonIconKey;
+  is_visible: boolean;
+  opens_in_new_tab: boolean;
+}
+
+export interface ApiHubSocialStripBlockConfig {
+  enabled: boolean;
+  style: 'icons' | 'chips' | 'cards';
+  size: 'sm' | 'md' | 'lg';
+  items: ApiHubSocialItem[];
+}
+
+export interface ApiHubSponsorItem {
+  id: string;
+  name: string;
+  subtitle: string | null;
+  logo_path: string | null;
+  href: string | null;
+  is_visible: boolean;
+  opens_in_new_tab: boolean;
+}
+
+export interface ApiHubSponsorStripBlockConfig {
+  enabled: boolean;
+  title: string;
+  style: 'logos' | 'cards' | 'compact';
+  items: ApiHubSponsorItem[];
+}
+
+export interface ApiHubBuilderConfig {
+  version: 1;
+  layout_key: ApiHubLayoutKey;
+  theme_key: ApiHubThemeKey;
+  theme_tokens: ApiHubThemeTokens;
+  block_order: ApiHubBlockKey[];
+  blocks: {
+    hero: ApiHubHeroBlockConfig;
+    meta_cards: ApiHubMetaCardsBlockConfig;
+    welcome: ApiHubWelcomeBlockConfig;
+    countdown: ApiHubCountdownBlockConfig;
+    info_grid: ApiHubInfoGridBlockConfig;
+    cta_list: ApiHubCtaListBlockConfig;
+    social_strip: ApiHubSocialStripBlockConfig;
+    sponsor_strip: ApiHubSponsorStripBlockConfig;
+  };
+}
+
+export interface ApiEventDetail extends ApiEvent {
+  module_flags: ApiEventModuleFlags;
+  menu: ApiEventMenuItem[];
+  stats: ApiEventStats;
+  public_links: Record<'gallery' | 'upload' | 'wall' | 'hub' | 'play' | 'find_me', ApiEventPublicLink>;
+  public_identifiers: Record<'slug' | 'upload_slug' | 'wall_code', ApiEventPublicIdentifier>;
+  wall?: ApiEventWallSummary | null;
+  play?: {
+    id: number;
+    is_enabled: boolean;
+    memory_enabled: boolean;
+    puzzle_enabled: boolean;
+    ranking_enabled: boolean;
+  } | null;
+  hub?: {
+    id: number;
+    is_enabled: boolean;
+    headline: string | null;
+    subheadline: string | null;
+    welcome_text?: string | null;
+    hero_image_path?: string | null;
+    hero_image_url?: string | null;
+    button_style?: ApiHubButtonStyle;
+    buttons?: ApiHubButton[];
+    builder_config?: ApiHubBuilderConfig;
+    show_gallery_button: boolean;
+    show_upload_button: boolean;
+    show_wall_button: boolean;
+    show_play_button: boolean;
+  } | null;
+}
+
+export interface ApiEventCommercialStatus {
+  event_id: number;
+  commercial_mode: 'none' | 'subscription_covered' | 'trial' | 'single_purchase' | 'bonus' | 'manual_override';
+  subscription_summary: {
+    source_type: 'subscription';
+    status: string;
+    plan_id: number;
+    plan_key: string | null;
+    plan_name: string | null;
+    billing_cycle: string | null;
+    starts_at: string | null;
+    trial_ends_at: string | null;
+    renews_at: string | null;
+    ends_at: string | null;
+  } | null;
+  purchase_summary: {
+    source_type: 'event_purchase';
+    catalog_type: 'event_package' | 'legacy_plan';
+    status: string;
+    plan_id: number | null;
+    plan_key: string | null;
+    plan_name: string | null;
+    package_id: number | null;
+    package_code: string | null;
+    package_name: string | null;
+    price_snapshot_cents: number | null;
+    currency: string | null;
+    purchased_at: string | null;
+  } | null;
+  grants_summary: Array<{
+    id: number;
+    source_type: 'subscription' | 'event_purchase' | 'trial' | 'bonus' | 'manual_override' | null;
+    source_id: number | null;
+    package_id: number | null;
+    status: string | null;
+    priority: number | null;
+    merge_strategy: 'expand' | 'replace' | 'restrict' | null;
+    starts_at: string | null;
+    ends_at: string | null;
+    granted_by_user_id: number | null;
+    granted_by_name: string | null;
+    notes: string | null;
+    active: boolean;
+  }>;
+  event_modules: {
+    live: boolean;
+    wall: boolean;
+    play: boolean;
+    hub: boolean;
+  };
+  resolved_entitlements: Record<string, unknown>;
+}
+
+export type HubButtonIconKey =
+  | 'camera'
+  | 'image'
+  | 'monitor'
+  | 'gamepad'
+  | 'link'
+  | 'calendar'
+  | 'map-pin'
+  | 'ticket'
+  | 'music'
+  | 'gift'
+  | 'sparkles'
+  | 'message-circle'
+  | 'instagram';
+
+export interface ApiHubButtonStyle {
+  background_color: string;
+  text_color: string;
+  outline_color: string;
+}
+
+export interface ApiHubButton {
+  id: string;
+  type: 'preset' | 'custom';
+  preset_key: 'upload' | 'gallery' | 'wall' | 'play' | null;
+  label: string;
+  icon: HubButtonIconKey;
+  href: string | null;
+  resolved_url: string | null;
+  is_visible: boolean;
+  is_available: boolean;
+  opens_in_new_tab: boolean;
+  background_color: string | null;
+  text_color: string | null;
+  outline_color: string | null;
+  sort_order: number;
+}
+
+export interface ApiHubIconOption {
+  value: HubButtonIconKey;
+  label: string;
+}
+
+export interface ApiHubPresetActionOption {
+  preset_key: 'upload' | 'gallery' | 'wall' | 'play';
+  label: string;
+  icon: HubButtonIconKey;
+  description: string;
+  is_available: boolean;
+  resolved_url: string | null;
+}
+
+export interface ApiHubButtonInsight {
+  button_id: string;
+  label: string;
+  type: 'preset' | 'custom' | 'social' | 'sponsor';
+  preset_key: 'upload' | 'gallery' | 'wall' | 'play' | null;
+  icon: HubButtonIconKey;
+  resolved_url: string | null;
+  is_visible: boolean;
+  clicks: number;
+  last_clicked_at: string | null;
+}
+
+export interface ApiHubTimelinePoint {
+  date: string;
+  page_views: number;
+  button_clicks: number;
+  ctr: number;
+}
+
+export interface ApiEventHubInsightsResponse {
+  summary: {
+    page_views: number;
+    unique_visitors: number;
+    button_clicks: number;
+    ctr: number;
+    active_buttons: number;
+    last_activity_at: string | null;
+  };
+  buttons: ApiHubButtonInsight[];
+  top_buttons: ApiHubButtonInsight[];
+  timeline: ApiHubTimelinePoint[];
+  window_days: 7 | 30 | 90;
+  generated_at: string;
+}
+
+export interface ApiEventHubSettingsResponse {
+  event: ApiEvent;
+  links: {
+    hub_url: string | null;
+    hub_api_url: string | null;
+    gallery_url: string | null;
+    upload_url: string | null;
+    wall_url: string | null;
+    play_url: string | null;
+  };
+  settings: {
+    id: number;
+    event_id: number;
+    is_enabled: boolean;
+    headline: string | null;
+    subheadline: string | null;
+    welcome_text: string | null;
+    hero_image_path: string | null;
+    hero_image_url: string | null;
+    button_style: ApiHubButtonStyle;
+    buttons: ApiHubButton[];
+    builder_config: ApiHubBuilderConfig;
+    sponsor: unknown[];
+    extra_links: unknown[];
+    created_at: string | null;
+    updated_at: string | null;
+  };
+  options: {
+    icons: ApiHubIconOption[];
+    preset_actions: ApiHubPresetActionOption[];
+  };
+}
+
+export interface ApiPublicHubResponse {
+  event: {
+    id: number;
+    title: string;
+    slug: string;
+    starts_at: string | null;
+    location_name: string | null;
+    description: string | null;
+    cover_image_path: string | null;
+    cover_image_url: string | null;
+    logo_path: string | null;
+    logo_url: string | null;
+    primary_color: string | null;
+    secondary_color: string | null;
+    public_url: string | null;
+  };
+  hub: {
+    headline: string | null;
+    subheadline: string | null;
+    welcome_text: string | null;
+    hero_image_url: string | null;
+    button_style: ApiHubButtonStyle;
+    builder_config: ApiHubBuilderConfig;
+    buttons: ApiHubButton[];
+  };
+}
+
+export interface ApiHubHeroUploadResponse {
+  path: string;
+  url: string;
+}
+
+export interface ApiHubPreset {
+  id: number;
+  organization_id: number;
+  name: string;
+  description: string | null;
+  theme_key: ApiHubThemeKey;
+  layout_key: ApiHubLayoutKey;
+  source_event: {
+    id: number;
+    title: string;
+    slug: string;
+  } | null;
+  creator: {
+    id: number;
+    name: string;
+  } | null;
+  payload: {
+    button_style: ApiHubButtonStyle;
+    builder_config: ApiHubBuilderConfig;
+    buttons: ApiHubButton[];
+  };
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ApiWallSettings {
+  interval_ms: number;
+  queue_limit: number;
+  selection_mode: ApiWallSelectionMode;
+  event_phase: ApiWallEventPhase;
+  selection_policy: ApiWallSelectionPolicy;
+  layout: string;
+  transition_effect: string;
+  background_url: string | null;
+  partner_logo_url: string | null;
+  show_qr: boolean;
+  show_branding: boolean;
+  show_neon: boolean;
+  neon_text: string | null;
+  neon_color: string | null;
+  show_sender_credit: boolean;
+  instructions_text: string | null;
+}
+
+export type ApiWallSelectionMode =
+  | 'balanced'
+  | 'live'
+  | 'inclusive'
+  | 'editorial'
+  | 'custom';
+
+export type ApiWallEventPhase =
+  | 'reception'
+  | 'flow'
+  | 'party'
+  | 'closing';
+
+export interface ApiWallSelectionPolicy {
+  max_eligible_items_per_sender: number;
+  max_replays_per_item: number;
+  low_volume_max_items: number;
+  medium_volume_max_items: number;
+  replay_interval_low_minutes: number;
+  replay_interval_medium_minutes: number;
+  replay_interval_high_minutes: number;
+  sender_cooldown_seconds: number;
+  sender_window_limit: number;
+  sender_window_minutes: number;
+  avoid_same_sender_if_alternative_exists: boolean;
+  avoid_same_duplicate_cluster_if_alternative_exists: boolean;
+}
+
+export type ApiWallPersistentStorage =
+  | 'none'
+  | 'localstorage'
+  | 'indexeddb'
+  | 'cache_api'
+  | 'unavailable'
+  | 'unknown';
+
+export interface ApiWallHeartbeatPayload {
+  player_instance_id: string;
+  runtime_status: 'booting' | 'idle' | 'playing' | 'paused' | 'stopped' | 'expired' | 'error';
+  connection_status: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error';
+  current_item_id?: string | null;
+  current_sender_key?: string | null;
+  ready_count: number;
+  loading_count: number;
+  error_count: number;
+  stale_count: number;
+  cache_enabled: boolean;
+  persistent_storage: ApiWallPersistentStorage;
+  cache_usage_bytes?: number | null;
+  cache_quota_bytes?: number | null;
+  cache_hit_count: number;
+  cache_miss_count: number;
+  cache_stale_fallback_count: number;
+  last_sync_at?: string | null;
+  last_fallback_reason?: string | null;
+}
+
+export interface ApiWallDiagnosticsSummary {
+  health_status: 'idle' | 'healthy' | 'degraded' | 'offline';
+  total_players: number;
+  online_players: number;
+  offline_players: number;
+  degraded_players: number;
+  ready_count: number;
+  loading_count: number;
+  error_count: number;
+  stale_count: number;
+  cache_enabled_players: number;
+  persistent_storage_players: number;
+  cache_hit_rate_avg: number;
+  cache_usage_bytes_max?: number | null;
+  cache_quota_bytes_max?: number | null;
+  cache_stale_fallback_count: number;
+  last_seen_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface ApiWallDiagnosticsPlayer {
+  player_instance_id: string;
+  health_status: 'healthy' | 'degraded' | 'offline';
+  is_online: boolean;
+  runtime_status: ApiWallHeartbeatPayload['runtime_status'];
+  connection_status: ApiWallHeartbeatPayload['connection_status'];
+  current_item_id?: string | null;
+  current_sender_key?: string | null;
+  ready_count: number;
+  loading_count: number;
+  error_count: number;
+  stale_count: number;
+  cache_enabled: boolean;
+  persistent_storage: ApiWallPersistentStorage;
+  cache_usage_bytes?: number | null;
+  cache_quota_bytes?: number | null;
+  cache_hit_count: number;
+  cache_miss_count: number;
+  cache_stale_fallback_count: number;
+  cache_hit_rate: number;
+  last_sync_at?: string | null;
+  last_seen_at?: string | null;
+  last_fallback_reason?: string | null;
+  updated_at?: string | null;
+}
+
+export interface ApiWallDiagnosticsResponse {
+  summary: ApiWallDiagnosticsSummary;
+  players: ApiWallDiagnosticsPlayer[];
+  updated_at?: string | null;
+}
+
+export interface ApiWallSimulationSummary {
+  selection_mode: ApiWallSelectionMode;
+  selection_mode_label: string;
+  event_phase: ApiWallEventPhase;
+  event_phase_label: string;
+  queue_items: number;
+  active_senders: number;
+  estimated_first_appearance_seconds?: number | null;
+  monopolization_risk: 'low' | 'medium' | 'high';
+  freshness_intensity: 'low' | 'medium' | 'high';
+  fairness_level: 'low' | 'medium' | 'high';
+}
+
+export interface ApiWallSimulationPreviewItem {
+  position: number;
+  eta_seconds: number;
+  item_id: string;
+  sender_name: string;
+  sender_key: string;
+  duplicate_cluster_key?: string | null;
+  is_featured: boolean;
+  is_replay: boolean;
+  created_at?: string | null;
+}
+
+export interface ApiWallSimulationResponse {
+  summary: ApiWallSimulationSummary;
+  sequence_preview: ApiWallSimulationPreviewItem[];
+  explanation: string[];
+}
+
+export interface ApiWallSettingsResponse {
+  id: number;
+  event_id: number;
+  wall_code: string;
+  is_enabled: boolean;
+  status: string;
+  status_label: string;
+  public_url: string;
+  settings: ApiWallSettings;
+  diagnostics_summary: ApiWallDiagnosticsSummary;
+  expires_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ApiWallOption {
+  value: string;
+  label: string;
+}
+
+export interface ApiWallSelectionModeOption extends ApiWallOption {
+  value: ApiWallSelectionMode;
+  description: string;
+  selection_policy: ApiWallSelectionPolicy;
+}
+
+export interface ApiWallEventPhaseOption extends ApiWallOption {
+  value: ApiWallEventPhase;
+  description: string;
+}
+
+export interface ApiWallOptionsResponse {
+  layouts: ApiWallOption[];
+  transitions: ApiWallOption[];
+  statuses: ApiWallOption[];
+  selection_modes: ApiWallSelectionModeOption[];
+  event_phases: ApiWallEventPhaseOption[];
+}
+
+export interface ApiWallActionResponse {
+  message: string;
+  status: string;
+  wall_code?: string;
+}
+
+export type ApiWallPlayerCommand = 'clear-cache' | 'revalidate-assets' | 'reinitialize-engine';
+
+export interface ApiWallPlayerCommandResponse {
+  message: string;
+  command: ApiWallPlayerCommand;
+  issued_at: string;
+}
+
+export interface ApiEventMediaItem {
+  id: number;
+  event_id: number;
+  event_title?: string | null;
+  event_slug?: string | null;
+  event_status?: string | null;
+  event_moderation_mode?: string | null;
+  event_face_search_enabled?: boolean;
+  event_allow_public_selfie_search?: boolean;
+  media_type: 'image' | 'video' | string;
+  channel: 'upload' | 'link' | 'whatsapp' | 'telegram' | 'qrcode' | string;
+  status: 'received' | 'processing' | 'pending_moderation' | 'approved' | 'published' | 'rejected' | 'error' | string;
+  processing_status: string | null;
+  moderation_status: string | null;
+  publication_status: string | null;
+  safety_status?: string | null;
+  face_index_status?: string | null;
+  vlm_status?: string | null;
+  decision_source?: 'none_mode' | 'manual_review' | 'ai_safety' | 'ai_vlm' | 'user_override' | string | null;
+  decision_overridden_at?: string | null;
+  decision_overridden_by_user_id?: number | null;
+  decision_override_reason?: string | null;
+  pipeline_version?: string | null;
+  mime_type?: string | null;
+  original_filename?: string | null;
+  client_filename?: string | null;
+  duplicate_group_key?: string | null;
+  is_duplicate_candidate?: boolean;
+  sender_name: string;
+  caption: string | null;
+  thumbnail_url: string | null;
+  preview_url?: string | null;
+  original_url?: string | null;
+  created_at: string | null;
+  published_at: string | null;
+  is_featured: boolean;
+  is_pinned?: boolean;
+  sort_order?: number;
+  width?: number | null;
+  height?: number | null;
+  orientation?: 'portrait' | 'landscape' | 'square' | string | null;
+}
+
+export interface ApiEventMediaVariant {
+  id: number;
+  variant_key: string;
+  disk: string | null;
+  path: string | null;
+  url: string | null;
+  mime_type: string | null;
+  width: number | null;
+  height: number | null;
+  size_bytes: number | null;
+}
+
+export interface ApiMediaProcessingRun {
+  id: number;
+  run_type: string;
+  stage_key?: string | null;
+  provider_key?: string | null;
+  provider_version?: string | null;
+  model_key?: string | null;
+  model_snapshot?: string | null;
+  input_ref?: string | null;
+  decision_key?: string | null;
+  queue_name?: string | null;
+  worker_ref?: string | null;
+  result_json?: Record<string, unknown> | null;
+  metrics_json?: Record<string, unknown> | null;
+  cost_units?: number | null;
+  idempotency_key?: string | null;
+  status: string;
+  attempts: number;
+  error_message: string | null;
+  failure_class?: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface ApiEventMediaSafetyEvaluationSummary {
+  id: number;
+  provider_key?: string | null;
+  provider_version?: string | null;
+  model_key?: string | null;
+  model_snapshot?: string | null;
+  threshold_version?: string | null;
+  decision: string;
+  blocked: boolean;
+  review_required: boolean;
+  category_scores?: Record<string, number>;
+  reason_codes?: string[];
+  completed_at: string | null;
+}
+
+export interface ApiEventMediaVlmEvaluationSummary {
+  id: number;
+  provider_key?: string | null;
+  provider_version?: string | null;
+  model_key?: string | null;
+  model_snapshot?: string | null;
+  prompt_version?: string | null;
+  response_schema_version?: string | null;
+  mode_applied?: string | null;
+  decision: string;
+  review_required: boolean;
+  reason?: string | null;
+  short_caption?: string | null;
+  tags?: string[];
+  tokens_input?: number | null;
+  tokens_output?: number | null;
+  completed_at: string | null;
+}
+
+export interface ApiEventMediaDetail extends ApiEventMediaItem {
+  title: string | null;
+  source_label: string | null;
+  original_filename: string | null;
+  client_filename?: string | null;
+  perceptual_hash?: string | null;
+  mime_type: string | null;
+  size_bytes: number | null;
+  duration_seconds: number | null;
+  preview_url: string | null;
+  original_url: string | null;
+  decision_override?: {
+    source: 'none_mode' | 'manual_review' | 'ai_safety' | 'ai_vlm' | 'user_override' | string | null;
+    overridden_at: string | null;
+    overridden_by_user_id: number | null;
+    overridden_by?: {
+      id: number;
+      name: string;
+      email: string | null;
+    } | null;
+    reason: string | null;
+  } | null;
+  variants: ApiEventMediaVariant[];
+  processing_runs: ApiMediaProcessingRun[];
+  latest_safety_evaluation?: ApiEventMediaSafetyEvaluationSummary | null;
+  latest_vlm_evaluation?: ApiEventMediaVlmEvaluationSummary | null;
+  indexed_faces_count?: number | null;
+}
+
+export interface ApiFaceSearchRequestSummary {
+  id: number;
+  event_id: number;
+  requester_type: string;
+  requester_user_id: number | null;
+  status: string;
+  consent_version: string | null;
+  selfie_storage_strategy: string | null;
+  faces_detected: number;
+  query_face_quality_score: number | null;
+  top_k: number;
+  best_distance: number | null;
+  result_photo_ids: number[];
+  created_at: string | null;
+  expires_at: string | null;
+}
+
+export interface ApiFaceSearchMatch {
+  rank: number;
+  event_media_id: number;
+  best_distance: number;
+  best_quality_score: number | null;
+  best_face_area_ratio: number | null;
+  matched_face_ids: number[];
+  media: ApiEventMediaItem;
+}
+
+export interface ApiFaceSearchResponse {
+  request: ApiFaceSearchRequestSummary;
+  total_results: number;
+  results: ApiFaceSearchMatch[];
+}
+
+export interface PublicFaceSearchBootstrap {
+  event: {
+    id: number;
+    title: string;
+    slug: string;
+    cover_image_path: string | null;
+    cover_image_url: string | null;
+    logo_path: string | null;
+    logo_url: string | null;
+    primary_color: string | null;
+    secondary_color: string | null;
+    starts_at: string | null;
+    location_name: string | null;
+  };
+  search: {
+    enabled: boolean;
+    status: 'available' | 'disabled' | 'inactive' | string;
+    reason: string | null;
+    message: string;
+    instructions: string;
+    consent_required: boolean;
+    consent_version: string;
+    selfie_retention_hours: number;
+    top_k: number;
+  };
+  links: {
+    find_me_url: string;
+    find_me_api_url: string;
+    gallery_url: string | null;
+    hub_url: string | null;
+  };
+}
+
+// ─── Play ──────────────────────────────────────────────────
+
+export interface PlayCatalogItem {
+  key: string;
+  name: string;
+  description: string | null;
+  enabled: boolean;
+  supports_ranking: boolean;
+  supports_photo_assets: boolean;
+  config_schema: Record<string, unknown>;
+}
+
+export interface PlayGameAssetMedia {
+  id: number;
+  thumbnail_url: string | null;
+  mime_type: string | null;
+  width: number | null;
+  height: number | null;
+}
+
+export interface PlayGameAsset {
+  id: number;
+  media_id: number;
+  role: string;
+  sort_order: number;
+  metadata: Record<string, unknown>;
+  media?: PlayGameAssetMedia;
+}
+
+export interface PlayEventGame {
+  id: number;
+  uuid: string;
+  event_id: number;
+  game_type_key: string | null;
+  game_type_name: string | null;
+  title: string;
+  slug: string;
+  is_active: boolean;
+  sort_order: number;
+  ranking_enabled: boolean;
+  settings: Record<string, unknown>;
+  assets?: PlayGameAsset[];
+  assets_count?: number;
+  sessions_count?: number;
+  rankings_count?: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface EventPlaySettings {
+  is_enabled: boolean;
+  memory_enabled: boolean;
+  puzzle_enabled: boolean;
+  memory_card_count: number;
+  puzzle_piece_count: number;
+  auto_refresh_assets: boolean;
+  ranking_enabled: boolean;
+}
+
+export interface EventPlayManagerResponse {
+  event: {
+    id: number;
+    title: string;
+    slug: string;
+    status: string | null;
+  };
+  settings: EventPlaySettings;
+  catalog: PlayCatalogItem[];
+  games: PlayEventGame[];
+}
+
+export interface PublicPlayEventManifest {
+  event: {
+    id: number;
+    title: string;
+    slug: string;
+    cover_image_url: string | null;
+    logo_url: string | null;
+    primary_color: string | null;
+    secondary_color: string | null;
+  };
+  settings: {
+    is_enabled: boolean;
+    ranking_enabled: boolean;
+    auto_refresh_assets: boolean;
+  };
+  games: PlayEventGame[];
+  pwa?: {
+    installable: boolean;
+    min_version: string | null;
+  };
+}
+
+export interface PlayRuntimeAsset {
+  id: string;
+  url: string | null;
+  width?: number | null;
+  height?: number | null;
+  mimeType?: string | null;
+  role?: string;
+  sortOrder?: number;
+  orientation?: 'portrait' | 'landscape' | 'square' | null;
+  variantKey?: string | null;
+  deliveryProfile?: string | null;
+  sourceWidth?: number | null;
+  sourceHeight?: number | null;
+}
+
+export interface PlayRankingEntry {
+  position: number | null;
+  player_identifier: string;
+  player_name: string | null;
+  best_score: number;
+  best_time_ms: number | null;
+  best_moves: number | null;
+  total_sessions: number;
+  total_wins: number;
+  last_played_at: string | null;
+  metrics: Record<string, unknown>;
+}
+
+export interface PlayGameSession {
+  uuid: string;
+  event_game_id: number;
+  player_identifier: string;
+  player_name: string | null;
+  status: string;
+  started_at: string | null;
+  last_activity_at?: string | null;
+  expires_at?: string | null;
+  finished_at: string | null;
+  result: Record<string, unknown>;
+  score: number | null;
+  time_ms: number | null;
+}
+
+export interface PlayRestoreMove {
+  moveNumber: number;
+  type: string;
+  payload?: Record<string, unknown>;
+  occurredAt?: string | null;
+}
+
+export interface PlayResumeState {
+  lastAcceptedMoveNumber: number;
+  serverElapsedMs: number;
+  moves: PlayRestoreMove[];
+}
+
+export interface PlaySessionAnalytics {
+  total_moves: number;
+  unique_move_types: number;
+  move_type_breakdown: Record<string, number>;
+  last_move_number: number | null;
+  first_move_at: string | null;
+  last_move_at: string | null;
+  elapsed_ms: number | null;
+  activity_window_ms: number;
+  completed: boolean;
+  score: number | null;
+  time_ms: number | null;
+  moves_reported: number | null;
+  mistakes: number | null;
+  accuracy: number | null;
+}
+
+export interface PlayGameAnalytics {
+  total_sessions: number;
+  finished_sessions: number;
+  abandoned_sessions: number;
+  active_sessions: number;
+  completion_rate: number;
+  unique_players: number;
+  total_moves: number;
+  average_score: number | null;
+  average_time_ms: number | null;
+  average_moves: number | null;
+  best_score: number | null;
+  last_finished_at: string | null;
+}
+
+export interface PlayAnalyticsTimelinePoint {
+  date: string;
+  sessions: number;
+  finished_sessions: number;
+  abandoned_sessions: number;
+  unique_players: number;
+  total_moves: number;
+  average_score: number | null;
+  best_score: number | null;
+}
+
+export interface PlayAdminSession extends PlayGameSession {
+  game: {
+    id: number;
+    uuid: string;
+    title: string;
+    slug: string;
+    game_type_key: string | null;
+    game_type_name: string | null;
+  } | null;
+  move_count: number | null;
+  moves_reported: number | null;
+  mistakes: number | null;
+  accuracy: number | null;
+  completed: boolean;
+}
+
+export interface PlayAnalyticsGameItem {
+  game: PlayEventGame;
+  analytics: PlayGameAnalytics;
+}
+
+export interface PlayAnalyticsResponse {
+  filters: {
+    play_game_id: number | null;
+    date_from: string | null;
+    date_to: string | null;
+    status: string | null;
+    search: string | null;
+    session_limit: number;
+  };
+  summary: PlayGameAnalytics;
+  timeline: PlayAnalyticsTimelinePoint[];
+  games: PlayAnalyticsGameItem[];
+  recent_sessions: PlayAdminSession[];
+}
+
+export interface PublicPlayGameResponse {
+  game: PlayEventGame;
+  runtime: {
+    assets: PlayRuntimeAsset[];
+    ranking: PlayRankingEntry[];
+    last_plays: PlayGameSession[];
+    analytics: PlayGameAnalytics;
+    realtime: {
+      channel: string;
+      events: {
+        leaderboard_updated: string;
+      };
+    };
+  };
+}
+
+export interface StartPlaySessionPayload {
+  player_identifier?: string;
+  player_name?: string;
+  playerIdentifier?: string;
+  displayName?: string | null;
+  device?: {
+    platform?: string;
+    viewportWidth?: number;
+    viewportHeight?: number;
+    pixelRatio?: number;
+    connection?: {
+      saveData?: boolean;
+      effectiveType?: string;
+      downlink?: number;
+    };
+  };
+}
+
+export interface StartPlaySessionResponse {
+  sessionUuid: string;
+  eventGameId: number;
+  gameKey: string;
+  sessionSeed?: string;
+  resumeToken?: string;
+  status?: string;
+  startedAt?: string | null;
+  lastActivityAt?: string | null;
+  expiresAt?: string | null;
+  authoritativeScoring?: boolean;
+  session?: {
+    uuid: string;
+    resumeToken: string | null;
+    status: string;
+    startedAt: string | null;
+    lastActivityAt: string | null;
+    expiresAt: string | null;
+    authoritativeScoring: boolean;
+    seed: string;
+  };
+  player: {
+    identifier: string;
+    name: string | null;
+  };
+  settings: Record<string, unknown>;
+  assets: PlayRuntimeAsset[];
+  analytics: PlaySessionAnalytics;
+  restore?: PlayResumeState | null;
+}
+
+export interface FinishPlaySessionPayload {
+  score?: number;
+  completed?: boolean;
+  time_ms?: number;
+  moves?: number;
+  mistakes?: number;
+  accuracy?: number;
+  metadata?: Record<string, unknown>;
+  clientResult?: {
+    score?: number;
+    completed?: boolean;
+    timeMs?: number;
+    moves?: number;
+    mistakes?: number;
+    accuracy?: number;
+    metadata?: Record<string, unknown>;
+  };
+}
+
+export interface StorePlayMovesPayload {
+  batchNumber?: number;
+  moves: Array<{
+    move_number: number;
+    move_type: string;
+    payload?: Record<string, unknown>;
+    occurred_at?: string;
+  }>;
+}
+
+export interface HeartbeatPlaySessionPayload {
+  state: 'visible' | 'hidden' | 'backgrounded';
+  reason?: string;
+  elapsedMs?: number;
+}
+
+export interface HeartbeatPlaySessionResponse {
+  session: PlayGameSession;
+  analytics: PlaySessionAnalytics;
+}
+
+export interface ResumePlaySessionPayload {
+  resumeToken: string;
+}
+
+export interface ResumePlaySessionResponse extends StartPlaySessionResponse {}
+
+export interface StorePlayMovesResponse {
+  session: PlayGameSession;
+  accepted_moves: number;
+  analytics: PlaySessionAnalytics;
+}
+
+export interface PlaySessionAnalyticsResponse {
+  session: PlayGameSession;
+  analytics: PlaySessionAnalytics;
+}
+
+export interface FinishPlaySessionResponse {
+  session: PlayGameSession;
+  status: string;
+  result: Record<string, unknown>;
+  authoritative_result?: Record<string, unknown>;
+  analytics: PlaySessionAnalytics;
+  leaderboard: PlayRankingEntry[];
+  last_plays: PlayGameSession[];
+  game_analytics: PlayGameAnalytics;
 }
 
 // ─── Pagination ────────────────────────────────────────────
@@ -213,6 +2104,35 @@ export interface PaginatedMeta {
   per_page: number;
   total: number;
   last_page: number;
+  request_id: string;
+}
+
+export interface ModerationStatsMeta {
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  featured: number;
+  pinned: number;
+}
+
+export interface MediaCatalogStatsMeta {
+  total: number;
+  images: number;
+  videos: number;
+  pending: number;
+  published: number;
+  featured: number;
+  pinned: number;
+  duplicates: number;
+  face_indexed: number;
+}
+
+export interface CursorPaginatedMeta {
+  per_page: number;
+  next_cursor: string | null;
+  prev_cursor: string | null;
+  has_more: boolean;
   request_id: string;
 }
 
@@ -260,7 +2180,7 @@ export interface PublicEventUploadBootstrap {
     max_files: number;
     max_file_size_mb: number;
     accept_hint: string;
-    moderation_mode: 'auto' | 'manual' | string;
+    moderation_mode: 'none' | 'manual' | 'ai' | string;
     instructions: string;
   };
   links: {

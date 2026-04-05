@@ -1,0 +1,387 @@
+import type {
+  ApiWallEventPhaseOption,
+  ApiWallOptionsResponse,
+  ApiWallSelectionModeOption,
+  ApiWallSettings,
+} from '@/lib/api-types';
+
+export const fallbackOptions: ApiWallOptionsResponse = {
+  layouts: [
+    { value: 'auto', label: 'Automatico' },
+    { value: 'fullscreen', label: 'Tela cheia' },
+    { value: 'polaroid', label: 'Polaroid' },
+    { value: 'split', label: 'Split' },
+    { value: 'cinematic', label: 'Cinematografico' },
+  ],
+  transitions: [
+    { value: 'fade', label: 'Fade' },
+    { value: 'slide', label: 'Slide' },
+    { value: 'zoom', label: 'Zoom' },
+    { value: 'flip', label: 'Flip' },
+    { value: 'none', label: 'Nenhuma' },
+  ],
+  statuses: [],
+  event_phases: [
+    {
+      value: 'reception',
+      label: 'Recepcao',
+      description: 'Mais cuidado com repeticao enquanto o evento ainda esta enchendo.',
+    },
+    {
+      value: 'flow',
+      label: 'Fluxo',
+      description: 'Equilibrio padrao entre novidade, replay e fairness.',
+    },
+    {
+      value: 'party',
+      label: 'Festa',
+      description: 'Ritmo mais vivo e menor atraso para valorizar o pico da festa.',
+    },
+    {
+      value: 'closing',
+      label: 'Encerramento',
+      description: 'Ritmo mais contemplativo com mais elasticidade para reprises finais.',
+    },
+  ],
+  selection_modes: [
+    {
+      value: 'balanced',
+      label: 'Equilibrado',
+      description: 'Distribui melhor entre convidados e evita monopolizacao do telao.',
+      selection_policy: {
+        max_eligible_items_per_sender: 4,
+        max_replays_per_item: 2,
+        low_volume_max_items: 6,
+        medium_volume_max_items: 12,
+        replay_interval_low_minutes: 8,
+        replay_interval_medium_minutes: 12,
+        replay_interval_high_minutes: 20,
+        sender_cooldown_seconds: 60,
+        sender_window_limit: 3,
+        sender_window_minutes: 10,
+        avoid_same_sender_if_alternative_exists: true,
+        avoid_same_duplicate_cluster_if_alternative_exists: true,
+      },
+    },
+    {
+      value: 'live',
+      label: 'Ao vivo',
+      description: 'Valoriza fotos recem-chegadas sem perder a justica basica da fila.',
+      selection_policy: {
+        max_eligible_items_per_sender: 5,
+        max_replays_per_item: 3,
+        low_volume_max_items: 6,
+        medium_volume_max_items: 12,
+        replay_interval_low_minutes: 5,
+        replay_interval_medium_minutes: 8,
+        replay_interval_high_minutes: 12,
+        sender_cooldown_seconds: 30,
+        sender_window_limit: 4,
+        sender_window_minutes: 10,
+        avoid_same_sender_if_alternative_exists: true,
+        avoid_same_duplicate_cluster_if_alternative_exists: true,
+      },
+    },
+    {
+      value: 'inclusive',
+      label: 'Inclusivo',
+      description: 'Prioriza mostrar pessoas diferentes antes de repetir remetentes.',
+      selection_policy: {
+        max_eligible_items_per_sender: 3,
+        max_replays_per_item: 1,
+        low_volume_max_items: 6,
+        medium_volume_max_items: 12,
+        replay_interval_low_minutes: 10,
+        replay_interval_medium_minutes: 14,
+        replay_interval_high_minutes: 20,
+        sender_cooldown_seconds: 90,
+        sender_window_limit: 2,
+        sender_window_minutes: 10,
+        avoid_same_sender_if_alternative_exists: true,
+        avoid_same_duplicate_cluster_if_alternative_exists: true,
+      },
+    },
+    {
+      value: 'editorial',
+      label: 'Editorial',
+      description: 'Mantem a justica base, mas abre mais espaco para destaques da operacao.',
+      selection_policy: {
+        max_eligible_items_per_sender: 4,
+        max_replays_per_item: 2,
+        low_volume_max_items: 6,
+        medium_volume_max_items: 12,
+        replay_interval_low_minutes: 8,
+        replay_interval_medium_minutes: 12,
+        replay_interval_high_minutes: 16,
+        sender_cooldown_seconds: 45,
+        sender_window_limit: 3,
+        sender_window_minutes: 10,
+        avoid_same_sender_if_alternative_exists: true,
+        avoid_same_duplicate_cluster_if_alternative_exists: true,
+      },
+    },
+    {
+      value: 'custom',
+      label: 'Personalizado',
+      description: 'Usa combinacao manual de fairness, cooldown e backlog por remetente.',
+      selection_policy: {
+        max_eligible_items_per_sender: 4,
+        max_replays_per_item: 2,
+        low_volume_max_items: 6,
+        medium_volume_max_items: 12,
+        replay_interval_low_minutes: 8,
+        replay_interval_medium_minutes: 12,
+        replay_interval_high_minutes: 20,
+        sender_cooldown_seconds: 60,
+        sender_window_limit: 3,
+        sender_window_minutes: 10,
+        avoid_same_sender_if_alternative_exists: true,
+        avoid_same_duplicate_cluster_if_alternative_exists: true,
+      },
+    },
+  ],
+};
+
+export const HELP_TEXTS = {
+  realtime: {
+    title: 'Atualizacao ao vivo',
+    description: 'Mostra se esta tela esta recebendo as mudancas do telao na hora.',
+    why: 'Isso ajuda a saber se suas mudancas estao sendo sincronizadas imediatamente com o telao.',
+  },
+  wallCode: {
+    title: 'Codigo do telao',
+    description: 'E o codigo unico que identifica este telao no sistema.',
+    why: 'Ele serve para conectar o telao certo e facilitar suporte quando houver mais de um telao no evento.',
+  },
+  slideshowSection: {
+    title: 'Ajustes da exibicao',
+    description: 'Aqui voce define como as fotos e videos vao aparecer no telao.',
+    why: 'Esses ajustes controlam ritmo, volume de conteudo e elementos visuais que aparecem junto das midias.',
+  },
+  selectionMode: {
+    title: 'Modo do telao',
+    description: 'Define o comportamento principal da fila antes dos ajustes finos.',
+    why: 'Com presets o operador escolhe uma abordagem segura sem precisar entender o algoritmo inteiro.',
+  },
+  eventPhase: {
+    title: 'Fase do evento',
+    description: 'Aplica um contexto operacional por cima do modo escolhido sem destruir seus ajustes manuais.',
+    why: 'A fase ajuda o wall a se comportar diferente na recepcao, no pico da festa e no encerramento sem exigir reconfiguracao completa.',
+  },
+  fairnessSection: {
+    title: 'Fila e justica',
+    description: 'Regras que impedem uma unica pessoa de dominar a exibicao.',
+    why: 'Esse bloco controla cooldown, backlog por remetente e a chance de alternar convidados na tela.',
+  },
+  senderCooldown: {
+    title: 'Tempo minimo entre aparicoes',
+    description: 'E o tempo que o mesmo remetente precisa esperar para voltar a aparecer quando ha alternativas.',
+    why: 'Isso deixa o wall mais coletivo e reduz a sensacao de spam durante picos de envio.',
+  },
+  senderWindowLimit: {
+    title: 'Limite por janela',
+    description: 'Controla quantas fotos do mesmo remetente podem aparecer dentro de uma janela de tempo.',
+    why: 'Serve para evitar monopolizacao sem precisar bloquear ou apagar o que a pessoa enviou.',
+  },
+  senderWindowMinutes: {
+    title: 'Janela de controle',
+    description: 'Define a duracao da janela usada no limite por remetente.',
+    why: 'Janelas menores reagem mais rapido a rajadas; janelas maiores distribuem melhor eventos longos.',
+  },
+  maxEligibleItems: {
+    title: 'Backlog elegivel por remetente',
+    description: 'Quantidade maxima de midias do mesmo remetente disputando a tela ao mesmo tempo.',
+    why: 'O restante continua no backlog, mas entra de forma gradual para nao sequestrar a fila.',
+  },
+  maxReplaysPerItem: {
+    title: 'Maximo de repeticoes por foto',
+    description: 'Controla quantas vezes a mesma foto ou video pode voltar para a fila antes do fallback de continuidade.',
+    why: 'Esse guardrail reduz a sensacao de loop infinito quando a festa esta com pouco conteudo novo, sem apagar o item da fila.',
+  },
+  replayAdaptiveSection: {
+    title: 'Replay adaptativo por volume',
+    description: 'Ajusta o tempo minimo de repeticao conforme o tamanho atual da fila do telao.',
+    why: 'Com pouco conteudo, o replay pode ser mais rapido. Com muita fila, o replay fica mais longo para priorizar novidade.',
+  },
+  lowVolumeThreshold: {
+    title: 'Faixa de fila baixa',
+    description: 'Quantidade maxima de itens para o wall ainda ser tratado como fila baixa.',
+    why: 'Quando o evento esta vazio, o wall precisa girar mais rapido sem parecer travado.',
+  },
+  mediumVolumeThreshold: {
+    title: 'Faixa de fila media',
+    description: 'Quantidade maxima de itens para a fila media antes de virar fila alta.',
+    why: 'Isso define quando o selector endurece o replay para proteger recencia e variedade.',
+  },
+  replayIntervalLow: {
+    title: 'Replay na fila baixa',
+    description: 'Tempo minimo para uma foto voltar quando a fila esta curta.',
+    why: 'Use menos tempo em festa com pouco envio; use mais tempo se o loop estiver cansando.',
+  },
+  replayIntervalMedium: {
+    title: 'Replay na fila media',
+    description: 'Tempo minimo para repetir quando o evento esta em volume intermediario.',
+    why: 'Esse e o comportamento mais comum da noite e precisa equilibrar novidade e continuidade.',
+  },
+  replayIntervalHigh: {
+    title: 'Replay na fila alta',
+    description: 'Tempo minimo para repetir quando ha muito conteudo novo no wall.',
+    why: 'Em pico de festa, o replay precisa ser mais raro para dar espaco ao que acabou de chegar.',
+  },
+  antiDuplicateSequence: {
+    title: 'Anti-sequencia parecida',
+    description: 'Evita puxar duas midias muito parecidas da mesma pessoa quando existir alternativa.',
+    why: 'Isso reduz sequencias de fotos quase iguais e melhora a percepcao de variedade no telao.',
+  },
+  interval: {
+    title: 'Tempo de cada midia',
+    description: 'E o tempo que cada foto ou video fica na tela antes de passar para o proximo.',
+    why: 'Use menos tempo quando entram muitas fotos e mais tempo quando voce quer dar destaque maior a cada envio.',
+  },
+  queueLimit: {
+    title: 'Maximo de midias na fila',
+    description: 'E a quantidade maxima de midias que o telao mantem prontas para exibir.',
+    why: 'Isso existe para o telao nao ficar muito atrasado mostrando conteudo antigo. Quando a fila lota, o sistema prioriza as midias mais recentes.',
+  },
+  qrOverlay: {
+    title: 'Mostrar QR para envio',
+    description: 'Mostra um QR Code no canto do telao para o publico abrir a pagina de envio de fotos.',
+    why: 'Deixe ligado quando quiser incentivar novas participacoes durante o evento.',
+  },
+  branding: {
+    title: 'Mostrar marca',
+    description: 'Controla a exibicao da assinatura visual do telao, como a marca da plataforma e elementos de identidade.',
+    why: 'Desative se quiser uma tela mais limpa ou se o evento pedir uma apresentacao sem marcas visiveis.',
+  },
+  senderCredit: {
+    title: 'Mostrar nome de quem enviou',
+    description: 'Mostra no telao o nome de quem enviou a foto ou video.',
+    why: 'Isso da reconhecimento ao participante, mas pode poluir a tela em eventos mais formais.',
+  },
+  neonToggle: {
+    title: 'Chamada em destaque',
+    description: 'Liga uma frase fixa em destaque no canto do telao.',
+    why: 'Serve para reforcar o nome da festa, uma hashtag ou uma chamada curta para o publico.',
+  },
+  neonText: {
+    title: 'Texto da chamada',
+    description: 'E a frase que vai aparecer nesse destaque visual.',
+    why: 'Prefira um texto curto e facil de ler de longe, como o nome do evento ou uma hashtag.',
+  },
+  neonColor: {
+    title: 'Cor da chamada',
+    description: 'Define a cor do destaque fixo do texto neon.',
+    why: 'Use uma cor com bom contraste para o texto continuar visivel no telao.',
+  },
+  layoutSection: {
+    title: 'Visual e troca de fotos',
+    description: 'Essas opcoes mudam a forma como as midias entram, ocupam a tela e trocam entre si.',
+    why: 'Com isso voce adapta o telao ao estilo do evento sem precisar trocar o sistema de exibicao.',
+  },
+  layout: {
+    title: 'Estilo da exibicao',
+    description: 'Define o estilo visual de exibicao das fotos e videos.',
+    why: 'O modo Automatico tenta escolher a melhor composicao sozinho. Os demais forcam um estilo especifico.',
+  },
+  transition: {
+    title: 'Animacao de troca',
+    description: 'E a animacao usada quando uma midia sai da tela e a proxima entra.',
+    why: 'Animacoes suaves deixam o telao mais elegante. Animacoes fortes chamam mais atencao, mas podem cansar em exibicoes longas.',
+  },
+  idleSection: {
+    title: 'Mensagem quando nao ha fotos',
+    description: 'Essa mensagem aparece quando o telao esta ligado, mas ainda nao ha midias para exibir.',
+    why: 'E o melhor lugar para explicar ao publico como participar e enviar conteudo.',
+  },
+  instructions: {
+    title: 'Texto de espera',
+    description: 'Texto mostrado enquanto o telao espera novas fotos e videos.',
+    why: 'Use uma frase simples ensinando a escanear o QR Code ou acessar o link de envio.',
+  },
+  advancedActions: {
+    title: 'Acoes avancadas',
+    description: 'Esses comandos fazem mudancas fortes no funcionamento do telao.',
+    why: 'Use apenas quando precisar encerrar ou parar totalmente a exibicao. Eles afetam o telao imediatamente.',
+  },
+  saving: {
+    title: 'Salvar alteracoes',
+    description: 'As mudancas feitas nesta tela ficam locais ate voce tocar em salvar.',
+    why: 'Isso reduz chamadas em redes lentas e evita varias atualizacoes pequenas enquanto voce ainda esta ajustando o telao.',
+  },
+} as const;
+
+export type WallHelpKey = keyof typeof HELP_TEXTS;
+
+export const WALL_SELECTION_MODE_OPTIONS: ApiWallSelectionModeOption[] = fallbackOptions.selection_modes;
+export const WALL_EVENT_PHASE_OPTIONS: ApiWallEventPhaseOption[] = fallbackOptions.event_phases;
+export const WALL_COOLDOWN_OPTIONS = [0, 30, 45, 60, 90, 120];
+export const WALL_WINDOW_MINUTE_OPTIONS = [5, 10, 15];
+export const WALL_VOLUME_THRESHOLD_OPTIONS = [4, 6, 8, 10, 12, 16, 20, 24, 30, 40, 50];
+export const WALL_REPLAY_MINUTE_OPTIONS = [5, 8, 10, 12, 14, 16, 20, 25, 30];
+
+export const WALL_TOGGLE_FIELDS: Array<{
+  key: keyof Pick<ApiWallSettings, 'show_qr' | 'show_branding' | 'show_sender_credit' | 'show_neon'>;
+  label: string;
+  helpKey: WallHelpKey;
+  description: string;
+}> = [
+  {
+    key: 'show_qr',
+    label: 'Mostrar QR para envio',
+    helpKey: 'qrOverlay',
+    description: 'Mantem o QR visivel no telao quando habilitado.',
+  },
+  {
+    key: 'show_branding',
+    label: 'Mostrar marca',
+    helpKey: 'branding',
+    description: 'Liga ou desliga a assinatura visual do telao.',
+  },
+  {
+    key: 'show_sender_credit',
+    label: 'Mostrar nome de quem enviou',
+    helpKey: 'senderCredit',
+    description: 'Mostra o nome de quem enviou a midia na exibicao.',
+  },
+  {
+    key: 'show_neon',
+    label: 'Chamada em destaque',
+    helpKey: 'neonToggle',
+    description: 'Mostra uma chamada destacada sobre o layout do telao.',
+  },
+];
+
+export const WALL_SLIDER_FIELDS: Array<{
+  key: keyof Pick<ApiWallSettings, 'interval_ms' | 'queue_limit'>;
+  label: string;
+  helpKey: WallHelpKey;
+  min: number;
+  max: number;
+  step: number;
+  formatValue: (value: number) => string;
+  toControlValue: (value: number) => number;
+  fromControlValue: (value: number) => number;
+}> = [
+  {
+    key: 'interval_ms',
+    label: 'Tempo de cada midia',
+    helpKey: 'interval',
+    min: 2,
+    max: 60,
+    step: 1,
+    formatValue: (value) => `${Math.round(value / 1000)}s`,
+    toControlValue: (value) => Math.round(value / 1000),
+    fromControlValue: (value) => value * 1000,
+  },
+  {
+    key: 'queue_limit',
+    label: 'Maximo de midias na fila',
+    helpKey: 'queueLimit',
+    min: 5,
+    max: 500,
+    step: 5,
+    formatValue: (value) => String(value),
+    toControlValue: (value) => value,
+    fromControlValue: (value) => value,
+  },
+];

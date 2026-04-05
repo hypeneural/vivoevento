@@ -11,7 +11,9 @@ class EventPurchase extends Model
         'organization_id',
         'client_id',
         'event_id',
+        'billing_order_id',
         'plan_id',
+        'package_id',
         'price_snapshot_cents',
         'currency',
         'features_snapshot_json',
@@ -36,9 +38,19 @@ class EventPurchase extends Model
         return $this->belongsTo(\App\Modules\Events\Models\Event::class);
     }
 
+    public function billingOrder(): BelongsTo
+    {
+        return $this->belongsTo(BillingOrder::class, 'billing_order_id');
+    }
+
     public function plan(): BelongsTo
     {
         return $this->belongsTo(\App\Modules\Plans\Models\Plan::class);
+    }
+
+    public function package(): BelongsTo
+    {
+        return $this->belongsTo(EventPackage::class, 'package_id');
     }
 
     public function purchasedBy(): BelongsTo

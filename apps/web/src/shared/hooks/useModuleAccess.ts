@@ -4,7 +4,7 @@ import { useAuth } from '@/app/providers/AuthProvider';
  * Hook for checking module access.
  */
 export function useModuleAccess() {
-  const { meAccess, canAccessModule, hasFeature } = useAuth();
+  const { meAccess, meEntitlements, canAccessModule, hasFeature } = useAuth();
 
   return {
     /** Quick check: can user access module? */
@@ -18,5 +18,8 @@ export function useModuleAccess() {
 
     /** Feature flags */
     featureFlags: meAccess?.feature_flags ?? {},
+
+    /** Resolved organization entitlements */
+    entitlements: meEntitlements,
   };
 }

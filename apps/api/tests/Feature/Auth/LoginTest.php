@@ -2,6 +2,7 @@
 
 use App\Modules\Users\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Activitylog\Models\Activity;
 
 // ─── Login ───────────────────────────────────────────────
 
@@ -27,6 +28,18 @@ it('allows login with valid email and password', function () {
             'token',
         ],
     ]);
+
+    $activity = Activity::query()
+        ->where('description', 'Login realizado')
+        ->latest('id')
+        ->first();
+
+    expect($activity)->not->toBeNull();
+    expect($activity?->event)->toBe('auth.login');
+    expect($activity?->subject_type)->toBe(User::class);
+    expect($activity?->subject_id)->toBe($user->id);
+    expect($activity?->causer_id)->toBe($user->id);
+    expect($activity?->properties['login_method'])->toBe('email');
 });
 
 it('rejects login with wrong password', function () {
@@ -72,6 +85,17 @@ it('allows authenticated user to logout', function () {
     $response = $this->apiPost('/auth/logout');
 
     $this->assertApiSuccess($response);
+
+    $activity = Activity::query()
+        ->where('description', 'Logout realizado')
+        ->latest('id')
+        ->first();
+
+    expect($activity)->not->toBeNull();
+    expect($activity?->event)->toBe('auth.logout');
+    expect($activity?->subject_type)->toBe(User::class);
+    expect($activity?->subject_id)->toBe($user->id);
+    expect($activity?->causer_id)->toBe($user->id);
 });
 
 it('rejects logout for unauthenticated user', function () {

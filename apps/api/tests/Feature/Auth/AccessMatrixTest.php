@@ -15,6 +15,7 @@ it('returns access matrix for authenticated user', function () {
             'permissions',
             'modules',
             'features',
+            'entitlements',
         ],
         'meta' => ['request_id'],
     ]);
@@ -26,6 +27,44 @@ it('returns access matrix for authenticated user', function () {
     expect($data['modules'])->toBeArray();
     expect($data['modules'][0])->toHaveKeys(['key', 'enabled', 'visible']);
     expect($data['features'])->toBeArray();
+    expect($data['entitlements'])->toBeArray();
+    expect($data['entitlements'])->toHaveKeys(['modules', 'limits', 'branding', 'source_summary']);
+});
+
+it('derives access matrix features from organization entitlements', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $plan = \App\Modules\Plans\Models\Plan::create([
+        'code' => 'business',
+        'name' => 'Business',
+        'audience' => 'b2b',
+        'status' => 'active',
+    ]);
+
+    $plan->features()->createMany([
+        ['feature_key' => 'wall.enabled', 'feature_value' => 'true'],
+        ['feature_key' => 'play.enabled', 'feature_value' => 'true'],
+        ['feature_key' => 'white_label.enabled', 'feature_value' => 'true'],
+        ['feature_key' => 'custom_domain', 'feature_value' => 'true'],
+        ['feature_key' => 'events.max_active', 'feature_value' => '50'],
+    ]);
+
+    \App\Modules\Billing\Models\Subscription::create([
+        'organization_id' => $organization->id,
+        'plan_id' => $plan->id,
+        'status' => 'active',
+        'billing_cycle' => 'monthly',
+        'starts_at' => now(),
+        'renews_at' => now()->addMonth(),
+    ]);
+
+    $response = $this->apiGet('/access/matrix');
+
+    $this->assertApiSuccess($response);
+    expect($response->json('data.features.wall'))->toBeTrue();
+    expect($response->json('data.features.play_memory'))->toBeTrue();
+    expect($response->json('data.entitlements.branding.white_label'))->toBeTrue();
+    expect($response->json('data.entitlements.limits.max_active_events'))->toBe(50);
 });
 
 it('returns different modules for viewer vs owner', function () {

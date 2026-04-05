@@ -2,17 +2,26 @@
 
 namespace App\Modules\Wall\Http\Controllers;
 
+use App\Modules\Events\Models\Event;
 use App\Modules\Wall\Actions\ExpireWallAction;
 use App\Modules\Wall\Actions\ResetWallAction;
 use App\Modules\Wall\Actions\StartWallAction;
 use App\Modules\Wall\Actions\StopWallAction;
+use App\Modules\Wall\Enums\WallEventPhase;
 use App\Modules\Wall\Enums\WallLayout;
 use App\Modules\Wall\Enums\WallStatus;
 use App\Modules\Wall\Enums\WallTransition;
+use App\Modules\Wall\Http\Requests\RunWallPlayerCommandRequest;
+use App\Modules\Wall\Http\Requests\SimulateWallRequest;
 use App\Modules\Wall\Http\Requests\UpdateWallSettingsRequest;
+use App\Modules\Wall\Http\Resources\WallDiagnosticsResource;
 use App\Modules\Wall\Http\Resources\WallSettingsResource;
+use App\Modules\Wall\Http\Resources\WallSimulationResource;
 use App\Modules\Wall\Models\EventWallSetting;
 use App\Modules\Wall\Services\WallBroadcasterService;
+use App\Modules\Wall\Services\WallDiagnosticsService;
+use App\Modules\Wall\Services\WallSimulationService;
+use App\Modules\Wall\Support\WallSelectionPreset;
 use App\Shared\Http\BaseController;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,36 +30,38 @@ use Illuminate\Support\Str;
 
 class EventWallController extends BaseController
 {
-    // ─── CRUD ─────────────────────────────────────────────
-
-    /**
-     * GET /events/{event}/wall/settings
-     * Show wall settings for an event. Creates defaults if none exist.
-     */
-    public function show(int $event): JsonResponse
+    public function show(Event $event): JsonResponse
     {
-        $settings = EventWallSetting::firstOrCreate(['event_id' => $event]);
+        $this->authorize('viewWall', $event);
+
+        $settings = EventWallSetting::firstOrCreate(['event_id' => $event->id])->load('diagnosticSummary');
 
         return $this->success(
             (new WallSettingsResource($settings))->resolve(),
         );
     }
 
-    /**
-     * PATCH /events/{event}/wall/settings
-     * Update wall settings. Broadcasts changes instantly.
-     */
     public function update(
         UpdateWallSettingsRequest $request,
-        int $event,
+        Event $event,
         WallBroadcasterService $broadcaster,
     ): JsonResponse {
-        $settings = EventWallSetting::firstOrCreate(['event_id' => $event]);
+        $this->authorize('manageWall', $event);
 
-        $settings->update($request->validated());
-        $settings->refresh();
+        $settings = EventWallSetting::firstOrCreate(['event_id' => $event->id]);
+        $data = $request->validated();
 
-        // Broadcast settings change to connected wall players
+        if (array_key_exists('selection_mode', $data) || array_key_exists('selection_policy', $data)) {
+            $mode = $data['selection_mode'] ?? $settings->selection_mode;
+            $data['selection_policy'] = WallSelectionPreset::normalizePolicy(
+                $data['selection_policy'] ?? $settings->selection_policy,
+                $mode,
+            );
+        }
+
+        $settings->update($data);
+        $settings->refresh()->load('diagnosticSummary');
+
         $broadcaster->broadcastSettingsUpdated($settings);
 
         return $this->success(
@@ -58,115 +69,96 @@ class EventWallController extends BaseController
         );
     }
 
-    // ─── Status Controls ──────────────────────────────────
-
-    /**
-     * POST /events/{event}/wall/start
-     * Start the wall — goes live instantly.
-     */
-    public function start(int $event, StartWallAction $action): JsonResponse
+    public function start(Event $event, StartWallAction $action): JsonResponse
     {
-        $settings = $action->execute($event);
+        $this->authorize('manageWall', $event);
+
+        $settings = $action->execute($event->id);
 
         return $this->success([
             'message' => 'Wall iniciado',
-            'status'  => $settings->status->value,
+            'status' => $settings->status->value,
             'wall_code' => $settings->wall_code,
         ]);
     }
 
-    /**
-     * POST /events/{event}/wall/stop
-     * Pause the wall — slides stop, screen stays.
-     */
-    public function stop(int $event, StopWallAction $action): JsonResponse
+    public function stop(Event $event, StopWallAction $action): JsonResponse
     {
-        $settings = $action->execute($event, WallStatus::Paused);
+        $this->authorize('manageWall', $event);
+
+        $settings = $action->execute($event->id, WallStatus::Paused);
 
         return $this->success([
             'message' => 'Wall pausado',
-            'status'  => $settings->status->value,
+            'status' => $settings->status->value,
         ]);
     }
 
-    /**
-     * POST /events/{event}/wall/pause
-     * Alias for stop (pause).
-     */
-    public function pause(int $event, StopWallAction $action): JsonResponse
+    public function pause(Event $event, StopWallAction $action): JsonResponse
     {
-        $settings = $action->execute($event, WallStatus::Paused);
+        $this->authorize('manageWall', $event);
+
+        $settings = $action->execute($event->id, WallStatus::Paused);
 
         return $this->success([
             'message' => 'Wall pausado',
-            'status'  => $settings->status->value,
+            'status' => $settings->status->value,
         ]);
     }
 
-    /**
-     * POST /events/{event}/wall/full-stop
-     * Full stop — disables the wall completely.
-     */
-    public function fullStop(int $event, StopWallAction $action): JsonResponse
+    public function fullStop(Event $event, StopWallAction $action): JsonResponse
     {
-        $settings = $action->execute($event, WallStatus::Stopped);
+        $this->authorize('manageWall', $event);
+
+        $settings = $action->execute($event->id, WallStatus::Stopped);
 
         return $this->success([
             'message' => 'Wall parado completamente',
-            'status'  => $settings->status->value,
+            'status' => $settings->status->value,
         ]);
     }
 
-    /**
-     * POST /events/{event}/wall/expire
-     * Expire the wall — terminal state.
-     */
-    public function expire(int $event, ExpireWallAction $action): JsonResponse
+    public function expire(Event $event, ExpireWallAction $action): JsonResponse
     {
-        $settings = $action->execute($event);
+        $this->authorize('manageWall', $event);
+
+        $settings = $action->execute($event->id);
 
         return $this->success([
             'message' => 'Wall expirado',
-            'status'  => $settings->status->value,
+            'status' => $settings->status->value,
         ]);
     }
 
-    /**
-     * POST /events/{event}/wall/reset
-     * Reset wall to defaults — generates new code.
-     */
-    public function reset(int $event, ResetWallAction $action): JsonResponse
+    public function reset(Event $event, ResetWallAction $action): JsonResponse
     {
-        $settings = $action->execute($event);
+        $this->authorize('manageWall', $event);
+
+        $settings = $action->execute($event->id);
 
         return $this->success([
-            'message'   => 'Wall resetado',
-            'status'    => $settings->status->value,
+            'message' => 'Wall resetado',
+            'status' => $settings->status->value,
             'wall_code' => $settings->wall_code,
         ]);
     }
 
-    // ─── Asset Uploads ────────────────────────────────────
-
-    /**
-     * POST /events/{event}/wall/upload-background
-     * Upload a custom background image.
-     */
     public function uploadBackground(
         Request $request,
-        int $event,
+        Event $event,
         WallBroadcasterService $broadcaster,
     ): JsonResponse {
+        $this->authorize('manageWall', $event);
+
         $request->validate([
             'background' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
-        $settings = EventWallSetting::firstOrCreate(['event_id' => $event]);
+        $settings = EventWallSetting::firstOrCreate(['event_id' => $event->id]);
         $file = $request->file('background');
         $ext = strtolower($file->getClientOriginalExtension());
-        $path = "wall/events/{$event}/backgrounds/" . Str::uuid() . ".{$ext}";
+        $path = "wall/events/{$event->id}/backgrounds/".Str::uuid().".{$ext}";
 
-        // Delete previous background
         if ($settings->background_image_path) {
             Storage::disk('public')->delete($settings->background_image_path);
         }
@@ -174,35 +166,32 @@ class EventWallController extends BaseController
         Storage::disk('public')->put($path, file_get_contents($file->getRealPath()));
 
         $settings->update(['background_image_path' => $path]);
-        $settings->refresh();
+        $settings->refresh()->load('diagnosticSummary');
 
         $broadcaster->broadcastSettingsUpdated($settings);
 
         return $this->success([
             'path' => $path,
-            'url'  => Storage::disk('public')->url($path),
+            'url' => Storage::disk('public')->url($path),
         ]);
     }
 
-    /**
-     * POST /events/{event}/wall/upload-logo
-     * Upload a partner logo.
-     */
     public function uploadLogo(
         Request $request,
-        int $event,
+        Event $event,
         WallBroadcasterService $broadcaster,
     ): JsonResponse {
+        $this->authorize('manageWall', $event);
+
         $request->validate([
             'logo' => ['required', 'image', 'mimes:png,svg,webp', 'max:2048'],
         ]);
 
-        $settings = EventWallSetting::firstOrCreate(['event_id' => $event]);
+        $settings = EventWallSetting::firstOrCreate(['event_id' => $event->id]);
         $file = $request->file('logo');
         $ext = strtolower($file->getClientOriginalExtension());
-        $path = "wall/events/{$event}/partner-logos/" . Str::uuid() . ".{$ext}";
+        $path = "wall/events/{$event->id}/partner-logos/".Str::uuid().".{$ext}";
 
-        // Delete previous logo
         if ($settings->partner_logo_path) {
             Storage::disk('public')->delete($settings->partner_logo_path);
         }
@@ -210,33 +199,91 @@ class EventWallController extends BaseController
         Storage::disk('public')->put($path, file_get_contents($file->getRealPath()));
 
         $settings->update(['partner_logo_path' => $path]);
-        $settings->refresh();
+        $settings->refresh()->load('diagnosticSummary');
 
         $broadcaster->broadcastSettingsUpdated($settings);
 
         return $this->success([
             'path' => $path,
-            'url'  => Storage::disk('public')->url($path),
+            'url' => Storage::disk('public')->url($path),
         ]);
     }
 
-    // ─── Options (enums for admin forms) ──────────────────
+    public function diagnostics(
+        Event $event,
+        WallDiagnosticsService $diagnostics,
+    ): JsonResponse {
+        $this->authorize('viewWall', $event);
 
-    /**
-     * GET /events/{event}/wall/options
-     * Returns available options for the admin form.
-     */
-    public function options(): JsonResponse
-    {
+        $settings = EventWallSetting::firstOrCreate(['event_id' => $event->id])->load('diagnosticSummary');
+        $diagnostics->recalculateSummary($settings, broadcast: false);
+
+        return $this->success(
+            (new WallDiagnosticsResource($diagnostics->diagnosticsPayload($settings)))->resolve(),
+        );
+    }
+
+    public function simulate(
+        SimulateWallRequest $request,
+        Event $event,
+        WallSimulationService $simulation,
+    ): JsonResponse {
+        $this->authorize('viewWall', $event);
+
+        $settings = EventWallSetting::firstOrCreate(['event_id' => $event->id]);
+
+        return $this->success(
+            (new WallSimulationResource(
+                $simulation->simulate($settings, $request->validated()),
+            ))->resolve(),
+        );
+    }
+
+    public function playerCommand(
+        RunWallPlayerCommandRequest $request,
+        Event $event,
+        WallBroadcasterService $broadcaster,
+    ): JsonResponse {
+        $this->authorize('manageWall', $event);
+
+        $settings = EventWallSetting::firstOrCreate(['event_id' => $event->id]);
+        $payload = [
+            'command' => $request->validated('command'),
+            'reason' => $request->validated('reason'),
+            'issued_at' => now()->toIso8601String(),
+        ];
+
+        $broadcaster->broadcastPlayerCommand($settings, $payload);
+
         return $this->success([
-            'layouts'     => collect(WallLayout::cases())->map(fn ($l) => [
-                'value' => $l->value, 'label' => $l->label(),
+            'message' => 'Comando enviado aos players do wall.',
+            'command' => $payload['command'],
+            'issued_at' => $payload['issued_at'],
+        ]);
+    }
+
+    public function options(Request $request): JsonResponse
+    {
+        abort_unless($request->user()?->can('wall.view'), 403);
+
+        return $this->success([
+            'layouts' => collect(WallLayout::cases())->map(fn ($layout) => [
+                'value' => $layout->value,
+                'label' => $layout->label(),
             ]),
-            'transitions' => collect(WallTransition::cases())->map(fn ($t) => [
-                'value' => $t->value, 'label' => $t->label(),
+            'transitions' => collect(WallTransition::cases())->map(fn ($transition) => [
+                'value' => $transition->value,
+                'label' => $transition->label(),
             ]),
-            'statuses'    => collect(WallStatus::cases())->map(fn ($s) => [
-                'value' => $s->value, 'label' => $s->label(),
+            'statuses' => collect(WallStatus::cases())->map(fn ($status) => [
+                'value' => $status->value,
+                'label' => $status->label(),
+            ]),
+            'selection_modes' => WallSelectionPreset::options(),
+            'event_phases' => collect(WallEventPhase::cases())->map(fn ($phase) => [
+                'value' => $phase->value,
+                'label' => $phase->label(),
+                'description' => $phase->description(),
             ]),
         ]);
     }

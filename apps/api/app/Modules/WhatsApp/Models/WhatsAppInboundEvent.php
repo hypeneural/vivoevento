@@ -11,6 +11,8 @@ class WhatsAppInboundEvent extends Model
 {
     public $timestamps = false;
 
+    protected $table = 'whatsapp_inbound_events';
+
     protected $fillable = [
         'instance_id',
         'provider_key',

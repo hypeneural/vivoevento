@@ -22,7 +22,7 @@ export const mockOrganizations: Organization[] = [
     plan: 'Pro Parceiro',
     logoEmoji: '📸',
     branding: { ...DEFAULT_BRANDING },
-    enabledModules: ['dashboard', 'events', 'media', 'moderation', 'gallery', 'wall', 'play', 'hub', 'analytics', 'settings'],
+    enabledModules: ['dashboard', 'events', 'media', 'moderation', 'gallery', 'wall', 'play', 'hub', 'whatsapp', 'analytics', 'settings'],
     status: 'active',
   },
   {
@@ -38,7 +38,7 @@ export const mockOrganizations: Organization[] = [
       accentColor: '#f59e0b',
       mode: 'co-branding',
     },
-    enabledModules: ['dashboard', 'events', 'media', 'moderation', 'gallery', 'wall', 'hub', 'partners', 'clients', 'plans', 'analytics', 'audit', 'settings'],
+    enabledModules: ['dashboard', 'events', 'media', 'moderation', 'gallery', 'wall', 'hub', 'whatsapp', 'partners', 'clients', 'plans', 'analytics', 'audit', 'settings'],
     status: 'active',
   },
   {
@@ -76,7 +76,7 @@ export function buildMockSession(user: User): UserSession {
   const org = mockOrganizations.find(o => o.id === user.organizationId);
   const allPerms = [
     'dashboard.view', 'events.view', 'events.create', 'events.update',
-    'media.view', 'media.moderate', 'gallery.manage', 'wall.manage',
+    'channels.view', 'channels.manage', 'media.view', 'media.moderate', 'gallery.manage', 'wall.manage',
     'play.manage', 'hub.manage', 'partners.view', 'partners.manage',
     'clients.view', 'clients.manage', 'plans.view', 'billing.manage',
     'analytics.view', 'audit.view', 'settings.manage', 'branding.manage',
@@ -87,11 +87,11 @@ export function buildMockSession(user: User): UserSession {
     super_admin: allPerms,
     platform_admin: allPerms.filter(p => !p.startsWith('billing')),
     partner_owner: allPerms.filter(p => !['audit.view', 'partners.manage'].includes(p)),
-    partner_manager: ['dashboard.view', 'events.view', 'events.create', 'events.update', 'media.view', 'media.moderate', 'gallery.manage', 'wall.manage', 'play.manage', 'hub.manage', 'analytics.view', 'settings.manage', 'team.manage'],
-    event_operator: ['dashboard.view', 'events.view', 'media.view', 'media.moderate', 'gallery.manage', 'wall.manage', 'play.manage'],
+    partner_manager: ['dashboard.view', 'events.view', 'events.create', 'events.update', 'channels.view', 'channels.manage', 'media.view', 'media.moderate', 'gallery.manage', 'wall.manage', 'play.manage', 'hub.manage', 'analytics.view', 'settings.manage', 'team.manage'],
+    event_operator: ['dashboard.view', 'events.view', 'channels.view', 'media.view', 'media.moderate', 'gallery.manage', 'wall.manage', 'play.manage'],
     financial: ['dashboard.view', 'plans.view', 'billing.manage', 'analytics.view'],
     partner: ['dashboard.view', 'events.view', 'media.view', 'gallery.manage', 'analytics.view'],
-    viewer: ['dashboard.view', 'events.view', 'gallery.manage'],
+    viewer: ['dashboard.view', 'events.view', 'channels.view', 'gallery.manage'],
   };
 
   return {

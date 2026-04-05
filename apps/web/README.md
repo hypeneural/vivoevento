@@ -2,6 +2,8 @@
 
 **Painel administrativo SPA para a plataforma Evento Vivo.**
 
+Este app continua sendo o painel servido em `admin.eventovivo.com.br`. A landing page publica do dominio principal agora vive em `apps/landing`.
+
 ---
 
 ## Stack

@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Events\Enums\EventModerationMode;
 use App\Modules\Events\Models\Event;
 
 // ─── Event Model ─────────────────────────────────────────
@@ -18,12 +19,47 @@ it('auto-generates upload_slug on creation', function () {
     expect(strlen($event->upload_slug))->toBe(12);
 });
 
-it('detects auto moderation correctly', function () {
-    $event = Event::factory()->create(['moderation_mode' => 'auto']);
-    expect($event->isAutoModeration())->toBeTrue();
+it('detects moderation modes correctly', function () {
+    $event = Event::factory()->create(['moderation_mode' => 'none']);
+    expect($event->isNoModeration())->toBeTrue()
+        ->and($event->isAutoModeration())->toBeTrue()
+        ->and($event->isManualModeration())->toBeFalse()
+        ->and($event->isAiModeration())->toBeFalse();
 
-    $event2 = Event::factory()->create(['moderation_mode' => 'manual']);
-    expect($event2->isAutoModeration())->toBeFalse();
+    $manualEvent = Event::factory()->create(['moderation_mode' => 'manual']);
+    expect($manualEvent->isNoModeration())->toBeFalse()
+        ->and($manualEvent->isManualModeration())->toBeTrue()
+        ->and($manualEvent->isAiModeration())->toBeFalse();
+
+    $aiEvent = Event::factory()->create(['moderation_mode' => 'ai']);
+    expect($aiEvent->isNoModeration())->toBeFalse()
+        ->and($aiEvent->isManualModeration())->toBeFalse()
+        ->and($aiEvent->isAiModeration())->toBeTrue();
+});
+
+it('normalizes legacy moderation mode values', function () {
+    expect(EventModerationMode::normalize('auto'))->toBe('none')
+        ->and(EventModerationMode::fromStorage('auto'))->toBe(EventModerationMode::None)
+        ->and(EventModerationMode::fromStorage('ai'))->toBe(EventModerationMode::Ai)
+        ->and(EventModerationMode::fromStorage(null))->toBeNull();
+});
+
+it('detects face search settings correctly', function () {
+    $event = Event::factory()->create();
+
+    expect($event->isFaceSearchEnabled())->toBeFalse()
+        ->and($event->allowsPublicSelfieSearch())->toBeFalse();
+
+    \Database\Factories\EventFaceSearchSettingFactory::new()->create([
+        'event_id' => $event->id,
+        'enabled' => true,
+        'allow_public_selfie_search' => true,
+    ]);
+
+    $event->refresh()->load('faceSearchSettings');
+
+    expect($event->isFaceSearchEnabled())->toBeTrue()
+        ->and($event->allowsPublicSelfieSearch())->toBeTrue();
 });
 
 it('detects draft status correctly', function () {

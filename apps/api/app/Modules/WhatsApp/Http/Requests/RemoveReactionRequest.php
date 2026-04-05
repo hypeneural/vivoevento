@@ -18,6 +18,7 @@ class RemoveReactionRequest extends FormRequest
             'phone' => ['required', 'string', 'min:10', 'max:40'],
             'message_id' => ['required', 'string', 'max:180'],
             'delay_message' => ['nullable', 'integer', 'min:1', 'max:15'],
+            'from_me' => ['nullable', 'boolean'],
         ];
     }
 }

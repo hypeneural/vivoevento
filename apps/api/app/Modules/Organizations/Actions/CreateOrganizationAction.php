@@ -9,8 +9,10 @@ class CreateOrganizationAction
 {
     public function execute(array $data): Organization
     {
+        $displayName = $data['name'] ?? $data['trade_name'] ?? $data['legal_name'] ?? 'organizacao';
+
         $data['slug'] = Helpers::generateUniqueSlug(
-            $data['name'],
+            $displayName,
             Organization::class
         );
 

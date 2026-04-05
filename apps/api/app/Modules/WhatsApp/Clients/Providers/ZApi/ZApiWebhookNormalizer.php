@@ -20,6 +20,7 @@ class ZApiWebhookNormalizer implements WhatsAppWebhookNormalizerInterface
         $messageType = $this->detectMessageType($payload);
         $chatId = $this->extractChatId($payload);
         $isGroup = $this->isGroupMessage($payload);
+        $caption = $this->extractCaption($payload, $messageType);
 
         return new NormalizedInboundMessageData(
             providerKey: 'zapi',
@@ -35,9 +36,15 @@ class ZApiWebhookNormalizer implements WhatsAppWebhookNormalizerInterface
             text: $this->extractText($payload, $messageType),
             mediaUrl: $this->extractMediaUrl($payload, $messageType),
             mimeType: $this->extractMimeType($payload),
-            caption: $payload['caption'] ?? null,
+            caption: $caption,
             occurredAt: $this->extractTimestamp($payload),
             rawPayload: $payload,
+            callbackType: $payload['type'] ?? null,
+            fromMe: isset($payload['fromMe']) ? (bool) $payload['fromMe'] : null,
+            participantPhone: $payload['participantPhone'] ?? null,
+            participantLid: $payload['participantLid'] ?? null,
+            connectedPhone: $payload['connectedPhone'] ?? null,
+            chatName: $payload['chatName'] ?? null,
         );
     }
 
@@ -84,15 +91,17 @@ class ZApiWebhookNormalizer implements WhatsAppWebhookNormalizerInterface
 
     private function detectEventType(array $payload): string
     {
-        // Z-API can send status updates or message events
-        if (isset($payload['status'])) {
-            return 'status';
-        }
-        if (isset($payload['ack'])) {
-            return 'delivery';
-        }
-
-        return 'message';
+        return match ($payload['type'] ?? null) {
+            'ReceivedCallback' => 'message',
+            'MessageStatusCallback', 'DeliveryCallback' => 'delivery',
+            'ConnectedCallback', 'DisconnectedCallback' => 'status',
+            'PresenceChatCallback' => 'presence',
+            default => match ($payload['_webhook_type'] ?? null) {
+                'delivery' => 'delivery',
+                'status' => 'status',
+                default => 'message',
+            },
+        };
     }
 
     // ─── Field Extraction ──────────────────────────────────
@@ -116,8 +125,7 @@ class ZApiWebhookNormalizer implements WhatsAppWebhookNormalizerInterface
     {
         $chatId = $this->extractChatId($payload);
 
-        // Z-API group IDs end with @g.us
-        if (str_contains($chatId, '@g.us')) {
+        if (str_contains($chatId, '@g.us') || str_ends_with($chatId, '-group')) {
             return true;
         }
 
@@ -126,6 +134,15 @@ class ZApiWebhookNormalizer implements WhatsAppWebhookNormalizerInterface
 
     private function extractSenderPhone(array $payload): ?string
     {
+        if ($this->isGroupMessage($payload)) {
+            return $payload['participantPhone']
+                ?? $payload['participantLid']
+                ?? $payload['senderPhone']
+                ?? $payload['from']
+                ?? $payload['phone']
+                ?? null;
+        }
+
         return $payload['phone']
             ?? $payload['senderPhone']
             ?? $payload['from']
@@ -135,8 +152,8 @@ class ZApiWebhookNormalizer implements WhatsAppWebhookNormalizerInterface
     private function extractSenderName(array $payload): ?string
     {
         return $payload['senderName']
-            ?? $payload['chatName']
             ?? $payload['notifyName']
+            ?? $payload['chatName']
             ?? null;
     }
 
@@ -153,7 +170,7 @@ class ZApiWebhookNormalizer implements WhatsAppWebhookNormalizerInterface
             return $payload['reaction'] ?? null;
         }
 
-        return $payload['caption'] ?? null;
+        return $this->extractCaption($payload, $messageType);
     }
 
     private function extractMediaUrl(array $payload, string $messageType): ?string
@@ -177,21 +194,40 @@ class ZApiWebhookNormalizer implements WhatsAppWebhookNormalizerInterface
 
     private function extractMimeType(array $payload): ?string
     {
-        return $payload['mimetype']
+        $messageType = $this->detectMessageType($payload);
+
+        return $payload[$messageType]['mimeType']
+            ?? $payload[$messageType]['mimetype']
+            ?? $payload['mimetype']
             ?? $payload['mimeType']
             ?? null;
     }
 
     private function extractTimestamp(array $payload): CarbonImmutable
     {
-        if (isset($payload['mompiledentTimestamp'])) {
-            return CarbonImmutable::createFromTimestamp($payload['momentTimestamp']);
+        foreach (['momment', 'mommentTimestamp', 'moment', 'momentTimestamp', 'timestamp'] as $key) {
+            if (! isset($payload[$key])) {
+                continue;
+            }
+
+            $value = $payload[$key];
+
+            if (is_numeric($value)) {
+                return CarbonImmutable::createFromTimestamp((int) $value)->utc();
+            }
+
+            if (is_string($value) && trim($value) !== '') {
+                return CarbonImmutable::parse($value)->utc();
+            }
         }
 
-        if (isset($payload['timestamp'])) {
-            return CarbonImmutable::createFromTimestamp($payload['timestamp']);
-        }
+        return CarbonImmutable::now()->utc();
+    }
 
-        return CarbonImmutable::now();
+    private function extractCaption(array $payload, string $messageType): ?string
+    {
+        return $payload[$messageType]['caption']
+            ?? $payload['caption']
+            ?? null;
     }
 }

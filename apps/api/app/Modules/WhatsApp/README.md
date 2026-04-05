@@ -2,182 +2,210 @@
 
 ## Responsabilidade
 
-Core funcional do domínio WhatsApp — provider-agnostic, com Z-API como primeiro adapter.
+Core funcional do dominio WhatsApp, provider-agnostic, com adapters para Z-API e Evolution API.
 
 Gerencia:
-- Instâncias WhatsApp (CRUD, lifecycle, conexão via QR)
-- Envio de mensagens (texto, imagem, áudio, reação, carrossel, PIX)
-- Menções em grupos (@mentions)
-- Recebimento de webhooks (inbound normalizado)
-- Chats: listagem paginada, pin/unpin
-- Grupos: criar, atualizar (nome/foto/descrição/settings), convidar, participantes, admin, sair
-- Binding de grupo ↔ evento
-- Logs de dispatch (auditoria)
-- Automação de reações
+- Instancias WhatsApp, lifecycle e conexao por QR/pairing.
+- Envio de mensagens e reacoes.
+- Recebimento de webhooks com payload normalizado.
+- Chats remotos via provider.
+- Grupos remotos via provider e bindings internos grupo -> evento.
+- Logs de dispatch e auditoria operacional.
 
 ## Arquitetura Provider-Agnostic
 
-```
-Controller → Service → ProviderResolver → ProviderAdapter → HTTP API do Provider
-                                              ↑
-                                        WhatsAppProviderInterface
-                                              ↑
-                              ┌───────────────┼───────────────┐
-                        ZApiProvider    EvolutionProvider   (futuro)
+```text
+Controller -> Service -> ProviderResolver -> ProviderAdapter -> HTTP API do Provider
+                                       ^
+                                 WhatsAppProviderInterface
+                                       ^
+                       +---------------+---------------+
+                       |                               |
+                  ZApiProvider                EvolutionProvider
 ```
 
-O sistema nunca sabe qual provider está usando. O `WhatsAppProviderResolver`
-resolve o adapter correto pela `provider_key` da instância.
+O modulo nao conhece os detalhes do provider no controller. A resolucao sempre parte da `provider_key` da instancia.
+
+## Escopo atual por provider
+
+### Z-API
+
+- Cobertura completa do contrato atual do modulo: conexao, mensageria, chats e grupos.
+
+### Evolution API
+
+- Conexao: status, detalhes da sessao, QR code, pairing por telefone e disconnect.
+- Mensageria: texto, media, audio, reacao e remocao de reacao.
+- Chats: listagem remota via provider e busca remota de mensagens por chat.
+- Grupos: catalogo remoto, participantes, criar, atualizar nome/foto/descricao, convite, adicionar/remover/promover participantes, aplicar settings suportados e sair do grupo.
+- Limitacoes atuais do contrato: `carousel`, `pix` e `pin/unpin` nao possuem paridade direta na documentacao oficial atual da Evolution dentro deste adapter.
+- Settings sem paridade direta no provider (`require_admin_approval` e `admin_only_add_member`) retornam erro explicito.
 
 ## Entidades
 
-| Model | Tabela | Descrição |
+| Model | Tabela | Descricao |
 |-------|--------|-----------|
-| WhatsAppProvider | whatsapp_providers | Catálogo de providers |
-| WhatsAppInstance | whatsapp_instances | Instância conectada à org |
-| WhatsAppChat | whatsapp_chats | Chat conhecido |
-| WhatsAppMessage | whatsapp_messages | Mensagem inbound/outbound |
-| WhatsAppInboundEvent | whatsapp_inbound_events | Payload bruto webhook |
-| WhatsAppDispatchLog | whatsapp_dispatch_logs | Log de envio |
-| WhatsAppGroupBinding | whatsapp_group_bindings | Grupo ↔ evento |
+| WhatsAppProvider | `whatsapp_providers` | Catalogo de providers |
+| WhatsAppInstance | `whatsapp_instances` | Instancia conectada a org |
+| WhatsAppChat | `whatsapp_chats` | Chat conhecido |
+| WhatsAppMessage | `whatsapp_messages` | Mensagem inbound/outbound |
+| WhatsAppInboundEvent | `whatsapp_inbound_events` | Payload bruto de webhook |
+| WhatsAppDispatchLog | `whatsapp_dispatch_logs` | Log de envio |
+| WhatsAppGroupBinding | `whatsapp_group_bindings` | Grupo -> evento |
 
 ## Rotas
 
-### Webhook (sem auth)
+### Webhook
 
-| Método | Rota | Descrição |
+| Metodo | Rota | Descricao |
 |--------|------|-----------|
-| POST | /webhooks/whatsapp/{provider}/{instanceKey}/inbound | Webhook inbound |
-| POST | /webhooks/whatsapp/{provider}/{instanceKey}/status | Status update |
-| POST | /webhooks/whatsapp/{provider}/{instanceKey}/delivery | Delivery receipt |
+| POST | `/webhooks/whatsapp/{provider}/{instanceKey}/inbound` | Webhook inbound |
+| POST | `/webhooks/whatsapp/{provider}/{instanceKey}/status` | Status update |
+| POST | `/webhooks/whatsapp/{provider}/{instanceKey}/delivery` | Delivery receipt |
 
-### Instâncias
+### Instancias
 
-| Método | Rota | Descrição |
+| Metodo | Rota | Descricao |
 |--------|------|-----------|
-| GET | /whatsapp/instances | Listar instâncias |
-| POST | /whatsapp/instances | Criar instância |
-| GET | /whatsapp/instances/{id} | Detalhes |
-| PATCH | /whatsapp/instances/{id} | Atualizar |
-| DELETE | /whatsapp/instances/{id} | Remover |
+| GET | `/whatsapp/instances` | Listar instancias |
+| POST | `/whatsapp/instances` | Criar instancia |
+| GET | `/whatsapp/instances/{id}` | Detalhes |
+| PATCH | `/whatsapp/instances/{id}` | Atualizar |
+| DELETE | `/whatsapp/instances/{id}` | Remover |
+| POST | `/whatsapp/instances/{id}/test-connection` | Testar integracao |
+| POST | `/whatsapp/instances/{id}/set-default` | Definir instancia padrao |
 
-### Conexão
+### Conexao
 
-| Método | Rota | Descrição |
+| Metodo | Rota | Descricao |
 |--------|------|-----------|
-| GET | /whatsapp/instances/{id}/status | Status da conexão |
-| GET | /whatsapp/instances/{id}/qr-code | QR (bytes) |
-| GET | /whatsapp/instances/{id}/qr-code/image | QR (base64 image) |
-| POST | /whatsapp/instances/{id}/phone-code | Código por telefone |
-| POST | /whatsapp/instances/{id}/disconnect | Desconectar |
-| POST | /whatsapp/instances/{id}/sync-status | Sincronizar status |
+| GET | `/whatsapp/instances/{id}/status` | Status bruto do provider |
+| GET | `/whatsapp/instances/{id}/connection-state` | Estado unificado para frontend |
+| GET | `/whatsapp/instances/{id}/qr-code` | QR em bytes/string |
+| GET | `/whatsapp/instances/{id}/qr-code/image` | QR pronto para renderizacao |
+| POST | `/whatsapp/instances/{id}/phone-code` | Codigo por telefone |
+| POST | `/whatsapp/instances/{id}/disconnect` | Desconectar sessao |
+| POST | `/whatsapp/instances/{id}/sync-status` | Enfileirar sync de status |
 
-### Chats (Provider)
+### Chats
 
-| Método | Rota | Descrição |
+| Metodo | Rota | Descricao |
 |--------|------|-----------|
-| GET | /whatsapp/chats | Listar chats (paginado via provider) |
-| POST | /whatsapp/chats/modify | Fixar/desafixar chat (pin/unpin) |
+| GET | `/whatsapp/chats` | Listar chats remotos do provider |
+| POST | `/whatsapp/chats/find-messages` | Buscar mensagens remotas de um chat |
+| POST | `/whatsapp/chats/modify` | Acao de chat dependente do provider |
 
 ### Mensageria
 
-| Método | Rota | Descrição |
+| Metodo | Rota | Descricao |
 |--------|------|-----------|
-| GET | /whatsapp/messages | Listar mensagens |
-| GET | /whatsapp/messages/{id} | Detalhes |
-| POST | /whatsapp/messages/text | Enviar texto (suporta `mentioned`) |
-| POST | /whatsapp/messages/image | Enviar imagem |
-| POST | /whatsapp/messages/audio | Enviar áudio |
-| POST | /whatsapp/messages/reaction | Enviar reação |
-| POST | /whatsapp/messages/remove-reaction | Remover reação |
-| POST | /whatsapp/messages/carousel | Enviar carrossel |
-| POST | /whatsapp/messages/pix | Enviar botão PIX |
+| GET | `/whatsapp/messages` | Listar mensagens da organizacao |
+| GET | `/whatsapp/messages/{id}` | Detalhes da mensagem |
+| POST | `/whatsapp/messages/text` | Enviar texto |
+| POST | `/whatsapp/messages/image` | Enviar imagem/media |
+| POST | `/whatsapp/messages/audio` | Enviar audio |
+| POST | `/whatsapp/messages/reaction` | Enviar reacao |
+| POST | `/whatsapp/messages/remove-reaction` | Remover reacao |
+| POST | `/whatsapp/messages/carousel` | Enviar carrossel |
+| POST | `/whatsapp/messages/pix` | Enviar botao PIX |
 
-### Group Management (CRUD direto no WhatsApp)
+### Group Management
 
-| Método | Rota | Descrição |
+| Metodo | Rota | Descricao |
 |--------|------|-----------|
-| POST | /whatsapp/group-management/create | Criar grupo |
-| POST | /whatsapp/group-management/{groupId}/update-name | Atualizar nome |
-| POST | /whatsapp/group-management/{groupId}/update-photo | Atualizar foto |
-| POST | /whatsapp/group-management/{groupId}/update-description | Atualizar descrição |
-| POST | /whatsapp/group-management/{groupId}/update-settings | Configurações admin |
-| GET | /whatsapp/group-management/{groupId}/invitation-link | Obter link de convite |
-| POST | /whatsapp/group-management/{groupId}/add-participants | Adicionar participantes |
-| POST | /whatsapp/group-management/{groupId}/remove-participants | Remover participantes |
-| POST | /whatsapp/group-management/{groupId}/promote-admin | Promover a admin |
-| POST | /whatsapp/group-management/{groupId}/leave | Sair do grupo |
+| GET | `/whatsapp/group-management/catalog` | Catalogo remoto de grupos |
+| POST | `/whatsapp/group-management/create` | Criar grupo remoto |
+| POST | `/whatsapp/group-management/{groupId}/update-name` | Atualizar nome |
+| POST | `/whatsapp/group-management/{groupId}/update-photo` | Atualizar foto |
+| POST | `/whatsapp/group-management/{groupId}/update-description` | Atualizar descricao |
+| POST | `/whatsapp/group-management/{groupId}/update-settings` | Atualizar settings |
+| GET | `/whatsapp/group-management/{groupId}/invitation-link` | Obter link de convite |
+| GET | `/whatsapp/group-management/{groupId}/participants` | Listar participantes remotos |
+| POST | `/whatsapp/group-management/{groupId}/add-participants` | Adicionar participantes |
+| POST | `/whatsapp/group-management/{groupId}/remove-participants` | Remover participantes |
+| POST | `/whatsapp/group-management/{groupId}/promote-admin` | Promover a admin |
+| POST | `/whatsapp/group-management/{groupId}/leave` | Sair do grupo |
 
-### Groups / Bindings (vinculação grupo ↔ evento)
+### Group Bindings
 
-| Método | Rota | Descrição |
+| Metodo | Rota | Descricao |
 |--------|------|-----------|
-| GET | /whatsapp/groups | Listar bindings |
-| POST | /whatsapp/groups/{groupId}/bind-event | Vincular grupo |
-| PATCH | /whatsapp/groups/{groupId}/binding | Atualizar binding |
-| DELETE | /whatsapp/groups/{groupId}/binding | Desvincular |
+| GET | `/whatsapp/groups` | Listar bindings |
+| POST | `/whatsapp/groups/{groupId}/bind-event` | Vincular grupo |
+| PATCH | `/whatsapp/groups/{groupId}/binding` | Atualizar binding |
+| DELETE | `/whatsapp/groups/{groupId}/binding` | Desvincular |
 
 ### Logs
 
-| Método | Rota | Descrição |
+| Metodo | Rota | Descricao |
 |--------|------|-----------|
-| GET | /whatsapp/logs/dispatch | Logs de envio |
-| GET | /whatsapp/logs/inbound | Logs de inbound |
+| GET | `/whatsapp/logs/dispatch` | Logs de envio |
+| GET | `/whatsapp/logs/inbound` | Logs de inbound |
 
 ## Filas
 
 | Fila | Prioridade | Uso |
 |------|------------|-----|
-| whatsapp-inbound | ALTA | Processamento de webhooks |
-| whatsapp-send | MÉDIA-ALTA | Envio de mensagens |
-| whatsapp-sync | BAIXA | Polling de status/QR |
+| `whatsapp-inbound` | Alta | Processamento de webhooks |
+| `whatsapp-send` | Media-alta | Envio de mensagens |
+| `whatsapp-sync` | Baixa | Polling de status/QR |
 
-## DTOs
+## DTOs principais
 
-### Envio (Outbound)
+### Envio
+
 | DTO | Uso |
 |-----|-----|
-| SendTextData | Texto + menções (@mentions) |
-| SendImageData | Imagem com caption |
-| SendAudioData | Áudio com waveform |
-| SendReactionData | Reação a mensagem |
-| RemoveReactionData | Remoção de reação |
-| SendCarouselData | Carrossel de cards |
-| SendPixButtonData | Botão PIX com chave |
+| `SendTextData` | Texto e mencoes |
+| `SendImageData` | Imagem/media com caption |
+| `SendAudioData` | Audio |
+| `SendReactionData` | Reacao a mensagem |
+| `RemoveReactionData` | Remocao de reacao |
+| `SendCarouselData` | Carrossel |
+| `SendPixButtonData` | Botao PIX |
 
 ### Grupos
+
 | DTO | Uso |
 |-----|-----|
-| CreateGroupData | Criar grupo com participantes |
-| GroupParticipantsData | Add/remove/promote participantes |
-| UpdateGroupData | Nome/foto/descrição do grupo |
-| UpdateGroupSettingsData | Permissões admin do grupo |
+| `CreateGroupData` | Criar grupo |
+| `GroupParticipantsData` | Add/remove/promote participantes |
+| `UpdateGroupData` | Nome/foto/descricao |
+| `UpdateGroupSettingsData` | Settings de grupo |
 
-### Chats
+### Provider responses
+
 | DTO | Uso |
 |-----|-----|
-| ModifyChatData | Pin/unpin chat |
+| `ProviderStatusData` | Status da conexao |
+| `ProviderConnectionDetailsData` | Perfil e device conectados |
+| `ProviderQrCodeData` | QR code bytes/base64/value |
+| `ProviderHealthCheckData` | Resultado de health check |
+| `ProviderActionResultData` | Resultado de acao generica |
+| `ProviderSendMessageResultData` | Resultado de envio |
+| `ProviderGroupCreatedData` | Grupo criado |
+| `ProviderChatsPageData` | Lista paginada de chats |
+| `ProviderChatMessagesData` | Lista remota de mensagens por chat |
+| `ProviderGroupCatalogData` | Catalogo remoto de grupos |
+| `ProviderGroupParticipantsData` | Participantes remotos de grupo |
 
-### Provider Responses
-| DTO | Uso |
-|-----|-----|
-| ProviderStatusData | Status da conexão |
-| ProviderQrCodeData | QR code bytes/base64 |
-| ProviderActionResultData | Resultado de ação genérica |
-| ProviderSendMessageResultData | Resultado de envio |
-| ProviderGroupCreatedData | Grupo criado (ID + invite link) |
-| ProviderChatsPageData | Lista paginada de chats |
+## Dependencias
 
-## Dependências
+- Organizations para escopo multi-tenant.
+- Events para bindings grupo -> evento.
+- Users para `created_by` e `updated_by`.
+- InboundMedia e MediaProcessing para pipeline posterior.
 
-- Organizations (multi-tenant via HasOrganization)
-- Events (binding grupo ↔ evento)
-- Users (created_by)
-- InboundMedia (pipeline de mídia via listener)
-- MediaProcessing (downstream da pipeline)
+## Idempotencia de inbound
 
-## Pré-requisitos de Infraestrutura
+- `whatsapp_inbound_events` continua servindo como trilha bruta de auditoria.
+- `whatsapp_messages` protege o processamento canonico com unique constraint em
+  `instance_id + direction + provider_message_id`.
+- `WhatsAppInboundRouter` faz lookup rapido e refetch seguro em caso de
+  corrida de insert.
 
-- **APP_KEY** configurado e estável (encrypted casts)
-- Workers do Supervisor/Horizon para filas `whatsapp-*`
-- Log channel `whatsapp` configurado no `config/logging.php`
+## Requisitos de infraestrutura
+
+- `APP_KEY` estavel para encrypted casts.
+- Workers para filas `whatsapp-*`.
+- Canal de log `whatsapp` configurado em `config/logging.php`.

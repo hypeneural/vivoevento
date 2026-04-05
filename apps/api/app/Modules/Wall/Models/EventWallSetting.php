@@ -3,12 +3,17 @@
 namespace App\Modules\Wall\Models;
 
 use App\Modules\Events\Models\Event;
+use App\Modules\Wall\Enums\WallEventPhase;
 use App\Modules\Wall\Enums\WallLayout;
+use App\Modules\Wall\Enums\WallSelectionMode;
 use App\Modules\Wall\Enums\WallStatus;
 use App\Modules\Wall\Enums\WallTransition;
+use App\Modules\Wall\Support\WallSelectionPreset;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 class EventWallSetting extends Model
@@ -29,6 +34,9 @@ class EventWallSetting extends Model
         'transition_effect',
         'interval_ms',
         'queue_limit',
+        'selection_mode',
+        'event_phase',
+        'selection_policy',
         'show_qr',
         'show_branding',
         'show_neon',
@@ -48,6 +56,9 @@ class EventWallSetting extends Model
         'transition_effect' => WallTransition::class,
         'interval_ms' => 'integer',
         'queue_limit' => 'integer',
+        'selection_mode' => WallSelectionMode::class,
+        'event_phase' => WallEventPhase::class,
+        'selection_policy' => 'array',
         'show_qr' => 'boolean',
         'show_branding' => 'boolean',
         'show_neon' => 'boolean',
@@ -73,6 +84,18 @@ class EventWallSetting extends Model
             if (empty($setting->transition_effect)) {
                 $setting->transition_effect = WallTransition::Fade;
             }
+
+            if (empty($setting->selection_mode)) {
+                $setting->selection_mode = WallSelectionMode::Balanced;
+            }
+
+            if (empty($setting->event_phase)) {
+                $setting->event_phase = WallEventPhase::Flow;
+            }
+
+            if (empty($setting->selection_policy)) {
+                $setting->selection_policy = WallSelectionPreset::defaultsFor($setting->selection_mode);
+            }
         });
     }
 
@@ -81,26 +104,35 @@ class EventWallSetting extends Model
         return $this->belongsTo(Event::class);
     }
 
+    public function playerRuntimeStatuses(): HasMany
+    {
+        return $this->hasMany(WallPlayerRuntimeStatus::class, 'event_wall_setting_id');
+    }
+
+    public function diagnosticSummary(): HasOne
+    {
+        return $this->hasOne(WallDiagnosticSummary::class, 'event_wall_setting_id');
+    }
+
     public function isPlayable(): bool
     {
-        $event = $this->relationLoaded('event')
-            ? $this->getRelation('event')
-            : $this->event()->first();
-
         return $this->is_enabled
             && $this->status === WallStatus::Live
-            && $event?->isActive() === true;
+            && $this->eventAllowsWall() === true;
     }
 
     public function isAvailable(): bool
     {
         return $this->is_enabled
+            && $this->eventAllowsWall()
             && ! in_array($this->status, [WallStatus::Expired], true);
     }
 
     public function isLive(): bool
     {
-        return $this->status === WallStatus::Live && $this->is_enabled;
+        return $this->status === WallStatus::Live
+            && $this->is_enabled
+            && $this->eventAllowsWall();
     }
 
     public function isExpired(): bool
@@ -114,7 +146,7 @@ class EventWallSetting extends Model
 
     public function publicStatus(): string
     {
-        if (! $this->is_enabled) {
+        if (! $this->eventAllowsWall() || ! $this->is_enabled) {
             return 'disabled';
         }
 
@@ -139,5 +171,15 @@ class EventWallSetting extends Model
         } while (static::query()->where('wall_code', $candidate)->exists());
 
         return $candidate;
+    }
+
+    private function eventAllowsWall(): bool
+    {
+        $event = $this->relationLoaded('event')
+            ? $this->getRelation('event')
+            : $this->event()->first();
+
+        return $event?->isActive() === true
+            && $event->isModuleEnabled('wall');
     }
 }

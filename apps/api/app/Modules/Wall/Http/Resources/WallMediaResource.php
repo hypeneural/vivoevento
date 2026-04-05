@@ -2,6 +2,7 @@
 
 namespace App\Modules\Wall\Http\Resources;
 
+use App\Modules\Wall\Services\WallPayloadFactory;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -14,8 +15,8 @@ class WallMediaResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        $broadcaster = app(\App\Modules\Wall\Services\WallBroadcasterService::class);
+        $payloads = app(WallPayloadFactory::class);
 
-        return $broadcaster->mediaPayload($this->resource);
+        return $payloads->media($this->resource);
     }
 }

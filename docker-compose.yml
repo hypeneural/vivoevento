@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   # ─── PostgreSQL ───────────────────────────────────────
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: eventovivo-postgres
     restart: unless-stopped
     ports:
@@ -68,8 +66,12 @@ services:
       /bin/sh -c "
       mc alias set ev http://minio:9000 ${MINIO_ACCESS_KEY:-eventovivo} ${MINIO_SECRET_KEY:-secret123};
       mc mb ev/eventovivo-media --ignore-existing;
+      mc mb ev/eventovivo-media-public --ignore-existing;
+      mc mb ev/eventovivo-media-private --ignore-existing;
+      mc mb ev/eventovivo-ai-private --ignore-existing;
       mc mb ev/eventovivo-temp --ignore-existing;
       mc anonymous set download ev/eventovivo-media;
+      mc anonymous set download ev/eventovivo-media-public;
       exit 0;
       "
 

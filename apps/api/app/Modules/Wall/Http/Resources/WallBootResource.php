@@ -2,10 +2,9 @@
 
 namespace App\Modules\Wall\Http\Resources;
 
-use App\Modules\Wall\Services\WallBroadcasterService;
+use App\Modules\Wall\Services\WallPayloadFactory;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Collection;
 
 /**
  * Resource for the wall boot endpoint.
@@ -18,9 +17,8 @@ class WallBootResource extends JsonResource
     public function toArray(Request $request): array
     {
         $event = $this->event;
-        $broadcaster = app(WallBroadcasterService::class);
+        $payloads = app(WallPayloadFactory::class);
 
-        // Media items loaded externally and set as a relation
         $files = $event && $event->relationLoaded('media')
             ? WallMediaResource::collection($event->media)->resolve($request)
             : [];
@@ -30,11 +28,12 @@ class WallBootResource extends JsonResource
                 'id'        => $event?->id,
                 'title'     => $event?->title,
                 'slug'      => $event?->slug,
+                'upload_url' => $event?->isModuleEnabled('live') ? $event->publicUploadUrl() : null,
                 'wall_code' => $this->wall_code,
                 'status'    => $this->publicStatus(),
             ],
-            'files'    => $files,
-            'settings' => $broadcaster->settingsPayload($this->resource),
+            'files' => $files,
+            'settings' => $payloads->settings($this->resource, runtime: true),
         ];
     }
 }

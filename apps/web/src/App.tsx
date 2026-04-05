@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -8,33 +8,48 @@ import { ThemeProvider } from '@/app/providers/ThemeProvider';
 import { AuthProvider, useAuth } from '@/app/providers/AuthProvider';
 import { BrandingProvider } from '@/app/providers/BrandingProvider';
 import { AdminLayout } from '@/app/layouts/AdminLayout';
+import { AdminWarmup } from '@/app/routing/AdminWarmup';
+import { routeImports } from '@/app/routing/route-preload';
 import { queryClient } from '@/lib/query-client';
+import { buildWhatsAppInstancePath, WHATSAPP_SETTINGS_PATH } from '@/modules/whatsapp/paths';
+import { resolveLoginReturnPath } from '@/modules/auth/login-navigation';
+import { AppErrorBoundary } from '@/shared/components/AppErrorBoundary';
 import { Loader2 } from 'lucide-react';
 
 // ─── Lazy-loaded Pages (code splitting) ────────────────────
 
-const LoginPage = lazy(() => import('@/modules/auth/LoginPage'));
-const ProfilePage = lazy(() => import('@/modules/auth/ProfilePage'));
-const DashboardPage = lazy(() => import('@/modules/dashboard/DashboardPage'));
-const EventsListPage = lazy(() => import('@/modules/events/EventsListPage'));
-const CreateEventPage = lazy(() => import('@/modules/events/CreateEventPage'));
-const EventDetailPage = lazy(() => import('@/modules/events/EventDetailPage'));
-const MediaPage = lazy(() => import('@/modules/media/MediaPage'));
-const ModerationPage = lazy(() => import('@/modules/moderation/ModerationPage'));
-const GalleryPage = lazy(() => import('@/modules/gallery/GalleryPage'));
-const WallPage = lazy(() => import('@/modules/wall/WallPage'));
-const PlayPage = lazy(() => import('@/modules/play/PlayPage'));
-const HubPage = lazy(() => import('@/modules/hub/HubPage'));
-const PartnersPage = lazy(() => import('@/modules/partners/PartnersPage'));
-const ClientsPage = lazy(() => import('@/modules/clients/ClientsPage'));
-const PlansPage = lazy(() => import('@/modules/plans/PlansPage'));
-const AnalyticsPage = lazy(() => import('@/modules/analytics/AnalyticsPage'));
-const AuditPage = lazy(() => import('@/modules/audit/AuditPage'));
-const SettingsPage = lazy(() => import('@/modules/settings/SettingsPage'));
-const NotFound = lazy(() => import('@/pages/NotFound'));
+const LoginPage = lazy(routeImports.login);
+const ProfilePage = lazy(routeImports.profile);
+const DashboardPage = lazy(routeImports.dashboard);
+const EventsListPage = lazy(routeImports.eventsList);
+const CreateEventPage = lazy(routeImports.eventCreate);
+const EventDetailPage = lazy(routeImports.eventDetail);
+const EditEventPage = lazy(routeImports.eventEdit);
+const MediaPage = lazy(routeImports.media);
+const ModerationPage = lazy(routeImports.moderation);
+const GalleryPage = lazy(routeImports.gallery);
+const PublicGalleryPage = lazy(routeImports.publicGallery);
+const WallPage = lazy(routeImports.wall);
+const PlayPage = lazy(routeImports.play);
+const PublicPlayHubPage = lazy(routeImports.publicPlayHub);
+const PublicGamePage = lazy(routeImports.publicGame);
+const HubPage = lazy(routeImports.hub);
+const PublicHubPage = lazy(routeImports.publicHub);
+const PublicFaceSearchPage = lazy(routeImports.publicFaceSearch);
+const PublicEventCheckoutPage = lazy(routeImports.publicEventCheckout);
+const WhatsAppInstancesPage = lazy(routeImports.whatsappInstances);
+const WhatsAppInstanceDetailPage = lazy(routeImports.whatsappInstanceDetail);
+const PartnersPage = lazy(routeImports.partners);
+const ClientsPage = lazy(routeImports.clients);
+const PlansPage = lazy(routeImports.plans);
+const AnalyticsPage = lazy(routeImports.analytics);
+const AuditPage = lazy(routeImports.audit);
+const SettingsPage = lazy(routeImports.settings);
+const NotFound = lazy(routeImports.notFound);
 
 // Public pages (no auth required)
-const WallPlayerPage = lazy(() => import('@/modules/wall/player/WallPlayerPage'));
+const WallPlayerPage = lazy(routeImports.wallPlayer);
+const PublicEventUploadPage = lazy(routeImports.publicEventUpload);
 
 // ─── Loading Fallback ──────────────────────────────────────
 
@@ -57,6 +72,16 @@ function FullScreenLoader() {
   );
 }
 
+function LegacyWhatsAppDetailRedirect() {
+  const { id } = useParams<{ id: string }>();
+
+  if (!id) {
+    return <Navigate to={WHATSAPP_SETTINGS_PATH} replace />;
+  }
+
+  return <Navigate to={buildWhatsAppInstancePath(id)} replace />;
+}
+
 // ─── Route Guards ──────────────────────────────────────────
 
 function ProtectedRoutes() {
@@ -66,7 +91,8 @@ function ProtectedRoutes() {
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   return (
-    <Suspense fallback={<PageLoader />}>
+    <>
+      <AdminWarmup />
       <Routes>
         <Route element={<AdminLayout />}>
           <Route index element={<DashboardPage />} />
@@ -75,6 +101,9 @@ function ProtectedRoutes() {
           <Route path="events" element={<EventsListPage />} />
           <Route path="events/create" element={<CreateEventPage />} />
           <Route path="events/:id" element={<EventDetailPage />} />
+          <Route path="events/:id/wall" element={<WallPage />} />
+          <Route path="events/:id/play" element={<PlayPage />} />
+          <Route path="events/:id/edit" element={<EditEventPage />} />
 
           {/* Content */}
           <Route path="media" element={<MediaPage />} />
@@ -83,6 +112,8 @@ function ProtectedRoutes() {
           <Route path="wall" element={<WallPage />} />
           <Route path="play" element={<PlayPage />} />
           <Route path="hub" element={<HubPage />} />
+          <Route path="whatsapp" element={<Navigate to={WHATSAPP_SETTINGS_PATH} replace />} />
+          <Route path="whatsapp/:id" element={<LegacyWhatsAppDetailRedirect />} />
 
           {/* Profile */}
           <Route path="profile" element={<ProfilePage />} />
@@ -94,17 +125,20 @@ function ProtectedRoutes() {
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="audit" element={<AuditPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="settings/whatsapp" element={<WhatsAppInstancesPage />} />
+          <Route path="settings/whatsapp/:id" element={<WhatsAppInstanceDetailPage />} />
 
           {/* 404 */}
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
-    </Suspense>
+    </>
   );
 }
 
 function PublicRoutes() {
   const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
 
   if (isLoading) return <FullScreenLoader />;
 
@@ -113,15 +147,34 @@ function PublicRoutes() {
       <Routes>
         <Route
           path="/login"
-          element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />}
+          element={isAuthenticated
+            ? <Navigate to={resolveLoginReturnPath(location.search, '/')} replace />
+            : <LoginPage />}
         />
 
         {/* Public wall player — no auth, accessed by TV/projector screens */}
         <Route path="/wall/player/:code" element={<WallPlayerPage />} />
+        <Route path="/upload/:code" element={<PublicEventUploadPage />} />
+        <Route path="/checkout/evento" element={<PublicEventCheckoutPage />} />
+        <Route path="/e/:slug" element={<PublicHubPage />} />
+        <Route path="/e/:slug/gallery" element={<PublicGalleryPage />} />
+        <Route path="/e/:slug/find-me" element={<PublicFaceSearchPage />} />
+        <Route path="/e/:slug/play" element={<PublicPlayHubPage />} />
+        <Route path="/e/:slug/play/:gameSlug" element={<PublicGamePage />} />
 
         <Route path="/*" element={<ProtectedRoutes />} />
       </Routes>
     </Suspense>
+  );
+}
+
+function AppRouter() {
+  const location = useLocation();
+
+  return (
+    <AppErrorBoundary resetKey={location.pathname}>
+      <PublicRoutes />
+    </AppErrorBoundary>
   );
 }
 
@@ -135,8 +188,8 @@ const App = () => (
         <Sonner />
         <AuthProvider>
           <BrandingProvider>
-            <BrowserRouter>
-              <PublicRoutes />
+            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+              <AppRouter />
             </BrowserRouter>
           </BrandingProvider>
         </AuthProvider>

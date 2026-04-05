@@ -2,12 +2,14 @@
 
 namespace App\Modules\MediaProcessing\Models;
 
+use App\Modules\MediaProcessing\Enums\MediaDecisionSource;
 use App\Modules\MediaProcessing\Enums\MediaProcessingStatus;
 use App\Modules\MediaProcessing\Enums\ModerationStatus;
 use App\Modules\MediaProcessing\Enums\PublicationStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -25,20 +27,27 @@ class EventMedia extends Model
     protected $fillable = [
         'event_id', 'inbound_message_id', 'uploaded_by_user_id',
         'media_type', 'source_type', 'source_label', 'title', 'caption',
-        'original_filename', 'mime_type', 'size_bytes', 'width', 'height',
+        'original_filename', 'original_disk', 'original_path', 'client_filename',
+        'perceptual_hash', 'duplicate_group_key',
+        'mime_type', 'size_bytes', 'width', 'height',
         'duration_seconds', 'checksum', 'processing_status', 'moderation_status',
-        'publication_status', 'is_featured', 'sort_order', 'published_at',
+        'publication_status', 'safety_status', 'face_index_status', 'vlm_status',
+        'decision_source', 'decision_overridden_at', 'decision_overridden_by_user_id', 'decision_override_reason',
+        'pipeline_version', 'last_pipeline_error_code', 'last_pipeline_error_message',
+        'is_featured', 'sort_order', 'published_at',
     ];
 
     protected $casts = [
         'processing_status' => MediaProcessingStatus::class,
         'moderation_status' => ModerationStatus::class,
         'publication_status' => PublicationStatus::class,
+        'decision_source' => MediaDecisionSource::class,
         'is_featured' => 'boolean',
         'sort_order' => 'integer',
         'size_bytes' => 'integer',
         'width' => 'integer',
         'height' => 'integer',
+        'decision_overridden_at' => 'datetime',
         'published_at' => 'datetime',
     ];
 
@@ -52,6 +61,11 @@ class EventMedia extends Model
         return $this->belongsTo(\App\Modules\InboundMedia\Models\InboundMessage::class);
     }
 
+    public function decisionOverriddenBy(): BelongsTo
+    {
+        return $this->belongsTo(\App\Modules\Users\Models\User::class, 'decision_overridden_by_user_id');
+    }
+
     public function variants(): HasMany
     {
         return $this->hasMany(EventMediaVariant::class);
@@ -60,6 +74,58 @@ class EventMedia extends Model
     public function processingRuns(): HasMany
     {
         return $this->hasMany(MediaProcessingRun::class);
+    }
+
+    public function safetyEvaluations(): HasMany
+    {
+        return $this->hasMany(\App\Modules\ContentModeration\Models\EventMediaSafetyEvaluation::class);
+    }
+
+    public function latestSafetyEvaluation(): HasOne
+    {
+        return $this->hasOne(\App\Modules\ContentModeration\Models\EventMediaSafetyEvaluation::class)
+            ->latestOfMany();
+    }
+
+    public function vlmEvaluations(): HasMany
+    {
+        return $this->hasMany(\App\Modules\MediaIntelligence\Models\EventMediaVlmEvaluation::class);
+    }
+
+    public function latestVlmEvaluation(): HasOne
+    {
+        return $this->hasOne(\App\Modules\MediaIntelligence\Models\EventMediaVlmEvaluation::class)
+            ->latestOfMany();
+    }
+
+    public function faces(): HasMany
+    {
+        return $this->hasMany(\App\Modules\FaceSearch\Models\EventMediaFace::class, 'event_media_id');
+    }
+
+    public function originalStorageDisk(): string
+    {
+        return $this->original_disk ?: 'public';
+    }
+
+    public function originalStoragePath(): ?string
+    {
+        if ($this->original_path) {
+            return $this->original_path;
+        }
+
+        if (! $this->original_filename) {
+            return null;
+        }
+
+        return str_contains($this->original_filename, '/')
+            ? $this->original_filename
+            : "events/{$this->event_id}/originals/{$this->original_filename}";
+    }
+
+    public function displayFilename(): ?string
+    {
+        return $this->client_filename ?: $this->original_filename;
     }
 
     // ─── Scopes ────────────────────────────────────────────

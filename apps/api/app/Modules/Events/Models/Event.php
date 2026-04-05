@@ -2,10 +2,13 @@
 
 namespace App\Modules\Events\Models;
 
+use App\Modules\Events\Enums\EventCommercialMode;
+use App\Modules\Events\Enums\EventModerationMode;
 use App\Modules\Events\Enums\EventStatus;
 use App\Modules\Events\Enums\EventType;
 use App\Shared\Concerns\HasAudit;
 use App\Shared\Concerns\HasOrganization;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -47,17 +50,29 @@ class Event extends Model
         'public_url',
         'upload_url',
         'retention_days',
+        'commercial_mode',
+        'current_entitlements_json',
         'purchased_plan_snapshot_json',
     ];
 
     protected $casts = [
         'event_type' => EventType::class,
         'status' => EventStatus::class,
+        'commercial_mode' => EventCommercialMode::class,
         'starts_at' => 'datetime',
         'ends_at' => 'datetime',
         'retention_days' => 'integer',
+        'current_entitlements_json' => 'array',
         'purchased_plan_snapshot_json' => 'array',
     ];
+
+    protected function moderationMode(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value) => EventModerationMode::fromStorage($value),
+            set: fn (EventModerationMode|string|null $value) => EventModerationMode::normalize($value),
+        );
+    }
 
     // ─── Boot ─────────────────────────────────────────────
 
@@ -110,6 +125,16 @@ class Event extends Model
         return $this->hasMany(EventBanner::class);
     }
 
+    public function purchases(): HasMany
+    {
+        return $this->hasMany(\App\Modules\Billing\Models\EventPurchase::class);
+    }
+
+    public function accessGrants(): HasMany
+    {
+        return $this->hasMany(\App\Modules\Billing\Models\EventAccessGrant::class);
+    }
+
     public function wallSettings(): HasOne
     {
         return $this->hasOne(\App\Modules\Wall\Models\EventWallSetting::class);
@@ -120,9 +145,29 @@ class Event extends Model
         return $this->hasOne(\App\Modules\Play\Models\EventPlaySetting::class);
     }
 
+    public function playGames(): HasMany
+    {
+        return $this->hasMany(\App\Modules\Play\Models\PlayEventGame::class);
+    }
+
     public function hubSettings(): HasOne
     {
         return $this->hasOne(\App\Modules\Hub\Models\EventHubSetting::class);
+    }
+
+    public function contentModerationSettings(): HasOne
+    {
+        return $this->hasOne(\App\Modules\ContentModeration\Models\EventContentModerationSetting::class);
+    }
+
+    public function faceSearchSettings(): HasOne
+    {
+        return $this->hasOne(\App\Modules\FaceSearch\Models\EventFaceSearchSetting::class);
+    }
+
+    public function mediaIntelligenceSettings(): HasOne
+    {
+        return $this->hasOne(\App\Modules\MediaIntelligence\Models\EventMediaIntelligenceSetting::class);
     }
 
     // ─── Scopes ────────────────────────────────────────────
@@ -159,9 +204,35 @@ class Event extends Model
         return $this->status === EventStatus::Draft;
     }
 
+    public function isNoModeration(): bool
+    {
+        return $this->moderation_mode === EventModerationMode::None;
+    }
+
+    public function isManualModeration(): bool
+    {
+        return $this->moderation_mode === EventModerationMode::Manual;
+    }
+
+    public function isAiModeration(): bool
+    {
+        return $this->moderation_mode === EventModerationMode::Ai;
+    }
+
     public function isAutoModeration(): bool
     {
-        return $this->moderation_mode === 'auto';
+        return $this->isNoModeration();
+    }
+
+    public function isFaceSearchEnabled(): bool
+    {
+        return (bool) ($this->faceSearchSettings?->enabled ?? false);
+    }
+
+    public function allowsPublicSelfieSearch(): bool
+    {
+        return $this->isFaceSearchEnabled()
+            && (bool) ($this->faceSearchSettings?->allow_public_selfie_search ?? false);
     }
 
     public function isModuleEnabled(string $moduleKey): bool
@@ -185,5 +256,61 @@ class Event extends Model
         $backendUrl = rtrim((string) config('app.url'), '/');
 
         return "{$backendUrl}/api/v1/public/events/{$this->upload_slug}/upload";
+    }
+
+    public function publicGalleryUrl(): string
+    {
+        $frontendUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/');
+
+        return "{$frontendUrl}/e/{$this->slug}/gallery";
+    }
+
+    public function publicGalleryApiUrl(): string
+    {
+        $backendUrl = rtrim((string) config('app.url'), '/');
+
+        return "{$backendUrl}/api/v1/public/events/{$this->slug}/gallery";
+    }
+
+    public function publicHubUrl(): string
+    {
+        $frontendUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/');
+
+        return "{$frontendUrl}/e/{$this->slug}";
+    }
+
+    public function publicHubApiUrl(): string
+    {
+        $backendUrl = rtrim((string) config('app.url'), '/');
+
+        return "{$backendUrl}/api/v1/public/events/{$this->slug}/hub";
+    }
+
+    public function publicPlayUrl(): string
+    {
+        $frontendUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/');
+
+        return "{$frontendUrl}/e/{$this->slug}/play";
+    }
+
+    public function publicPlayApiUrl(): string
+    {
+        $backendUrl = rtrim((string) config('app.url'), '/');
+
+        return "{$backendUrl}/api/v1/public/events/{$this->slug}/play";
+    }
+
+    public function publicFindMeUrl(): string
+    {
+        $frontendUrl = rtrim((string) config('app.frontend_url', config('app.url')), '/');
+
+        return "{$frontendUrl}/e/{$this->slug}/find-me";
+    }
+
+    public function publicFindMeApiUrl(): string
+    {
+        $backendUrl = rtrim((string) config('app.url'), '/');
+
+        return "{$backendUrl}/api/v1/public/events/{$this->slug}/face-search";
     }
 }

@@ -1,0 +1,97 @@
+﻿@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.header {
+  margin-bottom: 1.5rem;
+
+  :global(.section-title) {
+    margin-top: 1rem;
+    max-width: 16ch;
+  }
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.card {
+  @include surface(rgba(10, 16, 29, 0.82), $border-subtle, 18px);
+  display: grid;
+  gap: 1rem;
+  border-radius: $radius-md;
+  padding: 1rem;
+}
+
+.quoteMark {
+  @include flex-center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+  background: rgba($c-accent-warm, 0.12);
+  color: $c-accent-warm;
+}
+
+.quote {
+  font-size: 1.02rem;
+  color: $c-white-80;
+}
+
+.meta {
+  strong {
+    display: block;
+    font-size: 1rem;
+  }
+
+  span {
+    display: block;
+    margin-top: 0.25rem;
+    color: $c-white-48;
+  }
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+
+  span {
+    padding: 0.35rem 0.6rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    color: $c-white-64;
+    font-weight: 700;
+    font-size: 0.82rem;
+  }
+}
+
+.detailGrid {
+  display: grid;
+  gap: 0.75rem;
+
+  div {
+    padding: 0.9rem;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  small {
+    display: block;
+    color: $c-white-48;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.72rem;
+  }
+
+  strong {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 0.92rem;
+  }
+}
+
+@media (min-width: 980px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

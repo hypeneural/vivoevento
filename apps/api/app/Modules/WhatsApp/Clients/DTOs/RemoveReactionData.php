@@ -11,5 +11,6 @@ final readonly class RemoveReactionData
         public string $phone,
         public string $messageId,
         public ?int $delayMessage = null,
+        public bool $fromMe = false,
     ) {}
 }

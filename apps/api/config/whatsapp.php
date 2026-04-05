@@ -70,6 +70,20 @@ return [
     'qr_code' => [
         'poll_interval_seconds' => (int) env('WHATSAPP_QR_POLL_INTERVAL', 15),
         'max_attempts'          => (int) env('WHATSAPP_QR_MAX_ATTEMPTS', 3),
+        'expires_in_seconds'    => (int) env('WHATSAPP_QR_EXPIRES_IN', 20),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Connection State Cache
+    |--------------------------------------------------------------------------
+    */
+
+    'cache' => [
+        'status_ttl_seconds' => (int) env('WHATSAPP_STATUS_CACHE_TTL', 15),
+        'details_ttl_seconds' => (int) env('WHATSAPP_DETAILS_CACHE_TTL', 30),
+        'qr_ttl_seconds' => (int) env('WHATSAPP_QR_CACHE_TTL', 10),
+        'lock_seconds' => (int) env('WHATSAPP_CACHE_LOCK_TTL', 5),
     ],
 
     /*
@@ -81,6 +95,22 @@ return [
     'dispatch_log' => [
         'mask_tokens'    => true,
         'retention_days' => (int) env('WHATSAPP_LOG_RETENTION_DAYS', 90),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Authentication / Signup OTP
+    |--------------------------------------------------------------------------
+    */
+
+    'auth' => [
+        'instance_id' => env('WHATSAPP_AUTH_INSTANCE_ID'),
+        'allow_env_sender_in_testing' => (bool) env('WHATSAPP_AUTH_ALLOW_ENV_SENDER_IN_TESTING', false),
+        'zapi' => [
+            'instance_id' => env('WHATSAPP_AUTH_ZAPI_INSTANCE_ID'),
+            'token' => env('WHATSAPP_AUTH_ZAPI_TOKEN'),
+            'client_token' => env('WHATSAPP_AUTH_ZAPI_CLIENT_TOKEN'),
+        ],
     ],
 
 ];

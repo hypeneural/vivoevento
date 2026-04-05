@@ -22,6 +22,12 @@ Route::middleware('auth:sanctum')->group(function () {
         ->whereNumber('event');
     Route::patch('events/{event}/wall/settings', [EventWallController::class, 'update'])
         ->whereNumber('event');
+    Route::get('events/{event}/wall/diagnostics', [EventWallController::class, 'diagnostics'])
+        ->whereNumber('event');
+    Route::post('events/{event}/wall/simulate', [EventWallController::class, 'simulate'])
+        ->whereNumber('event');
+    Route::post('events/{event}/wall/player-command', [EventWallController::class, 'playerCommand'])
+        ->whereNumber('event');
 
     // Status controls (all instant via broadcast)
     Route::post('events/{event}/wall/start', [EventWallController::class, 'start'])
@@ -51,4 +57,5 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::prefix('public/wall')->group(function () {
     Route::get('{wallCode}/boot', [PublicWallController::class, 'boot']);
     Route::get('{wallCode}/state', [PublicWallController::class, 'state']);
+    Route::post('{wallCode}/heartbeat', [PublicWallController::class, 'heartbeat']);
 });

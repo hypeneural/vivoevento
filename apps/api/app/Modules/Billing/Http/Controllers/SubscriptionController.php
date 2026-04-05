@@ -1,5 +1,12 @@
 <?php
+
 namespace App\Modules\Billing\Http\Controllers;
+
+use App\Modules\Billing\Actions\CancelCurrentSubscriptionAction;
+use App\Modules\Billing\Actions\CreateSubscriptionCheckoutAction;
+use App\Modules\Billing\Http\Requests\CancelCurrentSubscriptionRequest;
+use App\Modules\Billing\Http\Requests\StoreSubscriptionCheckoutRequest;
+use App\Modules\Billing\Http\Resources\BillingInvoiceResource;
 use App\Modules\Billing\Models\Subscription;
 use App\Shared\Http\BaseController;
 use Illuminate\Http\JsonResponse;
@@ -12,33 +19,23 @@ class SubscriptionController extends BaseController
      */
     public function current(Request $request): JsonResponse
     {
+        $this->ensureCanViewBilling($request);
+
         $org = $request->user()->currentOrganization();
 
-        if (!$org) {
-            return $this->error('Nenhuma organização encontrada', 404);
+        if (! $org) {
+            return $this->error('Nenhuma organizacao encontrada', 404);
         }
 
         $subscription = $org->subscription;
 
-        if (!$subscription) {
+        if (! $subscription) {
             return $this->success(null);
         }
 
         $subscription->load('plan.features');
 
-        return $this->success([
-            'id' => $subscription->id,
-            'plan_key' => $subscription->plan?->slug,
-            'plan_name' => $subscription->plan?->name,
-            'billing_cycle' => $subscription->billing_cycle,
-            'status' => $subscription->status,
-            'starts_at' => $subscription->starts_at?->toISOString(),
-            'trial_ends_at' => $subscription->trial_ends_at?->toISOString(),
-            'renews_at' => $subscription->renews_at?->toISOString(),
-            'ends_at' => $subscription->ends_at?->toISOString(),
-            'canceled_at' => $subscription->canceled_at?->toISOString(),
-            'features' => $subscription->plan?->features?->pluck('value', 'key'),
-        ]);
+        return $this->success($this->serializeSubscription($subscription));
     }
 
     /**
@@ -46,10 +43,12 @@ class SubscriptionController extends BaseController
      */
     public function currentPlan(Request $request): JsonResponse
     {
+        $this->ensureCanViewBilling($request);
+
         $org = $request->user()->currentOrganization();
         $plan = $org?->subscription?->plan;
 
-        if (!$plan) {
+        if (! $plan) {
             return $this->success(null);
         }
 
@@ -63,68 +62,104 @@ class SubscriptionController extends BaseController
      */
     public function invoices(Request $request): JsonResponse
     {
+        $this->ensureCanViewBilling($request);
+
         $org = $request->user()->currentOrganization();
 
-        if (!$org) {
-            return $this->error('Nenhuma organização encontrada', 404);
+        if (! $org) {
+            return $this->error('Nenhuma organizacao encontrada', 404);
         }
 
-        // TODO: integrate with payment gateway for real invoices
-        $purchases = $org->purchases()
-            ->with('plan:id,name,slug')
+        $invoices = $org->invoices()
+            ->with([
+                'order.event:id,title',
+                'order.payments',
+            ])
             ->latest()
             ->paginate(20);
 
-        return $this->success($purchases);
+        $invoices->setCollection(
+            $invoices->getCollection()->map(
+                fn ($invoice) => BillingInvoiceResource::make($invoice)->resolve()
+            )
+        );
+
+        return $this->success($invoices);
     }
 
     /**
      * POST /api/v1/billing/checkout
      */
-    public function checkout(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'plan_id' => ['required', 'exists:plans,id'],
-            'billing_cycle' => ['nullable', 'string', 'in:monthly,yearly'],
-        ]);
-
+    public function checkout(
+        StoreSubscriptionCheckoutRequest $request,
+        CreateSubscriptionCheckoutAction $action,
+    ): JsonResponse {
         $org = $request->user()->currentOrganization();
 
-        if (!$org) {
-            return $this->error('Nenhuma organização encontrada', 404);
+        if (! $org) {
+            return $this->error('Nenhuma organizacao encontrada', 404);
         }
 
-        // TODO: integrate with payment gateway (Stripe/Pagar.me)
-        // For now, create the subscription directly
+        $validated = $request->validated();
         $plan = \App\Modules\Plans\Models\Plan::findOrFail($validated['plan_id']);
-
-        $subscription = Subscription::updateOrCreate(
-            ['organization_id' => $org->id],
-            [
-                'plan_id' => $plan->id,
-                'status' => 'active',
-                'billing_cycle' => $validated['billing_cycle'] ?? 'monthly',
-                'starts_at' => now(),
-                'renews_at' => now()->addMonth(),
-            ]
+        $checkout = $action->execute(
+            $org,
+            $request->user(),
+            $plan,
+            $validated['billing_cycle'] ?? 'monthly',
         );
 
-        activity()
-            ->performedOn($subscription)
-            ->causedBy($request->user())
-            ->withProperties(['plan_id' => $plan->id, 'plan_name' => $plan->name])
-            ->log('Plano contratado: ' . $plan->name);
+        $subscription = $checkout['subscription'];
+        $order = $checkout['order'];
+        $payment = $checkout['payment'];
+        $invoice = $checkout['invoice'];
 
         return $this->created([
-            'subscription_id' => $subscription->id,
+            'subscription_id' => $subscription?->id,
             'plan_name' => $plan->name,
-            'status' => $subscription->status,
-            'starts_at' => $subscription->starts_at?->toISOString(),
-            'renews_at' => $subscription->renews_at?->toISOString(),
+            'status' => $subscription?->status ?? $order->status?->value,
+            'starts_at' => $subscription?->starts_at?->toISOString(),
+            'renews_at' => $subscription?->renews_at?->toISOString(),
+            'billing_order_id' => $order->id,
+            'payment_id' => $payment?->id,
+            'invoice_id' => $invoice?->id,
+            'checkout' => [
+                'provider' => $order->gateway_provider,
+                'gateway_order_id' => $order->gateway_order_id,
+                'status' => $order->status?->value,
+                'checkout_url' => $order->metadata_json['gateway']['checkout_url'] ?? null,
+                'confirm_url' => $order->metadata_json['gateway']['confirm_url'] ?? null,
+                'expires_at' => $order->metadata_json['gateway']['expires_at'] ?? null,
+            ],
         ]);
     }
 
-    // ─── Admin ────────────────────────────────────────────
+    public function cancel(
+        CancelCurrentSubscriptionRequest $request,
+        CancelCurrentSubscriptionAction $action,
+    ): JsonResponse {
+        $org = $request->user()->currentOrganization();
+
+        if (! $org) {
+            return $this->error('Nenhuma organizacao encontrada', 404);
+        }
+
+        $subscription = $action->execute(
+            $org,
+            $request->user(),
+            $request->validated('effective', 'period_end'),
+            $request->validated('reason'),
+        );
+
+        return $this->success([
+            'message' => $request->validated('effective', 'period_end') === 'immediately'
+                ? 'Assinatura da conta cancelada com efeito imediato.'
+                : 'Assinatura da conta agendada para cancelamento ao fim do ciclo.',
+            'cancel_effective' => $request->validated('effective', 'period_end'),
+            'access_until' => $subscription->ends_at?->toISOString(),
+            'subscription' => $this->serializeSubscription($subscription),
+        ]);
+    }
 
     public function index(): JsonResponse
     {
@@ -134,5 +169,42 @@ class SubscriptionController extends BaseController
     public function show(Subscription $subscription): JsonResponse
     {
         return $this->success($subscription->load(['plan', 'organization']));
+    }
+
+    private function serializeSubscription(Subscription $subscription): array
+    {
+        $cancelAtPeriodEnd = $subscription->isCanceledPendingEnd();
+
+        return [
+            'id' => $subscription->id,
+            'plan_key' => $subscription->plan?->code,
+            'plan_name' => $subscription->plan?->name,
+            'billing_cycle' => $subscription->billing_cycle,
+            'status' => $subscription->status,
+            'starts_at' => $subscription->starts_at?->toISOString(),
+            'trial_ends_at' => $subscription->trial_ends_at?->toISOString(),
+            'renews_at' => $subscription->renews_at?->toISOString(),
+            'ends_at' => $subscription->ends_at?->toISOString(),
+            'canceled_at' => $subscription->canceled_at?->toISOString(),
+            'cancel_at_period_end' => $cancelAtPeriodEnd,
+            'cancellation_effective_at' => $cancelAtPeriodEnd ? $subscription->ends_at?->toISOString() : $subscription->canceled_at?->toISOString(),
+            'features' => $subscription->plan?->features?->pluck('feature_value', 'feature_key')->all() ?? [],
+        ];
+    }
+
+    private function ensureCanViewBilling(Request $request): void
+    {
+        $user = $request->user();
+
+        abort_unless(
+            $user
+                && (
+                    $user->can('billing.view')
+                    || $user->can('billing.manage')
+                    || $user->can('billing.purchase')
+                    || $user->can('billing.manage_subscription')
+                ),
+            403
+        );
     }
 }

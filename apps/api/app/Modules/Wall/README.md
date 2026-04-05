@@ -1,85 +1,143 @@
 # Wall Module
 
 ## Responsabilidade
-Telão/slideshow realtime com layouts, overlays e exibição em tempo real via WebSocket (Pusher).
 
-## Entidades
-- **EventWallSetting** — configurações do wall por evento (1:1 com Event)
+Telao/slideshow realtime com layouts, overlays, bootstrap publico por `wall_code` e sincronizacao em tempo real via Reverb.
+
+## Entidade Principal
+
+- `EventWallSetting` - configuracao do wall por evento (relacao 1:1 com `Event`)
 
 ## Enums
+
 | Enum | Valores |
 |------|---------|
-| `WallStatus` | draft, live, paused, stopped, expired |
-| `WallLayout` | auto, polaroid, fullscreen, split, cinematic |
-| `WallTransition` | fade, slide, zoom, flip, none |
+| `WallStatus` | `draft`, `live`, `paused`, `stopped`, `expired` |
+| `WallLayout` | `auto`, `polaroid`, `fullscreen`, `split`, `cinematic` |
+| `WallTransition` | `fade`, `slide`, `zoom`, `flip`, `none` |
 
-## Broadcasting (ShouldBroadcastNow)
-Canal público: `wall.{wallCode}` — sem autenticação (o wall_code é o secret).
+## Canais Realtime
 
-| Evento | Quando | Payload |
-|--------|--------|---------|
-| `WallMediaPublished` | Nova mídia publicada | {id, url, type, sender_name, caption, is_featured, created_at} |
-| `WallMediaUpdated` | Variante gerada | Mesmo payload (URL diferente) |
-| `WallMediaDeleted` | Mídia removida | {id} |
-| `WallSettingsUpdated` | Admin altera config | {interval_ms, layout, transition_effect, ...} |
-| `WallStatusChanged` | Status muda | {status, reason, updated_at} |
-| `WallExpired` | Wall expirado | {reason, expired_at} |
+### Publico
+
+- `wall.{wallCode}`
+  - Uso: player publico do telao
+  - Auth: nao exige autenticacao interativa
+  - Observacao: o `wall_code` funciona como segredo curto do player
+
+### Privados por evento
+
+- `event.{eventId}.wall`
+  - Permissao: `wall.view`
+- `event.{eventId}.gallery`
+  - Permissao: `gallery.view`
+- `event.{eventId}.moderation`
+  - Permissao: `media.moderate`
+- `event.{eventId}.play`
+  - Permissao: `play.view`
+
+Todos os canais privados validam:
+
+1. permissao especifica do modulo
+2. vinculacao ativa do usuario a organizacao do evento
+3. excecao para roles globais (`super-admin`, `platform-admin`)
+
+## Eventos Broadcastaveis
+
+### Eventos de midia
+
+Usam `ShouldBroadcast`, `ShouldDispatchAfterCommit` e fila `broadcasts`.
+
+- `WallMediaPublished`
+- `WallMediaUpdated`
+- `WallMediaDeleted`
+
+### Eventos operacionais
+
+Usam broadcast imediato com `ShouldDispatchAfterCommit`.
+
+- `WallSettingsUpdated`
+- `WallStatusChanged`
+- `WallExpired`
 
 ## Actions
-| Action | Descrição |
+
+| Action | Descricao |
 |--------|-----------|
-| `StartWallAction` | Ativa wall → live + broadcast |
-| `StopWallAction` | Para wall → paused/stopped + broadcast |
-| `ExpireWallAction` | Expira wall (terminal) + broadcast |
-| `ResetWallAction` | Reseta tudo + novo wall_code |
+| `StartWallAction` | Coloca o wall em `live` e notifica os players |
+| `StopWallAction` | Pausa ou para o wall |
+| `ExpireWallAction` | Expira o wall e encerra o ciclo do player |
+| `ResetWallAction` | Reseta defaults e gera um novo `wall_code` |
 
-## Rotas
+## Endpoints
 
-### Admin (auth:sanctum)
-| Método | Rota | Descrição |
+### Admin (`auth:sanctum`)
+
+| Metodo | Rota | Regra |
+|--------|------|-------|
+| `GET` | `/events/{event}/wall/settings` | `viewWall` |
+| `PATCH` | `/events/{event}/wall/settings` | `manageWall` |
+| `POST` | `/events/{event}/wall/start` | `manageWall` |
+| `POST` | `/events/{event}/wall/stop` | `manageWall` |
+| `POST` | `/events/{event}/wall/pause` | `manageWall` |
+| `POST` | `/events/{event}/wall/full-stop` | `manageWall` |
+| `POST` | `/events/{event}/wall/expire` | `manageWall` |
+| `POST` | `/events/{event}/wall/reset` | `manageWall` |
+| `POST` | `/events/{event}/wall/upload-background` | `manageWall` |
+| `POST` | `/events/{event}/wall/upload-logo` | `manageWall` |
+| `GET` | `/wall/options` | permissao `wall.view` |
+
+### Publico
+
+| Metodo | Rota | Descricao |
 |--------|------|-----------|
-| GET | /events/{id}/wall/settings | Config do wall |
-| PATCH | /events/{id}/wall/settings | Atualizar config |
-| POST | /events/{id}/wall/start | Iniciar wall (live) |
-| POST | /events/{id}/wall/stop | Pausar wall |
-| POST | /events/{id}/wall/pause | Pausar wall (alias) |
-| POST | /events/{id}/wall/full-stop | Parar wall completamente |
-| POST | /events/{id}/wall/expire | Expirar wall |
-| POST | /events/{id}/wall/reset | Resetar wall |
-| POST | /events/{id}/wall/upload-background | Upload background |
-| POST | /events/{id}/wall/upload-logo | Upload logo parceiro |
-| GET | /wall/options | Opções de layout/status/transição |
+| `GET` | `/public/wall/{wallCode}/boot` | bootstrap inicial do player |
+| `GET` | `/public/wall/{wallCode}/state` | estado publico atual do wall |
 
-### Público (sem auth — via wall_code)
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| GET | /public/wall/{wallCode}/boot | Bootstrap do telão |
-| GET | /public/wall/{wallCode}/state | Estado atual |
+## Integracao com MediaProcessing
 
-## Services
-- **WallBroadcasterService** — Centralizador de broadcasts com payload builders e verificação de elegibilidade
+O modulo Wall nao escuta mais strings como `media.published`. Ele consome eventos tipados do pipeline:
 
-## Listeners (integração com MediaProcessing)
-| Listener | Evento escutado |
-|----------|----------------|
-| `BroadcastWallOnMediaPublished` | `media.published` |
-| `BroadcastWallOnMediaUpdated` | `media.variants.generated` |
-| `BroadcastWallOnMediaDeleted` | `media.deleted`, `media.rejected` |
+- `MediaPublished`
+- `MediaVariantsGenerated`
+- `MediaDeleted`
+- `MediaRejected`
 
-## Dependências
-- Events (Model Event)
-- MediaProcessing (EventMedia, EventMediaVariant para resolução de URL)
+Listeners atuais:
 
-## Fluxo: Foto → Telão
+| Listener | Evento de dominio |
+|----------|-------------------|
+| `BroadcastWallOnMediaPublished` | `MediaPublished` |
+| `BroadcastWallOnMediaUpdated` | `MediaVariantsGenerated` |
+| `BroadcastWallOnMediaDeleted` | `MediaDeleted`, `MediaRejected` |
 
-```
-1. MediaProcessing publica mídia (publication_status = published)
-2. Dispara evento `media.published`
-3. BroadcastWallOnMediaPublished escuta
-4. WallBroadcasterService verifica elegibilidade:
-   - Wall está live?
-   - Mídia está approved + published?
-   - Tipo é image/video?
-5. Se elegível: event(new WallMediaPublished(wallCode, payload))
-6. Pusher entrega ao wall player via WebSocket (instantâneo!)
-```
+## Servicos
+
+- `WallBroadcasterService`
+  - Estado atual: orquestra o disparo de eventos broadcastaveis do wall
+- `WallEligibilityService`
+  - Responsavel por decidir se uma midia pode aparecer no telao
+- `WallPayloadFactory`
+  - Responsavel por montar payloads de midia, settings e status
+- `MediaAssetUrlService`
+  - Responsavel por resolver URLs publicas de variantes/originais da midia
+
+## Fluxo Atual
+
+1. `MediaProcessing` publica ou atualiza uma midia.
+2. O pipeline emite evento de dominio tipado.
+3. O listener do Wall resolve a `EventMedia`.
+4. `WallBroadcasterService` verifica elegibilidade do wall e da midia.
+5. O modulo Wall emite evento broadcastavel para o canal do player.
+6. O player do telao recebe o payload via Reverb.
+
+## Contrato Compartilhado
+
+O contrato TypeScript consumido pelo player fica em `packages/shared-types/src/wall.ts`.
+
+Ele centraliza:
+
+- payloads HTTP do boot e do state publico
+- payloads dos eventos realtime
+- nomes canonicos dos eventos do Wall
+- status publicos, incluindo `disabled`

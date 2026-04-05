@@ -1,4 +1,5 @@
 import { useAuth } from '@/app/providers/AuthProvider';
+import { formatRoleLabel } from '@/shared/auth/labels';
 
 /**
  * Hook for permission checks.
@@ -25,6 +26,6 @@ export function usePermissions() {
     roleKey: meUser?.role.key ?? 'viewer',
 
     /** Current role display name */
-    roleName: meUser?.role.name ?? 'Visualizador',
+    roleName: formatRoleLabel(meUser?.role.key, meUser?.role.name),
   };
 }

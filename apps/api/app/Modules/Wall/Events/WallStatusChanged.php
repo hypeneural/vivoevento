@@ -7,7 +7,7 @@ namespace App\Modules\Wall\Events;
  * The wall player should show/hide content accordingly.
  * Payload: {status, reason, updated_at}
  */
-class WallStatusChanged extends AbstractWallBroadcastEvent
+class WallStatusChanged extends AbstractWallImmediateBroadcastEvent
 {
     public function broadcastAs(): string
     {

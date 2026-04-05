@@ -26,6 +26,7 @@ export const SYSTEM_MODULES: Record<string, SystemModule> = {
   wall: { key: 'wall', label: 'Wall', description: 'Slideshow para telão', requiredPermission: 'wall.manage', requiresOrgModule: true },
   play: { key: 'play', label: 'Play', description: 'Minigames interativos', requiredPermission: 'play.manage', requiresOrgModule: true },
   hub: { key: 'hub', label: 'Hub', description: 'Página oficial do evento', requiredPermission: 'hub.manage', requiresOrgModule: true },
+  whatsapp: { key: 'whatsapp', label: 'WhatsApp', description: 'Instâncias e conexão de WhatsApp', requiredPermission: 'channels.manage', requiresOrgModule: true },
   partners: { key: 'partners', label: 'Parceiros', description: 'Gestão de parceiros', requiredPermission: 'partners.view', requiresOrgModule: false },
   clients: { key: 'clients', label: 'Clientes', description: 'Gestão de clientes', requiredPermission: 'clients.view', requiresOrgModule: true },
   plans: { key: 'plans', label: 'Planos', description: 'Planos e billing', requiredPermission: 'plans.view', requiresOrgModule: false },

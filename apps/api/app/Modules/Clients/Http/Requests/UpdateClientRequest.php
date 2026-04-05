@@ -14,6 +14,7 @@ class UpdateClientRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'organization_id' => ['prohibited'],
             'type' => ['sometimes', 'string', 'in:pessoa_fisica,empresa'],
             'name' => ['sometimes', 'string', 'max:180'],
             'email' => ['nullable', 'email', 'max:160'],

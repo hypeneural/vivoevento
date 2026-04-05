@@ -6,8 +6,13 @@ use App\Modules\WhatsApp\Clients\DTOs\CreateGroupData;
 use App\Modules\WhatsApp\Clients\DTOs\GroupParticipantsData;
 use App\Modules\WhatsApp\Clients\DTOs\ModifyChatData;
 use App\Modules\WhatsApp\Clients\DTOs\ProviderActionResultData;
+use App\Modules\WhatsApp\Clients\DTOs\ProviderChatMessagesData;
 use App\Modules\WhatsApp\Clients\DTOs\ProviderChatsPageData;
+use App\Modules\WhatsApp\Clients\DTOs\ProviderConnectionDetailsData;
 use App\Modules\WhatsApp\Clients\DTOs\ProviderGroupCreatedData;
+use App\Modules\WhatsApp\Clients\DTOs\ProviderGroupCatalogData;
+use App\Modules\WhatsApp\Clients\DTOs\ProviderGroupParticipantsData;
+use App\Modules\WhatsApp\Clients\DTOs\ProviderHealthCheckData;
 use App\Modules\WhatsApp\Clients\DTOs\ProviderQrCodeData;
 use App\Modules\WhatsApp\Clients\DTOs\ProviderSendMessageResultData;
 use App\Modules\WhatsApp\Clients\DTOs\ProviderStatusData;
@@ -34,9 +39,13 @@ interface WhatsAppProviderInterface
 
     public function getStatus(WhatsAppInstance $instance): ProviderStatusData;
 
+    public function getConnectionDetails(WhatsAppInstance $instance): ProviderConnectionDetailsData;
+
     public function getQrCode(WhatsAppInstance $instance): ProviderQrCodeData;
 
     public function getQrCodeImage(WhatsAppInstance $instance): ProviderQrCodeData;
+
+    public function testConnection(WhatsAppInstance $instance): ProviderHealthCheckData;
 
     public function requestPhoneCode(WhatsAppInstance $instance, string $phone): ProviderActionResultData;
 
@@ -62,11 +71,17 @@ interface WhatsAppProviderInterface
 
     public function getChats(WhatsAppInstance $instance, int $page = 1, int $pageSize = 20): ProviderChatsPageData;
 
+    public function findMessages(WhatsAppInstance $instance, string $remoteJid, array $filters = []): ProviderChatMessagesData;
+
     public function modifyChat(WhatsAppInstance $instance, ModifyChatData $data): ProviderActionResultData;
 
     // ─── Groups ────────────────────────────────────────────
 
     public function createGroup(WhatsAppInstance $instance, CreateGroupData $data): ProviderGroupCreatedData;
+
+    public function fetchGroups(WhatsAppInstance $instance, bool $includeParticipants = false): ProviderGroupCatalogData;
+
+    public function getGroupParticipants(WhatsAppInstance $instance, string $groupId): ProviderGroupParticipantsData;
 
     public function updateGroupName(WhatsAppInstance $instance, UpdateGroupData $data): ProviderActionResultData;
 

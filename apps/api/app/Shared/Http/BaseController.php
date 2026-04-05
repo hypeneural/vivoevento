@@ -6,6 +6,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Str;
 
 abstract class BaseController extends Controller
@@ -82,6 +83,6 @@ abstract class BaseController extends Controller
      */
     private function requestId(): string
     {
-        return 'req_' . Str::random(12);
+        return (string) Context::remember('request_id', fn () => 'req_' . Str::random(12));
     }
 }

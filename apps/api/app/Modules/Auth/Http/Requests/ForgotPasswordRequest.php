@@ -2,7 +2,9 @@
 
 namespace App\Modules\Auth\Http\Requests;
 
+use App\Shared\Support\PhoneNumber;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class ForgotPasswordRequest extends FormRequest
 {
@@ -25,20 +27,33 @@ class ForgotPasswordRequest extends FormRequest
         ];
     }
 
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            $login = trim((string) $this->input('login'));
+
+            if ($login === '') {
+                return;
+            }
+
+            if (
+                ! PhoneNumber::looksLikeBrazilianPhone($login)
+                && filter_var($login, FILTER_VALIDATE_EMAIL) === false
+            ) {
+                $validator->errors()->add('login', 'Informe um WhatsApp com DDD ou e-mail valido.');
+            }
+        });
+    }
+
     public function isPhoneLogin(): bool
     {
-        $digits = preg_replace('/\D/', '', $this->validated('login'));
-        return strlen($digits) >= 10 && strlen($digits) <= 13;
+        return PhoneNumber::looksLikeBrazilianPhone($this->validated('login'));
     }
 
     public function getLoginIdentifier(): string
     {
         if ($this->isPhoneLogin()) {
-            $digits = preg_replace('/\D/', '', $this->validated('login'));
-            if (strlen($digits) <= 11) {
-                $digits = '55' . $digits;
-            }
-            return $digits;
+            return PhoneNumber::normalizeBrazilianWhatsApp($this->validated('login'));
         }
         return strtolower(trim($this->validated('login')));
     }

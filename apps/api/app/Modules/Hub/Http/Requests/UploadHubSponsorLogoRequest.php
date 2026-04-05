@@ -1,0 +1,31 @@
+<?php
+
+namespace App\Modules\Hub\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class UploadHubSponsorLogoRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'file' => ['required', 'image', 'max:10240', 'mimes:jpg,jpeg,png,webp'],
+            'previous_path' => ['nullable', 'string', 'max:255'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'file.required' => 'Selecione uma imagem para enviar.',
+            'file.image' => 'O arquivo precisa ser uma imagem valida.',
+            'file.max' => 'A imagem nao pode ter mais de 10MB.',
+            'file.mimes' => 'Formato aceito: JPG, PNG ou WebP.',
+        ];
+    }
+}

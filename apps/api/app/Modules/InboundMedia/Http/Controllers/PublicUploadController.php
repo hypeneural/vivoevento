@@ -2,9 +2,11 @@
 
 namespace App\Modules\InboundMedia\Http\Controllers;
 
+use App\Modules\Analytics\Services\AnalyticsTracker;
 use App\Modules\Events\Models\Event;
 use App\Modules\MediaProcessing\Jobs\GenerateMediaVariantsJob;
 use App\Modules\MediaProcessing\Models\EventMedia;
+use App\Modules\MediaProcessing\Services\ModerationBroadcasterService;
 use App\Shared\Http\BaseController;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,11 +20,19 @@ class PublicUploadController extends BaseController
     private const SINGLE_UPLOAD_MIMES = 'jpg,jpeg,png,gif,webp,heic,heif,mp4,mov';
     private const MULTI_UPLOAD_MIMES = 'jpg,jpeg,png,gif,webp,heic,heif';
 
-    public function show(string $uploadSlug): JsonResponse
+    public function show(string $uploadSlug, Request $request, AnalyticsTracker $analytics): JsonResponse
     {
-        $event = Event::with('modules')
+        $event = Event::with(['modules', 'faceSearchSettings'])
             ->where('upload_slug', $uploadSlug)
             ->firstOrFail();
+
+        $analytics->trackEvent(
+            $event,
+            'upload.page_view',
+            $request,
+            ['surface' => 'upload'],
+            channel: 'upload',
+        );
 
         return $this->success($this->payloadFor($event));
     }
@@ -31,9 +41,9 @@ class PublicUploadController extends BaseController
      * Public media upload via guest link / QR code.
      * Does not require authentication and accepts one or multiple images.
      */
-    public function upload(Request $request, string $uploadSlug): JsonResponse
+    public function upload(Request $request, string $uploadSlug, AnalyticsTracker $analytics): JsonResponse
     {
-        $event = Event::with('modules')
+        $event = Event::with(['modules', 'faceSearchSettings'])
             ->where('upload_slug', $uploadSlug)
             ->firstOrFail();
 
@@ -61,12 +71,27 @@ class PublicUploadController extends BaseController
         $createdMedia = [];
 
         foreach ($files as $file) {
-            $createdMedia[] = $this->storePublicUpload(
+            $media = $this->storePublicUpload(
                 event: $event,
                 file: $file,
                 senderName: $senderName,
                 caption: $caption,
             );
+
+            $analytics->trackEvent(
+                $event,
+                'upload.completed',
+                $request,
+                [
+                    'surface' => 'upload',
+                    'media_type' => $media->media_type,
+                    'source_type' => $media->source_type,
+                ],
+                eventMediaId: $media->id,
+                channel: 'upload',
+            );
+
+            $createdMedia[] = $media;
         }
 
         return $this->success([
@@ -75,7 +100,7 @@ class PublicUploadController extends BaseController
                 : 'Imagem recebida com sucesso!',
             'uploaded_count' => count($createdMedia),
             'media_ids' => array_map(static fn (EventMedia $media) => $media->id, $createdMedia),
-            'moderation' => $event->isAutoModeration() ? 'approved' : 'pending',
+            'moderation' => 'pending',
         ], 201);
     }
 
@@ -107,15 +132,17 @@ class PublicUploadController extends BaseController
                 'max_files' => self::MAX_FILES,
                 'max_file_size_mb' => (int) floor(self::MAX_FILE_SIZE_KB / 1024),
                 'accept_hint' => 'image/*',
-                'moderation_mode' => $event->moderation_mode,
-                'instructions' => $event->isAutoModeration()
-                    ? 'As fotos entram em processamento automaticamente assim que forem recebidas.'
-                    : 'As fotos enviadas passam por moderacao antes de aparecer no evento.',
+                'moderation_mode' => $event->moderation_mode?->value,
+                'instructions' => $event->isNoModeration()
+                    ? 'As fotos entram no ar automaticamente apos o processamento base.'
+                    : ($event->isAiModeration()
+                        ? 'As fotos passam por moderacao por IA antes de aparecer no evento.'
+                        : 'As fotos enviadas passam por moderacao manual antes de aparecer no evento.'),
             ],
             'links' => [
                 'upload_url' => $event->publicUploadUrl(),
                 'upload_api_url' => $event->publicUploadApiUrl(),
-                'hub_url' => $event->public_url,
+                'hub_url' => $event->publicHubUrl(),
             ],
         ];
     }
@@ -174,6 +201,8 @@ class PublicUploadController extends BaseController
 
     private function storePublicUpload(Event $event, UploadedFile $file, string $senderName, ?string $caption): EventMedia
     {
+        $path = $file->store("events/{$event->id}/originals", 'public');
+
         $media = EventMedia::create([
             'event_id' => $event->id,
             'media_type' => str_starts_with((string) $file->getMimeType(), 'video') ? 'video' : 'image',
@@ -181,16 +210,23 @@ class PublicUploadController extends BaseController
             'source_label' => $senderName,
             'caption' => $caption,
             'original_filename' => $file->getClientOriginalName(),
+            'original_disk' => 'public',
+            'original_path' => $path,
+            'client_filename' => $file->getClientOriginalName(),
             'mime_type' => $file->getMimeType(),
             'size_bytes' => $file->getSize(),
             'processing_status' => 'received',
-            'moderation_status' => $event->isAutoModeration() ? 'approved' : 'pending',
+            'moderation_status' => 'pending',
             'publication_status' => 'draft',
+            'safety_status' => 'queued',
+            'face_index_status' => $this->shouldQueueFaceIndex($event, $file) ? 'queued' : 'skipped',
+            'vlm_status' => 'queued',
+            'pipeline_version' => 'media_ai_foundation_v1',
         ]);
 
-        $path = $file->store("events/{$event->id}/originals", 'public');
-
-        $media->update(['original_filename' => $path]);
+        app(ModerationBroadcasterService::class)->broadcastCreated(
+            $media->fresh(['event', 'variants', 'inboundMessage']),
+        );
 
         GenerateMediaVariantsJob::dispatch($media->id);
 
@@ -208,5 +244,11 @@ class PublicUploadController extends BaseController
         }
 
         return url(Storage::disk('public')->url($path));
+    }
+
+    private function shouldQueueFaceIndex(Event $event, UploadedFile $file): bool
+    {
+        return str_starts_with((string) $file->getMimeType(), 'image/')
+            && $event->isFaceSearchEnabled();
     }
 }

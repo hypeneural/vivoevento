@@ -3,11 +3,16 @@
 namespace App\Modules\WhatsApp\Jobs;
 
 use App\Modules\WhatsApp\Clients\Contracts\WhatsAppWebhookNormalizerInterface;
+use App\Modules\WhatsApp\Enums\InstanceStatus;
 use App\Modules\WhatsApp\Enums\InboundEventStatus;
+use App\Modules\WhatsApp\Enums\MessageDirection;
+use App\Modules\WhatsApp\Enums\MessageStatus;
+use App\Modules\WhatsApp\Events\WhatsAppInstanceStatusChanged;
 use App\Modules\WhatsApp\Models\WhatsAppInboundEvent;
 use App\Modules\WhatsApp\Models\WhatsAppInstance;
+use App\Modules\WhatsApp\Models\WhatsAppMessage;
 use App\Modules\WhatsApp\Services\WhatsAppInboundRouter;
-use App\Modules\WhatsApp\Services\WhatsAppProviderResolver;
+use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -40,10 +45,8 @@ class ProcessInboundWebhookJob implements ShouldQueue
         $this->onQueue(config('whatsapp.queues.inbound', 'whatsapp-inbound'));
     }
 
-    public function handle(
-        WhatsAppProviderResolver $providerResolver,
-        WhatsAppInboundRouter $inboundRouter,
-    ): void {
+    public function handle(WhatsAppInboundRouter $inboundRouter): void
+    {
         // 1. Find instance
         $instance = WhatsAppInstance::where('provider_key', $this->providerKey)
             ->where('external_instance_id', $this->instanceKey)
@@ -69,18 +72,12 @@ class ProcessInboundWebhookJob implements ShouldQueue
         ]);
 
         try {
-            // 3. Get the normalizer for this provider
-            $normalizer = $this->resolveNormalizer($this->providerKey);
-            $normalized = $normalizer->normalize($this->payload, $instance);
-
-            // 4. Save normalized data
-            $inboundEvent->update(['normalized_json' => $normalized->rawPayload]);
-
-            // 5. Route the message
-            $inboundRouter->route($normalized, $instance);
-
-            // 6. Mark as processed
-            $inboundEvent->markProcessed();
+            match ($this->detectCallbackType()) {
+                'received' => $this->processReceivedCallback($instance, $inboundEvent, $inboundRouter),
+                'message_status' => $this->processMessageStatusCallback($instance, $inboundEvent),
+                'connected', 'disconnected' => $this->processInstanceLifecycleCallback($instance, $inboundEvent),
+                default => $this->ignoreCallback($inboundEvent),
+            };
 
         } catch (\Throwable $e) {
             $inboundEvent->markFailed($e->getMessage());
@@ -97,13 +94,14 @@ class ProcessInboundWebhookJob implements ShouldQueue
 
     private function detectEventType(): string
     {
-        if (isset($this->payload['status'])) {
-            return 'status';
-        }
-        if (isset($this->payload['ack'])) {
-            return 'delivery';
-        }
-        return 'message';
+        return match ($this->detectCallbackType()) {
+            'received' => 'message',
+            'message_status' => 'delivery',
+            'connected', 'disconnected' => 'status',
+            'presence' => 'presence',
+            'sent' => 'dispatch',
+            default => 'unknown',
+        };
     }
 
     private function resolveNormalizer(string $providerKey): WhatsAppWebhookNormalizerInterface
@@ -112,5 +110,216 @@ class ProcessInboundWebhookJob implements ShouldQueue
             'zapi' => app(\App\Modules\WhatsApp\Clients\Providers\ZApi\ZApiWebhookNormalizer::class),
             default => throw new \RuntimeException("No webhook normalizer for provider: {$providerKey}"),
         };
+    }
+
+    private function detectCallbackType(): string
+    {
+        return match ($this->payload['type'] ?? null) {
+            'ReceivedCallback' => 'received',
+            'MessageStatusCallback' => 'message_status',
+            'ConnectedCallback' => 'connected',
+            'DisconnectedCallback' => 'disconnected',
+            'PresenceChatCallback' => 'presence',
+            'DeliveryCallback' => 'sent',
+            default => $this->inferCallbackTypeFromPayload(),
+        };
+    }
+
+    private function inferCallbackTypeFromPayload(): string
+    {
+        if (array_key_exists('connected', $this->payload)) {
+            return 'connected';
+        }
+
+        if (array_key_exists('disconnected', $this->payload)) {
+            return 'disconnected';
+        }
+
+        if (isset($this->payload['ids']) && isset($this->payload['status'])) {
+            return 'message_status';
+        }
+
+        if (($this->payload['_webhook_type'] ?? null) === 'delivery') {
+            return 'message_status';
+        }
+
+        if (($this->payload['_webhook_type'] ?? null) === 'status') {
+            return 'unknown';
+        }
+
+        return 'received';
+    }
+
+    private function processReceivedCallback(
+        WhatsAppInstance $instance,
+        WhatsAppInboundEvent $inboundEvent,
+        WhatsAppInboundRouter $inboundRouter,
+    ): void {
+        $normalizer = $this->resolveNormalizer($this->providerKey);
+        $normalized = $normalizer->normalize($this->payload, $instance);
+
+        $inboundEvent->update(['normalized_json' => $normalized->toArray()]);
+        $inboundRouter->route($normalized, $instance);
+        $inboundEvent->markProcessed();
+    }
+
+    private function processMessageStatusCallback(
+        WhatsAppInstance $instance,
+        WhatsAppInboundEvent $inboundEvent,
+    ): void {
+        $status = (string) ($this->payload['status'] ?? '');
+        $occurredAt = $this->extractOccurredAt();
+        $messageIds = collect($this->payload['ids'] ?? [$this->payload['messageId'] ?? null])
+            ->filter(fn ($value) => is_string($value) && trim($value) !== '')
+            ->values()
+            ->all();
+
+        $inboundEvent->update([
+            'normalized_json' => [
+                'callback_type' => $this->payload['type'] ?? 'MessageStatusCallback',
+                'message_status' => $status,
+                'message_ids' => $messageIds,
+                'phone' => $this->payload['phone'] ?? null,
+                'is_group' => (bool) ($this->payload['isGroup'] ?? false),
+                'occurred_at' => $occurredAt->toIso8601String(),
+            ],
+        ]);
+
+        $mappedStatus = $this->mapProviderMessageStatus($status);
+
+        if ($mappedStatus === null || $messageIds === []) {
+            $inboundEvent->markIgnored();
+            return;
+        }
+
+        $messages = WhatsAppMessage::query()
+            ->where('instance_id', $instance->id)
+            ->where('direction', MessageDirection::Outbound)
+            ->whereIn('provider_message_id', $messageIds)
+            ->get();
+
+        if ($messages->isEmpty()) {
+            Log::channel('whatsapp')->info('Outbound delivery callback ignored because no message matched', [
+                'instance_id' => $instance->id,
+                'message_ids' => $messageIds,
+                'provider_status' => $status,
+            ]);
+
+            $inboundEvent->markIgnored();
+            return;
+        }
+
+        foreach ($messages as $message) {
+            $updates = [
+                'status' => $mappedStatus,
+            ];
+
+            if ($mappedStatus === MessageStatus::Sent && $message->sent_at === null) {
+                $updates['sent_at'] = $occurredAt;
+            }
+
+            $existingNormalized = is_array($message->normalized_payload_json) ? $message->normalized_payload_json : [];
+            $updates['normalized_payload_json'] = array_merge($existingNormalized, [
+                'last_delivery_callback' => [
+                    'provider_status' => $status,
+                    'occurred_at' => $occurredAt->toIso8601String(),
+                    'message_ids' => $messageIds,
+                ],
+            ]);
+
+            $message->update($updates);
+        }
+
+        $inboundEvent->markProcessed();
+    }
+
+    private function processInstanceLifecycleCallback(
+        WhatsAppInstance $instance,
+        WhatsAppInboundEvent $inboundEvent,
+    ): void {
+        $callbackType = $this->detectCallbackType();
+        $occurredAt = $this->extractOccurredAt();
+        $previousStatus = $instance->status ?? InstanceStatus::Draft;
+        $newStatus = $callbackType === 'connected'
+            ? InstanceStatus::Connected
+            : InstanceStatus::Disconnected;
+
+        $updates = [
+            'status' => $newStatus,
+            'phone_number' => $this->payload['phone'] ?? $this->payload['connectedPhone'] ?? $instance->phone_number,
+            'last_status_sync_at' => $occurredAt,
+            'last_health_check_at' => $occurredAt,
+            'last_health_status' => $newStatus->value,
+        ];
+
+        if ($newStatus === InstanceStatus::Connected) {
+            $updates['connected_at'] = $occurredAt;
+            $updates['disconnected_at'] = null;
+            $updates['last_error'] = null;
+        } else {
+            $updates['disconnected_at'] = $occurredAt;
+            $updates['last_error'] = $this->payload['error'] ?? null;
+        }
+
+        $instance->update($updates);
+
+        $inboundEvent->update([
+            'normalized_json' => [
+                'callback_type' => $this->payload['type'] ?? ($callbackType === 'connected' ? 'ConnectedCallback' : 'DisconnectedCallback'),
+                'instance_status' => $newStatus->value,
+                'phone' => $updates['phone_number'],
+                'error' => $updates['last_error'] ?? null,
+                'occurred_at' => $occurredAt->toIso8601String(),
+            ],
+        ]);
+
+        if ($previousStatus !== $newStatus) {
+            WhatsAppInstanceStatusChanged::dispatch($instance, $previousStatus, $newStatus);
+        }
+
+        $inboundEvent->markProcessed();
+    }
+
+    private function ignoreCallback(WhatsAppInboundEvent $inboundEvent): void
+    {
+        $inboundEvent->update([
+            'normalized_json' => [
+                'callback_type' => $this->payload['type'] ?? null,
+                'webhook_type' => $this->payload['_webhook_type'] ?? null,
+            ],
+        ]);
+
+        $inboundEvent->markIgnored();
+    }
+
+    private function mapProviderMessageStatus(string $providerStatus): ?MessageStatus
+    {
+        return match (strtoupper($providerStatus)) {
+            'SENT' => MessageStatus::Sent,
+            'RECEIVED' => MessageStatus::Delivered,
+            'READ', 'READ_BY_ME', 'PLAYED' => MessageStatus::Read,
+            default => null,
+        };
+    }
+
+    private function extractOccurredAt(): CarbonImmutable
+    {
+        foreach (['momment', 'mommentTimestamp', 'moment', 'momentTimestamp', 'timestamp'] as $key) {
+            if (! isset($this->payload[$key])) {
+                continue;
+            }
+
+            $value = $this->payload[$key];
+
+            if (is_numeric($value)) {
+                return CarbonImmutable::createFromTimestamp((int) $value)->utc();
+            }
+
+            if (is_string($value) && trim($value) !== '') {
+                return CarbonImmutable::parse($value)->utc();
+            }
+        }
+
+        return CarbonImmutable::now()->utc();
     }
 }

@@ -1,0 +1,87 @@
+﻿@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.header {
+  margin-bottom: 1.5rem;
+
+  :global(.section-title) {
+    margin-top: 1rem;
+    max-width: 16ch;
+  }
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+
+  button {
+    @include button-reset;
+    position: relative;
+    overflow: hidden;
+    min-height: 3rem;
+    padding: 0 0.95rem;
+    border-radius: 999px;
+    border: $border-subtle;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  span:last-child,
+  > button > span {
+    position: relative;
+    z-index: 1;
+    color: $c-white-80;
+    font-weight: 800;
+  }
+}
+
+.tabHighlight {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba($c-accent, 0.12);
+  border: 1px solid rgba($c-accent, 0.22);
+}
+
+.activeTab > span {
+  color: $c-accent;
+}
+
+.panelShell {
+  margin-top: 1rem;
+}
+
+.panel {
+  @include surface(rgba(10, 16, 29, 0.82), $border-strong, 18px);
+  display: grid;
+  gap: 0.85rem;
+  border-radius: $radius-lg;
+  padding: 1rem;
+
+  div {
+    padding: 1rem;
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  small {
+    display: block;
+    color: $c-white-48;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+
+  strong {
+    display: block;
+    margin-top: 0.4rem;
+    font-size: 1rem;
+    color: $c-white-80;
+  }
+}
+
+@media (min-width: 980px) {
+  .panel {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

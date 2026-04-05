@@ -39,7 +39,7 @@ class DemoSeeder extends Seeder
         OrganizationMember::firstOrCreate(
             ['organization_id' => $org->id, 'user_id' => $admin->id],
             [
-                'role_key' => 'owner',
+                'role_key' => 'super-admin',
                 'is_owner' => true,
                 'joined_at' => now(),
             ]
@@ -60,8 +60,8 @@ class DemoSeeder extends Seeder
         OrganizationMember::firstOrCreate(
             ['organization_id' => $org->id, 'user_id' => $partner->id],
             [
-                'role_key' => 'manager',
-                'is_owner' => false,
+                'role_key' => 'partner-owner',
+                'is_owner' => true,
                 'joined_at' => now(),
             ]
         );
@@ -77,5 +77,14 @@ class DemoSeeder extends Seeder
             ]
         );
         $operator->assignRole('event-operator');
+
+        OrganizationMember::firstOrCreate(
+            ['organization_id' => $org->id, 'user_id' => $operator->id],
+            [
+                'role_key' => 'event-operator',
+                'is_owner' => false,
+                'joined_at' => now(),
+            ]
+        );
     }
 }

@@ -7,8 +7,13 @@ use App\Modules\WhatsApp\Clients\DTOs\CreateGroupData;
 use App\Modules\WhatsApp\Clients\DTOs\GroupParticipantsData;
 use App\Modules\WhatsApp\Clients\DTOs\ModifyChatData;
 use App\Modules\WhatsApp\Clients\DTOs\ProviderActionResultData;
+use App\Modules\WhatsApp\Clients\DTOs\ProviderChatMessagesData;
 use App\Modules\WhatsApp\Clients\DTOs\ProviderChatsPageData;
+use App\Modules\WhatsApp\Clients\DTOs\ProviderConnectionDetailsData;
 use App\Modules\WhatsApp\Clients\DTOs\ProviderGroupCreatedData;
+use App\Modules\WhatsApp\Clients\DTOs\ProviderGroupCatalogData;
+use App\Modules\WhatsApp\Clients\DTOs\ProviderGroupParticipantsData;
+use App\Modules\WhatsApp\Clients\DTOs\ProviderHealthCheckData;
 use App\Modules\WhatsApp\Clients\DTOs\ProviderQrCodeData;
 use App\Modules\WhatsApp\Clients\DTOs\ProviderSendMessageResultData;
 use App\Modules\WhatsApp\Clients\DTOs\ProviderStatusData;
@@ -50,6 +55,35 @@ class ZApiWhatsAppProvider implements WhatsAppProviderInterface
         );
     }
 
+    public function getConnectionDetails(WhatsAppInstance $instance): ProviderConnectionDetailsData
+    {
+        $response = $this->client->getDevice($instance);
+        $body = is_array($response['body']) ? $response['body'] : [];
+
+        return new ProviderConnectionDetailsData(
+            phone: $body['phone'] ?? $body['number'] ?? null,
+            statusMessage: $body['status'] ?? null,
+            profile: [
+                'lid' => $body['lid'] ?? null,
+                'name' => $body['name'] ?? null,
+                'about' => $body['about'] ?? null,
+                'img_url' => $body['imgUrl'] ?? $body['img_url'] ?? null,
+                'is_business' => (bool) ($body['isBusiness'] ?? $body['is_business'] ?? false),
+            ],
+            device: [
+                'session_id' => $body['sessionId'] ?? $body['session_id'] ?? null,
+                'session_name' => $body['sessionName'] ?? $body['session_name'] ?? $body['session'] ?? null,
+                'device_model' => $body['deviceModel'] ?? $body['device_model'] ?? $body['model'] ?? null,
+                'original_device' => $body['originalDevice'] ?? $body['original_device'] ?? null,
+            ],
+            meta: [
+                'provider' => 'zapi',
+            ],
+            rawResponse: $body,
+            error: $response['success'] ? null : ($body['error'] ?? 'Nao foi possivel obter detalhes do dispositivo.'),
+        );
+    }
+
     public function getQrCode(WhatsAppInstance $instance): ProviderQrCodeData
     {
         $response = $this->client->getQrCode($instance);
@@ -61,6 +95,7 @@ class ZApiWhatsAppProvider implements WhatsAppProviderInterface
 
         return new ProviderQrCodeData(
             qrCodeBytes: $body['value'] ?? null,
+            error: $response['success'] ? null : ($body['error'] ?? 'QR Code indisponivel.'),
         );
     }
 
@@ -75,6 +110,48 @@ class ZApiWhatsAppProvider implements WhatsAppProviderInterface
 
         return new ProviderQrCodeData(
             qrCodeBase64Image: $body['value'] ?? null,
+            error: $response['success'] ? null : ($body['error'] ?? 'QR Code indisponivel.'),
+        );
+    }
+
+    public function testConnection(WhatsAppInstance $instance): ProviderHealthCheckData
+    {
+        $response = $this->client->getStatus($instance);
+        $body = is_array($response['body']) ? $response['body'] : [];
+
+        if (in_array($response['status'], [401, 403], true)) {
+            return new ProviderHealthCheckData(
+                success: false,
+                connected: false,
+                status: 'invalid_credentials',
+                message: 'As credenciais da Z-API foram rejeitadas.',
+                rawResponse: $body,
+                error: $body['error'] ?? 'Credenciais invalidas.',
+            );
+        }
+
+        if (! $response['success']) {
+            return new ProviderHealthCheckData(
+                success: false,
+                connected: false,
+                status: 'error',
+                message: 'Nao foi possivel validar a instancia na Z-API.',
+                rawResponse: $body,
+                error: $body['error'] ?? 'Falha ao consultar a Z-API.',
+            );
+        }
+
+        $connected = (bool) ($body['connected'] ?? false);
+
+        return new ProviderHealthCheckData(
+            success: true,
+            connected: $connected,
+            status: $connected ? 'connected' : 'disconnected',
+            message: $connected
+                ? 'Instancia conectada com sucesso.'
+                : 'Credenciais validas, mas a instancia esta desconectada.',
+            rawResponse: $body,
+            error: $body['error'] ?? null,
         );
     }
 
@@ -228,6 +305,15 @@ class ZApiWhatsAppProvider implements WhatsAppProviderInterface
         );
     }
 
+    public function findMessages(WhatsAppInstance $instance, string $remoteJid, array $filters = []): ProviderChatMessagesData
+    {
+        return new ProviderChatMessagesData(
+            success: false,
+            remoteJid: $remoteJid,
+            error: 'Busca remota de mensagens ainda nao implementada para Z-API neste modulo.',
+        );
+    }
+
     public function modifyChat(WhatsAppInstance $instance, ModifyChatData $data): ProviderActionResultData
     {
         $response = $this->client->modifyChat($instance, [
@@ -256,6 +342,24 @@ class ZApiWhatsAppProvider implements WhatsAppProviderInterface
             invitationLink: $body['invitationLink'] ?? null,
             error: $response['success'] ? null : ($body['error'] ?? 'Failed to create group'),
             rawResponse: $body,
+        );
+    }
+
+    public function fetchGroups(WhatsAppInstance $instance, bool $includeParticipants = false): ProviderGroupCatalogData
+    {
+        return new ProviderGroupCatalogData(
+            success: false,
+            includesParticipants: $includeParticipants,
+            error: 'Catalogo remoto de grupos ainda nao implementado para Z-API neste modulo.',
+        );
+    }
+
+    public function getGroupParticipants(WhatsAppInstance $instance, string $groupId): ProviderGroupParticipantsData
+    {
+        return new ProviderGroupParticipantsData(
+            success: false,
+            groupId: $groupId,
+            error: 'Consulta de participantes ainda nao implementada para Z-API neste modulo.',
         );
     }
 

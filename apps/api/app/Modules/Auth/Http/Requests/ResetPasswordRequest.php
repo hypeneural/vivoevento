@@ -14,39 +14,29 @@ class ResetPasswordRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'login' => ['required', 'string'],
-            'code' => ['required', 'string', 'size:6'],
+            'session_token' => ['required', 'string', 'min:20', 'max:120'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'device_name' => ['nullable', 'string', 'max:60'],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'login.required' => 'Informe seu WhatsApp ou e-mail.',
-            'code.required' => 'Informe o código de verificação.',
-            'code.size' => 'O código deve ter 6 dígitos.',
+            'session_token.required' => 'Sessao de recuperacao invalida. Solicite um novo codigo.',
             'password.required' => 'Informe a nova senha.',
-            'password.min' => 'A senha deve ter no mínimo 8 caracteres.',
-            'password.confirmed' => 'As senhas não conferem.',
+            'password.min' => 'A senha deve ter no minimo 8 caracteres.',
+            'password.confirmed' => 'As senhas nao conferem.',
         ];
     }
 
-    public function isPhoneLogin(): bool
+    public function sessionToken(): string
     {
-        $digits = preg_replace('/\D/', '', $this->validated('login'));
-        return strlen($digits) >= 10 && strlen($digits) <= 13;
+        return $this->validated('session_token');
     }
 
-    public function getLoginIdentifier(): string
+    public function deviceName(): string
     {
-        if ($this->isPhoneLogin()) {
-            $digits = preg_replace('/\D/', '', $this->validated('login'));
-            if (strlen($digits) <= 11) {
-                $digits = '55' . $digits;
-            }
-            return $digits;
-        }
-        return strtolower(trim($this->validated('login')));
+        return $this->validated('device_name', 'web-panel');
     }
 }

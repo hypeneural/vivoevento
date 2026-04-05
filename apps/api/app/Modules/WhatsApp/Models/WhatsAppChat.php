@@ -12,6 +12,8 @@ class WhatsAppChat extends Model
 {
     use HasFactory;
 
+    protected $table = 'whatsapp_chats';
+
     protected $fillable = [
         'instance_id',
         'external_chat_id',

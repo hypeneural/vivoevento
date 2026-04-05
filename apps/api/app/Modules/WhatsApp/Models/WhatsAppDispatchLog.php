@@ -10,6 +10,8 @@ class WhatsAppDispatchLog extends Model
 {
     public $timestamps = false;
 
+    protected $table = 'whatsapp_dispatch_logs';
+
     protected $fillable = [
         'instance_id',
         'message_id',

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Auth\Http\Requests;
 
+use App\Shared\Support\PhoneNumber;
 use Illuminate\Foundation\Http\FormRequest;
 
 class LoginRequest extends FormRequest
@@ -33,10 +34,7 @@ class LoginRequest extends FormRequest
      */
     public function isPhoneLogin(): bool
     {
-        $login = $this->validated('login');
-        // If it contains only digits (after stripping formatting), it's a phone
-        $digits = preg_replace('/\D/', '', $login);
-        return strlen($digits) >= 10 && strlen($digits) <= 13;
+        return PhoneNumber::looksLikeBrazilianPhone($this->validated('login'));
     }
 
     /**
@@ -45,13 +43,7 @@ class LoginRequest extends FormRequest
     public function getLoginIdentifier(): string
     {
         if ($this->isPhoneLogin()) {
-            // Normalize phone: strip everything except digits
-            $digits = preg_replace('/\D/', '', $this->validated('login'));
-            // Ensure starts with country code 55
-            if (strlen($digits) <= 11) {
-                $digits = '55' . $digits;
-            }
-            return $digits;
+            return PhoneNumber::normalizeBrazilianWhatsApp($this->validated('login'));
         }
 
         return strtolower(trim($this->validated('login')));

@@ -1,10 +1,45 @@
-// ─── Types ─────────────────────────────────────────────────
-// All TypeScript types for the wall player module.
+import type {
+  WallBootData,
+  WallEventSummary,
+  WallExpiredPayload,
+  WallHeartbeatPayload,
+  WallLayout,
+  WallMediaDeletedPayload,
+  WallMediaItem,
+  WallMediaType,
+  WallPlayerCommandPayload,
+  WallPersistentStorage,
+  WallPublicStatus,
+  WallSelectionMode,
+  WallSelectionModeOption,
+  WallSelectionPolicy,
+  WallSettings,
+  WallStateData,
+  WallStatusChangedPayload,
+  WallTransition,
+} from '@eventovivo/shared-types/wall';
 
-export type WallMediaType = 'image' | 'video';
-export type WallLayout = 'auto' | 'polaroid' | 'fullscreen' | 'split' | 'cinematic';
-export type WallTransition = 'fade' | 'slide' | 'zoom' | 'flip' | 'none';
-export type WallStatus = 'draft' | 'live' | 'paused' | 'stopped' | 'expired';
+export type {
+  WallBootData,
+  WallEventSummary,
+  WallExpiredPayload,
+  WallHeartbeatPayload,
+  WallLayout,
+  WallMediaDeletedPayload,
+  WallMediaItem,
+  WallMediaType,
+  WallPlayerCommandPayload,
+  WallPersistentStorage,
+  WallSelectionMode,
+  WallSelectionModeOption,
+  WallSelectionPolicy,
+  WallSettings,
+  WallStateData,
+  WallStatusChangedPayload,
+  WallTransition,
+};
+
+export type WallStatus = WallPublicStatus;
 
 export type WallConnectionStatus =
   | 'idle'
@@ -23,73 +58,26 @@ export type WallPlayerStatus =
   | 'expired'
   | 'error';
 
-// ─── API Payloads ──────────────────────────────────────────
-
-export interface WallEventSummary {
-  id: number;
-  title: string;
-  slug?: string | null;
-  wall_code: string;
-  status: WallStatus;
-}
-
-export interface WallMediaItem {
-  id: string;
-  url: string;
-  type: WallMediaType;
-  sender_name?: string | null;
-  caption?: string | null;
-  is_featured: boolean;
-  created_at?: string | null;
-}
-
-export interface WallSettings {
-  interval_ms: number;
-  queue_limit: number;
-  layout: WallLayout;
-  transition_effect: WallTransition;
-  background_url?: string | null;
-  partner_logo_url?: string | null;
-  show_qr: boolean;
-  show_branding: boolean;
-  show_neon: boolean;
-  neon_text?: string | null;
-  neon_color?: string | null;
-  show_sender_credit: boolean;
-  instructions_text?: string | null;
-}
-
-export interface WallBootData {
-  event: WallEventSummary;
-  files: WallMediaItem[];
-  settings: WallSettings;
-}
-
-// ─── WebSocket Event Payloads ──────────────────────────────
-
-export interface WallMediaDeletedPayload {
-  id: string;
-}
-
-export interface WallStatusChangedPayload {
-  status: WallStatus;
-  reason?: string | null;
-  updated_at?: string | null;
-}
-
-export interface WallExpiredPayload {
-  reason?: string;
-  expired_at?: string | null;
-}
-
-// ─── Runtime ───────────────────────────────────────────────
-
 export type MediaOrientation = 'vertical' | 'horizontal' | 'squareish';
 
+export type WallAssetStatus = 'idle' | 'loading' | 'ready' | 'stale' | 'error';
+
 export interface WallRuntimeItem extends WallMediaItem {
+  senderKey: string;
+  duplicateClusterKey?: string | null;
+  assetStatus: WallAssetStatus;
+  playedAt?: string | null;
+  playCount: number;
+  lastError?: string | null;
   orientation?: MediaOrientation | null;
   width?: number | null;
   height?: number | null;
+}
+
+export interface WallSenderRuntimeStats {
+  lastPlayedAt?: string | null;
+  recentPlayTimestamps: string[];
+  totalPlayCount: number;
 }
 
 export interface WallPlayerState {
@@ -98,5 +86,7 @@ export interface WallPlayerState {
   event: WallEventSummary | null;
   settings: WallSettings | null;
   items: WallRuntimeItem[];
+  senderStats: Record<string, WallSenderRuntimeStats>;
   currentIndex: number;
+  currentItemId?: string | null;
 }

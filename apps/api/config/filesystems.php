@@ -47,6 +47,20 @@ return [
             'report' => false,
         ],
 
+        'media-private' => [
+            'driver' => 'local',
+            'root' => storage_path('app/media-private'),
+            'throw' => false,
+            'report' => false,
+        ],
+
+        'ai-private' => [
+            'driver' => 'local',
+            'root' => storage_path('app/ai-private'),
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

@@ -1,195 +1,76 @@
-/**
- * useWallEngine — Core state machine for the wall player.
- *
- * Manages the slide queue, current index, auto-advance timer,
- * and maps API/WebSocket events into state updates.
- */
-
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type {
   WallBootData,
-  WallMediaItem,
   WallMediaDeletedPayload,
-  WallPlayerState,
+  WallMediaItem,
   WallPlayerStatus,
   WallRuntimeItem,
   WallSettings,
   WallStatusChangedPayload,
-  MediaOrientation,
 } from '../types';
+import { primeWallAsset } from '../engine/cache';
+import { createEmptyState, wallReducer } from '../engine/reducer';
+import {
+  clearWallRuntimeStorage,
+  readWallRuntimeStorage,
+  readWallRuntimeStorageAsync,
+  writeWallRuntimeStorage,
+  hydrateWallRuntimeItems,
+  hydrateWallSenderStats,
+} from '../engine/storage';
 
-// ─── Helpers ───────────────────────────────────────────────
+function uniqueItems(items: Array<WallRuntimeItem | null | undefined>): WallRuntimeItem[] {
+  const seen = new Set<string>();
+  const result: WallRuntimeItem[] = [];
 
-function detectOrientation(width?: number | null, height?: number | null): MediaOrientation | null {
-  if (!width || !height) return null;
-  const ratio = width / height;
-  if (ratio > 1.15) return 'horizontal';
-  if (ratio < 0.85) return 'vertical';
-  return 'squareish';
-}
-
-function mediaToRuntime(media: WallMediaItem): WallRuntimeItem {
-  return { ...media, orientation: null, width: null, height: null };
-}
-
-function createEmptyState(code: string): WallPlayerState {
-  return {
-    code,
-    status: 'booting',
-    event: null,
-    settings: null,
-    items: [],
-    currentIndex: 0,
-  };
-}
-
-// ─── Reducer ───────────────────────────────────────────────
-
-type Action =
-  | { type: 'reset'; code: string }
-  | { type: 'apply-snapshot'; snapshot: WallBootData; fallbackStatus: WallPlayerStatus }
-  | { type: 'apply-settings'; settings: WallSettings }
-  | { type: 'status-changed'; payload: WallStatusChangedPayload }
-  | { type: 'new-media'; media: WallMediaItem }
-  | { type: 'media-updated'; media: Partial<WallMediaItem> & { id: string } }
-  | { type: 'media-deleted'; id: string }
-  | { type: 'media-dimensions'; id: string; width: number; height: number }
-  | { type: 'advance' }
-  | { type: 'mark-expired' }
-  | { type: 'sync-error' };
-
-function wallReducer(state: WallPlayerState, action: Action): WallPlayerState {
-  switch (action.type) {
-    case 'reset':
-      return createEmptyState(action.code);
-
-    case 'apply-snapshot': {
-      const { snapshot, fallbackStatus } = action;
-      const controlStatus = snapshot.event.status;
-      const playerStatus: WallPlayerStatus =
-        controlStatus === 'live' ? 'playing'
-        : controlStatus === 'paused' ? 'paused'
-        : controlStatus === 'stopped' ? 'stopped'
-        : controlStatus === 'expired' ? 'expired'
-        : fallbackStatus;
-
-      const items = snapshot.files.map(mediaToRuntime);
-
-      return {
-        ...state,
-        status: items.length > 0 ? playerStatus : (playerStatus === 'playing' ? 'idle' : playerStatus),
-        event: snapshot.event,
-        settings: snapshot.settings,
-        items,
-        currentIndex: 0,
-      };
+  for (const item of items) {
+    if (!item || seen.has(item.id)) {
+      continue;
     }
 
-    case 'apply-settings':
-      return { ...state, settings: action.settings };
-
-    case 'status-changed': {
-      const { status } = action.payload;
-      const playerStatus: WallPlayerStatus =
-        status === 'live' ? (state.items.length > 0 ? 'playing' : 'idle')
-        : status === 'paused' ? 'paused'
-        : status === 'stopped' ? 'stopped'
-        : status === 'expired' ? 'expired'
-        : state.status;
-
-      return { ...state, status: playerStatus };
-    }
-
-    case 'new-media': {
-      const existing = state.items.findIndex(i => i.id === action.media.id);
-      let items: WallRuntimeItem[];
-
-      if (existing >= 0) {
-        items = [...state.items];
-        items[existing] = { ...items[existing], ...action.media };
-      } else {
-        // Prepend (newest first)
-        items = [mediaToRuntime(action.media), ...state.items];
-
-        // Trim to queue_limit
-        const limit = state.settings?.queue_limit ?? 100;
-        if (items.length > limit) {
-          items = items.slice(0, limit);
-        }
-      }
-
-      const newStatus = state.status === 'idle' && items.length > 0 ? 'playing' : state.status;
-
-      return { ...state, items, status: newStatus };
-    }
-
-    case 'media-updated': {
-      const idx = state.items.findIndex(i => i.id === action.media.id);
-      if (idx < 0) return state;
-
-      const items = [...state.items];
-      items[idx] = { ...items[idx], ...action.media };
-      return { ...state, items };
-    }
-
-    case 'media-deleted': {
-      const items = state.items.filter(i => i.id !== action.id);
-      let { currentIndex } = state;
-      if (currentIndex >= items.length) currentIndex = 0;
-
-      return {
-        ...state,
-        items,
-        currentIndex,
-        status: items.length === 0 && state.status === 'playing' ? 'idle' : state.status,
-      };
-    }
-
-    case 'media-dimensions': {
-      const idx = state.items.findIndex(i => i.id === action.id);
-      if (idx < 0) return state;
-
-      const items = [...state.items];
-      items[idx] = {
-        ...items[idx],
-        width: action.width,
-        height: action.height,
-        orientation: detectOrientation(action.width, action.height),
-      };
-      return { ...state, items };
-    }
-
-    case 'advance': {
-      if (state.items.length === 0) return state;
-      return { ...state, currentIndex: (state.currentIndex + 1) % state.items.length };
-    }
-
-    case 'mark-expired':
-      return { ...state, status: 'expired' };
-
-    case 'sync-error':
-      return state.items.length > 0 ? state : { ...state, status: 'error' };
-
-    default:
-      return state;
+    seen.add(item.id);
+    result.push(item);
   }
-}
 
-// ─── Hook ──────────────────────────────────────────────────
+  return result;
+}
 
 export function useWallEngine(code: string) {
   const [state, dispatch] = useReducer(wallReducer, createEmptyState(code));
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const stateRef = useRef(state);
-
-  useEffect(() => { stateRef.current = state; }, [state]);
+  const persistedRef = useRef(readWallRuntimeStorage(code));
 
   useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  useEffect(() => {
+    persistedRef.current = readWallRuntimeStorage(code);
     dispatch({ type: 'reset', code });
     setErrorMessage(null);
   }, [code]);
 
-  // Auto-advance timer
+  useEffect(() => {
+    let active = true;
+
+    void readWallRuntimeStorageAsync(code).then((persistedState) => {
+      if (!active || !persistedState) {
+        return;
+      }
+
+      persistedRef.current = persistedState;
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [code]);
+
+  useEffect(() => {
+    writeWallRuntimeStorage(code, state);
+  }, [code, state]);
+
   useEffect(() => {
     if (state.status !== 'playing' || !state.settings || state.items.length === 0) {
       return;
@@ -200,33 +81,71 @@ export function useWallEngine(code: string) {
     }, state.settings.interval_ms);
 
     return () => window.clearTimeout(timeout);
-  }, [state.currentIndex, state.items.length, state.settings, state.status]);
+  }, [state.currentItemId, state.items.length, state.settings, state.status]);
 
-  // Preload image dimensions
-  const preloadDimensions = useCallback((item: WallRuntimeItem) => {
-    if (item.type !== 'image' || item.width) return;
+  const currentItem = useMemo(() => {
+    if (!state.currentItemId) {
+      return state.items[state.currentIndex] ?? null;
+    }
 
-    const img = new Image();
-    img.onload = () => {
-      dispatch({
-        type: 'media-dimensions',
-        id: item.id,
-        width: img.naturalWidth,
-        height: img.naturalHeight,
+    return state.items.find((item) => item.id === state.currentItemId) ?? null;
+  }, [state.currentIndex, state.currentItemId, state.items]);
+
+  const itemsToPrime = useMemo(() => {
+    const topQueueItems = state.items
+      .filter((item) => item.assetStatus === 'idle')
+      .slice(0, 4);
+
+    return uniqueItems([
+      currentItem,
+      ...topQueueItems,
+    ]);
+  }, [currentItem, state.items]);
+
+  useEffect(() => {
+    if (itemsToPrime.length === 0) {
+      return;
+    }
+
+    itemsToPrime.forEach((item) => {
+      void primeWallAsset(item, (result) => {
+        dispatch({
+          type: 'media-asset-status',
+          payload: {
+            id: item.id,
+            assetStatus: result.status,
+            width: result.width ?? null,
+            height: result.height ?? null,
+            orientation: result.orientation ?? null,
+            errorMessage: result.errorMessage ?? null,
+          },
+        });
       });
-    };
-    img.src = item.url;
-  }, []);
+    });
+  }, [itemsToPrime]);
 
   const applySnapshot = useCallback((snapshot: WallBootData) => {
-    dispatch({ type: 'apply-snapshot', snapshot, fallbackStatus: 'playing' });
-    setErrorMessage(null);
+    const persistedState = persistedRef.current ?? readWallRuntimeStorage(code);
+    const runtimeItems = hydrateWallRuntimeItems(snapshot.files, persistedState);
+    const senderStats = Object.keys(stateRef.current.senderStats).length > 0
+      ? stateRef.current.senderStats
+      : hydrateWallSenderStats(persistedState);
+    const preferredCurrentItemId =
+      stateRef.current.currentItemId
+      ?? persistedState?.currentItemId
+      ?? null;
 
-    // Preload first few items
-    snapshot.files.slice(0, 5).forEach(f => {
-      preloadDimensions(mediaToRuntime(f));
+    dispatch({
+      type: 'apply-snapshot',
+      snapshot,
+      items: runtimeItems,
+      senderStats,
+      preferredCurrentItemId,
+      fallbackStatus: 'playing' satisfies WallPlayerStatus,
     });
-  }, [preloadDimensions]);
+
+    setErrorMessage(null);
+  }, [code]);
 
   const applySettings = useCallback((settings: WallSettings) => {
     dispatch({ type: 'apply-settings', settings });
@@ -238,8 +157,7 @@ export function useWallEngine(code: string) {
 
   const handleNewMedia = useCallback((media: WallMediaItem) => {
     dispatch({ type: 'new-media', media });
-    preloadDimensions(mediaToRuntime(media));
-  }, [preloadDimensions]);
+  }, []);
 
   const handleMediaUpdated = useCallback((media: Partial<WallMediaItem> & { id: string }) => {
     dispatch({ type: 'media-updated', media });
@@ -251,7 +169,7 @@ export function useWallEngine(code: string) {
 
   const markExpired = useCallback((message?: string | null) => {
     dispatch({ type: 'mark-expired' });
-    setErrorMessage(message || 'O telão foi encerrado.');
+    setErrorMessage(message || 'O telao foi encerrado.');
   }, []);
 
   const markSyncError = useCallback((message: string) => {
@@ -259,10 +177,16 @@ export function useWallEngine(code: string) {
     setErrorMessage(message);
   }, []);
 
-  const currentItem = useMemo(() => {
-    if (state.items.length === 0) return null;
-    return state.items[state.currentIndex % state.items.length] ?? null;
-  }, [state.items, state.currentIndex]);
+  const resetAssetStatuses = useCallback((ids?: string[]) => {
+    dispatch({ type: 'reset-assets', ids });
+  }, []);
+
+  const resetRuntime = useCallback(() => {
+    clearWallRuntimeStorage(code);
+    persistedRef.current = null;
+    dispatch({ type: 'reset', code });
+    setErrorMessage(null);
+  }, [code]);
 
   return {
     state,
@@ -276,6 +200,8 @@ export function useWallEngine(code: string) {
     handleMediaDeleted,
     markExpired,
     markSyncError,
+    resetAssetStatuses,
+    resetRuntime,
   };
 }
 

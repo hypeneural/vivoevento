@@ -2,8 +2,10 @@
 
 namespace App\Modules\Auth\Http\Resources;
 
+use App\Modules\Auth\Services\AccessStateBuilderService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 class MeResource extends JsonResource
 {
@@ -17,6 +19,7 @@ class MeResource extends JsonResource
         $organization = $user->currentOrganization();
         $subscription = $organization?->subscription;
         $plan = $subscription?->plan;
+        $access = app(AccessStateBuilderService::class)->build($user, $organization);
 
         return [
             'user' => [
@@ -24,7 +27,7 @@ class MeResource extends JsonResource
                 'name' => $user->name,
                 'email' => $user->email,
                 'phone' => $user->phone,
-                'avatar_url' => $user->avatar_path,
+                'avatar_url' => $this->publicUrl($user->avatar_path),
                 'status' => $user->status ?? 'active',
                 'role' => $this->buildRole($user, $organization),
                 'permissions' => $user->getAllPermissions()->pluck('name')->values(),
@@ -36,19 +39,31 @@ class MeResource extends JsonResource
                 'last_login_at' => $user->last_login_at?->toISOString(),
             ],
             'organization' => $this->buildOrganization($organization),
-            'access' => $this->buildAccess($user, $plan),
+            'access' => $access,
             'subscription' => $this->buildSubscription($subscription, $plan),
         ];
     }
 
     private function buildRole($user, $organization): ?array
     {
-        // Get the user's role from org membership or Spatie roles
+        $globalRole = $user->roles->pluck('name')->first(
+            fn (string $role) => in_array($role, ['super-admin', 'platform-admin'], true)
+        );
+
+        if ($globalRole) {
+            return [
+                'key' => $globalRole,
+                'name' => $this->roleDisplayName($globalRole),
+            ];
+        }
+
         $orgMembership = $organization
             ? $user->organizationMembers()->where('organization_id', $organization->id)->first()
             : null;
 
-        $roleKey = $orgMembership?->role_key ?? $user->roles->first()?->name ?? 'viewer';
+        $roleKey = $this->normalizeRoleKey(
+            $orgMembership?->role_key ?? $user->roles->first()?->name ?? 'viewer'
+        );
 
         return [
             'key' => $roleKey,
@@ -60,9 +75,9 @@ class MeResource extends JsonResource
     {
         return match ($key) {
             'super-admin' => 'Super Admin',
-            'platform-admin' => 'Admin da Plataforma',
-            'partner-owner' => 'Owner da Organização',
-            'partner-manager' => 'Gerente da Organização',
+            'platform-admin' => 'Administrador da Plataforma',
+            'partner-owner' => "Propriet\u{00E1}rio",
+            'partner-manager' => "Gerente da organiza\u{00E7}\u{00E3}o",
             'event-operator' => 'Operador de Evento',
             'financeiro' => 'Financeiro',
             'client' => 'Cliente',
@@ -73,7 +88,7 @@ class MeResource extends JsonResource
 
     private function buildOrganization($organization): ?array
     {
-        if (!$organization) {
+        if (! $organization) {
             return null;
         }
 
@@ -84,7 +99,7 @@ class MeResource extends JsonResource
             'name' => $organization->displayName(),
             'slug' => $organization->slug,
             'status' => $organization->status?->value,
-            'logo_url' => $organization->logo_path,
+            'logo_url' => $this->publicUrl($organization->logo_path),
             'branding' => [
                 'primary_color' => $organization->primary_color,
                 'secondary_color' => $organization->secondary_color,
@@ -94,89 +109,43 @@ class MeResource extends JsonResource
         ];
     }
 
-    private function buildAccess($user, $plan): array
-    {
-        $permissions = $user->getAllPermissions()->pluck('name');
-
-        // Derive accessible modules from permissions
-        $moduleMap = [
-            'dashboard' => true, // always visible
-            'events' => $permissions->contains('events.view'),
-            'media' => $permissions->contains('media.view'),
-            'moderation' => $permissions->contains('media.moderate'),
-            'gallery' => $permissions->contains('gallery.view'),
-            'wall' => $permissions->contains('wall.view'),
-            'play' => $permissions->contains('play.view'),
-            'hub' => $permissions->contains('hub.view'),
-            'clients' => $permissions->contains('clients.view'),
-            'plans' => $permissions->contains('plans.view') || $permissions->contains('billing.view'),
-            'analytics' => $permissions->contains('analytics.view'),
-            'audit' => $permissions->contains('audit.view'),
-            'settings' => $permissions->contains('settings.manage'),
-        ];
-
-        $modules = collect($moduleMap)->map(fn ($enabled, $key) => [
-            'key' => $key,
-            'enabled' => $enabled,
-            'visible' => $enabled,
-        ])->values()->all();
-
-        // Feature flags from plan
-        $features = $this->buildFeatureFlags($plan);
-
-        return [
-            'accessible_modules' => collect($moduleMap)->filter()->keys()->values()->all(),
-            'modules' => $modules,
-            'feature_flags' => $features,
-        ];
-    }
-
-    private function buildFeatureFlags($plan): array
-    {
-        if (!$plan) {
-            // Default free tier
-            return [
-                'live_gallery' => true,
-                'wall' => false,
-                'play_memory' => false,
-                'play_puzzle' => false,
-                'hub' => true,
-                'white_label' => false,
-                'whatsapp_ingestion' => false,
-                'analytics_advanced' => false,
-                'custom_domain' => false,
-            ];
-        }
-
-        // Derive from plan features
-        $planFeatures = $plan->features?->pluck('value', 'key')->all() ?? [];
-
-        return [
-            'live_gallery' => (bool) ($planFeatures['live_gallery'] ?? true),
-            'wall' => (bool) ($planFeatures['wall'] ?? false),
-            'play_memory' => (bool) ($planFeatures['play_memory'] ?? false),
-            'play_puzzle' => (bool) ($planFeatures['play_puzzle'] ?? false),
-            'hub' => (bool) ($planFeatures['hub'] ?? true),
-            'white_label' => (bool) ($planFeatures['white_label'] ?? false),
-            'whatsapp_ingestion' => (bool) ($planFeatures['whatsapp_ingestion'] ?? false),
-            'analytics_advanced' => (bool) ($planFeatures['analytics_advanced'] ?? false),
-            'custom_domain' => (bool) ($planFeatures['custom_domain'] ?? false),
-        ];
-    }
-
     private function buildSubscription($subscription, $plan): ?array
     {
-        if (!$subscription) {
+        if (! $subscription) {
             return null;
         }
 
         return [
-            'plan_key' => $plan?->slug,
+            'plan_key' => $plan?->code,
             'plan_name' => $plan?->name,
             'billing_type' => $subscription->billing_cycle === 'monthly' ? 'recurring' : $subscription->billing_cycle,
             'status' => $subscription->status,
             'trial_ends_at' => $subscription->trial_ends_at?->toISOString(),
             'renews_at' => $subscription->renews_at?->toISOString(),
+            'ends_at' => $subscription->ends_at?->toISOString(),
+            'canceled_at' => $subscription->canceled_at?->toISOString(),
+            'cancel_at_period_end' => $subscription->isCanceledPendingEnd(),
+            'cancellation_effective_at' => $subscription->isCanceledPendingEnd()
+                ? $subscription->ends_at?->toISOString()
+                : $subscription->canceled_at?->toISOString(),
         ];
+    }
+
+    private function normalizeRoleKey(string $roleKey): string
+    {
+        return match ($roleKey) {
+            'owner' => 'partner-owner',
+            'manager' => 'partner-manager',
+            default => $roleKey,
+        };
+    }
+
+    private function publicUrl(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        return Storage::disk('public')->url($path);
     }
 }

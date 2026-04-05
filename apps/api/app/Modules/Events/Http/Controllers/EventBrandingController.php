@@ -2,15 +2,30 @@
 
 namespace App\Modules\Events\Http\Controllers;
 
+use App\Modules\Events\Actions\UploadEventBrandingAssetAction;
+use App\Modules\Events\Http\Requests\UploadEventBrandingAssetRequest;
 use App\Modules\Events\Models\Event;
+use App\Modules\Events\Http\Resources\EventResource;
 use App\Shared\Http\BaseController;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
-use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class EventBrandingController extends BaseController
 {
+    public function storeAsset(
+        UploadEventBrandingAssetRequest $request,
+        UploadEventBrandingAssetAction $action,
+    ): JsonResponse {
+        $payload = $action->execute(
+            user: $request->user(),
+            file: $request->file('file'),
+            kind: $request->validated('kind'),
+            previousPath: $request->validated('previous_path'),
+        );
+
+        return $this->success($payload, 201);
+    }
+
     public function update(Request $request, Event $event): JsonResponse
     {
         $validated = $request->validate([
@@ -22,6 +37,6 @@ class EventBrandingController extends BaseController
 
         $event->update($validated);
 
-        return $this->success(new \App\Modules\Events\Http\Resources\EventResource($event->fresh()));
+        return $this->success(new EventResource($event->fresh()));
     }
 }

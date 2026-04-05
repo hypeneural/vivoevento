@@ -1,10 +1,22 @@
-import { useState, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { AppSidebar } from './AppSidebar';
 import { AppHeader } from './AppHeader';
 import { Breadcrumbs } from '@/shared/components/Breadcrumbs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+
+function AdminContentLoader() {
+  return (
+    <div className="glass rounded-3xl border border-border/60 px-4 py-16 text-center text-sm text-muted-foreground">
+      <div className="flex items-center justify-center gap-2">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Carregando pagina...
+      </div>
+    </div>
+  );
+}
 
 export function AdminLayout() {
   const isMobile = useIsMobile();
@@ -75,7 +87,9 @@ export function AdminLayout() {
         <AppHeader onMenuToggle={() => setMobileOpen(o => !o)} />
         <main className="flex-1 p-3 sm:p-4 lg:p-6">
           <Breadcrumbs />
-          <Outlet />
+          <Suspense fallback={<AdminContentLoader />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
     </div>

@@ -14,7 +14,14 @@ class LoginUserAction
      * @param string $login Phone number (digits) or email
      * @param bool $isPhone Whether the login identifier is a phone number
      */
-    public function execute(string $login, string $password, string $deviceName = 'api', bool $isPhone = false): array
+    public function execute(
+        string $login,
+        string $password,
+        string $deviceName = 'api',
+        bool $isPhone = false,
+        ?string $ipAddress = null,
+        ?string $userAgent = null,
+    ): array
     {
         if ($isPhone) {
             // Search by phone — try with and without country code
@@ -50,6 +57,19 @@ class LoginUserAction
         $user->update(['last_login_at' => now()]);
 
         $token = $user->createToken($deviceName)->plainTextToken;
+
+        activity()
+            ->event('auth.login')
+            ->performedOn($user)
+            ->causedBy($user)
+            ->withProperties([
+                'organization_id' => $user->currentOrganization()?->id,
+                'device_name' => $deviceName,
+                'login_method' => $isPhone ? 'phone' : 'email',
+                'ip_address' => $ipAddress,
+                'user_agent' => $userAgent,
+            ])
+            ->log('Login realizado');
 
         return [
             'user' => $user,

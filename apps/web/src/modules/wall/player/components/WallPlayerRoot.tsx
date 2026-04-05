@@ -61,13 +61,21 @@ export function WallPlayerRoot({ code }: { code: string }) {
     <PlayerShell backgroundUrl={state.settings?.background_url}>
       {/* Branding overlay */}
       <BrandingOverlay
+        showBranding={state.settings?.show_branding ?? true}
+        showQr={
+          (state.settings?.show_qr ?? true)
+          && state.status !== 'expired'
+          && state.status !== 'stopped'
+          && state.status !== 'error'
+        }
+        qrUrl={state.event?.upload_url}
         showNeon={state.settings?.show_neon ?? false}
         neonText={state.settings?.neon_text}
         neonColor={state.settings?.neon_color}
         partnerLogoUrl={state.settings?.partner_logo_url}
         showSenderCredit={state.settings?.show_sender_credit ?? false}
         senderCredit={currentItem?.sender_name}
-        syncLabel={resolveSyncLabel(isSyncing, connectionStatus)}
+        syncLabel={resolveSyncLabel(isSyncing, connectionStatus, modeLabel)}
       />
 
       {/* Connection status */}

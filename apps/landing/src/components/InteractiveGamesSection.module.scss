@@ -1,0 +1,208 @@
+﻿@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.grid {
+  display: grid;
+  gap: 1.7rem;
+  align-items: start;
+}
+
+.copyColumn {
+  display: grid;
+  gap: 1rem;
+
+  :global(.section-title) {
+    margin-top: 1rem;
+    max-width: 14ch;
+  }
+}
+
+.featureList {
+  display: grid;
+  gap: 0.85rem;
+
+  article {
+    @include surface(rgba(10, 16, 29, 0.72), $border-subtle, 16px);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.75rem;
+    align-items: start;
+    border-radius: 20px;
+    padding: 0.95rem;
+  }
+
+  svg {
+    color: $c-accent-warm;
+  }
+
+  h3 {
+    font-size: 1rem;
+    letter-spacing: -0.03em;
+  }
+
+  p {
+    margin-top: 0.28rem;
+    color: $c-white-64;
+    font-size: 0.92rem;
+  }
+}
+
+.sourceStrip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+
+  img {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 18px;
+    object-fit: cover;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+}
+
+.stageColumn {
+  @include surface(rgba(10, 16, 29, 0.82), $border-strong, 18px);
+  border-radius: $radius-lg;
+  padding: 1rem;
+}
+
+.modeTabs {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  padding: 0.35rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+
+  button {
+    @include button-reset;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.9rem;
+    padding: 0 1rem;
+    border-radius: 999px;
+    color: $c-white-64;
+    font-weight: 800;
+    overflow: hidden;
+  }
+}
+
+.tabBackground {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba($c-accent-warm, 0.16);
+  border: 1px solid rgba($c-accent-warm, 0.26);
+}
+
+.activeTab span:last-child,
+.activeTab > span {
+  position: relative;
+  z-index: 1;
+  color: $c-accent-warm;
+}
+
+.stageInfo {
+  margin-top: 1rem;
+
+  strong {
+    display: block;
+    font-size: 1.1rem;
+    letter-spacing: -0.03em;
+  }
+
+  p {
+    margin-top: 0.35rem;
+    color: $c-white-64;
+  }
+}
+
+.stageFrame {
+  display: grid;
+  gap: 0.95rem;
+  margin-top: 1.15rem;
+}
+
+.stageMeta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: $c-white-48;
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.phoneFrame {
+  overflow: hidden;
+  border-radius: 30px;
+  border: 1px solid rgba($c-accent-secondary, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+    rgba(4, 9, 16, 0.9);
+  min-height: 32rem;
+  padding: 0.65rem;
+}
+
+.demoCanvas {
+  width: 100%;
+  height: 100%;
+  min-height: 30rem;
+}
+
+.demoCanvas canvas {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 24px;
+}
+
+.loader {
+  @include flex-center;
+  height: 100%;
+  min-height: 30rem;
+  border-radius: 24px;
+  background:
+    linear-gradient(135deg, rgba($c-accent-secondary, 0.12), rgba($c-accent-warm, 0.08)),
+    rgba(9, 15, 26, 0.92);
+  color: $c-white-64;
+  text-align: center;
+  padding: 1.2rem;
+}
+
+.scorePanel {
+  display: grid;
+  gap: 0.75rem;
+
+  div {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.9rem;
+    padding: 0.95rem;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  span {
+    color: $c-white-48;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+
+  strong {
+    max-width: 18rem;
+    text-align: right;
+    font-size: 0.92rem;
+  }
+}
+
+@media (min-width: 1120px) {
+  .grid {
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+    gap: 2.2rem;
+  }
+}
