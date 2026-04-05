@@ -1,87 +1,94 @@
 # Evento Vivo
 
-Evento Vivo e um monorepo para uma plataforma SaaS de experiencias vivas em eventos. A ideia central do produto e transformar fotos, videos, interacoes e canais de captura em experiencias publicas e operacionais para casamentos, festas, eventos corporativos, festivais e parceiros B2B.
+Evento Vivo e o monorepo da plataforma SaaS de experiencias vivas para eventos.
 
-No estado atual do codigo, o repositorio combina:
+O produto hoje combina:
 
-- um backend modular em Laravel, organizado por dominio;
-- um frontend SPA em React para painel administrativo;
-- um player publico de wall/telao em tempo real;
-- uma base de dominio de WhatsApp bastante avancada;
-- uma serie de modulos ja funcionais;
-- e algumas partes ainda em scaffold/placeholder, principalmente na pipeline completa de ingestao e processamento de midia.
-
-## Resumo rapido
-
-- Entidade central do produto: `Event`.
-- Modelo de negocio: multi-tenant por `Organization`, com `Clients`, `Plans` e `Subscriptions`.
-- Canais de entrada: upload publico, canais do evento e modulo de WhatsApp.
-- Saidas de experiencia: galeria, wall/telao, play e hub publico.
-- Backend: API-first, responses padronizadas e filas para trabalho assincrono.
-- Frontend: autenticacao e wall ja falam com API real; a maior parte do painel ainda usa mocks.
-- Feature mais madura hoje: wall realtime.
-- Modulo mais complexo do backend: WhatsApp.
-
-## O que o produto e
-
-O Evento Vivo foi desenhado para parceiros como fotografos, agencias, cerimonialistas e operadores de evento criarem eventos com identidade visual propria, receberem conteudo dos convidados e exibirem esse conteudo em diferentes formatos:
-
-- galeria publica do evento;
-- wall/telao com slideshow e atualizacao em tempo real;
+- captura publica de fotos e videos;
+- pipeline de midia com variantes, moderacao, IA e publicacao;
+- galeria publica;
+- wall/telao realtime;
+- jogos mobile-first com ranking e analytics;
 - hub publico do evento;
-- jogos e experiencias interativas;
-- operacao administrativa com permissao por papel;
-- trilha de auditoria;
-- camada de assinatura e plano.
+- painel administrativo multi-tenant;
+- checkout publico por evento e trilha de billing;
+- operacao de WhatsApp com adapters por provider;
+- assets e scripts de deploy para VPS de producao.
 
-Na modelagem atual, o fluxo esperado e:
+## Panorama atual
 
-1. uma organizacao entra na plataforma;
-2. ela cria clientes e eventos;
-3. cada evento habilita modulos como `live`, `wall`, `play` e `hub`;
-4. o conteudo entra por upload publico, canais externos ou WhatsApp;
-5. a midia e moderada e publicada;
-6. os modulos publicos consomem essa midia e entregam a experiencia ao vivo.
+- 3 apps ativas no monorepo:
+  - `apps/api` -> backend Laravel
+  - `apps/web` -> painel admin + experiencias publicas
+  - `apps/landing` -> landing page principal
+- 4 superficies de producao ja desenhadas:
+  - `eventovivo.com.br`
+  - `admin.eventovivo.com.br`
+  - `api.eventovivo.com.br`
+  - `ws.eventovivo.com.br`
+- backend modular por dominio, com 25 modulos registrados em `apps/api/config/modules.php`
+- painel React com rotas lazy-loaded, autenticacao real, permissoes por modulo, busca global e varias areas ja integradas via API
+- landing page separada do admin, com build independente e deploy proprio
+- stack operacional de VPS ja versionada em `deploy/` e `scripts/`
 
-## Estado real do repositorio
+## Principais entregas da fase atual
 
-Esta secao e importante porque parte da documentacao interna descreve a arquitetura-alvo, e o codigo atual ainda esta em uma fase intermediaria entre estrutura pronta e implementacao completa.
+- separacao oficial da landing page em `apps/landing`
+- evolucao forte do painel administrativo, com mais modulos consumindo API real
+- checkout publico por evento com Pix e cartao via Pagar.me v5
+- onboarding do checkout com CTA para abrir o painel e tratamento de identidade existente
+- notificacoes de billing por WhatsApp a partir da maquina de estados local
+- pipeline de midia com `fast_preview`, variantes canonicas, hash perceptual, agrupamento de duplicatas e reprocessamento por etapa
+- camada de `ContentModeration` com provider OpenAI e thresholds por evento
+- camada de `MediaIntelligence` com VLM, `enrich_only` e `gate`
+- `FaceSearch` com indexacao por rosto, `pgvector` e busca publica por selfie
+- `Wall` com manager administrativo, player publico, fila `broadcasts`, boot/state publicos e contrato compartilhado em `packages/shared-types`
+- `Play` com jogos `memory` e `puzzle`, sessoes, ranking, analytics e runtime PWA
+- `Hub` com builder de hot site, presets por organizacao, hero, logos de patrocinador e tracking publico de CTA
+- modulo `WhatsApp` provider-agnostic com adapters para Z-API e Evolution API
+- endpoints de health, templates de Nginx/PHP-FPM/systemd, deploy por release, rollback e smoke test
 
-| Area | Estado atual |
-| --- | --- |
-| Arquitetura modular do backend | Estrutura consistente e bem definida. Os modulos estao registrados em `apps/api/config/modules.php`. |
-| Autenticacao e sessao | Implementadas. Login por email ou telefone/WhatsApp, token Sanctum, `/auth/me` e matrix de acesso. |
-| Organizations, Clients, Events, Roles, Users | CRUD basico implementado. |
-| Plans e Billing | Basico implementado. Seed de planos, assinatura simples e checkout local sem gateway real. |
-| Audit | Implementado sobre `spatie/laravel-activitylog`, com listagem e timeline. |
-| Wall | Implementado e e a vertical mais completa: settings, status, boot publico, eventos broadcast e player React. |
-| WhatsApp | Implementado em profundidade: instancias, QR/status, envio assincrono, webhooks inbound, normalizacao e bindings. |
-| InboundMedia e MediaProcessing | Estrutura, filas e jobs existem, mas varios jobs ainda estao em stub com comentarios. |
-| Gallery | Leitura/admin basica implementada, dependente de `event_media`. |
-| Play e Hub | Settings publicos e administrativos implementados de forma simples. Geracao de assets ainda e placeholder. |
-| Analytics | Endpoints existem, mas hoje retornam placeholder. |
-| Frontend SPA | Muito do painel ainda usa `src/shared/mock/data.ts`; auth e wall sao os pontos mais conectados a API real. |
-| Packages compartilhados | `packages/contracts` e `packages/shared-types` ainda sao placeholders. |
+## Superficies do produto
 
-## Stack real do codigo
+| Superficie | Dominio / rota | App | Papel |
+| --- | --- | --- | --- |
+| Landing | `eventovivo.com.br` | `apps/landing` | Site principal de captura e conversao |
+| Painel admin | `admin.eventovivo.com.br` | `apps/web` | Operacao, configuracao e gestao |
+| API | `api.eventovivo.com.br` | `apps/api` | Backend Laravel, auth, filas, webhooks e dominio |
+| WebSocket | `ws.eventovivo.com.br` | `apps/api` + Reverb | Realtime do wall e de outros modulos |
+
+### Experiencias publicas entregues hoje
+
+As experiencias publicas do produto ficam principalmente em `apps/web`:
+
+- `/upload/:code` -> upload publico do evento
+- `/wall/player/:code` -> player publico do telao
+- `/checkout/evento` -> checkout publico por pacote
+- `/e/:slug` -> hub publico do evento
+- `/e/:slug/gallery` -> galeria publica
+- `/e/:slug/find-me` -> busca facial publica por selfie
+- `/e/:slug/play` -> hub publico de jogos
+- `/e/:slug/play/:gameSlug` -> jogo publico individual
+
+## Stack atual
 
 ### Backend
 
 | Camada | Tecnologia |
 | --- | --- |
 | Runtime | PHP 8.3 |
-| Framework | Laravel 13 (`apps/api/composer.json`) |
-| Auth | Laravel Sanctum + Fortify |
+| Framework | Laravel 13 |
+| Auth | Sanctum + Fortify |
 | Permissoes | Spatie Laravel Permission |
-| Data/DTO | Spatie Laravel Data |
+| DTO / Data | Spatie Laravel Data |
 | Auditoria | Spatie Activitylog |
 | Midia | Spatie Medialibrary + Intervention Image |
-| Filas | Laravel Horizon |
-| Realtime | Laravel Reverb |
-| Feature flags | Laravel Pennant |
+| Filas | Horizon |
+| Realtime | Reverb |
+| Feature flags | Pennant |
 | Observabilidade | Telescope + Pulse |
 
-### Frontend
+### Painel e experiencias web
 
 | Camada | Tecnologia |
 | --- | --- |
@@ -90,419 +97,461 @@ Esta secao e importante porque parte da documentacao interna descreve a arquitet
 | Build | Vite 5 |
 | Estilo | TailwindCSS 3 |
 | Componentes | shadcn/ui + Radix UI |
-| Roteamento | React Router 6 |
-| Cache/fetch | TanStack Query 5 |
+| Fetch / cache | TanStack Query 5 |
 | Formularios | React Hook Form + Zod |
+| Realtime | `pusher-js` compativel com Reverb |
+| Games | Phaser |
 | Animacao | Framer Motion |
-| Realtime | `pusher-js`, compatível com Reverb |
+| PWA | `vite-plugin-pwa` + Workbox |
 | Testes | Vitest |
 
-### Infra local
+### Landing page
 
-| Servico | Tecnologia |
+| Camada | Tecnologia |
 | --- | --- |
-| Banco | PostgreSQL 16 |
-| Cache e filas | Redis 7 |
-| Storage | MinIO, compativel com S3 |
+| UI | React 18 |
+| Build | Vite 5 |
+| Linguagem | TypeScript 5 |
+| Motion | GSAP + `@gsap/react` + `motion` |
+| Interacao / storytelling | Lenis + Rive |
+| Estilo | Sass modular |
+
+### Infra local e producao
+
+| Camada | Tecnologia |
+| --- | --- |
+| Banco | PostgreSQL 16 + `pgvector` |
+| Cache / fila / sessao | Redis 7 |
+| Storage local de dev | MinIO |
 | E-mail de desenvolvimento | Mailpit |
+| Web server | Nginx |
+| PHP runtime | PHP-FPM |
+| Edge | Cloudflare |
 
 ## Estrutura do monorepo
 
 ```text
 eventovivo/
-├── apps/
-│   ├── api/                # Backend Laravel
-│   └── web/                # Frontend React SPA
-├── docs/                   # Arquitetura, fluxos e mapa de modulos
-├── packages/
-│   ├── contracts/          # Placeholder para contratos e schemas
-│   └── shared-types/       # Placeholder para tipos compartilhados
-├── scripts/                # Geradores e automacoes
-├── docker/                 # Infra auxiliar
-├── docker-compose.yml      # Postgres, Redis, MinIO, Mailpit
-├── Makefile                # Comandos utilitarios
-└── AGENTS.md               # Convencoes do repositorio para agentes
+|-- apps/
+|   |-- api/        # Backend Laravel
+|   |-- landing/    # Landing page principal
+|   `-- web/        # Painel admin + experiencias publicas
+|-- deploy/         # Templates de producao (nginx, php-fpm, redis, systemd, etc.)
+|-- docker/         # Infra auxiliar para dev
+|-- docs/           # Arquitetura, fluxos, planos e mapa de modulos
+|-- packages/
+|   |-- contracts/      # Reserva para contratos formais e codegen
+|   `-- shared-types/   # Tipos compartilhados, hoje com contrato do wall
+|-- scripts/
+|   |-- deploy/     # Deploy, rollback, healthcheck, smoke test
+|   `-- ops/        # Bootstrap e validacao de host
+|-- AGENTS.md
+|-- Makefile
+`-- docker-compose.yml
 ```
 
-## Arquitetura e convencoes
+## Backend e API (`apps/api`)
 
-### Backend modular por dominio
+### Fundamentos
 
-O backend segue a regra principal do projeto: features importantes devem nascer dentro de um modulo em `apps/api/app/Modules/<Modulo>`.
+O backend segue a regra principal do repositorio: features importantes devem nascer dentro de modulos de dominio em `apps/api/app/Modules/<Modulo>`.
 
-Cada modulo tende a concentrar:
+Hoje a API ja entrega:
 
-- `Http/Controllers` com controllers finos;
-- `Actions` para operacoes de escrita;
-- `Queries` para leitura complexa;
-- `Models`, `Policies`, `Requests`, `Resources`;
-- `Jobs` para assincronia;
-- `Providers` para registrar rotas, listeners e dependencias.
+- envelope padrao `success`, `data`, `meta.request_id`
+- `GET /health/live` e `GET /health/ready`
+- middleware de contexto com `request_id` e `trace_id`
+- configuracao de trusted proxies para operacao atras de Nginx/Cloudflare
+- broadcasting via Reverb
+- filas dedicadas por lane de processamento
+- bootstrap multi-tenant por `Organization`, `User`, `Role` e `Event`
 
-Os providers de modulo sao carregados por `App\Providers\ModuleServiceProvider`, que le `apps/api/config/modules.php`.
+### Modulos de dominio
 
-### Envelope de API
+#### Core e operacao
 
-Os controllers herdam de `App\Shared\Http\BaseController`, entao a API responde em formato padrao:
-
-```json
-{
-  "success": true,
-  "data": {},
-  "meta": {
-    "request_id": "req_xxxxxxxxxxxx"
-  }
-}
-```
-
-Respostas paginadas incluem `page`, `per_page`, `total` e `last_page` dentro de `meta`.
-
-### Multi-tenant e controle de acesso
-
-O modelo de acesso atual se organiza assim:
-
-- `Organization` representa a conta parceira;
-- `OrganizationMember` conecta usuarios a organizacoes;
-- `User` pode ter papeis globais via Spatie e papel contextual na organizacao;
-- `/api/v1/auth/me` devolve usuario, organizacao atual, modulos acessiveis e feature flags derivadas do plano.
-
-Isso alimenta diretamente o frontend:
-
-- menu lateral;
-- visibilidade de modulos;
-- branding da organizacao;
-- feature flags;
-- papeis e permissoes.
-
-## Modulos de dominio
-
-### Nucleo operacional
-
-| Modulo | Papel |
+| Modulo | Papel atual |
 | --- | --- |
-| `Organizations` | Conta parceira, branding, time e escopo de dados |
-| `Users` | Usuarios do sistema, perfil e avatar |
-| `Roles` | Roles e permissoes |
-| `Auth` | Login, logout, reset de senha e sessao bootstrap |
-| `Clients` | Clientes finais de uma organizacao |
-| `Events` | Agregado principal do produto |
-| `EventTeam` | Time operacional por evento |
+| `Organizations` | conta parceira, branding e membership |
+| `Users` | usuarios, perfil e avatar |
+| `Roles` | roles e permissoes |
+| `Auth` | login por email/telefone, `me`, access matrix, OTP de registro e reset |
+| `Clients` | gestao de clientes finais da organizacao |
+| `Events` | entidade central, branding, links publicos, status e modo comercial |
+| `EventTeam` | equipe operacional por evento |
+| `Dashboard` | KPIs, eventos recentes, uploads por hora, fila de moderacao e alertas |
 
-### Captura e midia
+#### Captura, midia e IA
 
-| Modulo | Papel |
+| Modulo | Papel atual |
 | --- | --- |
-| `Channels` | Canais de entrada por evento |
-| `InboundMedia` | Recepcao e normalizacao de webhooks |
-| `MediaProcessing` | Download, variantes, moderacao e publicacao |
-| `WhatsApp` | Instancias, mensageria, webhooks inbound e bindings de grupo |
+| `Channels` | canais de entrada por evento |
+| `InboundMedia` | upload publico, webhooks e normalizacao inicial |
+| `WhatsApp` | instancias, conexao, mensagens, grupos, bindings, inbound e logs |
+| `MediaProcessing` | variantes, moderacao final, publish, reprocessamento e metricas do pipeline |
+| `ContentModeration` | safety moderation por evento via provider dedicado |
+| `FaceSearch` | indexacao facial e busca por selfie |
+| `MediaIntelligence` | VLM para caption, tags e decisao semantica |
+| `Gallery` | curadoria e publicacao para galeria |
+| `Wall` | telao realtime, manager, player e diagnosticos |
 
-### Experiencia
+#### Experiencia, negocio e suporte
 
-| Modulo | Papel |
+| Modulo | Papel atual |
 | --- | --- |
-| `Gallery` | Galeria ao vivo e listagem publica |
-| `Wall` | Telao/slideshow em tempo real |
-| `Play` | Configuracoes para jogos do evento |
-| `Hub` | Pagina/manifesto publico do evento |
+| `Play` | jogos do evento, sessoes, ranking, analytics e runtime publico |
+| `Hub` | hot site do evento, presets, hero, patrocinadores e CTA tracking |
+| `Plans` | catalogo de planos e features |
+| `Billing` | assinatura, trial, compra unica por evento, invoices, pagamentos e webhooks |
+| `Partners` | camada B2B da plataforma |
+| `Analytics` | metricas por plataforma e por evento |
+| `Audit` | trilha de auditoria, timeline e filtros |
+| `Notifications` | base de notificacoes e alertas de suporte |
 
-### Suporte e negocio
+### Capacidades importantes ja implementadas
 
-| Modulo | Papel |
-| --- | --- |
-| `Plans` | Catalogo de planos e features |
-| `Billing` | Assinaturas e checkout local |
-| `Partners` | Camada B2B, hoje ainda minima |
-| `Analytics` | Estrutura de metricas, hoje com endpoints placeholder |
-| `Audit` | Log de atividades e timeline |
-| `Notifications` | Estrutura inicial para notificacoes |
+#### Auth, acesso e sessao
 
-## Entidades centrais do dominio
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/logout`
+- `GET /api/v1/auth/me`
+- `GET /api/v1/access/matrix`
+- jornada de OTP para registro por WhatsApp e reset de senha
+- payload de sessao com:
+  - usuario
+  - organizacao atual
+  - permissoes
+  - modulos acessiveis
+  - feature flags
+  - assinatura atual
+  - entitlements resolvidos
 
-As tabelas e models mais importantes para entender o sistema hoje sao:
+#### Events
 
-- `organizations`: conta parceira, branding, dominio, timezone, status;
-- `organization_members`: vinculo user x organizacao;
-- `clients`: cliente final da organizacao;
-- `events`: evento principal, datas, branding, URLs publicas e modo de moderacao;
-- `event_modules`: habilitacao de `live`, `wall`, `play`, `hub` por evento;
-- `event_channels`: origem/canal de captura;
-- `inbound_messages`: payload normalizado de entrada;
-- `event_media`: midia do evento, com status de processamento, moderacao e publicacao;
-- `event_media_variants`: variantes como thumb, gallery e wall;
-- `event_wall_settings`, `event_play_settings`, `event_hub_settings`: configuracoes 1:1 por evento;
-- `plans`, `plan_prices`, `plan_features`: monetizacao;
-- `subscriptions`: assinatura da organizacao;
-- `whatsapp_*`: toda a base de instancias, chats, mensagens, logs e group bindings.
+O modulo `Events` ja cobre:
 
-## Como o sistema funciona
+- CRUD de evento
+- listagem com filtros
+- detalhe rico do evento
+- status comercial e modo de moderacao
+- upload de ativos de branding
+- links publicos do evento
+- regeneracao de `slug`, `upload_slug` e identificadores publicos
+- cards de configuracao por evento para:
+  - `ContentModeration`
+  - `MediaIntelligence`
+  - `FaceSearch`
 
-### 1. Login, bootstrap de sessao e montagem do painel
+#### MediaProcessing e pipeline
 
-O fluxo de autenticacao do backend e um dos pontos mais completos do repositorio:
-
-1. `POST /api/v1/auth/login` aceita email ou telefone/WhatsApp + senha.
-2. `LoginUserAction` localiza o usuario, normaliza telefone e gera token Sanctum.
-3. O frontend persiste o token e chama `GET /api/v1/auth/me`.
-4. `MeResource` devolve:
-   - dados do usuario;
-   - organizacao atual;
-   - permissoes;
-   - modulos acessiveis;
-   - feature flags derivadas do plano;
-   - assinatura atual.
-5. O frontend usa isso para montar menu, branding, protecoes e features.
-
-Tambem existe fluxo de recuperacao de senha com codigo de 6 digitos armazenado em cache. Em ambiente local o codigo e logado; o envio real ainda esta marcado como TODO.
-
-### 2. Criacao e lifecycle do evento
-
-`Events` e o coracao do produto.
-
-Quando um evento e criado:
-
-1. o payload passa por `StoreEventRequest`;
-2. `CreateEventAction` gera slug unico;
-3. o model `Event` gera `uuid` e `upload_slug`;
-4. o sistema grava branding, privacidade e moderacao;
-5. sao criados `event_modules` para `live`, `wall`, `play` e `hub`;
-6. sao geradas URLs como:
-   - `public_url`;
-   - `upload_url`.
-
-O evento pode depois ser publicado ou arquivado. O status do evento impacta principalmente as areas publicas e o wall.
-
-### 3. Ingestao de midia
-
-Hoje existem duas realidades diferentes para ingestao:
-
-#### O que ja funciona
-
-- upload publico via `POST /api/v1/public/events/{uploadSlug}/upload`;
-- criacao direta de `event_media`;
-- armazenamento do arquivo em disco `public`;
-- dispatch de `GenerateMediaVariantsJob`.
-
-Esse caminho passa por `PublicUploadController` e e o fluxo mais concreto de entrada de midia no estado atual do codigo.
-
-#### O que ja esta desenhado, mas ainda incompleto
-
-Os modulos `InboundMedia` e `MediaProcessing` ja tem tabelas, rotas, filas e jobs para o pipeline completo:
+O pipeline atual do repositorio ja passa por estas etapas:
 
 ```text
-Webhook -> InboundMedia -> MediaProcessing -> Gallery/Wall
+Webhook / Upload -> Download -> Variantes -> Safety -> VLM -> Moderacao -> Face Index -> Publish
 ```
 
-Mas varios jobs ainda estao apenas descritos em comentarios:
+Entregas atuais do dominio:
 
-- `ProcessInboundWebhookJob`
-- `NormalizeInboundMessageJob`
-- `DownloadInboundMediaJob`
-- `GenerateMediaVariantsJob`
-- `RunModerationJob`
-- `PublishMediaJob`
+- `fast_preview`, `thumb`, `gallery` e `wall`
+- `perceptual_hash`
+- `duplicate_group_key`
+- central de moderacao com feed cursorizado
+- acoes de aprovar, rejeitar, favoritar, fixar e remover
+- reprocessamento seletivo por `safety`, `vlm` e `face_index`
+- cleanup propagado de artefatos ao excluir midia
+- metricas por evento em `/api/v1/events/{id}/media/pipeline-metrics`
 
-Ou seja: a arquitetura esta pronta e nomeada, mas a implementacao fim a fim ainda nao esta fechada.
+#### IA aplicada a midia
 
-### 4. Moderacao, galeria e publicacao
+`ContentModeration`:
 
-`EventMedia` concentra tres eixos de status:
+- configuracao por evento
+- thresholds por categoria
+- fila `media-safety`
+- provider `OpenAiContentModerationProvider`
+- fallback `NullContentModerationProvider`
 
-- `processing_status`
-- `moderation_status`
-- `publication_status`
+`MediaIntelligence`:
 
-Hoje o backend ja oferece:
+- configuracao por evento
+- `mode=enrich_only` ou `mode=gate`
+- resposta estruturada com `decision`, `reason`, `short_caption` e `tags`
+- historico em `event_media_vlm_evaluations`
 
-- listagem de midias por evento;
-- detalhe da midia com variantes;
-- aprovar/rejeitar;
-- remover;
-- galeria admin;
-- galeria publica filtrando `approved + published`.
+`FaceSearch`:
 
-Na pratica, a parte de consulta e moderacao existe. O que ainda depende de maior implementacao e o pipeline automatizado que deveria levar uma midia de "recebida" ate "publicada" de forma completa.
+- indexacao non-blocking em `face-index`
+- quality gate por tamanho e score
+- embeddings armazenados em `pgvector`
+- busca no backoffice e busca publica por selfie
+- retention e consentimento por evento
 
-### 5. Wall realtime
+#### Wall realtime
 
-O wall e a feature mais redonda do repositorio hoje.
+`Wall` e uma das verticais mais maduras do produto hoje.
 
-#### Backend
+Backend:
 
-O modulo `Wall` implementa:
+- settings por evento
+- start, stop, pause, expire e reset
+- uploads de background e logo
+- `boot` e `state` publicos por `wall_code`
+- eventos em `wall.{wallCode}` e canais privados por evento
+- listeners conectados aos eventos tipados do pipeline de midia
 
-- settings por evento;
-- `wall_code` publico de 8 caracteres;
-- estados `draft`, `live`, `paused`, `stopped`, `expired`;
-- layouts `auto`, `polaroid`, `fullscreen`, `split`, `cinematic`;
-- transicoes;
-- uploads de background e logo;
-- boot publico e endpoint leve de estado;
-- broadcasts em `wall.{wallCode}`.
+Frontend:
 
-O `WallBroadcasterService` centraliza os payloads e a elegibilidade de midia para o telao.
+- manager administrativo
+- player publico em `/wall/player/:code`
+- sincronizacao realtime via Reverb
+- runtime proprio de player
+- auto-resync e suporte a estados do wall
 
-#### Frontend
+#### Play
 
-O player publico em `apps/web/src/modules/wall/player` tem:
+`Play` ja saiu do estagio de placeholder.
 
-- rota publica `/wall/player/:code`;
-- bootstrap via API publica;
-- conexao websocket via protocolo Pusher/Reverb;
-- state machine propria (`useWallEngine`);
-- auto-resync periodico;
-- rotacao automatica de slides;
-- layouts diferentes conforme orientacao da imagem;
-- suporte a pause, expiracao e tela idle.
+Hoje o modulo entrega:
 
-Tambem existe uma pagina admin de wall em `WallPage.tsx` consumindo API real. Hoje ela ainda usa `CURRENT_EVENT_ID = 1`, entao esta funcional como prova real de integracao, mas ainda nao totalmente contextualizada por rota/evento.
+- catalogo de jogos
+- configuracao por evento
+- `memory` e `puzzle`
+- assets por jogo
+- sessoes publicas
+- `heartbeat`, `resume`, `finish` e `abandoned`
+- ranking por jogo
+- analytics por sessao e por jogo
+- leaderboard em tempo real
 
-### 6. WhatsApp
+#### Hub
 
-O modulo `WhatsApp` e o dominio mais rico do backend atual.
+O `Hub` hoje funciona como hot site mobile-first do evento:
 
-Ele foi desenhado para ser provider-agnostic:
+- headline, subheadline e texto livre
+- hero image
+- logos de patrocinadores
+- botoes preset e customizados
+- builder config tipado
+- presets por organizacao
+- tracking de page view e clique
+- insights operacionais por evento
 
-```text
-Controller -> Service -> ProviderResolver -> ProviderAdapter -> Provider API
-```
+#### Billing
 
-Hoje o adapter implementado e o da Z-API.
+O dominio de billing evoluiu bastante.
 
-#### O que ja existe
+O que ja existe no codigo:
 
-- CRUD de instancias;
-- armazenamento de tokens com cast criptografado;
-- status e conexao por QR code;
-- refresh de QR via job;
-- sincronizacao de status via job;
-- envio assincrono de mensagens:
-  - texto
-  - imagem
-  - audio
-  - reaction
-  - carousel
-  - botao PIX
-- persistencia de `WhatsAppMessage`;
-- logs de dispatch;
-- webhooks inbound;
-- normalizacao do payload do provider;
-- deduplicacao de mensagens recebidas;
-- `WhatsAppChat`;
-- `WhatsAppGroupBinding` para ligar grupo a evento.
+- catalogo publico de pacotes por evento
+- jornada publica de trial
+- checkout publico por evento
+- leitura de status local do checkout
+- assinatura recorrente da organizacao
+- invoices e pagamentos
+- webhook idempotente de gateway
+- retry seguro do mesmo pedido
+- refresh administrativo para troubleshooting
+- `admin/quick-events`
+- grants e entitlements comerciais
 
-#### Como o envio funciona
+Pagar.me v5:
 
-1. controller valida request;
-2. `WhatsAppMessagingService` verifica se a instancia esta conectada;
-3. cria `WhatsAppMessage` com status `queued`;
-4. dispara `SendWhatsAppMessageJob`;
-5. o job resolve o provider correto;
-6. chama o metodo do adapter;
-7. atualiza status para `sent` ou `failed`;
-8. grava `whatsapp_dispatch_logs`.
+- Pix
+- cartao tokenizado no frontend
+- reconciliacao por webhook
+- cancelamento / refund administrativo
+- retry com a mesma `Idempotency-Key`
+- notificacoes de `pix_generated`, `payment_paid`, `payment_failed` e `payment_refunded` via WhatsApp
 
-#### Como o inbound funciona
+#### WhatsApp
 
-1. webhook entra sem auth;
-2. `ProcessInboundWebhookJob` salva payload bruto em `whatsapp_inbound_events`;
-3. normaliza via `ZApiWebhookNormalizer`;
-4. `WhatsAppInboundRouter` cria/resolve chat;
-5. persiste `WhatsAppMessage` inbound;
-6. procura binding de grupo ativo;
-7. dispara evento interno `WhatsAppMessageReceived`.
+O modulo `WhatsApp` hoje e provider-agnostic e suporta dois adapters:
 
-Existe um listener, `RouteInboundToMediaPipeline`, que tenta encaminhar mensagens com midia para a pipeline antiga de `InboundMedia`. Isso e um bom ponto de integracao arquitetural, mas o resultado fim a fim ainda depende da pipeline de midia que continua parcial.
+- Z-API
+- Evolution API
 
-#### Observacao operacional importante
+Cobertura atual:
 
-O modulo configura filas dedicadas:
+- CRUD de instancias
+- QR code e pairing
+- sync de status
+- conexao e disconnect
+- chats remotos
+- grupos remotos
+- binding grupo -> evento
+- envio de texto, imagem, audio, reacao, carrossel e botao Pix
+- logs de dispatch
+- trilha bruta de inbound
+- deduplicacao em `whatsapp_messages`
 
+### Filas, realtime e observabilidade
+
+Filas principais documentadas no codigo e nos docs:
+
+- `webhooks`
+- `media-download`
+- `media-fast`
+- `face-index`
+- `media-process`
+- `media-safety`
+- `media-vlm`
+- `media-publish`
+- `broadcasts`
+- `notifications`
+- `default`
+- `analytics`
+- `billing`
 - `whatsapp-inbound`
 - `whatsapp-send`
 - `whatsapp-sync`
 
-Mas o `config/horizon.php` do repositorio ainda nao supervisiona essas filas. Para operar o modulo de WhatsApp de verdade, e preciso adicionar workers/supervisores para elas.
+Observabilidade ja presente no repositorio:
 
-### 7. Billing, planos, auditoria, hub e play
+- Horizon
+- Telescope
+- Pulse
+- `queue:monitor` para filas criticas
+- `horizon:snapshot` agendado
+- metricas de `inbound -> publish`
+- health endpoints
+- logs dedicados, incluindo canal de WhatsApp
 
-Esses modulos estao em niveis diferentes de maturidade:
+## Painel admin e experiencias web (`apps/web`)
 
-- `Plans`: seed e leitura de planos/precos/features;
-- `Billing`: checkout local simples, sem gateway real conectado;
-- `Audit`: listagem de atividades e timeline com `spatie/laravel-activitylog`;
-- `Hub`: settings e endpoint publico basico;
-- `Play`: settings e endpoints para "gerar" memoria/puzzle, mas a geracao em si ainda e TODO;
-- `Analytics`: estrutura de rotas e tabela existe, mas controller ainda responde placeholder.
+O app `apps/web` concentra o painel administrativo e varias superficies publicas do produto.
 
-## Frontend: como esta dividido
+### O shell do painel ja entrega
 
-O frontend em `apps/web` cumpre dois papeis:
+- autenticacao real com `AuthProvider`
+- persistencia de sessao
+- consumo de `/auth/login` e `/auth/me`
+- navegacao guiada por permissao e modulo acessivel
+- code splitting por rota
+- preloading de rotas do admin
+- `AppErrorBoundary`
+- busca global por eventos, midias e clientes
+- notificacoes com Sonner / shadcn
+- service worker e registro de PWA para as experiencias de `Play`
 
-1. painel administrativo da operacao;
-2. player publico do wall.
+### Areas do painel
 
-### Modulos do painel
+| Area | O que ja existe |
+| --- | --- |
+| Dashboard | KPIs, resumo de operacao e stats do backend |
+| Events | listagem, criacao, edicao, detalhe, branding, links publicos e configuracoes por evento |
+| Media | catalogo de midias com filtros |
+| Moderation | feed em tempo real, detalhe da midia e bulk actions |
+| Gallery | curadoria, destaque, pin e publicacao |
+| Wall | manager, settings, estado e player publico |
+| Play | manager do evento, catalogo, assets, analytics e paginas publicas |
+| Hub | builder, presets, insights e pagina publica |
+| Clients | CRUD e relacao com organizacao/plano |
+| Analytics | plataforma, organizacao, cliente e evento |
+| Audit | filtros, timeline e trilha de atividades |
+| WhatsApp | settings, detalhe da instancia, conexao, grupos, chats e explorer remoto |
+| Billing publico | checkout por pacote em `/checkout/evento` |
+| Profile / Settings | perfil do usuario e configuracoes gerais |
 
-Existem modulos visuais para:
+### Integracao atual do frontend
 
-- `dashboard`
-- `events`
-- `media`
-- `moderation`
-- `gallery`
-- `wall`
-- `play`
-- `hub`
-- `partners`
-- `clients`
-- `plans`
-- `analytics`
-- `audit`
-- `settings`
+O painel ja consome API real em varias frentes importantes, incluindo:
 
-### O que usa API real hoje
+- auth e sessao
+- dashboard
+- events
+- media
+- moderation
+- gallery
+- hub
+- play
+- analytics
+- audit
+- clients
+- WhatsApp
+- checkout publico
+- public hub / gallery / face search / play
 
-- autenticacao/sessao (`auth.service.ts`);
-- pagina admin de wall;
-- player publico de wall.
+Algumas areas ainda seguem em refinamento de UX, cobertura automatizada e acabamento operacional, mas o estado atual do app ja esta bem alem de um painel apenas mockado.
 
-### O que ainda usa mocks
+### Realtime, PWA e runtime publico
 
-A maior parte das paginas de painel ainda le `apps/web/src/shared/mock/data.ts`.
+- `Wall` usa Reverb para boot e eventos realtime
+- `Play` usa cache de assets e rotas publicas via service worker
+- `registerSW({ immediate: true })` ja esta ligado em `src/main.tsx`
+- o service worker prioriza shell, imagens e APIs publicas de `Play`
 
-Na pratica isso significa:
+## Landing page (`apps/landing`)
 
-- layout, navegacao, permissoes e UX estao bem adiantados;
-- grande parte do painel funciona como prototipo visual e de navegacao;
-- a integracao real com backend ainda precisa ser expandida modulo a modulo.
+A landing agora vive em app separado e esta voltada para conversao comercial do produto.
 
-### Modo mock
+### O que ela comunica hoje
 
-Por padrao, o frontend opera em modo mock se `VITE_USE_MOCK` nao for definido como `false`.
+O storytelling atual da landing passa por:
 
-Isso afeta principalmente:
+- hero de experiencia
+- ecossistema do produto
+- galeria dinamica
+- jogos interativos
+- wall dinamico
+- moderacao por IA
+- busca facial
+- confianca tecnica
+- comparativo de posicionamento
+- depoimentos
+- segmentos de publico
+- precos
+- FAQ
+- CTA final
 
-- login;
-- sessao persistida;
-- listagens de eventos, midias, parceiros, clientes, planos, auditoria e dashboards.
+### Implementacao atual
 
-O login tambem oferece acesso rapido de desenvolvimento com usuarios mockados na propria UI.
+- build independente com Vite
+- arquitetura em componentes e secoes dedicadas
+- conteudo centralizado em `src/data/landing.ts`
+- configuracao de CTA, WhatsApp e links em `src/config/site.ts`
+- deploy estatico para o dominio principal
+
+### Variaveis de ambiente da landing
+
+`apps/landing/.env.example` ja cobre:
+
+- `VITE_PUBLIC_SITE_URL`
+- `VITE_ADMIN_URL`
+- `VITE_PRIMARY_CTA_URL`
+- `VITE_WHATSAPP_NUMBER`
+- `VITE_WHATSAPP_MESSAGE`
+- `VITE_INSTAGRAM_URL`
+- `VITE_LINKEDIN_URL`
+
+## Pacotes compartilhados
+
+### `packages/shared-types`
+
+Hoje o pacote compartilhado real em uso e `packages/shared-types`.
+
+Ele ja contem o contrato do wall em `packages/shared-types/src/wall.ts`, cobrindo:
+
+- payloads HTTP do player
+- payloads dos eventos realtime
+- nomes canonicos dos eventos do wall
+- status publicos
+
+### `packages/contracts`
+
+`packages/contracts` continua reservado para a camada futura de contratos formais, schemas e codegen.
 
 ## Setup local
 
-### Requisitos
+### Pre-requisitos
 
 - PHP 8.3+
 - Composer 2+
-- Node.js 20+
-- PostgreSQL 16+
-- Redis 7+
-- opcionalmente Docker Desktop para Postgres/Redis/MinIO/Mailpit
+- Node.js 24 LTS
+- PostgreSQL 16 com `pgvector`
+- Redis 7
+- opcionalmente Docker Desktop para a infraestrutura local
 
-### 1. Subir a infraestrutura
-
-Se quiser usar containers apenas para a infraestrutura:
+### 1. Subir a infraestrutura local
 
 ```bash
 docker-compose up -d
@@ -510,159 +559,118 @@ docker-compose up -d
 
 Isso sobe:
 
-- PostgreSQL
-- Redis
+- PostgreSQL 16 + `pgvector`
+- Redis 7
 - MinIO
 - Mailpit
 
-### 2. Configurar a API
+### 2. Instalar dependencias
+
+Fluxo rapido:
+
+```bash
+make setup
+```
+
+Ou manualmente:
 
 ```bash
 cd apps/api
 composer install
-copy .env.example .env
+cp .env.example .env
 php artisan key:generate
 php artisan migrate --seed
 ```
 
-Observacao importante: o arquivo `apps/api/.env.example` ainda esta proximo do stub padrao do Laravel. Para rodar a stack completa com PostgreSQL, Redis, S3/MinIO e Reverb, use o `.env.example` da raiz como referencia e ajuste pelo menos:
-
-- `DB_CONNECTION=pgsql`
-- `QUEUE_CONNECTION=redis`
-- `CACHE_STORE=redis`
-- `SESSION_DRIVER=redis`
-- `FILESYSTEM_DISK=s3`
-- `BROADCAST_CONNECTION=reverb`
-
-### 3. Configurar o frontend
-
 ```bash
 cd apps/web
 npm install
-copy .env.example .env
+cp .env.example .env
 ```
-
-Se quiser usar o wall com websocket real, adicione tambem no `apps/web/.env`:
-
-```env
-VITE_REVERB_APP_KEY=eventovivo-key
-VITE_REVERB_HOST=localhost
-VITE_REVERB_PORT=8080
-VITE_REVERB_SCHEME=http
-```
-
-Se quiser forcar o frontend a sair do modo mock:
-
-```env
-VITE_USE_MOCK=false
-```
-
-### 4. Rodar os servicos
-
-Backend:
 
 ```bash
-cd apps/api
-php artisan serve
-php artisan horizon
-php artisan reverb:start
+cd apps/landing
+npm install
+cp .env.example .env
 ```
 
-Frontend:
+### 3. Rodar o ambiente de desenvolvimento
+
+Tudo junto:
 
 ```bash
-cd apps/web
-npm run dev
+make dev
 ```
 
-### 5. Usando o Makefile
+Ou por app:
 
-O repositório tem alguns atalhos uteis:
+```bash
+make api
+make queue
+make reverb
+make web
+make landing
+```
 
-| Comando | O que faz |
-| --- | --- |
-| `make setup` | Instala API e Web e roda migrate/seed |
-| `make dev` | Sobe API, Horizon, Reverb e frontend em paralelo |
-| `make api` | Sobe so a API |
-| `make web` | Sobe so o frontend |
-| `make queue` | Inicia o Horizon |
-| `make test` | Roda testes API + Web |
-| `make fresh` | `migrate:fresh --seed` |
-| `make lint` | Pint no backend + ESLint no frontend |
+### 4. Contratos de ambiente importantes
 
-## Seeds e acessos de desenvolvimento
+Arquivos principais:
 
-`DatabaseSeeder` carrega:
+- `/.env.example` -> visao de stack local
+- `apps/api/.env.example` -> backend, billing, OpenAI, WhatsApp, filas e realtime
+- `apps/web/.env.example` -> API base URL, Reverb, Pagar.me public key e toggles
+- `apps/landing/.env.example` -> CTA e links da landing
 
-- roles e permissions;
-- planos;
-- usuarios e organizacao demo.
+## Operacao e deploy
 
-Credenciais seedadas:
+O repositorio ja contem a base operacional da VPS dentro do proprio monorepo.
 
-| Perfil | Login | Senha |
-| --- | --- | --- |
-| Super Admin | `admin@eventovivo.com.br` | `password` |
-| Parceiro demo | `parceiro@eventovivo.com.br` | `password` |
-| Operador demo | `operador@eventovivo.com.br` | `password` |
+### `deploy/`
 
-## Filas, processamento assincrono e realtime
+Templates versionados para:
 
-### Filas ja configuradas no Horizon
+- Nginx
+- restore de IP real do Cloudflare
+- OPcache
+- PHP-FPM pool dedicado
+- Redis
+- PostgreSQL
+- systemd
+- sudoers minimo do usuario `deploy`
+- logrotate
+- exemplos de `.env` de producao
 
-- `webhooks`
-- `media-download`
-- `media-process`
-- `media-publish`
-- `notifications`
-- `default`
-- `analytics`
-- `billing`
+### `scripts/deploy/`
 
-### Filas adicionais esperadas por modulos
+- `deploy.sh`
+- `rollback.sh`
+- `healthcheck.sh`
+- `smoke-test.sh`
 
-- `whatsapp-inbound`
-- `whatsapp-send`
-- `whatsapp-sync`
+### `scripts/ops/`
 
-### Broadcasting
+- `bootstrap-host.sh`
+- `install-configs.sh`
+- `verify-host.sh`
 
-Os canais principais descritos no codigo hoje sao:
+### Documentacao operacional mais importante
 
-- `wall.{wallCode}` para o player publico;
-- `event.{id}.wall`
-- `event.{id}.gallery`
-- `event.{id}.moderation`
-- `event.{id}.play`
+- `docs/architecture/production-vps-runbook.md`
+- `docs/architecture/production-vps-execution-plan.md`
+- `docs/architecture/production-vps-command-sequence.md`
+- `docs/architecture/landing-page-deployment.md`
+- `docs/api/queues.md`
 
-No estado atual, o fluxo mais solido de broadcast e o do wall publico.
-
-## Testes
+## Testes e validacoes
 
 ### Backend
-
-O backend usa Pest e ja possui cobertura para areas principais como:
-
-- login;
-- `/auth/me` e access matrix;
-- organizacoes;
-- clients;
-- eventos;
-- billing;
-- audit.
-
-Rodar:
 
 ```bash
 cd apps/api
 php artisan test
 ```
 
-### Frontend
-
-O frontend esta com estrutura de teste pronta, mas hoje ha apenas um teste exemplo.
-
-Rodar:
+### Painel
 
 ```bash
 cd apps/web
@@ -670,23 +678,63 @@ npm run test
 npm run type-check
 ```
 
-## Documentacao complementar
+### Landing
 
-Os arquivos mais uteis para continuar entendendo o projeto sao:
+```bash
+cd apps/landing
+npm run test
+npm run type-check
+```
+
+### Atalhos uteis
+
+```bash
+make test
+make lint
+make type-check
+```
+
+## Mapa de documentacao
+
+Para entender o estado atual do produto, estes arquivos sao os mais importantes:
 
 - `AGENTS.md`
-- `docs/architecture/overview.md`
 - `docs/modules/module-map.md`
-- `docs/flows/media-ingestion.md`
-- `docs/flows/whatsapp-inbound.md`
-- `docs/flows/whatsapp-messaging.md`
 - `docs/api/endpoints.md`
 - `docs/api/queues.md`
+- `docs/flows/media-ingestion.md`
+- `docs/flows/whatsapp-inbound.md`
+- `docs/architecture/billing-pagarme-v5-execution-plan.md`
+- `docs/architecture/whatsapp-zapi-webhook-execution-plan.md`
+- `docs/architecture/play-games-discovery.md`
+- `docs/architecture/telao-ao-vivo-implementation.md`
+- `docs/architecture/production-vps-runbook.md`
+- `docs/architecture/production-vps-execution-plan.md`
+- `docs/architecture/production-vps-command-sequence.md`
 
-## Leitura honesta do projeto
+## Leitura honesta do estado atual
 
-Se voce quiser resumir o estado do repositório em uma frase:
+O repositorio hoje ja nao e mais apenas um esqueleto arquitetural.
 
-> O Evento Vivo ja tem um esqueleto arquitetural muito bom, um backend modular consistente, um wall realtime bem avancado e um modulo de WhatsApp forte; ao mesmo tempo, boa parte da pipeline completa de midia e da integracao do painel web com a API ainda esta em construcao.
+O que ja esta forte:
 
-Essa combinacao importa porque o repositorio ja responde bem a trabalho incremental: os dominios estao nomeados, as tabelas existem, os endpoints principais estao distribuidos por modulo e a proxima camada natural de evolucao e conectar ponta a ponta o que hoje ainda esta scaffoldado.
+- backend modular consistente
+- painel com varias areas integradas a API real
+- checkout publico de evento
+- wall realtime
+- play publico
+- hub builder
+- pipeline de midia com IA
+- base provider-agnostic de WhatsApp
+- scripts e templates reais de deploy
+
+Os focos que ainda merecem endurecimento nas proximas rodadas sao:
+
+- fechar completamente o intake canonico `WhatsApp -> InboundMedia -> EventMedia` para todos os cenarios de producao
+- concluir a rodada final de homologacao real de cancelamento / estorno no billing
+- consolidar a migracao das midias remanescentes para object storage como caminho principal
+- continuar o hardening de throughput e readiness da VPS unica para multiplos eventos simultaneos
+
+Em resumo:
+
+> o Evento Vivo ja tem produto, runtime publico, billing, IA, realtime e operacao versionados no repo; o trabalho agora esta muito mais em endurecer e escalar do que em sair do zero.
