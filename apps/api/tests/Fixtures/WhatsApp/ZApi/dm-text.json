@@ -1,0 +1,16 @@
+{
+  "text": {
+    "message": "teste named tunnel"
+  },
+  "phone": "554899994444",
+  "chatId": "554899994444@c.us",
+  "fromMe": false,
+  "isGroup": false,
+  "messageId": "cf-named-1775391881",
+  "timestamp": 1775391881,
+  "senderName": "Contato DM Fixture",
+  "type": "ReceivedCallback",
+  "instanceId": "INSTANCE-FIXTURE-001",
+  "status": "RECEIVED",
+  "connectedPhone": "554899990000"
+}

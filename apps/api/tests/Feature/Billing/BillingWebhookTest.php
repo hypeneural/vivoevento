@@ -525,6 +525,62 @@ it('processes a queued pagarme failed event and marks the order as failed locall
     Queue::assertPushed(SendWhatsAppMessageJob::class);
 });
 
+it('processes a queued pagarme canceled event and marks the one-time order as canceled locally', function () {
+    $order = BillingOrder::factory()->create([
+        'mode' => 'event_package',
+        'status' => 'pending_payment',
+        'payment_method' => 'pix',
+        'gateway_provider' => 'pagarme',
+        'gateway_order_id' => 'or_test_canceled_123',
+        'customer_snapshot_json' => [
+            'name' => 'Camila Rocha',
+            'phone' => '5548999771111',
+            'email' => 'camila@example.com',
+        ],
+    ]);
+
+    $gatewayEvent = BillingGatewayEvent::create([
+        'provider_key' => 'pagarme',
+        'event_key' => 'hook_order_canceled_'.$order->id,
+        'event_type' => 'checkout.canceled',
+        'status' => 'pending',
+        'billing_order_id' => $order->id,
+        'gateway_order_id' => 'or_test_canceled_123',
+        'payload_json' => pagarmeOrderCanceledWebhookPayload($order, [
+            'gateway_order_id' => 'or_test_canceled_123',
+            'gateway_charge_id' => 'ch_test_canceled_123',
+            'gateway_transaction_id' => 'tx_test_canceled_123',
+        ]),
+        'headers_json' => [],
+        'occurred_at' => now(),
+    ]);
+
+    $result = app(ProcessBillingWebhookAction::class)->executeRecorded($gatewayEvent->fresh());
+
+    expect($result['duplicate'])->toBeFalse();
+    expect(data_get($result, 'result.action'))->toBe('order_canceled');
+
+    $order->refresh();
+
+    expect($order->status)->toBe(BillingOrderStatus::Canceled);
+    expect($order->canceled_at)->not()->toBeNull();
+    expect($order->gateway_order_id)->toBe('or_test_canceled_123');
+    expect($order->gateway_charge_id)->toBe('ch_test_canceled_123');
+    expect($order->gateway_transaction_id)->toBe('tx_test_canceled_123');
+    expect($order->gateway_status)->toBe('canceled');
+
+    $this->assertDatabaseHas('billing_gateway_events', [
+        'id' => $gatewayEvent->id,
+        'status' => 'processed',
+        'gateway_order_id' => 'or_test_canceled_123',
+        'gateway_charge_id' => 'ch_test_canceled_123',
+        'gateway_transaction_id' => 'tx_test_canceled_123',
+    ]);
+
+    $this->assertDatabaseCount('payments', 0);
+    $this->assertDatabaseCount('event_purchases', 0);
+});
+
 it('processes a queued pagarme refunded event and revokes the event access locally', function () {
     Queue::fake();
 
@@ -753,6 +809,38 @@ function pagarmeOrderPaymentFailedWebhookPayload(BillingOrder $order, array $ove
                         'status' => 'failed',
                         'acquirer_message' => $overrides['acquirer_message'] ?? 'Nao autorizado',
                         'acquirer_return_code' => $overrides['acquirer_return_code'] ?? '51',
+                    ],
+                ],
+            ],
+        ],
+    ];
+}
+
+function pagarmeOrderCanceledWebhookPayload(BillingOrder $order, array $overrides = []): array
+{
+    $gatewayOrderId = $overrides['gateway_order_id'] ?? 'or_test_canceled_123';
+    $gatewayChargeId = $overrides['gateway_charge_id'] ?? 'ch_test_canceled_123';
+    $gatewayTransactionId = $overrides['gateway_transaction_id'] ?? 'tx_test_canceled_123';
+
+    return [
+        'id' => 'hook_order_canceled_'.$order->id,
+        'type' => 'order.canceled',
+        'created_at' => now()->toISOString(),
+        'data' => [
+            'id' => $gatewayOrderId,
+            'code' => $order->uuid,
+            'status' => 'canceled',
+            'metadata' => [
+                'billing_order_uuid' => $order->uuid,
+            ],
+            'charges' => [
+                [
+                    'id' => $gatewayChargeId,
+                    'status' => 'canceled',
+                    'payment_method' => $order->payment_method ?? 'pix',
+                    'last_transaction' => [
+                        'id' => $gatewayTransactionId,
+                        'status' => 'refunded',
                     ],
                 ],
             ],

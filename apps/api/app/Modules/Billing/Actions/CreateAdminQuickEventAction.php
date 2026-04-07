@@ -18,6 +18,7 @@ use App\Modules\Organizations\Models\Organization;
 use App\Modules\Organizations\Models\OrganizationMember;
 use App\Modules\Users\Models\User;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -58,11 +59,7 @@ class CreateAdminQuickEventAction
                 preferOwnerRole: ! $organizationReused,
             );
 
-            $package = EventPackage::query()
-                ->with(['prices', 'features'])
-                ->findOrFail($data['grant']['package_id']);
-
-            $snapshot = $this->packageSnapshots->build($package);
+            [$package, $snapshot] = $this->resolveGrantPackageAndSnapshot($data['grant']);
 
             $event = $this->createEventAction->execute([
                 'organization_id' => $organization->id,
@@ -91,7 +88,7 @@ class CreateAdminQuickEventAction
                 'event_id' => $event->id,
                 'source_type' => $sourceType->value,
                 'source_id' => null,
-                'package_id' => $package->id,
+                'package_id' => $package?->id,
                 'status' => EventAccessGrantStatus::Active->value,
                 'priority' => $sourceType->defaultPriority(),
                 'merge_strategy' => $mergeStrategy->value,
@@ -112,7 +109,7 @@ class CreateAdminQuickEventAction
                     'responsible_user_reused' => $userReused,
                     'membership_role_key' => $membership->role_key,
                     'access_delivery_requested' => (bool) ($data['send_access'] ?? false),
-                    'package_code' => $package->code,
+                    'package_code' => $package?->code,
                 ],
             ]);
 
@@ -132,9 +129,9 @@ class CreateAdminQuickEventAction
                     'status' => $grant->status?->value,
                     'priority' => $grant->priority,
                     'merge_strategy' => $grant->merge_strategy?->value,
-                    'package_id' => $package->id,
-                    'package_code' => $package->code,
-                    'package_name' => $package->name,
+                    'package_id' => $package?->id,
+                    'package_code' => $package?->code,
+                    'package_name' => $package?->name,
                     'starts_at' => $grant->starts_at?->toISOString(),
                     'ends_at' => $grant->ends_at?->toISOString(),
                     'reason' => $data['grant']['reason'],
@@ -191,6 +188,34 @@ class CreateAdminQuickEventAction
         $payload['access_delivery'] = $accessDelivery;
 
         return $payload;
+    }
+
+    /**
+     * @param array<string, mixed> $grantData
+     * @return array{0: ?EventPackage, 1: array<string, mixed>}
+     */
+    private function resolveGrantPackageAndSnapshot(array $grantData): array
+    {
+        $package = null;
+
+        if (filled($grantData['package_id'] ?? null)) {
+            $package = EventPackage::query()
+                ->with(['prices', 'features'])
+                ->findOrFail($grantData['package_id']);
+        }
+
+        $flatFeatures = Arr::dot((array) ($grantData['features'] ?? []));
+        $flatLimits = Arr::dot((array) ($grantData['limits'] ?? []));
+
+        if ($flatFeatures === [] && $flatLimits === [] && $package) {
+            return [$package, $this->packageSnapshots->build($package)];
+        }
+
+        return [$package, $this->packageSnapshots->buildManualOverride(
+            features: $flatFeatures,
+            limits: $flatLimits,
+            package: $package,
+        )];
     }
 
     /**

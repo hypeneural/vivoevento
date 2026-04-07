@@ -2,11 +2,15 @@
 
 namespace App\Modules\WhatsApp\Providers;
 
+use App\Modules\MediaProcessing\Events\MediaPublished;
+use App\Modules\MediaProcessing\Events\MediaRejected;
 use App\Modules\WhatsApp\Clients\Contracts\WhatsAppProviderInterface;
 use App\Modules\WhatsApp\Clients\Providers\Evolution\EvolutionWhatsAppProvider;
 use App\Modules\WhatsApp\Clients\Providers\ZApi\ZApiWhatsAppProvider;
 use App\Modules\WhatsApp\Events\WhatsAppMessageReceived;
 use App\Modules\WhatsApp\Listeners\RouteInboundToMediaPipeline;
+use App\Modules\WhatsApp\Listeners\SendFeedbackOnMediaPublished;
+use App\Modules\WhatsApp\Listeners\SendFeedbackOnMediaRejected;
 use App\Modules\WhatsApp\Models\WhatsAppInstance;
 use App\Modules\WhatsApp\Policies\WhatsAppInstancePolicy;
 use App\Modules\WhatsApp\Services\WhatsAppMessagingService;
@@ -51,5 +55,7 @@ class WhatsAppServiceProvider extends ServiceProvider
 
         // Event → Listener bindings
         Event::listen(WhatsAppMessageReceived::class, RouteInboundToMediaPipeline::class);
+        Event::listen(MediaPublished::class, SendFeedbackOnMediaPublished::class);
+        Event::listen(MediaRejected::class, SendFeedbackOnMediaRejected::class);
     }
 }

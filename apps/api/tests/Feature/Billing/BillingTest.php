@@ -29,10 +29,67 @@ it('returns current subscription (null when none)', function () {
     expect($response->json('data'))->toBeNull();
 });
 
+it('returns only active plans in the billing catalog', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $activePlan = Plan::create([
+        'code' => 'starter',
+        'name' => 'Starter',
+        'audience' => 'b2b',
+        'status' => 'active',
+        'description' => 'Plano ativo para checkout.',
+    ]);
+
+    $activePlan->prices()->create([
+        'billing_cycle' => 'monthly',
+        'currency' => 'BRL',
+        'amount_cents' => 9900,
+        'is_default' => true,
+    ]);
+
+    $activePlan->features()->createMany([
+        ['feature_key' => 'wall.enabled', 'feature_value' => 'true'],
+        ['feature_key' => 'events.max_active', 'feature_value' => '5'],
+    ]);
+
+    $inactivePlan = Plan::create([
+        'code' => 'legacy-hidden',
+        'name' => 'Legacy Hidden',
+        'audience' => 'b2b',
+        'status' => 'inactive',
+        'description' => 'Nao deve aparecer no catalogo autenticado.',
+    ]);
+
+    $inactivePlan->prices()->create([
+        'billing_cycle' => 'monthly',
+        'currency' => 'BRL',
+        'amount_cents' => 4900,
+        'is_default' => true,
+    ]);
+
+    $response = $this->apiGet('/plans');
+
+    $this->assertApiSuccess($response);
+    expect(collect($response->json('data'))->pluck('code')->all())
+        ->toContain('starter')
+        ->not->toContain('legacy-hidden');
+    $response->assertJsonPath('data.0.prices.0.amount_cents', 9900);
+    expect(collect($response->json('data.0.features'))->pluck('feature_key')->all())
+        ->toContain('wall.enabled', 'events.max_active');
+});
+
 it('forbids billing endpoints for roles without billing permissions', function () {
     [$user, $organization] = $this->actingAsViewer();
 
     $response = $this->apiGet('/billing/subscription');
+
+    $this->assertApiForbidden($response);
+});
+
+it('forbids plans catalog for roles without billing permissions', function () {
+    [$user, $organization] = $this->actingAsViewer();
+
+    $response = $this->apiGet('/plans');
 
     $this->assertApiForbidden($response);
 });

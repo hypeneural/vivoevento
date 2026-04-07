@@ -1,39 +1,102 @@
 # Events Module
 
-## Responsabilidade
-Gerenciar eventos do Evento Vivo — o núcleo do produto.
+## Responsibility
+Manage Evento Vivo events as the main product aggregate, including:
 
-## Entidades
-- **Event** — evento principal com branding, status, datas
-- **EventModule** — módulos habilitados por evento (gallery, wall, play, hub)
-- **EventBanner** — banners promocionais do evento
+- event base data
+- commercial state resolved for the event
+- enabled modules
+- public links
+- canonical intake channel configuration
 
-## Casos de Uso
-- Criar evento
-- Editar evento
-- Publicar evento
-- Pausar evento
-- Encerrar evento
-- Arquivar evento
-- Duplicar evento
+## Entities
+- `Event` - main event with branding, status, dates, and intake defaults
+- `EventModule` - enabled modules for the event (`live`, `wall`, `play`, `hub`)
+- `EventBanner` - promotional banners for the event
+- `EventChannel` - canonical intake channels configured for the event
 
-## Rotas
-| Método | Rota | Controller | Descrição |
+## Main use cases
+- create event
+- update event
+- publish event
+- archive event
+- manage public links
+- configure media intake channels
+
+## Intake contract in Event CRUD
+
+`POST /api/v1/events`, `PATCH /api/v1/events/{id}`, and
+`GET /api/v1/events/{id}` support the blocks below:
+
+```json
+{
+  "intake_defaults": {
+    "whatsapp_instance_id": 10,
+    "whatsapp_instance_mode": "shared"
+  },
+  "intake_channels": {
+    "whatsapp_groups": {
+      "enabled": true,
+      "groups": [
+        {
+          "group_external_id": "120363425796926861-group",
+          "group_name": "Evento vivo 1",
+          "is_active": true,
+          "auto_feedback_enabled": true
+        }
+      ]
+    },
+    "whatsapp_direct": {
+      "enabled": true,
+      "media_inbox_code": "CODIGO-DO-EVENTO",
+      "session_ttl_minutes": 120
+    },
+    "public_upload": {
+      "enabled": true
+    },
+    "telegram": {
+      "enabled": false
+    }
+  }
+}
+```
+
+## Current backend rules
+
+- the intake block is optional on create/update
+- `whatsapp_instance_mode` accepts `shared` or `dedicated`
+- `whatsapp_groups.groups[*].group_external_id` is required when groups are
+  sent
+- `event_channels` is the canonical persisted representation
+- `whatsapp_group_bindings` is kept as operational legacy state synced from the
+  event
+- the backend enforces event entitlements before save:
+  - maximum number of WhatsApp groups
+  - `whatsapp_direct` availability
+  - `public_upload` availability
+  - `telegram` availability
+  - dedicated WhatsApp instance availability
+  - dedicated instance exclusivity across events
+
+## Routes
+| Method | Route | Controller | Description |
 |--------|------|-----------|-----------|
-| GET | /api/v1/events | EventController@index | Listar eventos |
-| POST | /api/v1/events | EventController@store | Criar evento |
-| GET | /api/v1/events/{id} | EventController@show | Detalhes |
-| PATCH | /api/v1/events/{id} | EventController@update | Atualizar |
-| DELETE | /api/v1/events/{id} | EventController@destroy | Remover |
-| POST | /api/v1/events/{id}/publish | EventStatusController@publish | Publicar |
-| POST | /api/v1/events/{id}/archive | EventStatusController@archive | Arquivar |
-| GET | /api/v1/events/{id}/share-links | EventQrController@shareLinks | Links publicos e identificadores |
-| PATCH | /api/v1/events/{id}/public-links | EventQrController@updateIdentifiers | Atualizar slug/slug de envio |
-| POST | /api/v1/events/{id}/public-links/regenerate | EventQrController@regenerateIdentifiers | Regenerar slug/upload slug/wall code |
+| GET | `/api/v1/events` | `EventController@index` | List events |
+| POST | `/api/v1/events` | `EventController@store` | Create event |
+| GET | `/api/v1/events/{id}` | `EventController@show` | Show event details |
+| PATCH | `/api/v1/events/{id}` | `EventController@update` | Update event |
+| DELETE | `/api/v1/events/{id}` | `EventController@destroy` | Delete event |
+| POST | `/api/v1/events/{id}/publish` | `EventStatusController@publish` | Publish event |
+| POST | `/api/v1/events/{id}/archive` | `EventStatusController@archive` | Archive event |
+| GET | `/api/v1/events/{id}/share-links` | `EventQrController@shareLinks` | Public links and identifiers |
+| PATCH | `/api/v1/events/{id}/public-links` | `EventQrController@updateIdentifiers` | Update slug and upload slug |
+| POST | `/api/v1/events/{id}/public-links/regenerate` | `EventQrController@regenerateIdentifiers` | Regenerate slug, upload slug, and wall code |
 
-## Dependências
+## Dependencies
 - Organizations
-- Users (created_by)
+- Users
+- Billing / Entitlements
 - Channels
+- WhatsApp
 - MediaProcessing
-- Gallery, Wall, Play, Hub (settings)
+- Gallery, Wall, Play, Hub

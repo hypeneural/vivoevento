@@ -752,13 +752,13 @@ export default function PublicGamePage() {
 
             <div className="flex flex-wrap gap-2 text-xs text-white/65">
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                Assets {runtimePayload?.assets.length ?? gameResponse.runtime.assets.length}
+                Fotos {runtimePayload?.assets.length ?? gameResponse.runtime.assets.length}
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                Moves locais {localMoves}
+                Jogadas no celular {localMoves}
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                Moves na API {sessionAnalytics?.total_moves ?? 0}
+                Jogadas registradas {sessionAnalytics?.total_moves ?? 0}
               </span>
               {resumeDeadline ? (
                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
@@ -785,7 +785,7 @@ export default function PublicGamePage() {
                   <div className="flex flex-col items-center gap-2 text-center">
                     <div className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Carregando runtime otimizado do jogo...
+                      Preparando o jogo...
                     </div>
                     {loadingProgress ? (
                       <span className="text-xs text-white/55">
@@ -798,14 +798,14 @@ export default function PublicGamePage() {
 
               {runtimePayload && runtimeStatus === 'error' ? (
                 <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-white/70">
-                  {runtimeError?.message ?? 'Nao foi possivel carregar o runtime deste jogo.'}
+                  {runtimeError?.message ?? 'Nao foi possivel abrir este jogo agora.'}
                 </div>
               ) : null}
             </div>
 
             {!runtimePayload ? (
               <div className="flex min-h-[96px] items-center justify-center text-center text-sm text-white/45">
-                Inicie uma partida para carregar o runtime Phaser deste jogo.
+                Inicie uma partida para carregar este jogo.
               </div>
             ) : null}
 
@@ -831,9 +831,9 @@ export default function PublicGamePage() {
             <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
               <div>
                 <p className="text-sm font-semibold text-white">Ultima partida registrada</p>
-                <p className="text-sm text-white/70">
-                  {latestResult.score} pts em {formatElapsed(latestResult.timeMs)} com {latestResult.moves} moves.
-                </p>
+                  <p className="text-sm text-white/70">
+                  {latestResult.score} pts em {formatElapsed(latestResult.timeMs)} com {latestResult.moves} jogadas.
+                  </p>
               </div>
 
               <Button

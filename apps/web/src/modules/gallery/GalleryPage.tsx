@@ -2,7 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, ExternalLink, FilterX, ImageIcon, LayoutGrid, Loader2, Pin, Search, Star } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import type { ApiEventMediaDetail, ApiEventMediaItem } from '@/lib/api-types';
 import { queryKeys } from '@/lib/query-client';
+import { resolveSenderBlockExpiration } from '@/lib/sender-blocking';
+import { buildSenderScopedPath, readSenderScopedPrefill } from '@/lib/sender-filters';
 import { eventsService } from '@/modules/events/services/events.service';
 import type { EventListItem } from '@/modules/events/types';
 import { MEDIA_CATALOG_CHANNEL_OPTIONS, MEDIA_CATALOG_TYPE_OPTIONS } from '@/modules/media/types';
@@ -20,9 +22,21 @@ import { PageHeader } from '@/shared/components/PageHeader';
 import { ChannelBadge } from '@/shared/components/StatusBadges';
 import { StatsCard } from '@/shared/components/StatsCard';
 import { usePermissions } from '@/shared/hooks/usePermissions';
+import type { MediaChannel } from '@/shared/types';
 
+import { GallerySenderActions } from './components/GallerySenderActions';
 import { galleryService } from './services/gallery.service';
-import { GALLERY_ORIENTATION_OPTIONS, GALLERY_PUBLICATION_OPTIONS, GALLERY_SORT_OPTIONS, type GalleryCatalogFilters } from './types';
+import {
+  GALLERY_ORIENTATION_OPTIONS,
+  GALLERY_PUBLICATION_OPTIONS,
+  GALLERY_SORT_OPTIONS,
+  type GalleryCatalogFilters,
+  type GalleryChannelFilter,
+  type GalleryMediaTypeFilter,
+  type GalleryOrientationFilter,
+  type GalleryPublicationStatusFilter,
+  type GallerySortBy,
+} from './types';
 
 const EMPTY_STATS = {
   total: 0,
@@ -98,6 +112,8 @@ export default function GalleryPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { can } = usePermissions();
+  const [searchParams] = useSearchParams();
+  const prefilledScope = useMemo(() => readSenderScopedPrefill(searchParams), [searchParams]);
   const canView = can('gallery.view') || can('gallery.manage');
   const canManageGallery = can('gallery.manage');
   const canFeature = can('media.moderate');
@@ -105,8 +121,8 @@ export default function GalleryPage() {
   const [mode, setMode] = useState<'cards' | 'preview'>('cards');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(24);
-  const [search, setSearch] = useState('');
-  const [eventId, setEventId] = useState('all');
+  const [search, setSearch] = useState(prefilledScope.search);
+  const [eventId, setEventId] = useState(prefilledScope.eventId);
   const [publicationStatus, setPublicationStatus] = useState('all');
   const [channel, setChannel] = useState('all');
   const [mediaType, setMediaType] = useState('all');
@@ -115,17 +131,23 @@ export default function GalleryPage() {
   const [featuredOnly, setFeaturedOnly] = useState(false);
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [senderBlockDuration, setSenderBlockDuration] = useState('7d');
   const deferredSearch = useDeferredValue(search);
+
+  useEffect(() => {
+    setSearch(prefilledScope.search);
+    setEventId(prefilledScope.eventId);
+  }, [prefilledScope.eventId, prefilledScope.search]);
 
   const filters = useMemo<GalleryCatalogFilters>(() => ({
     page,
     per_page: perPage,
     search: deferredSearch || undefined,
     event_id: eventId === 'all' ? undefined : Number(eventId),
-    publication_status: publicationStatus === 'all' ? undefined : publicationStatus as any,
-    channel: channel === 'all' ? undefined : channel as any,
-    media_type: mediaType === 'all' ? undefined : mediaType as any,
-    orientation: orientation === 'all' ? undefined : orientation as any,
+    publication_status: publicationStatus === 'all' ? undefined : publicationStatus as GalleryPublicationStatusFilter,
+    channel: channel === 'all' ? undefined : channel as GalleryChannelFilter,
+    media_type: mediaType === 'all' ? undefined : mediaType as GalleryMediaTypeFilter,
+    orientation: orientation === 'all' ? undefined : orientation as GalleryOrientationFilter,
     featured: featuredOnly ? true : undefined,
     pinned: pinnedOnly ? true : undefined,
     sort_by: sortBy,
@@ -192,6 +214,38 @@ export default function GalleryPage() {
     },
   });
 
+  const senderBlockMutation = useMutation({
+    mutationFn: (payload: { item: ApiEventMediaItem | ApiEventMediaDetail; checked: boolean }) => (
+      payload.checked
+        ? galleryService.blockSender(payload.item.id, {
+          reason: 'Bloqueado pela galeria do evento',
+          expires_at: resolveSenderBlockExpiration(senderBlockDuration),
+        })
+        : galleryService.unblockSender(payload.item.id)
+    ),
+    onSuccess: async (_data, payload) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.gallery.all() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.media.all(), refetchType: 'inactive' }),
+        queryClient.invalidateQueries({ queryKey: ['event-detail', String(payload.item.event_id)], refetchType: 'inactive' }),
+      ]);
+
+      toast({
+        title: payload.checked ? 'Remetente bloqueado' : 'Remetente desbloqueado',
+        description: payload.checked
+          ? 'Novas midias desse remetente deixam de entrar no evento enquanto o bloqueio estiver ativo.'
+          : 'O remetente voltou a ficar apto para intake no evento.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Falha ao atualizar o bloqueio do remetente',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   if (!canView) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center text-sm text-muted-foreground">
@@ -233,6 +287,22 @@ export default function GalleryPage() {
 
   function isBusy(mediaId: number) {
     return actionMutation.isPending && actionMutation.variables?.mediaId === mediaId;
+  }
+
+  function isSenderBlockBusy(mediaId: number) {
+    return senderBlockMutation.isPending && senderBlockMutation.variables?.item.id === mediaId;
+  }
+
+  function senderSearchValue(media: ApiEventMediaItem | ApiEventMediaDetail) {
+    return media.sender_recommended_identity_value
+      || media.sender_lid
+      || media.sender_phone
+      || media.sender_external_id
+      || media.sender_name;
+  }
+
+  function runSenderBlockToggle(item: ApiEventMediaItem | ApiEventMediaDetail, checked: boolean) {
+    senderBlockMutation.mutate({ item, checked });
   }
 
   function renderVisibilityButton(item: ApiEventMediaItem | ApiEventMediaDetail, compact = false) {
@@ -366,7 +436,7 @@ export default function GalleryPage() {
               </SelectContent>
             </Select>
 
-            <Select value={sortBy} onValueChange={(value) => setSortBy(value as any)}>
+            <Select value={sortBy} onValueChange={(value) => setSortBy(value as GallerySortBy)}>
               <SelectTrigger className="xl:col-span-3"><SelectValue placeholder="Ordenacao" /></SelectTrigger>
               <SelectContent>
                 {GALLERY_SORT_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
@@ -380,7 +450,17 @@ export default function GalleryPage() {
               </SelectContent>
             </Select>
 
-            <div className="flex gap-2 xl:col-span-4 xl:justify-end">
+            <Select value={senderBlockDuration} onValueChange={setSenderBlockDuration}>
+              <SelectTrigger className="xl:col-span-2"><SelectValue placeholder="Bloqueio rapido" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="24h">Bloqueio rapido 24h</SelectItem>
+                <SelectItem value="7d">Bloqueio rapido 7 dias</SelectItem>
+                <SelectItem value="30d">Bloqueio rapido 30 dias</SelectItem>
+                <SelectItem value="forever">Bloqueio sem prazo</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="flex gap-2 xl:col-span-2 xl:justify-end">
               <Button type="button" variant={featuredOnly ? 'default' : 'outline'} onClick={() => setFeaturedOnly((current) => !current)}>
                 <Star className={`h-4 w-4 ${featuredOnly ? 'fill-current' : ''}`} />
                 Destaque
@@ -458,7 +538,7 @@ export default function GalleryPage() {
                     <div className="space-y-4 p-4">
                       <div className="flex flex-wrap gap-2">
                         <PublicationBadge value={item.publication_status} />
-                        <ChannelBadge channel={item.channel as any} />
+                        <ChannelBadge channel={item.channel as MediaChannel} />
                         {item.is_featured ? <Badge variant="secondary">Destaque</Badge> : null}
                         {item.is_pinned ? <Badge variant="secondary">Fixada</Badge> : null}
                       </div>
@@ -468,6 +548,16 @@ export default function GalleryPage() {
                         <p className="truncate text-sm text-muted-foreground">{item.sender_name}</p>
                         <p className="line-clamp-2 text-sm text-muted-foreground">{item.caption || item.original_filename || 'Sem legenda ou nome amigavel.'}</p>
                       </div>
+
+                      <GallerySenderActions
+                        media={item}
+                        canManage={canManageGallery}
+                        busy={isSenderBlockBusy(item.id)}
+                        duration={senderBlockDuration}
+                        onDurationChange={setSenderBlockDuration}
+                        onToggle={(checked) => runSenderBlockToggle(item, checked)}
+                        compact
+                      />
 
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>{fmt(item.published_at)}</span>
@@ -532,7 +622,7 @@ export default function GalleryPage() {
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-2">
                   <PublicationBadge value={selected.publication_status} />
-                  <ChannelBadge channel={selected.channel as any} />
+                  <ChannelBadge channel={selected.channel as MediaChannel} />
                   {selected.is_featured ? <Badge variant="secondary">Destaque</Badge> : null}
                   {selected.is_pinned ? <Badge variant="secondary">Fixada</Badge> : null}
                 </div>
@@ -558,6 +648,20 @@ export default function GalleryPage() {
                     <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Posicao</p><p className="mt-1 font-medium">{selected.sort_order && selected.sort_order > 0 ? `#${selected.sort_order}` : 'Livre'}</p></div>
                     <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Dimensoes</p><p className="mt-1 font-medium">{selected.width && selected.height ? `${selected.width} x ${selected.height}` : 'Nao informado'}</p></div>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Remetente</p>
+                  <p className="text-sm font-medium">{selected.sender_name}</p>
+                  <p className="text-xs text-muted-foreground">{selected.sender_phone || selected.sender_lid || selected.sender_external_id || 'Identificador indisponivel'}</p>
+                  <GallerySenderActions
+                    media={selected}
+                    canManage={canManageGallery}
+                    busy={isSenderBlockBusy(selected.id)}
+                    duration={senderBlockDuration}
+                    onDurationChange={setSenderBlockDuration}
+                    onToggle={(checked) => runSenderBlockToggle(selected, checked)}
+                  />
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -589,6 +693,13 @@ export default function GalleryPage() {
                   <Button asChild variant="outline">
                     <Link to={`/events/${selected.event_id}`}>Abrir evento</Link>
                   </Button>
+                  {senderSearchValue(selected) ? (
+                    <Button asChild variant="outline">
+                      <Link to={buildSenderScopedPath('/moderation', selected.event_id, senderSearchValue(selected)!)}>
+                        Moderacao
+                      </Link>
+                    </Button>
+                  ) : null}
                   {selected.event_slug ? (
                     <Button asChild variant="outline">
                       <a href={`/e/${selected.event_slug}/gallery`} target="_blank" rel="noreferrer">

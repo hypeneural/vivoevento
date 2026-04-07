@@ -4,6 +4,7 @@ namespace App\Modules\MediaProcessing\Jobs;
 
 use App\Modules\FaceSearch\Jobs\IndexMediaFacesJob;
 use App\Modules\MediaProcessing\Actions\FinalizeMediaDecisionAction;
+use App\Modules\MediaProcessing\Events\MediaRejected;
 use App\Modules\MediaProcessing\Enums\ModerationStatus;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Services\MediaPipelineDegradationPolicy;
@@ -72,6 +73,7 @@ class RunModerationJob implements ShouldBeUnique, ShouldQueue
         ]);
 
         try {
+            $previousModerationStatus = $media->moderation_status;
             $media = app(FinalizeMediaDecisionAction::class)->execute($media);
 
             $runService->finishStage($run, [
@@ -86,6 +88,10 @@ class RunModerationJob implements ShouldBeUnique, ShouldQueue
                     'event_moderation_mode' => $media->event?->moderation_mode?->value,
                 ],
             ]);
+
+            if ($previousModerationStatus !== ModerationStatus::Rejected && $media->moderation_status === ModerationStatus::Rejected) {
+                event(MediaRejected::fromMedia($media));
+            }
         } catch (Throwable $exception) {
             $media->forceFill([
                 'last_pipeline_error_code' => 'moderation_failed',

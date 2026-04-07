@@ -51,12 +51,18 @@ class EntitlementResolverService
         }
 
         foreach ($grants as $grant) {
+            $grantPayload = array_merge(
+                (array) $grant->features_snapshot_json,
+                (array) $grant->limits_snapshot_json,
+            );
+
             $state = $this->applySource(
                 $state,
                 [
                     'modules' => $this->extractModules((array) $grant->features_snapshot_json),
                     'limits' => $this->extractLimits((array) $grant->limits_snapshot_json),
                     'branding' => $this->extractBranding((array) $grant->features_snapshot_json),
+                    'channels' => $this->extractChannels($grantPayload),
                 ],
                 $grant->merge_strategy ?? EntitlementMergeStrategy::Expand,
             );
@@ -171,6 +177,42 @@ class EntitlementResolverService
                 'watermark' => $this->lookupBoolean($legacySnapshot, ['gallery.watermark', 'branding.watermark', 'watermark'], false),
                 'white_label' => $this->lookupBoolean($legacySnapshot, ['white_label.enabled', 'branding.white_label', 'white_label'], false),
             ],
+            'channels' => [
+                'whatsapp_groups' => [
+                    'enabled' => $this->lookupBoolean($legacySnapshot, ['channels.whatsapp_groups.enabled', 'channels.whatsapp'], false),
+                    'max' => $this->lookupInteger($legacySnapshot, ['channels.whatsapp_groups.max']),
+                ],
+                'whatsapp_direct' => [
+                    'enabled' => $this->lookupBoolean($legacySnapshot, ['channels.whatsapp_direct.enabled', 'channels.whatsapp'], false),
+                ],
+                'public_upload' => [
+                    'enabled' => $this->lookupBoolean($legacySnapshot, ['channels.public_upload.enabled'], false),
+                ],
+                'telegram' => [
+                    'enabled' => $this->lookupBoolean($legacySnapshot, ['channels.telegram.enabled'], false),
+                ],
+                'blacklist' => [
+                    'enabled' => $this->lookupBoolean($legacySnapshot, ['channels.blacklist.enabled'], false),
+                ],
+                'whatsapp' => [
+                    'default_instance' => [
+                        'required' => $this->lookupBoolean($legacySnapshot, ['channels.whatsapp.default_instance.required'], false),
+                    ],
+                    'shared_instance' => [
+                        'enabled' => $this->lookupBoolean($legacySnapshot, ['channels.whatsapp.shared_instance.enabled', 'channels.whatsapp'], false),
+                    ],
+                    'dedicated_instance' => [
+                        'enabled' => $this->lookupBoolean($legacySnapshot, ['channels.whatsapp.dedicated_instance.enabled'], false),
+                        'max_per_event' => $this->lookupInteger($legacySnapshot, ['channels.whatsapp.dedicated_instance.max_per_event']),
+                    ],
+                    'feedback' => [
+                        'reject_reply' => [
+                            'enabled' => $this->lookupBoolean($legacySnapshot, ['channels.whatsapp.feedback.reject_reply.enabled'], false),
+                            'message' => $this->lookupString($legacySnapshot, ['channels.whatsapp.feedback.reject_reply.message']),
+                        ],
+                    ],
+                ],
+            ],
             'source_summary' => [],
         ];
     }
@@ -202,6 +244,7 @@ class EntitlementResolverService
             'modules' => $this->extractModules($payload),
             'limits' => $this->extractLimits($payload),
             'branding' => $this->extractBranding($payload),
+            'channels' => $this->extractChannels($payload),
         ];
     }
 
@@ -232,6 +275,46 @@ class EntitlementResolverService
         ];
     }
 
+    private function extractChannels(array $payload): array
+    {
+        return [
+            'whatsapp_groups' => [
+                'enabled' => $this->lookupBoolean($payload, ['channels.whatsapp_groups.enabled', 'channels.whatsapp']),
+                'max' => $this->lookupInteger($payload, ['channels.whatsapp_groups.max']),
+            ],
+            'whatsapp_direct' => [
+                'enabled' => $this->lookupBoolean($payload, ['channels.whatsapp_direct.enabled', 'channels.whatsapp']),
+            ],
+            'public_upload' => [
+                'enabled' => $this->lookupBoolean($payload, ['channels.public_upload.enabled']),
+            ],
+            'telegram' => [
+                'enabled' => $this->lookupBoolean($payload, ['channels.telegram.enabled']),
+            ],
+            'blacklist' => [
+                'enabled' => $this->lookupBoolean($payload, ['channels.blacklist.enabled']),
+            ],
+            'whatsapp' => [
+                'default_instance' => [
+                    'required' => $this->lookupBoolean($payload, ['channels.whatsapp.default_instance.required']),
+                ],
+                'shared_instance' => [
+                    'enabled' => $this->lookupBoolean($payload, ['channels.whatsapp.shared_instance.enabled', 'channels.whatsapp']),
+                ],
+                'dedicated_instance' => [
+                    'enabled' => $this->lookupBoolean($payload, ['channels.whatsapp.dedicated_instance.enabled']),
+                    'max_per_event' => $this->lookupInteger($payload, ['channels.whatsapp.dedicated_instance.max_per_event']),
+                ],
+                'feedback' => [
+                    'reject_reply' => [
+                        'enabled' => $this->lookupBoolean($payload, ['channels.whatsapp.feedback.reject_reply.enabled']),
+                        'message' => $this->lookupString($payload, ['channels.whatsapp.feedback.reject_reply.message']),
+                    ],
+                ],
+            ],
+        ];
+    }
+
     private function applySource(array $state, array $payload, EntitlementMergeStrategy $mergeStrategy): array
     {
         foreach (['live', 'wall', 'play', 'hub'] as $moduleKey) {
@@ -257,6 +340,66 @@ class EntitlementResolverService
                 $mergeStrategy,
             );
         }
+
+        $state['channels']['whatsapp_groups']['enabled'] = $this->mergeBoolean(
+            $state['channels']['whatsapp_groups']['enabled'],
+            $payload['channels']['whatsapp_groups']['enabled'] ?? null,
+            $mergeStrategy,
+        );
+        $state['channels']['whatsapp_groups']['max'] = $this->mergeInteger(
+            $state['channels']['whatsapp_groups']['max'] ?? null,
+            $payload['channels']['whatsapp_groups']['max'] ?? null,
+            $mergeStrategy,
+        );
+        $state['channels']['whatsapp_direct']['enabled'] = $this->mergeBoolean(
+            $state['channels']['whatsapp_direct']['enabled'],
+            $payload['channels']['whatsapp_direct']['enabled'] ?? null,
+            $mergeStrategy,
+        );
+        $state['channels']['public_upload']['enabled'] = $this->mergeBoolean(
+            $state['channels']['public_upload']['enabled'],
+            $payload['channels']['public_upload']['enabled'] ?? null,
+            $mergeStrategy,
+        );
+        $state['channels']['telegram']['enabled'] = $this->mergeBoolean(
+            $state['channels']['telegram']['enabled'],
+            $payload['channels']['telegram']['enabled'] ?? null,
+            $mergeStrategy,
+        );
+        $state['channels']['blacklist']['enabled'] = $this->mergeBoolean(
+            $state['channels']['blacklist']['enabled'],
+            $payload['channels']['blacklist']['enabled'] ?? null,
+            $mergeStrategy,
+        );
+        $state['channels']['whatsapp']['default_instance']['required'] = $this->mergeBoolean(
+            $state['channels']['whatsapp']['default_instance']['required'],
+            $payload['channels']['whatsapp']['default_instance']['required'] ?? null,
+            $mergeStrategy,
+        );
+        $state['channels']['whatsapp']['shared_instance']['enabled'] = $this->mergeBoolean(
+            $state['channels']['whatsapp']['shared_instance']['enabled'],
+            $payload['channels']['whatsapp']['shared_instance']['enabled'] ?? null,
+            $mergeStrategy,
+        );
+        $state['channels']['whatsapp']['dedicated_instance']['enabled'] = $this->mergeBoolean(
+            $state['channels']['whatsapp']['dedicated_instance']['enabled'],
+            $payload['channels']['whatsapp']['dedicated_instance']['enabled'] ?? null,
+            $mergeStrategy,
+        );
+        $state['channels']['whatsapp']['dedicated_instance']['max_per_event'] = $this->mergeInteger(
+            $state['channels']['whatsapp']['dedicated_instance']['max_per_event'] ?? null,
+            $payload['channels']['whatsapp']['dedicated_instance']['max_per_event'] ?? null,
+            $mergeStrategy,
+        );
+        $state['channels']['whatsapp']['feedback']['reject_reply']['enabled'] = $this->mergeBoolean(
+            $state['channels']['whatsapp']['feedback']['reject_reply']['enabled'],
+            $payload['channels']['whatsapp']['feedback']['reject_reply']['enabled'] ?? null,
+            $mergeStrategy,
+        );
+        $state['channels']['whatsapp']['feedback']['reject_reply']['message'] = $this->mergeString(
+            $state['channels']['whatsapp']['feedback']['reject_reply']['message'] ?? null,
+            $payload['channels']['whatsapp']['feedback']['reject_reply']['message'] ?? null,
+        );
 
         return $state;
     }
@@ -285,6 +428,15 @@ class EntitlementResolverService
             EntitlementMergeStrategy::Expand => $current === null ? $incoming : max($current, $incoming),
             EntitlementMergeStrategy::Restrict => $current === null ? $incoming : min($current, $incoming),
         };
+    }
+
+    private function mergeString(?string $current, ?string $incoming): ?string
+    {
+        if ($incoming === null || $incoming === '') {
+            return $current;
+        }
+
+        return $incoming;
     }
 
     private function buildSubscriptionSummary(?Subscription $subscription): ?array
@@ -395,6 +547,17 @@ class EntitlementResolverService
         }
 
         return is_numeric($value) ? (int) $value : $fallback;
+    }
+
+    private function lookupString(array $payload, array $keys, ?string $fallback = null): ?string
+    {
+        $value = $this->lookup($payload, $keys);
+
+        if ($value === null || $value === '') {
+            return $fallback;
+        }
+
+        return is_scalar($value) ? (string) $value : $fallback;
     }
 
     private function lookup(array $payload, array $keys): mixed

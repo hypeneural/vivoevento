@@ -32,6 +32,12 @@ Webhook -> InboundMedia -> MediaProcessing -> Gallery
 ### 3. Rotear para evento
 - Service: `InboundMessageRouterService`
 - Acao: identifica o evento correto pelo canal e vincula o `event_id`
+- Regras minimas:
+  - grupo: binding ativo por `group_external_id` ou autovinculo por comando
+    `#ATIVAR#<group_bind_code>`
+  - privado: sessao ativa por `instance_id + sender_external_id`, aberta por
+    `media_inbox_code`
+  - blacklist do evento e avaliada antes de criar `event_media`
 - Modulo: `InboundMedia`
 
 ### 4. Download da midia
@@ -66,6 +72,9 @@ Webhook -> InboundMedia -> MediaProcessing -> Gallery
 - Acao: aplica a matriz final do pipeline base e decide `approved`, `pending` ou `rejected`
 - Evento de dominio esperado: `MediaRejected` quando a midia sair do wall
 - Modulo: `MediaProcessing`
+- Feedback esperado:
+  - `approved + published` -> reacao positiva na mensagem original
+  - `rejected` -> reacao negativa + reply `Sua midia nao segue as diretrizes do evento. 🛡️`
 
 ### 9. Indexacao facial non-blocking
 - Job: `IndexMediaFacesJob` na fila `face-index`

@@ -42,6 +42,16 @@ export const moderationService = {
     });
   },
 
+  async blockSender(mediaId: number | string, payload: { reason?: string; expires_at?: string | null }) {
+    return api.post<ApiEventMediaItem>(`/media/${mediaId}/sender-block`, {
+      body: payload,
+    });
+  },
+
+  async unblockSender(mediaId: number | string) {
+    return api.delete<ApiEventMediaItem>(`/media/${mediaId}/sender-block`);
+  },
+
   async bulkApprove(ids: number[]) {
     return api.post<ModerationBulkActionResponse>('/media/bulk/approve', {
       body: { ids },

@@ -213,6 +213,52 @@ export interface PublicEventCheckoutResponse {
         acquirer_return_code: string | null;
         last_status: string | null;
       } | null;
+      whatsapp: {
+        pix_generated: {
+          type: 'pix_generated' | string | null;
+          status: string | null;
+          recipient_phone: string | null;
+          dispatched_at: string | null;
+          failed_at: string | null;
+          whatsapp_message_id: number | null;
+          pix_button_message_id: number | null;
+          pix_button_enabled: boolean | null;
+          pix_button_value_source: string | null;
+        } | null;
+        payment_paid: {
+          type: 'payment_paid' | string | null;
+          status: string | null;
+          recipient_phone: string | null;
+          dispatched_at: string | null;
+          failed_at: string | null;
+          whatsapp_message_id: number | null;
+          pix_button_message_id: number | null;
+          pix_button_enabled: boolean | null;
+          pix_button_value_source: string | null;
+        } | null;
+        payment_failed: {
+          type: 'payment_failed' | string | null;
+          status: string | null;
+          recipient_phone: string | null;
+          dispatched_at: string | null;
+          failed_at: string | null;
+          whatsapp_message_id: number | null;
+          pix_button_message_id: number | null;
+          pix_button_enabled: boolean | null;
+          pix_button_value_source: string | null;
+        } | null;
+        payment_refunded: {
+          type: 'payment_refunded' | string | null;
+          status: string | null;
+          recipient_phone: string | null;
+          dispatched_at: string | null;
+          failed_at: string | null;
+          whatsapp_message_id: number | null;
+          pix_button_message_id: number | null;
+          pix_button_enabled: boolean | null;
+          pix_button_value_source: string | null;
+        } | null;
+      };
     };
     package: {
       id: number;
@@ -824,7 +870,7 @@ export interface ApiEventWallSummary {
 export interface ApiEventFaceSearchSettings {
   id: number | null;
   event_id: number;
-  provider_key: 'noop' | string;
+  provider_key: 'noop' | 'compreface' | string;
   embedding_model_key: string;
   vector_store_key: 'pgvector' | string;
   enabled: boolean;
@@ -1557,6 +1603,19 @@ export interface ApiEventMediaItem {
   duplicate_group_key?: string | null;
   is_duplicate_candidate?: boolean;
   sender_name: string;
+  sender_avatar_url?: string | null;
+  sender_phone?: string | null;
+  sender_lid?: string | null;
+  sender_external_id?: string | null;
+  sender_blocked?: boolean;
+  sender_blocking_entry_id?: number | null;
+  sender_block_reason?: string | null;
+  sender_block_expires_at?: string | null;
+  sender_blacklist_enabled?: boolean;
+  sender_recommended_identity_type?: 'phone' | 'lid' | 'external_id' | string | null;
+  sender_recommended_identity_value?: string | null;
+  sender_recommended_normalized_phone?: string | null;
+  sender_media_count?: number | null;
   caption: string | null;
   thumbnail_url: string | null;
   preview_url?: string | null;

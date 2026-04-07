@@ -421,7 +421,7 @@ export default function HubPage() {
     onSuccess: async (payload) => {
       await queryClient.invalidateQueries({ queryKey: ['hub', 'settings', eventId] });
       setDraft(toDraft(payload));
-      toast({ title: 'Hub salvo', description: 'Configuracoes atualizadas com sucesso.' });
+      toast({ title: 'Links salvos', description: 'Configuracoes atualizadas com sucesso.' });
     },
     onError: (error: Error) => toast({ title: 'Falha ao salvar', description: error.message, variant: 'destructive' }),
   });
@@ -430,7 +430,7 @@ export default function HubPage() {
     mutationFn: (file: File) => uploadHubHeroImage(eventId, file, draft?.hero_image_path ?? null),
     onSuccess: (asset) => {
       setDraft((current) => current ? { ...current, hero_image_path: asset.path } : current);
-      toast({ title: 'Imagem enviada', description: 'A imagem de destaque do hub foi atualizada.' });
+      toast({ title: 'Imagem enviada', description: 'A imagem principal da pagina de links foi atualizada.' });
     },
     onError: (error: Error) => toast({ title: 'Falha no upload', description: error.message, variant: 'destructive' }),
   });
@@ -456,7 +456,7 @@ export default function HubPage() {
       await queryClient.invalidateQueries({ queryKey: ['hub', 'presets'] });
       setPresetName('');
       setPresetDescription('');
-      toast({ title: 'Modelo salvo', description: 'Esse modelo agora pode ser reutilizado em outros hubs da organizacao.' });
+      toast({ title: 'Modelo salvo', description: 'Esse modelo agora pode ser reutilizado em outras paginas de links da organizacao.' });
     },
     onError: (error: Error) => toast({ title: 'Falha ao salvar modelo', description: error.message, variant: 'destructive' }),
   });
@@ -916,7 +916,7 @@ export default function HubPage() {
 
     toast({
       title: 'Modelo aplicado',
-      description: 'O modelo foi aplicado neste Hub. Conteudo do evento atual foi mantido e os links oficiais foram recalculados.',
+      description: 'O modelo foi aplicado nesta pagina de links. O conteudo do evento atual foi mantido e os links oficiais foram recalculados.',
     });
   }
 
@@ -928,7 +928,7 @@ export default function HubPage() {
     const name = presetName.trim();
 
     if (name === '') {
-      toast({ title: 'Nome obrigatorio', description: 'Defina um nome para salvar o modelo do hub.', variant: 'destructive' });
+      toast({ title: 'Nome obrigatorio', description: 'Defina um nome para salvar o modelo da pagina de links.', variant: 'destructive' });
       return;
     }
 
@@ -959,7 +959,7 @@ export default function HubPage() {
   if (sortedEvents.length === 0) return <EmptyState />;
   if (!selectedEvent) return <EventPickerState events={sortedEvents} invalidEventId={eventId} onSelect={selectEvent} />;
   if (hubQuery.isLoading || !draft || !hubQuery.data) return <LoaderState />;
-  if (hubQuery.isError) return <ErrorState title="Falha ao carregar o editor do Hub" description={(hubQuery.error as Error).message} />;
+  if (hubQuery.isError) return <ErrorState title="Falha ao carregar o editor de Links" description={(hubQuery.error as Error).message} />;
 
   const orderedBlockCards = [
     ...visibleSectionOrder,
@@ -1008,8 +1008,8 @@ export default function HubPage() {
       />
 
       <PageHeader
-        title="Hub do Evento"
-        description="Escolha um modelo pronto, ajuste os blocos e refine os detalhes da pagina de links."
+        title="Links do evento"
+        description="Escolha um modelo pronto, ajuste os blocos e monte a pagina de links do evento."
         actions={(
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="ghost" size="sm" onClick={clearSelectedEvent}>
@@ -1018,7 +1018,7 @@ export default function HubPage() {
             </Button>
             <Button type="button" variant="outline" size="sm" onClick={() => window.open(hubQuery.data.links.hub_url ?? selectedEvent.public_url ?? '#', '_blank', 'noopener,noreferrer')}>
               <ExternalLink className="mr-1.5 h-4 w-4" />
-              Abrir Hub
+              Abrir pagina de links
             </Button>
             <Button type="button" size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
               {saveMutation.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
@@ -1042,7 +1042,7 @@ export default function HubPage() {
                 </Select>
               </div>
               <div className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3">
-                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Slug</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Endereco</p>
                 <p className="mt-1 text-sm font-medium">{selectedEvent.slug}</p>
               </div>
               <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-background/70 px-4 py-3">
@@ -1063,14 +1063,14 @@ export default function HubPage() {
             </div>
           </SectionCard>
 
-          <SectionCard title="Performance da pagina" description="Visualizacoes e cliques reais do publico para guiar ajustes sem depender de achismo." defaultOpen={false}>
+          <SectionCard title="Performance da pagina" description="Visualizacoes e cliques reais do publico para orientar ajustes com base no uso." defaultOpen={false}>
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Janela de analise</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Periodo analisado</p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {insightsQuery.data?.generated_at
                     ? `Atualizado em ${formatDateTimeLabel(insightsQuery.data.generated_at)}`
-                    : 'Carregando performance operacional do Hub.'}
+                    : 'Carregando desempenho da pagina de links.'}
                 </p>
               </div>
               <div className="w-full sm:w-[180px]">
@@ -1088,11 +1088,11 @@ export default function HubPage() {
             {insightsQuery.isLoading ? (
               <div className="flex min-h-[160px] items-center justify-center rounded-3xl border border-dashed border-border/60 bg-background/40 text-sm text-muted-foreground">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Carregando metricas do Hub...
+                Carregando metricas da pagina de links...
               </div>
             ) : insightsQuery.isError || !insightsQuery.data ? (
               <div className="rounded-3xl border border-destructive/20 bg-destructive/5 px-5 py-4 text-sm text-muted-foreground">
-                Nao foi possivel carregar os insights do Hub agora.
+                Nao foi possivel carregar os dados da pagina de links agora.
               </div>
             ) : (
               <>
@@ -1107,7 +1107,7 @@ export default function HubPage() {
                     title="Visitantes unicos"
                     value={insightsQuery.data.summary.unique_visitors}
                     icon={Users}
-                    description="Baseado nas aberturas do Hub"
+                    description="Baseado nas aberturas da pagina"
                   />
                   <StatsCard
                     title="Cliques nos botoes"
@@ -1189,9 +1189,9 @@ export default function HubPage() {
               <div className="rounded-3xl border border-border/60 bg-background/60 p-4">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="space-y-1">
-                    <p className="text-sm font-semibold">Biblioteca de modelos da organizacao</p>
+                    <p className="text-sm font-semibold">Modelos salvos da organizacao</p>
                     <p className="text-sm text-muted-foreground">
-                      O melhor formato para reaproveitar o Hub e salvar o modelo por organizacao. Ele guarda tema, blocos, botoes e cores, sem misturar o conteudo especifico de cada evento.
+                      Salve aqui modelos reaproveitaveis da pagina de links com tema, blocos, botoes e cores, sem misturar o conteudo de cada evento.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -1234,7 +1234,7 @@ export default function HubPage() {
                   </div>
                 ) : (presetsQuery.data?.length ?? 0) === 0 ? (
                   <div className="rounded-3xl border border-dashed border-border/60 bg-background/40 px-5 py-8 text-center text-sm text-muted-foreground">
-                    Ainda nao ha modelos salvos. Monte um visual base e clique em salvar para reutilizar em outros hubs desta organizacao.
+                    Ainda nao ha modelos salvos. Monte um visual base e clique em salvar para reutilizar em outras paginas de links desta organizacao.
                   </div>
                 ) : (
                   <div className="grid gap-4 xl:grid-cols-2">
@@ -1346,7 +1346,7 @@ export default function HubPage() {
             </div>
           </SectionCard>
 
-          <SectionCard title="Blocos e estilo" description="Ligue, ordene e ajuste os blocos da pagina sem sair da estrutura controlada do Hub." defaultOpen={false}>
+          <SectionCard title="Blocos e estilo" description="Ligue, ordene e ajuste os blocos da pagina sem sair da estrutura principal dos Links." defaultOpen={false}>
             <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
               <div className="space-y-3 rounded-3xl border border-border/60 bg-background/60 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Ordem visivel</p>
@@ -1720,7 +1720,7 @@ export default function HubPage() {
                   <p className="text-sm font-semibold">Grade de informacoes</p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {draft.builder_config.blocks.info_grid.enabled
-                      ? 'A grade esta ativa no Hub e entra como bloco proprio na pagina.'
+                      ? 'A grade esta ativa nos Links e entra como bloco proprio na pagina.'
                       : 'Voce pode montar os destaques antes de publicar o bloco.'}
                   </p>
                 </div>
@@ -1896,7 +1896,7 @@ export default function HubPage() {
                       <div className="mt-4 flex items-center justify-between rounded-2xl border border-border/60 px-4 py-3">
                         <div>
                           <p className="text-sm font-medium">Abrir em nova aba</p>
-                          <p className="text-xs text-muted-foreground">Mantem o Hub aberto quando o visitante segue para fora.</p>
+                          <p className="text-xs text-muted-foreground">Mantem a pagina aberta quando o visitante segue para fora.</p>
                         </div>
                         <Switch checked={item.opens_in_new_tab} onCheckedChange={(checked) => updateSocialItem(item.id, { opens_in_new_tab: checked })} />
                       </div>
@@ -1907,7 +1907,7 @@ export default function HubPage() {
 
               {draft.builder_config.blocks.social_strip.items.length === 0 ? (
                 <div className="rounded-3xl border border-dashed border-border/60 bg-background/40 px-5 py-8 text-center text-sm text-muted-foreground">
-                  Adicione Instagram, WhatsApp, TikTok, playlist, mapa ou ingressos para montar a faixa social do Hub.
+                  Adicione Instagram, WhatsApp, TikTok, playlist, mapa ou ingressos para montar a faixa social da pagina.
                 </div>
               ) : null}
             </div>
@@ -1921,7 +1921,7 @@ export default function HubPage() {
                   <p className="mt-1 text-sm text-muted-foreground">
                     {draft.builder_config.blocks.sponsor_strip.enabled
                       ? 'O bloco esta ativo e pode receber logos clicaveis ou apenas marca institucional.'
-                      : 'Cadastre os parceiros antes de ligar a faixa no Hub publico.'}
+                      : 'Cadastre os parceiros antes de ligar a faixa na pagina publica.'}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -2134,9 +2134,9 @@ function LoaderState() {
 function EmptyState() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-      <PageHeader title="Hub do Evento" description="Nao existe evento com Hub habilitado para configurar." />
+      <PageHeader title="Links do evento" description="Nao existe evento com Links habilitado para configurar." />
       <div className="rounded-3xl border border-dashed border-border bg-muted/30 px-6 py-12 text-center text-sm text-muted-foreground">
-        Crie um evento com modulo Hub para editar o agregador de links.
+        Crie um evento com modulo Links para editar esta pagina.
       </div>
     </motion.div>
   );
@@ -2165,8 +2165,8 @@ function EventPickerState({
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <PageHeader
-        title="Hub do Evento"
-        description="Escolha um evento com o modulo Hub para abrir o editor. O menu lateral agora entra primeiro nesta lista."
+        title="Links do evento"
+        description="Escolha um evento com o modulo Links para abrir o editor."
       />
 
       {invalidEventId ? (
@@ -2196,7 +2196,7 @@ function EventPickerState({
                 <div className="relative flex h-full flex-col justify-between gap-6">
                   <div className="flex flex-wrap gap-2">
                     <Badge className="border-0 bg-white/16 text-white hover:bg-white/16">{EVENT_STATUS_LABELS[event.status]}</Badge>
-                    <Badge className="border-0 bg-white/12 text-white hover:bg-white/12">Hub ativo</Badge>
+                    <Badge className="border-0 bg-white/12 text-white hover:bg-white/12">Links ativos</Badge>
                   </div>
                   <div className="space-y-2">
                     <h2 className="text-xl font-semibold leading-tight">{event.title}</h2>
@@ -2210,8 +2210,8 @@ function EventPickerState({
                   {event.public_url ? <Badge variant="outline">Link publico pronto</Badge> : null}
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm text-muted-foreground">Abrir o editor do agregador para este evento.</p>
-                  <span className="text-sm font-semibold text-primary">Editar Hub</span>
+                  <p className="text-sm text-muted-foreground">Abrir o editor da pagina de links deste evento.</p>
+                  <span className="text-sm font-semibold text-primary">Editar links</span>
                 </div>
               </div>
             </button>
@@ -2498,11 +2498,11 @@ function SavedPresetCard({
           {preset.description ? (
             <p className="mt-2 text-sm text-muted-foreground">{preset.description}</p>
           ) : (
-            <p className="mt-2 text-sm text-muted-foreground">Modelo salvo para reaproveitar estrutura, blocos, cores e botoes entre hubs da mesma organizacao.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Modelo salvo para reaproveitar estrutura, blocos, cores e botoes entre paginas de links da mesma organizacao.</p>
           )}
         </div>
         <Button type="button" size="sm" onClick={onApply}>
-          Aplicar neste Hub
+          Aplicar nesta pagina
         </Button>
       </div>
 

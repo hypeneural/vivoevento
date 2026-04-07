@@ -24,9 +24,9 @@
 .card {
   @include surface(rgba(9, 15, 27, 0.84), $border-subtle, 18px);
   display: grid;
-  gap: 1rem;
+  gap: 0.9rem;
   border-radius: $radius-md;
-  padding: 1rem;
+  padding: 0.95rem;
   overflow: hidden;
 }
 
@@ -111,12 +111,11 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.45rem;
 
-  span {
+  img {
+    width: 100%;
     aspect-ratio: 1;
     border-radius: 1rem;
-    background:
-      linear-gradient(135deg, rgba($c-accent-warm, 0.34), rgba($c-accent-secondary, 0.14)),
-      rgba(255, 255, 255, 0.04);
+    object-fit: cover;
     border: 1px solid rgba($c-accent-warm, 0.14);
   }
 }
@@ -275,5 +274,41 @@
 
   .large {
     min-height: 100%;
+  }
+}
+
+@media (max-width: 719px) {
+  .header {
+    gap: 0.8rem;
+    margin-bottom: 1.15rem;
+  }
+
+  .grid {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(16.5rem, 84vw);
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    scroll-snap-type: x mandatory;
+  }
+
+  .card {
+    scroll-snap-align: start;
+    border-radius: 24px;
+  }
+
+  .cardBody {
+    p {
+      margin-top: 0.5rem;
+      font-size: 0.96rem;
+    }
+
+    small {
+      margin-top: 0.65rem;
+      font-size: 0.88rem;
+    }
+  }
+
+  .wallPreview {
+    min-height: 12.25rem;
   }
 }

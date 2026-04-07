@@ -7,6 +7,7 @@ use App\Modules\FaceSearch\DTOs\FaceBoundingBoxData;
 use App\Modules\FaceSearch\DTOs\FaceEmbeddingData;
 use App\Modules\FaceSearch\Models\EventFaceSearchRequest;
 use App\Modules\FaceSearch\Models\EventMediaFace;
+use App\Modules\FaceSearch\Services\CompreFaceEmbeddingProvider;
 use App\Modules\FaceSearch\Services\FaceDetectionProviderInterface;
 use App\Modules\FaceSearch\Services\FaceEmbeddingProviderInterface;
 use App\Modules\FaceSearch\Services\FaceVectorStoreInterface;
@@ -14,6 +15,7 @@ use App\Modules\MediaProcessing\Enums\ModerationStatus;
 use App\Modules\MediaProcessing\Enums\PublicationStatus;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 
 it('returns only matches from the requested event in internal selfie search', function () {
     [$user, $organization] = $this->actingAsOwner();
@@ -61,6 +63,70 @@ it('returns only matches from the requested event in internal selfie search', fu
     $response->assertJsonPath('data.results.0.media.id', $eventMedia->id);
 
     expect(EventFaceSearchRequest::query()->where('event_id', $event->id)->count())->toBe(1);
+});
+
+it('uses compreface calculator embedding to find a selfie match', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    config()->set('face_search.embedding_dimension', 3);
+    config()->set('face_search.providers.compreface', [
+        'provider_version' => 'compreface-rest-v1',
+        'model' => 'compreface-face-v1',
+        'model_snapshot' => 'compreface-face-v1',
+    ]);
+
+    Http::fake();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'provider_key' => 'compreface',
+        'top_k' => 10,
+        'search_threshold' => 0.4,
+    ]);
+
+    app()->instance(FaceDetectionProviderInterface::class, new class implements FaceDetectionProviderInterface
+    {
+        public function detect(\App\Modules\MediaProcessing\Models\EventMedia $media, \App\Modules\FaceSearch\Models\EventFaceSearchSetting $settings, string $binary): array
+        {
+            return [
+                new DetectedFaceData(
+                    boundingBox: new FaceBoundingBoxData(24, 24, 180, 180),
+                    detectionConfidence: 0.99,
+                    qualityScore: 0.92,
+                    isPrimaryCandidate: true,
+                    providerEmbedding: [0.10, 0.20, 0.30],
+                    providerPayload: [
+                        'provider' => 'compreface',
+                    ],
+                ),
+            ];
+        }
+    });
+
+    app()->instance(FaceEmbeddingProviderInterface::class, app(CompreFaceEmbeddingProvider::class));
+
+    $eventMedia = EventMedia::factory()->approved()->published()->create([
+        'event_id' => $event->id,
+    ]);
+    seedFaceEmbedding($event->id, $eventMedia->id, [0.10, 0.20, 0.30]);
+
+    $response = $this->withHeaders(['Accept' => 'application/json'])->post(
+        "/api/v1/events/{$event->id}/face-search/search",
+        [
+            'selfie' => UploadedFile::fake()->image('selfie.jpg'),
+            'include_pending' => true,
+        ],
+    );
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.total_results', 1);
+    $response->assertJsonPath('data.results.0.event_media_id', $eventMedia->id);
+
+    Http::assertSentCount(0);
 });
 
 it('returns a clear validation error when the selfie has no valid face', function () {

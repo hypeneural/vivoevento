@@ -2,6 +2,9 @@
 
 namespace App\Modules\Organizations\Providers;
 
+use App\Modules\Organizations\Models\Organization;
+use App\Modules\Organizations\Policies\OrganizationPolicy;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -14,6 +17,8 @@ class OrganizationsServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Gate::policy(Organization::class, OrganizationPolicy::class);
+
         $this->loadRoutes();
     }
 

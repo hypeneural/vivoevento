@@ -84,6 +84,10 @@ it('filters events by status type module and period', function () {
         'upload_api_url',
         'retention_days',
         'module_count',
+        'current_entitlements',
+        'intake_defaults',
+        'intake_channels',
+        'intake_blacklist',
     ]);
 });
 

@@ -17,6 +17,8 @@ Fonte de verdade complementar:
 - acesso SSH com usuario administrativo;
 - o repo pode ser clonado na VPS;
 - `WhatsApp inbound` continua fora do go-live atual;
+- o backend esta travado em `php >=8.3 <8.4` para evitar drift de dependencias
+  incompatibilizando o host Ubuntu 24.04;
 - o schema atual exige `pgvector`, entao `postgresql-16-pgvector` entra no
   bootstrap padrao;
 - o deploy inicial sera executado pelo usuario `deploy`.
@@ -42,6 +44,27 @@ cd /tmp
 rm -rf /tmp/eventovivo-bootstrap
 git clone --depth=1 --branch <branch> <repo-url> /tmp/eventovivo-bootstrap
 cd /tmp/eventovivo-bootstrap
+```
+
+Validar que o bootstrap realmente contem os artefatos operacionais desta fase:
+
+```bash
+test -d /tmp/eventovivo-bootstrap/deploy
+test -f /tmp/eventovivo-bootstrap/scripts/ops/bootstrap-host.sh
+test -f /tmp/eventovivo-bootstrap/scripts/ops/install-configs.sh
+test -f /tmp/eventovivo-bootstrap/scripts/ops/verify-host.sh
+test -f /tmp/eventovivo-bootstrap/scripts/deploy/deploy.sh
+```
+
+Se o clone remoto ainda nao contem os artefatos mais recentes da VPS, nao siga
+com um bootstrap incompleto. Envie a arvore validada localmente para a VPS e
+reuse o mesmo caminho `/tmp/eventovivo-bootstrap`:
+
+```bash
+scp -r ./deploy root@<server>:/tmp/eventovivo-bootstrap/
+scp -r ./scripts/ops root@<server>:/tmp/eventovivo-bootstrap/scripts/
+scp -r ./scripts/deploy root@<server>:/tmp/eventovivo-bootstrap/scripts/
+scp ./docs/architecture/production-vps-*.md root@<server>:/tmp/eventovivo-bootstrap/docs/architecture/
 ```
 
 ## 2. Bootstrap do host
@@ -120,19 +143,33 @@ sudo systemctl restart redis-server
 sudo systemctl restart postgresql
 ```
 
-## 7. Criar o `.env` de producao
+Observacao:
+
+- no Ubuntu 24.04, `systemctl status postgresql` mostra um wrapper `active
+  (exited)`;
+- o sinal real de prontidao do cluster e `pg_lsclusters` e `pg_isready`.
+
+## 7. Criar os envs de producao
 
 Executar como `root`:
 
 ```bash
 sudo mkdir -p /var/www/eventovivo/shared
 sudo cp /tmp/eventovivo-bootstrap/deploy/examples/apps-api.env.production.example /var/www/eventovivo/shared/.env
+sudo cp /tmp/eventovivo-bootstrap/deploy/examples/apps-web.env.production.example /var/www/eventovivo/shared/apps-web.env.production
+sudo cp /tmp/eventovivo-bootstrap/deploy/examples/apps-landing.env.production.example /var/www/eventovivo/shared/apps-landing.env.production
 sudo chown deploy:www-data /var/www/eventovivo/shared/.env
+sudo chown deploy:www-data /var/www/eventovivo/shared/apps-web.env.production
+sudo chown deploy:www-data /var/www/eventovivo/shared/apps-landing.env.production
 sudo chmod 640 /var/www/eventovivo/shared/.env
+sudo chmod 640 /var/www/eventovivo/shared/apps-web.env.production
+sudo chmod 640 /var/www/eventovivo/shared/apps-landing.env.production
 sudo nano /var/www/eventovivo/shared/.env
+sudo nano /var/www/eventovivo/shared/apps-web.env.production
+sudo nano /var/www/eventovivo/shared/apps-landing.env.production
 ```
 
-Checklist minima dentro do `.env`:
+Checklist minima dentro de `/var/www/eventovivo/shared/.env`:
 
 - `APP_KEY`
 - `APP_URL=https://api.eventovivo.com.br`
@@ -147,6 +184,28 @@ Checklist minima dentro do `.env`:
 - `REVERB_SCHEME=https`
 - `SANCTUM_STATEFUL_DOMAINS=admin.eventovivo.com.br`
 
+Checklist minima dentro de `/var/www/eventovivo/shared/apps-web.env.production`:
+
+- `VITE_API_BASE_URL=https://api.eventovivo.com.br/api/v1`
+- `VITE_APP_URL=https://admin.eventovivo.com.br`
+- `VITE_REVERB_HOST=ws.eventovivo.com.br`
+- `VITE_REVERB_PORT=443`
+- `VITE_REVERB_SCHEME=https`
+
+Checklist minima dentro de `/var/www/eventovivo/shared/apps-landing.env.production`:
+
+- `VITE_PUBLIC_SITE_URL=https://eventovivo.com.br`
+- `VITE_ADMIN_URL=https://admin.eventovivo.com.br`
+
+Observacao:
+
+- se o object storage externo ainda nao estiver pronto no primeiro deploy,
+  use `FILESYSTEM_DISK=public` para a fase 1 e mantenha a persistencia em
+  `shared/storage`;
+- nessa fase, garanta tambem `shared/storage/app/public`;
+- quando S3 ou equivalente estiver fechado, troque para `FILESYSTEM_DISK=s3`
+  e preencha `AWS_*`.
+
 ## 8. Validar o host antes do primeiro deploy
 
 Executar como usuario administrativo:
@@ -154,6 +213,18 @@ Executar como usuario administrativo:
 ```bash
 sudo bash /var/www/eventovivo/scripts/verify-host.sh --require-shared-env
 ```
+
+Se falhar em `nginx -t`, confirme primeiro a presenca de:
+
+- `/etc/ssl/certs/eventovivo-origin.crt`
+- `/etc/ssl/private/eventovivo-origin.key`
+- `/var/www/eventovivo/shared/apps-web.env.production`
+- `/var/www/eventovivo/shared/apps-landing.env.production`
+
+Se falhar em `health/ready` com `FILESYSTEM_DISK=public`, confirme:
+
+- `/var/www/eventovivo/shared/storage/app/public`
+- ownership `deploy:www-data` nos subdiretorios de `shared/storage`
 
 ## 9. Configurar Cloudflare e DNS
 
@@ -176,9 +247,9 @@ sudo -iu deploy bash -lc 'cd /tmp/eventovivo-bootstrap && bash scripts/deploy/de
 Executar como usuario administrativo:
 
 ```bash
-sudo systemctl enable eventovivo-horizon.service
-sudo systemctl enable eventovivo-reverb.service
-sudo systemctl enable eventovivo-scheduler.timer
+sudo systemctl enable --now eventovivo-horizon.service
+sudo systemctl enable --now eventovivo-reverb.service
+sudo systemctl enable --now eventovivo-scheduler.timer
 sudo systemctl status eventovivo-horizon.service --no-pager
 sudo systemctl status eventovivo-reverb.service --no-pager
 sudo systemctl status eventovivo-scheduler.timer --no-pager
@@ -218,6 +289,27 @@ curl -I https://admin.eventovivo.com.br
 curl -I https://api.eventovivo.com.br/health/live
 curl -I https://api.eventovivo.com.br/health/ready
 ```
+
+## 15. Purge de cache Cloudflare apos hotfix de admin
+
+Se uma release alterar service worker, HTML de bootstrap ou corrigir erro de
+runtime do admin, validar se a Cloudflare ainda serve artefatos antigos:
+
+```bash
+curl -I https://admin.eventovivo.com.br/sw.js
+curl -I https://admin.eventovivo.com.br/assets/NOME_DO_CHUNK_ANTIGO.js
+```
+
+Se aparecer `CF-Cache-Status: HIT` para `/sw.js` ou para um chunk que ja nao
+existe na origin, purgar no painel da Cloudflare:
+
+- `https://admin.eventovivo.com.br/sw.js`
+- `https://admin.eventovivo.com.br/`
+- chunks antigos que ainda aparecem como `HIT`
+
+Se houver muitos chunks antigos ou se o navegador continuar preso em bundle
+anterior, usar `Purge Everything` como fallback operacional e depois repetir o
+smoke test.
 
 ## Observacoes finais
 

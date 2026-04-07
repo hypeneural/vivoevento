@@ -10,6 +10,8 @@
 
 import Pusher from 'pusher-js';
 
+import { shouldDisableRealtimeInDev } from '@/lib/realtime';
+
 let pusherInstance: Pusher | null = null;
 
 // Reverb vars take priority (self-hosted, Pusher-protocol compatible)
@@ -43,6 +45,15 @@ export function createWallPusher(): Pusher | null {
   }
 
   if (isReverb()) {
+    if (shouldDisableRealtimeInDev('WallPlayer', {
+      key: REVERB_KEY,
+      host: REVERB_HOST,
+      port: REVERB_PORT,
+      scheme: REVERB_SCHEME,
+    })) {
+      return null;
+    }
+
     // Reverb (self-hosted, Pusher-protocol compatible)
     const forceTLS = REVERB_SCHEME === 'https';
 

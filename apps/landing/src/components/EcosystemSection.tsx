@@ -33,9 +33,12 @@ function ModulePreview({ id }: { id: string }) {
     return (
       <div className={styles.gamesPreview}>
         <div className={styles.gamesBoard}>
-          {Array.from({ length: 6 }).map((_, index) => (
-            <span key={index} />
-          ))}
+          <img src={eventImages.galleryFeatured.src} alt={eventImages.galleryFeatured.alt} />
+          <img src={eventImages.gallerySecondary.src} alt={eventImages.gallerySecondary.alt} />
+          <img src={eventImages.galleryFourth.src} alt={eventImages.galleryFourth.alt} />
+          <img src={eventImages.galleryFifth.src} alt={eventImages.galleryFifth.alt} />
+          <img src={eventImages.gallerySixth.src} alt={eventImages.gallerySixth.alt} />
+          <img src={eventImages.gallerySeventh.src} alt={eventImages.gallerySeventh.alt} />
         </div>
         <div className={styles.previewMetric}>
           <strong>Mesa 7</strong>

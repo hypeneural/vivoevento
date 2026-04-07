@@ -274,6 +274,13 @@ export function mediaToRuntimeItem(
   media: WallMediaItem,
   previous?: Partial<WallRuntimeItem> | null,
 ): WallRuntimeItem {
+  const width = previous?.width ?? media.width ?? null;
+  const height = previous?.height ?? media.height ?? null;
+  const orientation =
+    previous?.orientation
+    ?? media.orientation
+    ?? detectOrientation(width, height);
+
   return {
     ...media,
     senderKey: deriveWallSenderKey(media),
@@ -282,11 +289,9 @@ export function mediaToRuntimeItem(
     playedAt: previous?.playedAt ?? null,
     playCount: previous?.playCount ?? 0,
     lastError: previous?.lastError ?? null,
-    width: previous?.width ?? null,
-    height: previous?.height ?? null,
-    orientation:
-      previous?.orientation
-      ?? detectOrientation(previous?.width ?? null, previous?.height ?? null),
+    width,
+    height,
+    orientation,
   };
 }
 

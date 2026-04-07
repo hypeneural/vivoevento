@@ -10,6 +10,7 @@ import type {
   ApiEventPublicLinksPayload,
   PaginatedResponse,
 } from '@/lib/api-types';
+import type { EventIntakeBlacklist } from './intake';
 
 export interface EventListFilters {
   search?: string;
@@ -26,6 +27,21 @@ export interface UpdateEventPublicIdentifiersPayload {
 
 export interface RegenerateEventPublicIdentifiersPayload {
   fields: Array<'slug' | 'upload_slug' | 'wall_code'>;
+}
+
+export interface UpsertEventIntakeBlacklistEntryPayload {
+  id?: number | null;
+  identity_type: 'phone' | 'lid' | 'external_id';
+  identity_value: string;
+  normalized_phone?: string | null;
+  reason?: string | null;
+  expires_at?: string | null;
+  is_active?: boolean;
+}
+
+export interface EventIntakeBlacklistMutationResponse {
+  entry_id: number;
+  intake_blacklist: EventIntakeBlacklist;
 }
 
 export interface UpdateEventContentModerationSettingsPayload {
@@ -62,7 +78,7 @@ export interface UpdateEventMediaIntelligenceSettingsPayload {
 
 export interface UpdateEventFaceSearchSettingsPayload {
   enabled: boolean;
-  provider_key: 'noop';
+  provider_key: 'noop' | 'compreface';
   embedding_model_key: string;
   vector_store_key: 'pgvector';
   min_face_size_px: number;
@@ -164,4 +180,20 @@ export function regenerateEventPublicIdentifiers(
 
 export function getPublicGallery(slug: string) {
   return api.get<PaginatedResponse<ApiEventMediaItem>>(`/public/events/${slug}/gallery`);
+}
+
+export function upsertEventIntakeBlacklistEntry(
+  eventId: string | number,
+  payload: UpsertEventIntakeBlacklistEntryPayload,
+) {
+  return api.post<EventIntakeBlacklistMutationResponse>(`/events/${eventId}/intake-blacklist/entries`, {
+    body: payload,
+  });
+}
+
+export function deleteEventIntakeBlacklistEntry(
+  eventId: string | number,
+  entryId: string | number,
+) {
+  return api.delete<EventIntakeBlacklistMutationResponse>(`/events/${eventId}/intake-blacklist/entries/${entryId}`);
 }

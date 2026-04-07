@@ -11,6 +11,7 @@ use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Models\EventMediaVariant;
 use App\Modules\MediaProcessing\Models\MediaProcessingRun;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 
 it('marks face indexing as skipped when the event has face search disabled', function () {
@@ -154,6 +155,96 @@ it('indexes valid faces and stores private crops when face search is enabled', f
     expect($run?->decision_key)->toBe('indexed')
         ->and($run?->result_json['faces_detected'] ?? null)->toBe(2)
         ->and($run?->result_json['faces_indexed'] ?? null)->toBe(2);
+});
+
+it('indexes faces using compreface detection and embedding providers without a second provider request', function () {
+    Storage::fake('public');
+    Storage::fake('ai-private');
+
+    config()->set('face_search.embedding_dimension', 3);
+    config()->set('face_search.providers.compreface', [
+        'base_url' => 'http://compreface.test',
+        'api_key' => 'test-api-key',
+        'face_plugins' => 'calculator,landmarks',
+        'det_prob_threshold' => '0.70',
+        'status' => true,
+        'timeout' => 9,
+        'connect_timeout' => 3,
+        'provider_version' => 'compreface-rest-v1',
+        'model' => 'compreface-face-v1',
+        'model_snapshot' => 'compreface-face-v1',
+        'use_base64' => true,
+    ]);
+
+    Http::fake([
+        'http://compreface.test/api/v1/detection/detect*' => Http::response([
+            'result' => [
+                [
+                    'box' => [
+                        'probability' => 0.98,
+                        'x_min' => 40,
+                        'y_min' => 50,
+                        'x_max' => 220,
+                        'y_max' => 230,
+                    ],
+                    'landmarks' => [
+                        [100, 120],
+                        [160, 122],
+                    ],
+                    'embedding' => [0.11, 0.22, 0.33],
+                ],
+            ],
+            'plugins_versions' => [
+                'detector' => 'facenet.FaceDetector',
+                'calculator' => 'facenet.Calculator',
+            ],
+        ]),
+    ]);
+
+    $event = \App\Modules\Events\Models\Event::factory()->active()->create();
+    \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'provider_key' => 'compreface',
+        'min_face_size_px' => 96,
+        'min_quality_score' => 0.60,
+    ]);
+
+    $path = UploadedFile::fake()
+        ->image('gallery.jpg', 1200, 900)
+        ->store("events/{$event->id}/variants/202", 'public');
+
+    $media = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'moderation_status' => ModerationStatus::Approved->value,
+        'face_index_status' => 'queued',
+    ]);
+
+    EventMediaVariant::query()->create([
+        'event_media_id' => $media->id,
+        'variant_key' => 'gallery',
+        'disk' => 'public',
+        'path' => $path,
+        'width' => 1200,
+        'height' => 900,
+        'size_bytes' => Storage::disk('public')->size($path),
+        'mime_type' => 'image/jpeg',
+    ]);
+
+    app(IndexMediaFacesJob::class, ['eventMediaId' => $media->id])->handle();
+
+    $media->refresh();
+
+    expect($media->face_index_status)->toBe('indexed');
+
+    $face = \App\Modules\FaceSearch\Models\EventMediaFace::query()
+        ->where('event_media_id', $media->id)
+        ->first();
+
+    expect($face)->not->toBeNull()
+        ->and($face?->detection_confidence)->toBe(0.98)
+        ->and($face?->embedding_model_key)->toBe('compreface-face-v1');
+
+    Http::assertSentCount(1);
 });
 
 it('marks indexed faces as not searchable when the media is rejected', function () {

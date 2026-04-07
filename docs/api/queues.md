@@ -12,6 +12,9 @@
 | `media-safety` | `supervisor-media-safety` | 90s | 320MB | Moderacao de safety em fila isolada |
 | `media-vlm` | `supervisor-media-vlm` | 120s | 512MB | Avaliacao semantica do VLM, caption curta e gating opcional |
 | `media-publish` | `supervisor-media-publish` | 45s | 192MB | Publicacao da midia |
+| `whatsapp-inbound` | `supervisor-whatsapp-inbound` | 45s | 192MB | Webhooks Z-API/Evolution ja admitidos pelo controller e normalizacao inicial |
+| `whatsapp-send` | `supervisor-whatsapp-send` | 90s | 192MB | Outbound WhatsApp, incluindo notificacoes de billing e respostas operacionais |
+| `whatsapp-sync` | `supervisor-whatsapp-sync` | 120s | 192MB | Sincronizacao de estado, QR/status e operacoes administrativas do provider |
 | `broadcasts` | `supervisor-broadcasts` | 30s | 192MB | Broadcasts do telao e eventos realtime sensiveis a latencia |
 | `notifications` | `supervisor-notifications` | 60s | 128MB | Emails, push e alertas |
 | `default` | `supervisor-default` | 60s | 128MB | Tarefas gerais |
@@ -49,13 +52,14 @@
   deploy.
 - lanes de imagem e IA agora nascem com `maxJobs` e `maxTime` ativos para
   evitar acumulo progressivo de memoria em workers long-lived.
-- `webhooks`, `media-fast`, `media-publish` e `broadcasts` permanecem como
-  lanes sagradas e com capacidade reservada por supervisor dedicado.
+- `webhooks`, `whatsapp-inbound`, `media-fast`, `media-publish` e `broadcasts`
+  permanecem como lanes sagradas e com capacidade reservada por supervisor
+  dedicado.
 
 ## Pipeline de Midia
 
 ```text
-1. ProcessInboundWebhookJob [webhooks]
+1. ProcessInboundWebhookJob [whatsapp-inbound quando vier do modulo WhatsApp; webhooks nos fluxos legados]
 2. NormalizeInboundMessageJob [webhooks]
 3. DownloadInboundMediaJob [media-download]
 4. GenerateMediaVariantsJob [media-fast]
@@ -96,6 +100,9 @@ Estado atual:
 | `supervisor-media-safety` | 1 | 2 |
 | `supervisor-media-vlm` | 1 | 2 |
 | `supervisor-media-publish` | 1 | 2 |
+| `supervisor-whatsapp-inbound` | 1 | 2 |
+| `supervisor-whatsapp-send` | 1 | 2 |
+| `supervisor-whatsapp-sync` | 1 | 1 |
 | `supervisor-broadcasts` | 1 | 2 |
 | `supervisor-notifications` | 1 | 2 |
 | `supervisor-default` | 1 | 2 |
@@ -139,6 +146,8 @@ Estado atual:
 - `HORIZON_WAIT_MEDIA_SAFETY`: threshold de espera da fila `media-safety`.
 - `HORIZON_WAIT_MEDIA_VLM`: threshold de espera da fila `media-vlm`.
 - `HORIZON_WAIT_MEDIA_PUBLISH`: threshold de espera da fila `media-publish`.
+- `HORIZON_WAIT_WHATSAPP_INBOUND`, `HORIZON_WAIT_WHATSAPP_SEND` e
+  `HORIZON_WAIT_WHATSAPP_SYNC`: thresholds das filas dedicadas de WhatsApp.
 - `HORIZON_BROADCASTS_MAX_PROCESSES`: teto inicial de workers do supervisor de realtime.
 - `HORIZON_FACE_INDEX_MAX_PROCESSES`: teto inicial de workers do supervisor de `FaceSearch`.
 - `HORIZON_MEDIA_FAST_MAX_PROCESSES`: teto inicial de workers do fast lane.
@@ -146,6 +155,8 @@ Estado atual:
 - `HORIZON_MEDIA_SAFETY_MAX_PROCESSES`: teto inicial de workers do supervisor de safety.
 - `HORIZON_MEDIA_VLM_MAX_PROCESSES`: teto inicial de workers do supervisor do VLM.
 - `HORIZON_MEDIA_PUBLISH_MAX_PROCESSES`: teto inicial de workers de publicacao.
+- `HORIZON_WHATSAPP_INBOUND_MAX_PROCESSES`, `HORIZON_WHATSAPP_SEND_MAX_PROCESSES`
+  e `HORIZON_WHATSAPP_SYNC_MAX_PROCESSES`: tetos iniciais das filas WhatsApp.
 - `HORIZON_WEBHOOKS_MAX_PROCESSES`, `HORIZON_NOTIFICATIONS_MAX_PROCESSES` e
   `HORIZON_DEFAULT_MAX_PROCESSES`: tuning basico das lanes restantes.
 - `QUEUE_BUSY_WEBHOOKS_MAX`, `QUEUE_BUSY_MEDIA_FAST_MAX`,

@@ -207,9 +207,14 @@ class ProcessBillingWebhookAction
             ]);
         }
 
+        $details = $this->extractGatewayDetails($normalized);
         $canceledOrder = $this->cancelBillingOrder->execute($order, [
             'gateway_provider' => $normalized['provider_key'],
-            'gateway_order_id' => $normalized['gateway_order_id'] ?? $order->gateway_order_id,
+            'gateway_order_id' => $details['gateway_order_id'] ?? $normalized['gateway_order_id'] ?? $order->gateway_order_id,
+            'gateway_charge_id' => $details['gateway_charge_id'] ?? $normalized['gateway_charge_id'] ?? $order->gateway_charge_id,
+            'gateway_transaction_id' => $details['gateway_transaction_id'] ?? $normalized['gateway_transaction_id'] ?? $order->gateway_transaction_id,
+            'gateway_status' => $details['gateway_status'] ?? 'canceled',
+            'gateway_response' => $normalized['payload'] ?? [],
             'reason' => 'gateway_webhook_canceled',
         ]);
 

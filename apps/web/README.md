@@ -167,14 +167,14 @@ Variáveis de ambiente com prefixo `VITE_` ficam disponíveis via `import.meta.e
 | `wall` | Wall | 🟡 UI pronta |
 | `play` | Play | 🟡 UI pronta |
 | `hub` | Hub | 🟡 UI pronta |
-| `partners` | Partners | 🟡 UI pronta |
+| `partners` | Partners | API real (listagem) |
 | `clients` | Organizations/Users | 🟡 UI pronta |
 | `plans` | Plans/Billing | 🟡 UI pronta |
 | `analytics` | Analytics | 🟡 UI pronta |
 | `audit` | Audit | 🟡 UI pronta |
 | `settings` | — | 🟡 UI pronta |
 
-> **Status 🟡 UI pronta**: Interface visual implementada com dados mockados. Falta integração com a API real.
+> **Status UI pronta**: interface visual pronta. Alguns modulos ainda usam dados mockados; `partners` ja usa API real para listagem e filtros.
 
 ---
 

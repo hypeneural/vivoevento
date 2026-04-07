@@ -22,5 +22,22 @@ export default defineConfig(() => ({
     outDir: "dist",
     // Phaser lives behind a lazy boundary and should not fail CI because of its isolated demo chunk size.
     chunkSizeWarningLimit: 1600,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) {
+            return;
+          }
+
+          if (id.includes("phaser")) return "phaser";
+          if (id.includes("@rive-app")) return "rive-runtime";
+          if (id.includes("gsap")) return "gsap";
+          if (id.includes("motion")) return "motion";
+          if (id.includes("react")) return "react-vendor";
+
+          return "vendor";
+        },
+      },
+    },
   },
 }));

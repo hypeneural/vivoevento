@@ -1,0 +1,14 @@
+{
+  "ids": [
+    "2A13B9BC2F436E87513E",
+    "2AEE16D9CE23E523951E"
+  ],
+  "type": "MessageStatusCallback",
+  "phone": "144113366245434@lid",
+  "status": "READ",
+  "isGroup": false,
+  "momment": 1775411544000,
+  "instanceId": "INSTANCE-FIXTURE-001",
+  "phoneDevice": 6,
+  "_webhook_type": "delivery"
+}

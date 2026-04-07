@@ -63,4 +63,29 @@ describe('EventFaceSearchSettingsForm', () => {
     expect(screen.getByRole('button', { name: /salvando/i })).toBeDisabled();
     expect(screen.getByText(/continua fora do gate de moderacao/i)).toBeInTheDocument();
   });
+
+  it('preserves compreface provider when it comes from the API', async () => {
+    const onSubmit = vi.fn();
+
+    render(
+      <EventFaceSearchSettingsForm
+        settings={{
+          ...settings,
+          provider_key: 'compreface',
+          embedding_model_key: 'compreface-face-v1',
+        }}
+        eventModerationMode="ai"
+        onSubmit={onSubmit}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /salvar facesearch/i }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+        provider_key: 'compreface',
+        embedding_model_key: 'compreface-face-v1',
+      }));
+    });
+  });
 });

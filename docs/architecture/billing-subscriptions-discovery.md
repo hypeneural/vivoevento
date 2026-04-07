@@ -537,7 +537,22 @@ Estado atual:
 
 - suportado em versao inicial por `POST /api/v1/admin/quick-events`;
 - o fluxo ja cria ou reutiliza usuario/organizacao, gera evento e concede grant `bonus` ou `manual_override`;
-- ainda falta o envio real de acesso por WhatsApp e, se necessario, endpoints separados para alterar grants depois da criacao.
+- hoje o request ainda exige `package_id`, entao o bonus/admin quick event continua
+  nascendo a partir de um pacote base;
+- isso atende a jornada inicial, mas ainda nao cobre o caso em que o super admin
+  quer liberar um evento free com granularidade propria, sem ficar preso a um
+  pacote especifico;
+- a evolucao recomendada e permitir grant manual `package-less`, preenchendo
+  `features_snapshot_json` e `limits_snapshot_json` diretamente no fluxo
+  administrativo;
+- esse caminho e especialmente importante para capacidades de intake por
+  WhatsApp, como:
+  - quantidade maxima de grupos
+  - liberacao de DM
+  - liberacao de link de upload
+  - liberacao futura de Telegram
+  - uso de instancia dedicada por evento
+  - blacklists e automacoes operacionais.
 
 ## Logica Atual De Vinculo
 

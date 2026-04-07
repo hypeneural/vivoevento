@@ -1,0 +1,31 @@
+{
+  "code": null,
+  "type": "ReceivedCallback",
+  "phone": "120363488888888888-group",
+  "photo": null,
+  "callId": null,
+  "fromMe": false,
+  "status": "RECEIVED",
+  "chatLid": null,
+  "fromApi": false,
+  "isGroup": true,
+  "momment": 1775409749000,
+  "chatName": "Grupo Fixture Sistema",
+  "broadcast": false,
+  "expiresAt": null,
+  "forwarded": false,
+  "messageId": "1867371624",
+  "instanceId": "INSTANCE-FIXTURE-001",
+  "senderName": "Sistema Fixture",
+  "senderPhoto": null,
+  "isNewsletter": false,
+  "notification": "GROUP_PARTICIPANT_LEAVE",
+  "connectedPhone": "554899990000",
+  "participantLid": null,
+  "externalAdReply": null,
+  "participantPhone": "554899992222",
+  "referenceMessageId": null,
+  "notificationParameters": [
+    "554899992222@lid"
+  ]
+}

@@ -1,5 +1,5 @@
 import type { MouseEvent } from 'react';
-import { Check, CheckCircle2, Copy, ImageIcon, Loader2, Pin, Star, X, XCircle } from 'lucide-react';
+import { Check, CheckCircle2, Copy, ImageIcon, Loader2, Pin, ShieldBan, Star, X, XCircle } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -187,6 +187,12 @@ export function ModerationMediaCard({
             <MediaStatusBadge status={media.status as never} />
             <ChannelBadge channel={media.channel as never} />
             <Badge variant="outline">{getOrientationLabel(media.orientation)}</Badge>
+            {media.sender_blocked ? (
+              <Badge variant="outline" className="border-rose-300/60 bg-rose-500/10 text-rose-700 dark:text-rose-300">
+                <ShieldBan className="h-3.5 w-3.5" />
+                Remetente bloqueado
+              </Badge>
+            ) : null}
             {media.is_duplicate_candidate ? (
               <Badge variant="outline" className="border-amber-300/60 bg-amber-500/10 text-amber-700 dark:text-amber-300">
                 <Copy className="h-3.5 w-3.5" />

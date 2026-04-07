@@ -15,6 +15,7 @@ class ListEventsQuery implements QueryInterface
         protected ?int $clientId = null,
         protected ?string $status = null,
         protected ?string $eventType = null,
+        protected ?string $commercialMode = null,
         protected ?string $module = null,
         protected ?string $search = null,
         protected ?string $dateFrom = null,
@@ -48,6 +49,10 @@ class ListEventsQuery implements QueryInterface
 
         if ($this->eventType) {
             $query->where('event_type', $this->eventType);
+        }
+
+        if ($this->commercialMode) {
+            $query->where('commercial_mode', $this->commercialMode);
         }
 
         if ($this->module) {

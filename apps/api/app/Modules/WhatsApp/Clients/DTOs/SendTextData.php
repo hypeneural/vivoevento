@@ -13,6 +13,8 @@ final readonly class SendTextData
      * @param array|null  $mentioned     Array of phone numbers to mention in groups
      * @param int|null    $delayMessage
      * @param int|null    $delayTyping
+     * @param string|null $messageId
+     * @param bool|null   $privateAnswer
      * @param string|null $editMessageId
      */
     public function __construct(
@@ -21,6 +23,8 @@ final readonly class SendTextData
         public ?array $mentioned = null,
         public ?int $delayMessage = null,
         public ?int $delayTyping = null,
+        public ?string $messageId = null,
+        public ?bool $privateAnswer = null,
         public ?string $editMessageId = null,
     ) {}
 

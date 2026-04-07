@@ -11,6 +11,7 @@ use App\Modules\MediaProcessing\Services\MediaAssetUrlService;
 use App\Shared\Exceptions\ProviderMisconfiguredException;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 class OpenAiContentModerationProvider implements ContentModerationProviderInterface
@@ -32,17 +33,13 @@ class OpenAiContentModerationProvider implements ContentModerationProviderInterf
             throw new ProviderMisconfiguredException('OPENAI_API_KEY is not configured for content moderation.');
         }
 
-        $imageUrl = $this->assetUrls->preview($media);
-
-        if (! $imageUrl) {
-            throw new ProviderMisconfiguredException("No public preview URL available for media {$media->id}.");
-        }
+        $imageInput = $this->buildImageInput($media);
 
         $input = [
             [
                 'type' => 'image_url',
                 'image_url' => [
-                    'url' => $imageUrl,
+                    'url' => $imageInput['url'],
                 ],
             ],
         ];
@@ -93,7 +90,20 @@ class OpenAiContentModerationProvider implements ContentModerationProviderInterf
             throw new RuntimeException('OpenAI moderation response did not contain a valid result payload.');
         }
 
-        $categoryScores = $this->mapCategoryScores((array) ($result['category_scores'] ?? []));
+        $providerCategories = $this->normalizeProviderCategories((array) ($result['categories'] ?? []));
+        $providerCategoryScores = $this->normalizeProviderCategoryScores((array) ($result['category_scores'] ?? []));
+        $providerCategoryInputTypes = $this->normalizeProviderCategoryInputTypes((array) ($result['category_applied_input_types'] ?? []));
+        $normalizedProvider = [
+            'flagged' => (bool) ($result['flagged'] ?? false),
+            'categories' => $providerCategories,
+            'category_scores' => $providerCategoryScores,
+            'category_applied_input_types' => $providerCategoryInputTypes,
+            'input_path_used' => $imageInput['path_used'],
+            'input_source_ref' => $imageInput['source_ref'] ?? null,
+            'input_mime_type' => $imageInput['mime_type'] ?? null,
+        ];
+
+        $categoryScores = $this->mapCategoryScores($providerCategoryScores);
         $thresholdDecision = $this->thresholds->evaluate(
             $categoryScores,
             (array) ($settings->hard_block_thresholds_json ?? []),
@@ -110,11 +120,18 @@ class OpenAiContentModerationProvider implements ContentModerationProviderInterf
 
         $common = [
             'categoryScores' => $categoryScores,
+            'providerCategories' => $providerCategories,
+            'providerCategoryScores' => $providerCategoryScores,
+            'providerCategoryInputTypes' => $providerCategoryInputTypes,
+            'normalizedProvider' => $normalizedProvider,
             'reasonCodes' => array_values(array_unique($reasonCodes)),
             'rawResponse' => [
                 'id' => $payload['id'] ?? null,
                 'model' => $payload['model'] ?? ($config['model'] ?? 'omni-moderation-latest'),
                 'results' => $payload['results'] ?? [],
+                'input_path_used' => $imageInput['path_used'],
+                'input_source_ref' => $imageInput['source_ref'] ?? null,
+                'input_mime_type' => $imageInput['mime_type'] ?? null,
             ],
             'providerKey' => 'openai',
             'providerVersion' => (string) ($config['provider_version'] ?? 'openai-http-v1'),
@@ -161,5 +178,136 @@ class OpenAiContentModerationProvider implements ContentModerationProviderInterf
         return is_numeric($value)
             ? round((float) $value, 6)
             : 0.0;
+    }
+
+    /**
+     * @return array{url:string,path_used:string,source_ref:string,mime_type:string|null}
+     */
+    private function buildImageInput(EventMedia $media): array
+    {
+        $imageUrl = $this->assetUrls->preview($media);
+
+        if (is_string($imageUrl) && $imageUrl !== '') {
+            return [
+                'url' => $imageUrl,
+                'path_used' => 'image_url',
+                'source_ref' => $imageUrl,
+                'mime_type' => null,
+            ];
+        }
+
+        [$disk, $path, $binary, $mimeType] = $this->loadFallbackBinary($media);
+
+        return [
+            'url' => $this->toDataUrl($binary, $mimeType),
+            'path_used' => 'data_url',
+            'source_ref' => "{$disk}:{$path}",
+            'mime_type' => $mimeType,
+        ];
+    }
+
+    /**
+     * @return array{0:string,1:string,2:string,3:string}
+     */
+    private function loadFallbackBinary(EventMedia $media): array
+    {
+        $media->loadMissing('variants');
+
+        foreach (['fast_preview', 'gallery', 'wall', 'thumb'] as $variantKey) {
+            $variant = $media->variants->firstWhere('variant_key', $variantKey);
+            $disk = $variant?->disk ?: 'public';
+            $path = $variant?->path;
+
+            if ($path && Storage::disk($disk)->exists($path)) {
+                return [
+                    $disk,
+                    $path,
+                    Storage::disk($disk)->get($path),
+                    $this->resolveImageMimeType($variant?->mime_type, $media->mime_type),
+                ];
+            }
+        }
+
+        $disk = $media->originalStorageDisk();
+        $path = $media->originalStoragePath();
+
+        if ($path && Storage::disk($disk)->exists($path)) {
+            return [
+                $disk,
+                $path,
+                Storage::disk($disk)->get($path),
+                $this->resolveImageMimeType($media->mime_type),
+            ];
+        }
+
+        throw new ProviderMisconfiguredException("No public preview URL or local fallback asset available for media {$media->id}.");
+    }
+
+    private function toDataUrl(string $binary, string $mimeType): string
+    {
+        return sprintf('data:%s;base64,%s', $mimeType, base64_encode($binary));
+    }
+
+    private function resolveImageMimeType(?string ...$candidates): string
+    {
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate) && str_starts_with($candidate, 'image/')) {
+                return $candidate;
+            }
+        }
+
+        return 'image/jpeg';
+    }
+
+    /**
+     * @param array<string, mixed> $providerCategories
+     * @return array<string, bool>
+     */
+    private function normalizeProviderCategories(array $providerCategories): array
+    {
+        $normalized = [];
+
+        foreach ($providerCategories as $key => $value) {
+            $normalized[(string) $key] = (bool) $value;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $providerScores
+     * @return array<string, float>
+     */
+    private function normalizeProviderCategoryScores(array $providerScores): array
+    {
+        $normalized = [];
+
+        foreach ($providerScores as $key => $value) {
+            $normalized[(string) $key] = is_numeric($value)
+                ? round((float) $value, 6)
+                : 0.0;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string, mixed> $providerInputTypes
+     * @return array<string, array<int, string>>
+     */
+    private function normalizeProviderCategoryInputTypes(array $providerInputTypes): array
+    {
+        $normalized = [];
+
+        foreach ($providerInputTypes as $key => $value) {
+            $types = array_values(array_filter(array_map(
+                static fn (mixed $item): ?string => is_string($item) ? $item : null,
+                Arr::wrap($value),
+            )));
+
+            $normalized[(string) $key] = $types;
+        }
+
+        return $normalized;
     }
 }

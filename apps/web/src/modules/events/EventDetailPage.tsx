@@ -26,10 +26,11 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import type { ApiEventCommercialStatus, ApiEventDetail, ApiEventMediaItem } from '@/lib/api-types';
+import { resolveSenderBlockExpiration } from '@/lib/sender-blocking';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { EventStatusBadge, MediaStatusBadge, ChannelBadge } from '@/shared/components/StatusBadges';
 import { StatsCard } from '@/shared/components/StatsCard';
-import { EVENT_TYPE_LABELS, type EventStatus, type EventType } from '@/shared/types';
+import { EVENT_TYPE_LABELS, type EventStatus, type EventType, type MediaChannel, type MediaStatus } from '@/shared/types';
 import { usePermissions } from '@/shared/hooks/usePermissions';
 import {
   EVENT_COMMERCIAL_MODE_HINTS,
@@ -39,24 +40,34 @@ import {
 } from './types';
 
 import {
+  deleteEventIntakeBlacklistEntry,
   getEventCommercialStatus,
   getEventDetail,
   listEventMedia,
   regenerateEventPublicIdentifiers,
+  upsertEventIntakeBlacklistEntry,
   updateEventPublicIdentifiers,
 } from './api';
 import { EventContentModerationSettingsCard } from './components/content-moderation/EventContentModerationSettingsCard';
+import { EventSenderDirectoryCard } from './components/EventSenderDirectoryCard';
 import { EventFaceSearchSettingsCard } from './components/face-search/EventFaceSearchSettingsCard';
 import { EventMediaIntelligenceSettingsCard } from './components/media-intelligence/EventMediaIntelligenceSettingsCard';
 import { PublicLinkCard } from './components/PublicLinkCard';
 import { EventFaceSearchSearchCard } from '@/modules/face-search/components/EventFaceSearchSearchCard';
 
 const MODULE_CARD_CONFIG = [
-  { key: 'live', name: 'Live', icon: Image },
-  { key: 'wall', name: 'Wall', icon: Monitor },
-  { key: 'play', name: 'Play', icon: Gamepad2 },
-  { key: 'hub', name: 'Hub', icon: Globe },
+  { key: 'live', name: 'Galeria ao vivo', icon: Image },
+  { key: 'wall', name: 'Telao', icon: Monitor },
+  { key: 'play', name: 'Jogos', icon: Gamepad2 },
+  { key: 'hub', name: 'Links', icon: Globe },
 ] as const;
+
+const TAB_LABEL_OVERRIDES: Record<string, string> = {
+  wall: 'Telao',
+  play: 'Jogos',
+  hub: 'Links',
+  analytics: 'Relatorios',
+};
 
 const TAB_PERMISSION_CHECKS: Record<string, (can: (permission: string) => boolean) => boolean> = {
   overview: () => true,
@@ -84,6 +95,21 @@ function formatDateRange(event: ApiEventDetail) {
 
 function filterPublished(media: ApiEventMediaItem[]) {
   return media.filter((item) => item.status === 'published' || item.status === 'approved');
+}
+
+function formatWallStatus(status?: string | null) {
+  switch (status) {
+    case 'live':
+      return 'Ao vivo';
+    case 'paused':
+      return 'Pausado';
+    case 'stopped':
+      return 'Parado';
+    case 'expired':
+      return 'Encerrado';
+    default:
+      return 'Nao iniciado';
+  }
 }
 
 type EventResolvedEntitlements = {
@@ -261,13 +287,13 @@ export default function EventDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ['event-detail', id] });
       toast({
         title: 'Links atualizados',
-        description: 'Os slugs publicos foram salvos com sucesso.',
+        description: 'Os enderecos publicos foram salvos com sucesso.',
       });
     },
     onError: (error: Error) => {
       toast({
         title: 'Falha ao salvar',
-        description: error.message || 'Nao foi possivel atualizar os links publicos.',
+        description: error.message || 'Nao foi possivel atualizar os enderecos publicos.',
         variant: 'destructive',
       });
     },
@@ -292,6 +318,51 @@ export default function EventDetailPage() {
     },
   });
 
+  const senderBlacklistMutation = useMutation({
+    mutationFn: (payload: {
+      sender: NonNullable<ApiEventDetail['intake_blacklist']>['senders'][number];
+      checked: boolean;
+      duration: string;
+    }) => {
+      if (!id) {
+        throw new Error('Evento invalido para bloquear remetente.');
+      }
+
+      if (payload.checked) {
+        return upsertEventIntakeBlacklistEntry(id, {
+          identity_type: payload.sender.recommended_identity_type,
+          identity_value: payload.sender.recommended_identity_value,
+          normalized_phone: payload.sender.recommended_normalized_phone ?? payload.sender.sender_phone ?? null,
+          reason: 'Bloqueado pelo detalhe do evento',
+          expires_at: resolveSenderBlockExpiration(payload.duration),
+          is_active: true,
+        });
+      }
+
+      if (!payload.sender.blocking_entry_id) {
+        throw new Error('Nao existe um bloqueio ativo para remover desse remetente.');
+      }
+
+      return deleteEventIntakeBlacklistEntry(id, payload.sender.blocking_entry_id);
+    },
+    onSuccess: async (_response, payload) => {
+      await queryClient.invalidateQueries({ queryKey: ['event-detail', id] });
+      toast({
+        title: payload.checked ? 'Remetente bloqueado' : 'Remetente desbloqueado',
+        description: payload.checked
+          ? 'O remetente deixa de abrir sessao e de injetar novas midias no evento.'
+          : 'O remetente voltou a ficar apto para enviar novas midias ao evento.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Falha ao atualizar blacklist do evento',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const eventMedia = mediaQuery.data?.data ?? [];
   const publishedMedia = filterPublished(eventMedia);
   const shareLinks = event?.public_links ? Object.values(event.public_links).filter((link) => link.enabled) : [];
@@ -299,6 +370,7 @@ export default function EventDetailPage() {
     commercialStatus?.resolved_entitlements ?? event?.current_entitlements ?? null
   ) as EventResolvedEntitlements | null;
   const primaryCommercialSource = getPrimaryCommercialSource(commercialStatus);
+  const canManageEvent = can('events.update');
 
   function copyToClipboard(value: string, label: string) {
     navigator.clipboard.writeText(value);
@@ -393,12 +465,12 @@ export default function EventDetailPage() {
 
           <div className="grid min-w-[220px] gap-3 sm:grid-cols-2 md:grid-cols-1">
             <div className="rounded-3xl border border-white/15 bg-white/10 p-4 backdrop-blur">
-              <p className="text-xs uppercase tracking-[0.16em] text-white/60">Slug publico</p>
-              <p className="mt-2 font-mono text-sm text-white">{event.public_identifiers.slug.value || '—'}</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-white/60">Endereco publico</p>
+              <p className="mt-2 font-mono text-sm text-white">{event.public_identifiers.slug.value || 'Nao gerado'}</p>
             </div>
             <div className="rounded-3xl border border-white/15 bg-white/10 p-4 backdrop-blur">
-              <p className="text-xs uppercase tracking-[0.16em] text-white/60">Slug de envio</p>
-              <p className="mt-2 font-mono text-sm text-white">{event.public_identifiers.upload_slug.value || '—'}</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-white/60">Endereco de envio</p>
+              <p className="mt-2 font-mono text-sm text-white">{event.public_identifiers.upload_slug.value || 'Nao gerado'}</p>
             </div>
           </div>
         </div>
@@ -462,7 +534,7 @@ export default function EventDetailPage() {
         <TabsList className="flex h-auto flex-wrap gap-2 bg-muted/50 p-1">
           {visibleTabs.map((tab) => (
             <TabsTrigger key={tab.key} value={tab.key}>
-              {tab.label}
+              {TAB_LABEL_OVERRIDES[tab.key] ?? tab.label}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -508,12 +580,12 @@ export default function EventDetailPage() {
 
           <Card className="border-white/70 bg-white/90 shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Gestao de identificadores publicos</CardTitle>
+              <CardTitle className="text-base">Gestao de enderecos publicos</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4">
               <div className="grid gap-4 lg:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Slug publico</label>
+                  <label className="text-sm font-medium">Endereco publico</label>
                   <Input value={slug} onChange={(evt) => setSlug(evt.target.value)} placeholder="casamento-ana-e-pedro" />
                   <div className="flex gap-2">
                     <Button
@@ -529,7 +601,7 @@ export default function EventDetailPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Slug de envio publico</label>
+                  <label className="text-sm font-medium">Endereco de envio</label>
                   <Input value={uploadSlug} onChange={(evt) => setUploadSlug(evt.target.value)} placeholder="envio-casamento" />
                   <div className="flex gap-2">
                     <Button
@@ -549,9 +621,9 @@ export default function EventDetailPage() {
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-sm font-medium">Codigo do wall</p>
+                      <p className="text-sm font-medium">Codigo do telao</p>
                       <p className="mt-1 font-mono text-sm text-muted-foreground">
-                        {event.public_identifiers.wall_code.value || '—'}
+                        {event.public_identifiers.wall_code.value || 'Nao gerado'}
                       </p>
                     </div>
                     <Button
@@ -577,7 +649,7 @@ export default function EventDetailPage() {
                   ) : (
                     <Save className="mr-1.5 h-4 w-4" />
                   )}
-                  Salvar identificadores
+                  Salvar enderecos
                 </Button>
               </div>
             </CardContent>
@@ -610,8 +682,8 @@ export default function EventDetailPage() {
                       </div>
                       <div className="space-y-1">
                         <div className="flex items-center justify-between gap-2">
-                          <ChannelBadge channel={media.channel as any} />
-                          <MediaStatusBadge status={media.status as any} />
+                          <ChannelBadge channel={media.channel as MediaChannel} />
+                          <MediaStatusBadge status={media.status as MediaStatus} />
                         </div>
                         <p className="truncate text-xs text-muted-foreground">{media.sender_name}</p>
                       </div>
@@ -624,44 +696,58 @@ export default function EventDetailPage() {
         </TabsContent>
 
         <TabsContent value="uploads" className="mt-6">
-          <Card className="border-white/70 bg-white/90 shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Uploads do evento</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {!canSeeMedia ? (
-                <p className="text-sm text-muted-foreground">Seu perfil nao possui acesso a este modulo.</p>
-              ) : mediaQuery.isLoading ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Carregando uploads...
-                </div>
-              ) : eventMedia.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhuma midia recebida ate o momento.</p>
-              ) : (
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
-                  {eventMedia.map((media) => (
-                    <div key={media.id} className="space-y-2">
-                      <div className="overflow-hidden rounded-2xl bg-slate-100">
-                        {media.thumbnail_url ? (
-                          <img src={media.thumbnail_url} alt={media.caption || media.sender_name} className="h-32 w-full object-cover" />
-                        ) : (
-                          <div className="flex h-32 items-center justify-center text-xs text-muted-foreground">Sem preview</div>
-                        )}
-                      </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <ChannelBadge channel={media.channel as any} />
-                          <MediaStatusBadge status={media.status as any} />
+          <div className="space-y-6">
+            <Card className="border-white/70 bg-white/90 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Uploads do evento</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!canSeeMedia ? (
+                  <p className="text-sm text-muted-foreground">Seu perfil nao possui acesso a este modulo.</p>
+                ) : mediaQuery.isLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Carregando uploads...
+                  </div>
+                ) : eventMedia.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nenhuma midia recebida ate o momento.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
+                    {eventMedia.map((media) => (
+                      <div key={media.id} className="space-y-2">
+                        <div className="overflow-hidden rounded-2xl bg-slate-100">
+                          {media.thumbnail_url ? (
+                            <img src={media.thumbnail_url} alt={media.caption || media.sender_name} className="h-32 w-full object-cover" />
+                          ) : (
+                            <div className="flex h-32 items-center justify-center text-xs text-muted-foreground">Sem preview</div>
+                          )}
                         </div>
-                        <p className="truncate text-xs text-muted-foreground">{media.sender_name}</p>
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <ChannelBadge channel={media.channel as MediaChannel} />
+                            <MediaStatusBadge status={media.status as MediaStatus} />
+                          </div>
+                          <p className="truncate text-xs text-muted-foreground">{media.sender_name}</p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {event?.intake_blacklist ? (
+              <EventSenderDirectoryCard
+                eventId={event.id}
+                senders={event.intake_blacklist.senders}
+                canManageBlacklist={canManageEvent}
+                isBusy={(sender) => senderBlacklistMutation.isPending
+                  && senderBlacklistMutation.variables?.sender.recommended_identity_type === sender.recommended_identity_type
+                  && senderBlacklistMutation.variables?.sender.recommended_identity_value === sender.recommended_identity_value}
+                onToggleBlock={(sender, checked, duration) => senderBlacklistMutation.mutate({ sender, checked, duration })}
+              />
+            ) : null}
+          </div>
         </TabsContent>
 
         <TabsContent value="moderation" className="mt-6">
@@ -784,24 +870,24 @@ export default function EventDetailPage() {
               {event.public_links.wall.enabled ? (
                 <PublicLinkCard link={event.public_links.wall} onCopy={copyToClipboard} />
               ) : (
-                <p className="text-sm text-muted-foreground">O wall ainda nao esta disponivel para este evento.</p>
+                <p className="text-sm text-muted-foreground">O telao ainda nao esta disponivel para este evento.</p>
               )}
 
               <div className="grid gap-4 md:grid-cols-3">
-                <StatsCard title="Status" value={event.wall?.status || 'draft'} icon={Monitor} />
-                <StatsCard title="Codigo" value={event.wall?.wall_code || '—'} icon={Settings} />
-                <StatsCard title="Publicacao" value={event.public_links.wall.enabled ? 'Pronta' : 'Pendente'} icon={Link2} />
+                <StatsCard title="Situacao" value={formatWallStatus(event.wall?.status)} icon={Monitor} />
+                <StatsCard title="Codigo do telao" value={event.wall?.wall_code || 'Nao gerado'} icon={Settings} />
+                <StatsCard title="Link publico" value={event.public_links.wall.enabled ? 'Pronto' : 'Pendente'} icon={Link2} />
               </div>
 
               <div className="flex flex-wrap gap-2">
                 <Button asChild>
-                  <Link to={`/events/${event.id}/wall`}>Gerenciar wall</Link>
+                  <Link to={`/events/${event.id}/wall`}>Configurar telao</Link>
                 </Button>
                 {event.wall?.public_url ? (
                   <Button asChild variant="outline">
                     <a href={event.wall.public_url} target="_blank" rel="noreferrer">
                       <ExternalLink className="mr-1.5 h-4 w-4" />
-                      Abrir player
+                      Abrir telao
                     </a>
                   </Button>
                 ) : null}
@@ -814,9 +900,9 @@ export default function EventDetailPage() {
           <Card className="border-white/70 bg-white/90 shadow-sm">
             <CardContent className="space-y-4 p-6">
               <div className="grid gap-4 md:grid-cols-3">
-                <StatsCard title="Play ativo" value={event.play?.is_enabled ? 'Sim' : 'Nao'} icon={Gamepad2} />
-                <StatsCard title="Memoria" value={event.play?.memory_enabled ? 'Ativo' : 'Inativo'} icon={Image} />
-                <StatsCard title="Puzzle" value={event.play?.puzzle_enabled ? 'Ativo' : 'Inativo'} icon={Settings} />
+                <StatsCard title="Jogos ativos" value={event.play?.is_enabled ? 'Sim' : 'Nao'} icon={Gamepad2} />
+                <StatsCard title="Jogo da memoria" value={event.play?.memory_enabled ? 'Ativo' : 'Inativo'} icon={Image} />
+                <StatsCard title="Quebra-cabeca" value={event.play?.puzzle_enabled ? 'Ativo' : 'Inativo'} icon={Settings} />
               </div>
 
               {event.public_links.play.enabled ? (
@@ -839,12 +925,12 @@ export default function EventDetailPage() {
           <Card className="border-white/70 bg-white/90 shadow-sm">
             <CardContent className="space-y-4 p-6">
               <div className="grid gap-4 md:grid-cols-2">
-                <StatsCard title="Hub publico" value={event.hub?.is_enabled ? 'Ativo' : 'Inativo'} icon={Globe} />
-                <StatsCard title="Acoes visiveis" value={[
+                <StatsCard title="Pagina de links ativa" value={event.hub?.is_enabled ? 'Ativa' : 'Inativa'} icon={Globe} />
+                <StatsCard title="Acessos visiveis" value={[
                   event.hub?.show_gallery_button ? 'Galeria' : null,
                   event.hub?.show_upload_button ? 'Upload' : null,
-                  event.hub?.show_wall_button ? 'Wall' : null,
-                  event.hub?.show_play_button ? 'Play' : null,
+                  event.hub?.show_wall_button ? 'Telao' : null,
+                  event.hub?.show_play_button ? 'Jogos' : null,
                 ].filter(Boolean).length} icon={Link2} />
               </div>
             </CardContent>

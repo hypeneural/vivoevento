@@ -187,6 +187,8 @@ class ZApiWhatsAppProvider implements WhatsAppProviderInterface
             'mentioned' => $data->mentioned,
             'delayMessage' => $data->delayMessage,
             'delayTyping' => $data->delayTyping,
+            'messageId' => $data->messageId,
+            'privateAnswer' => $data->privateAnswer,
             'editMessageId' => $data->editMessageId,
         ], fn ($v) => $v !== null);
 

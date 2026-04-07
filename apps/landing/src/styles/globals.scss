@@ -81,6 +81,54 @@ p {
 .section-shell {
   @include section-padding;
   position: relative;
+  isolation: isolate;
+}
+
+.section-shell::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: min(92vw, 1180px);
+  height: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, rgba($c-accent-secondary, 0.22), rgba($c-accent, 0.14), transparent);
+  opacity: 0.9;
+}
+
+.section-shell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 12%, rgba($c-accent, 0.08), transparent 26%),
+    radial-gradient(circle at 86% 18%, rgba($c-accent-warm, 0.08), transparent 28%);
+  opacity: 0.78;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.section-shell > .container {
+  position: relative;
+  z-index: 1;
+}
+
+section[id].section-shell > .container::after {
+  content: '';
+  position: absolute;
+  left: 0.8rem;
+  right: 0.8rem;
+  top: -0.25rem;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba($c-accent, 0.24), rgba($c-accent-warm, 0.18), transparent);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.section-shell:nth-of-type(even)::after {
+  background:
+    radial-gradient(circle at 82% 10%, rgba($c-accent-secondary, 0.08), transparent 28%),
+    radial-gradient(circle at 16% 22%, rgba($c-accent-warm, 0.08), transparent 26%);
 }
 
 .eyebrow {
@@ -125,7 +173,8 @@ p {
     border-color 180ms ease,
     background 180ms ease,
     box-shadow 180ms ease,
-    color 180ms ease;
+    color 180ms ease,
+    opacity 180ms ease;
 }
 
 .button:hover {
@@ -147,6 +196,13 @@ p {
   border-color: rgba($c-accent-warm, 0.22);
   background: rgba($c-accent-warm, 0.08);
   color: $c-accent-warm;
+}
+
+.button:focus-visible,
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid rgba($c-accent, 0.78);
+  outline-offset: 2px;
 }
 
 .muted-copy {
@@ -176,5 +232,19 @@ p {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+@media (max-width: 719px) {
+  .section-shell {
+    padding: 3.2rem 0;
+  }
+
+  .section-title {
+    font-size: clamp(1.95rem, 8vw, 2.75rem);
+  }
+
+  .section-lead {
+    font-size: 0.98rem;
   }
 }

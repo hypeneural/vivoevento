@@ -97,16 +97,10 @@ log "Repointing current to $target_dir"
 ln -sfn "$target_dir" "$APP_ROOT/current"
 
 log "Recycling long-lived processes"
-(
-    cd "$APP_ROOT/current/apps/api"
-    "$PHP_BIN" artisan horizon:terminate || true
-    "$PHP_BIN" artisan reverb:restart || true
-)
-
 run_systemctl reload php8.3-fpm
 run_systemctl reload nginx
-run_systemctl restart eventovivo-horizon
-run_systemctl restart eventovivo-reverb
+run_systemctl reload eventovivo-horizon
+run_systemctl reload eventovivo-reverb
 
 if [[ "$RUN_SMOKE_TEST" == "1" ]]; then
     "$SCRIPT_DIR/smoke-test.sh"

@@ -62,6 +62,9 @@ it('returns the public wall boot payload with media settings and sender identity
         'source_type' => 'whatsapp',
         'caption' => 'Foto principal',
         'duplicate_group_key' => 'dup-group-001',
+        'original_filename' => 'original-photo.jpg',
+        'width' => 1080,
+        'height' => 1920,
     ]);
 
     EventMediaVariant::query()->create([
@@ -96,5 +99,10 @@ it('returns the public wall boot payload with media settings and sender identity
         ->assertJsonPath('data.files.0.sender_key', 'whatsapp:5511999999999')
         ->assertJsonPath('data.files.0.source_type', 'whatsapp')
         ->assertJsonPath('data.files.0.duplicate_cluster_key', 'dup-group-001')
-        ->assertJsonPath('data.files.0.caption', 'Foto principal');
+        ->assertJsonPath('data.files.0.caption', 'Foto principal')
+        ->assertJsonPath('data.files.0.url', rtrim((string) config('app.url'), '/')."/storage/wall/{$media->id}.jpg")
+        ->assertJsonPath('data.files.0.original_url', rtrim((string) config('app.url'), '/')."/storage/events/{$domainEvent->id}/originals/original-photo.jpg")
+        ->assertJsonPath('data.files.0.width', 1080)
+        ->assertJsonPath('data.files.0.height', 1920)
+        ->assertJsonPath('data.files.0.orientation', 'vertical');
 });

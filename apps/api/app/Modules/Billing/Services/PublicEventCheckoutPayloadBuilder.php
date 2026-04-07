@@ -2,7 +2,9 @@
 
 namespace App\Modules\Billing\Services;
 
+use App\Modules\Billing\Enums\BillingOrderNotificationType;
 use App\Modules\Billing\Models\BillingOrder;
+use App\Modules\Billing\Models\BillingOrderNotification;
 use App\Modules\Events\Support\EventCommercialStatusService;
 
 class PublicEventCheckoutPayloadBuilder
@@ -23,6 +25,7 @@ class PublicEventCheckoutPayloadBuilder
             'items.eventPackage.features',
             'payments',
             'purchases.package',
+            'notifications',
         ]);
 
         $event = $extra['event'] ?? $order->event?->fresh(['organization', 'modules']);
@@ -30,6 +33,8 @@ class PublicEventCheckoutPayloadBuilder
         $primaryItem = $order->items->first();
         $gateway = (array) ($order->metadata_json['gateway'] ?? []);
         $requestedPayment = (array) ($order->metadata_json['payment'] ?? []);
+        $notifications = $order->notifications
+            ->sortByDesc(fn ($notification) => sprintf('%015d-%015d', $notification->updated_at?->timestamp ?? 0, $notification->id));
         $latestPayment = $order->payments
             ->sortByDesc(fn ($payment) => sprintf('%015d-%015d', $payment->updated_at?->timestamp ?? 0, $payment->id))
             ->first();
@@ -102,6 +107,20 @@ class PublicEventCheckoutPayloadBuilder
                             ?? $order->gateway_status
                             ?? ($gateway['status'] ?? null),
                     ] : null,
+                    'whatsapp' => [
+                        'pix_generated' => $this->serializeNotification(
+                            $notifications->firstWhere('notification_type', BillingOrderNotificationType::PixGenerated),
+                        ),
+                        'payment_paid' => $this->serializeNotification(
+                            $notifications->firstWhere('notification_type', BillingOrderNotificationType::PaymentPaid),
+                        ),
+                        'payment_failed' => $this->serializeNotification(
+                            $notifications->firstWhere('notification_type', BillingOrderNotificationType::PaymentFailed),
+                        ),
+                        'payment_refunded' => $this->serializeNotification(
+                            $notifications->firstWhere('notification_type', BillingOrderNotificationType::PaymentRefunded),
+                        ),
+                    ],
                     'meta' => $gateway['meta'] ?? [],
                 ],
                 'package' => $primaryItem?->snapshot_json['package'] ?? null,
@@ -125,6 +144,28 @@ class PublicEventCheckoutPayloadBuilder
                 'purchased_at' => $purchase->purchased_at?->toISOString(),
             ] : null,
             'onboarding' => $extra['onboarding'] ?? null,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function serializeNotification(?BillingOrderNotification $notification): ?array
+    {
+        if (! $notification) {
+            return null;
+        }
+
+        return [
+            'type' => $notification->notification_type?->value,
+            'status' => $notification->status,
+            'recipient_phone' => $notification->recipient_phone,
+            'dispatched_at' => $notification->dispatched_at?->toISOString(),
+            'failed_at' => $notification->failed_at?->toISOString(),
+            'whatsapp_message_id' => $notification->whatsapp_message_id,
+            'pix_button_message_id' => data_get($notification->context_json, 'delivery.pix_button_message_id'),
+            'pix_button_enabled' => data_get($notification->context_json, 'delivery.pix_button_enabled'),
+            'pix_button_value_source' => data_get($notification->context_json, 'delivery.pix_button_value_source'),
         ];
     }
 }

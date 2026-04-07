@@ -14,6 +14,8 @@ use App\Modules\Events\Http\Resources\EventResource;
 use App\Modules\Events\Models\Event;
 use App\Modules\Events\Queries\ListEventsQuery;
 use App\Modules\Events\Support\EventCommercialStatusService;
+use App\Modules\Events\Support\EventIntakeBlacklistStateBuilder;
+use App\Modules\Events\Support\EventIntakeChannelsStateBuilder;
 use App\Modules\Events\Support\EventPublicLinksService;
 use App\Shared\Http\BaseController;
 use Illuminate\Http\JsonResponse;
@@ -32,6 +34,7 @@ class EventController extends BaseController
             clientId: $validated['client_id'] ?? null,
             status: $validated['status'] ?? null,
             eventType: $validated['event_type'] ?? null,
+            commercialMode: $validated['commercial_mode'] ?? null,
             module: $validated['module'] ?? null,
             search: $validated['search'] ?? null,
             dateFrom: $validated['date_from'] ?? null,
@@ -51,6 +54,8 @@ class EventController extends BaseController
         StoreEventRequest $request,
         CreateEventAction $action,
         EventPublicLinksService $links,
+        EventIntakeChannelsStateBuilder $intakeStateBuilder,
+        EventIntakeBlacklistStateBuilder $blacklistStateBuilder,
     ): JsonResponse {
         $this->authorize('create', Event::class);
 
@@ -58,6 +63,8 @@ class EventController extends BaseController
             $action->execute($request->validated(), $request->user()->id)
         );
         $payload = $links->links($event);
+        $intakeState = $intakeStateBuilder->build($event);
+        $blacklistState = $blacklistStateBuilder->build($event);
 
         return $this->success([
             'id' => $event->id,
@@ -67,6 +74,9 @@ class EventController extends BaseController
             'moderation_mode' => $event->moderation_mode?->value,
             'commercial_mode' => $event->commercial_mode?->value,
             'current_entitlements' => $event->current_entitlements_json,
+            'intake_defaults' => $intakeState['intake_defaults'],
+            'intake_channels' => $intakeState['intake_channels'],
+            'intake_blacklist' => $blacklistState['intake_blacklist'],
             'face_search' => $event->faceSearchSettings ? [
                 'id' => $event->faceSearchSettings->id,
                 'event_id' => $event->faceSearchSettings->event_id,
@@ -110,6 +120,9 @@ class EventController extends BaseController
             'organization',
             'modules',
             'channels',
+            'defaultWhatsAppInstance',
+            'whatsappGroupBindings',
+            'mediaSenderBlacklists',
             'banners',
             'client',
             'teamMembers.user:id,name,email',
@@ -157,7 +170,12 @@ class EventController extends BaseController
             ->withProperties(['event_id' => $event->id])
             ->log('Evento atualizado');
 
-        return $this->success(new EventResource($event->fresh()->load(['modules', 'faceSearchSettings', 'mediaIntelligenceSettings'])->loadCount('media')));
+        return $this->success(new EventResource(
+            $event->fresh()
+                ->load(['modules', 'faceSearchSettings', 'mediaIntelligenceSettings', 'channels', 'defaultWhatsAppInstance', 'whatsappGroupBindings'])
+                ->load(['mediaSenderBlacklists'])
+                ->loadCount('media')
+        ));
     }
 
     public function destroy(Event $event): JsonResponse

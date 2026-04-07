@@ -2,6 +2,7 @@
 
 namespace App\Modules\Dashboard\Queries;
 
+use App\Modules\MediaProcessing\Enums\MediaProcessingStatus;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -46,7 +47,8 @@ class KpiAggregatesQuery
 
             $selects[] = "(SELECT COUNT(*) FROM event_media WHERE event_id IN {$orgEventsSubquery} AND moderation_status = 'pending') AS pending_moderation";
 
-            $selects[] = "(SELECT COUNT(*) FROM event_media WHERE event_id IN {$orgEventsSubquery} AND processing_status = 'error') AS processing_errors";
+            $selects[] = "(SELECT COUNT(*) FROM event_media WHERE event_id IN {$orgEventsSubquery} AND processing_status = ?) AS processing_errors";
+            $bindings[] = MediaProcessingStatus::Failed->value;
         }
 
         // play_game_sessions

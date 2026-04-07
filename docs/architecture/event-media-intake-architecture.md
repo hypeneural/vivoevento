@@ -31,6 +31,8 @@ Regra esperada:
 - o grupo precisa estar vinculado a um evento;
 - o vinculo deve usar o `phone`/`group_external_id` que a Z-API manda no
   callback;
+- o vinculo pode nascer no painel ou por comando dentro do proprio grupo;
+- para isso funcionar, o telefone da instancia precisa estar dentro do grupo;
 - toda midia valida que chegar nesse grupo entra no intake do evento;
 - a reacao e a resposta precisam acontecer no contexto do grupo e da mensagem original.
 
@@ -57,6 +59,12 @@ Regra esperada:
 - essa sessao precisa expirar;
 - a Nany deve confirmar a ativacao.
 
+Observacao de produto:
+
+- o codigo de DM nao deve ser o mesmo codigo usado para vincular grupo;
+- grupo e DM tem superficies de exposicao diferentes e pedem segredos
+  independentes.
+
 ### 3. Upload por pagina/link
 
 Cenario:
@@ -81,6 +89,8 @@ Hoje o repositorio esta assim:
 - o fluxo "grupo WhatsApp -> evento -> galeria" ainda nao esta fechado;
 - o fluxo "conversa privada por codigo" ainda nao existe;
 - a automacao da Nany existe so parcialmente: ha job de reacao automatica, mas ele nao esta ligado ao evento inbound e ainda usa alvo errado para mensagens de grupo.
+- nao existe blacklist por evento para bloquear remetentes por `phone` ou
+  `@lid`.
 
 Conclusao curta:
 
@@ -737,6 +747,14 @@ Modelo sugerido:
   - `config_json`
 - `whatsapp_group_bindings` vira extensao operacional ou e gradualmente migrado.
 
+Melhoria adicional necessaria:
+
+- o evento precisa poder apontar uma `default_whatsapp_instance_id`;
+- essa instancia continua sendo um recurso da organizacao;
+- o evento apenas referencia a instancia a ser usada no intake;
+- isso permite modo compartilhado ou dedicado por evento sem quebrar o modelo
+  atual de `whatsapp_instances`.
+
 Tipos recomendados:
 
 - `whatsapp_group`
@@ -750,6 +768,9 @@ Decisao recomendada:
   travar entrega;
 - no medio prazo, `event_channels` deve virar o registro canonico e os bindings
   de grupo devem apontar para ele ou ser absorvidos por ele.
+- limites de quantidade de grupos, liberacao de DM, Telegram e instancia
+  dedicada devem vir de entitlements comerciais do evento, nao de regra fixa no
+  modulo `WhatsApp`.
 
 ## Regras por cenario
 
@@ -759,10 +780,17 @@ Decisao recomendada:
 
 1. webhook chega;
 2. se `isGroup = true`, resolver `group_external_id`;
-3. localizar binding ativo do grupo;
-4. validar que o binding pertence a um evento apto a receber midia;
-5. criar `InboundMessage`;
-6. se houver midia, criar `event_media` via pipeline.
+3. verificar se a mensagem e um comando `#ATIVAR#<group_bind_code>`;
+4. se for comando:
+   - resolver o evento pelo `group_bind_code`
+   - validar que o evento esta ativo e aceitando grupos
+   - validar blacklist do autor
+   - criar ou reativar binding do grupo para o evento
+   - confirmar o vinculo
+5. se nao for comando, localizar binding ativo do grupo;
+6. validar que o binding pertence a um evento apto a receber midia;
+7. criar `InboundMessage`;
+8. se houver midia, criar `event_media` via pipeline.
 
 ### Regras tecnicas importantes
 
@@ -770,6 +798,10 @@ Decisao recomendada:
 - `phone` ou `chatId` devem ser tratados como identificador do grupo;
 - `sender_key` deve ser o participante normalizado, nao o grupo;
 - `sender_avatar_url` deve vir de `senderPhoto` quando existir;
+- o autovinculo do grupo deve usar um codigo proprio do evento, separado do
+  codigo de DM;
+- o desvinculo do grupo deve existir no CRUD do evento;
+- participante em blacklist nao pode vincular grupo nem injetar midia;
 - a Nany deve reagir no contexto do grupo/chat, nao no telefone do participante.
 
 ### Metadados uteis
@@ -790,9 +822,10 @@ Decisao recomendada:
 2. parser identifica `#CODIGO`;
 3. resolve evento pelo codigo;
 4. valida que o evento esta apto a receber midia;
-5. cria ou atualiza `event_media_ingestion_session`;
-6. envia resposta da Nany confirmando a ativacao;
-7. midias seguintes do mesmo telefone vao para o evento enquanto a sessao estiver ativa.
+5. valida blacklist do remetente;
+6. cria ou atualiza `event_media_ingestion_session`;
+7. envia resposta da Nany confirmando a ativacao;
+8. midias seguintes do mesmo telefone vao para o evento enquanto a sessao estiver ativa.
 
 Melhor chave de sessao:
 
@@ -813,6 +846,7 @@ Campos complementares da sessao:
 - uma mesma conversa pode trocar de evento so com novo codigo;
 - se o evento estiver encerrado, a Nany responde com erro amigavel;
 - se o modulo `live` estiver desligado, nao ativa a sessao.
+- remetente em blacklist nao abre nem renova sessao.
 
 ### Regex inicial sugerida
 
@@ -827,6 +861,30 @@ Normalizacao:
 - uppercase;
 - trim;
 - sem depender de frase fixa.
+
+## Cenario B.1: blacklist de remetentes
+
+### Regra alvo
+
+1. toda mensagem potencialmente elegivel ao evento passa por consulta de
+   blacklist;
+2. o match deve aceitar:
+   - `sender_phone_e164`
+   - `participantPhone`
+   - `sender_external_id`
+   - `participantLid`
+3. se houver match:
+   - nao vincular grupo
+   - nao abrir sessao
+   - nao criar `event_media`
+   - nao disparar feedback automatico
+   - registrar auditoria de bloqueio
+
+### Regra de produto
+
+- a blacklist pertence ao evento;
+- o bloqueio e do autor da mensagem, nao do grupo inteiro;
+- o CRUD do evento precisa permitir remover o bloqueio depois.
 
 ## Cenario C: upload por link e QR
 
@@ -889,6 +947,13 @@ Leitura de produto:
 - o relogio comunica "ja identifiquei seu envio";
 - o coracao comunica "sua foto realmente foi ao ar";
 - as duas reacoes so fazem sentido para midia vinculada a evento ativo.
+
+Fluxo negativo recomendado:
+
+- quando a IA bloquear, o gestor rejeitar manualmente ou a politica do evento
+  barrar o remetente, o sistema deve:
+  - reagir negativamente na mensagem original
+  - responder em thread com `Sua midia nao segue as diretrizes do evento. 🛡️`
 
 ### 2. Resposta em cima da foto
 

@@ -18,5 +18,18 @@ return [
             'model' => 'noop-face-v1',
             'model_snapshot' => 'noop-face-v1',
         ],
+        'compreface' => [
+            'base_url' => env('FACE_SEARCH_COMPRE_FACE_BASE_URL', 'http://localhost:8000'),
+            'api_key' => env('FACE_SEARCH_COMPRE_FACE_API_KEY', ''),
+            'face_plugins' => env('FACE_SEARCH_COMPRE_FACE_FACE_PLUGINS', 'calculator,landmarks'),
+            'det_prob_threshold' => env('FACE_SEARCH_COMPRE_FACE_DET_PROB_THRESHOLD'),
+            'status' => (bool) env('FACE_SEARCH_COMPRE_FACE_STATUS', true),
+            'timeout' => (int) env('FACE_SEARCH_COMPRE_FACE_TIMEOUT', 15),
+            'connect_timeout' => (int) env('FACE_SEARCH_COMPRE_FACE_CONNECT_TIMEOUT', 5),
+            'provider_version' => env('FACE_SEARCH_COMPRE_FACE_PROVIDER_VERSION', 'compreface-rest-v1'),
+            'model' => env('FACE_SEARCH_COMPRE_FACE_MODEL', env('FACE_SEARCH_EMBEDDING_MODEL', 'compreface-face-v1')),
+            'model_snapshot' => env('FACE_SEARCH_COMPRE_FACE_MODEL_SNAPSHOT', ''),
+            'use_base64' => (bool) env('FACE_SEARCH_COMPRE_FACE_USE_BASE64', true),
+        ],
     ],
 ];

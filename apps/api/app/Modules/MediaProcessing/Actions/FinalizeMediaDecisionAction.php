@@ -10,7 +10,7 @@ class FinalizeMediaDecisionAction
 {
     public function execute(EventMedia $media): EventMedia
     {
-        $media->loadMissing('event.faceSearchSettings', 'event.mediaIntelligenceSettings');
+        $media->loadMissing('event.faceSearchSettings', 'event.mediaIntelligenceSettings', 'event.contentModerationSettings');
 
         if (! $media->event) {
             return $media;
@@ -83,7 +83,10 @@ class FinalizeMediaDecisionAction
      */
     private function nextModerationStatus(EventMedia $media, array $updates): ?ModerationStatus
     {
-        $safetyStatus = $updates['safety_status'] ?? $media->safety_status;
+        $safetyStatus = $this->effectiveSafetyStatus(
+            $media,
+            $updates['safety_status'] ?? $media->safety_status,
+        );
         $vlmStatus = $updates['vlm_status'] ?? $media->vlm_status;
 
         if ($media->moderation_status === ModerationStatus::Rejected) {
@@ -130,7 +133,10 @@ class FinalizeMediaDecisionAction
      */
     private function nextDecisionSource(EventMedia $media, array $updates): ?MediaDecisionSource
     {
-        $safetyStatus = $updates['safety_status'] ?? $media->safety_status;
+        $safetyStatus = $this->effectiveSafetyStatus(
+            $media,
+            $updates['safety_status'] ?? $media->safety_status,
+        );
         $vlmStatus = $updates['vlm_status'] ?? $media->vlm_status;
 
         if (
@@ -169,6 +175,19 @@ class FinalizeMediaDecisionAction
             && app(\App\Modules\MediaProcessing\Services\MediaPipelineDegradationPolicy::class)->vlmEnabled()
             && $media->event?->isAiModeration()
             && (bool) ($media->event?->mediaIntelligenceSettings?->enabled ?? false)
-            && ($media->event?->mediaIntelligenceSettings?->mode === 'gate');
+            && ($media->event?->mediaIntelligenceSettings?->mode === 'gate')
+            && in_array($this->effectiveSafetyStatus($media, $media->safety_status), ['pass', 'skipped'], true);
+    }
+
+    private function effectiveSafetyStatus(EventMedia $media, ?string $safetyStatus): ?string
+    {
+        if (
+            $media->event?->isContentModerationObserveOnly()
+            && ! in_array($safetyStatus, [null, 'queued'], true)
+        ) {
+            return 'pass';
+        }
+
+        return $safetyStatus;
     }
 }

@@ -12,20 +12,21 @@
 | 6 | Channels | Ingestao | 2 | Canais de entrada como WhatsApp e link |
 | 7 | InboundMedia | Ingestao | 2 | Recepcao e normalizacao de webhooks |
 | 8 | WhatsApp | Ingestao / Messaging | 2 | Core WhatsApp: instancias, envio, inbound e automacao |
-| 9 | MediaProcessing | Processamento | 2 | Download, variantes, moderacao e publicacao |
-| 10 | ContentModeration | Processamento | 2 | Safety moderation e avaliacoes de risco por foto |
-| 11 | FaceSearch | Processamento | 2 | Configuracao, indexacao facial por evento e base vetorial inicial |
-| 12 | MediaIntelligence | Processamento | 2 | VLM rapido, prompts por evento e historico semantico por foto |
-| 13 | Gallery | Experiencia | 3 | Galeria ao vivo e curadoria |
-| 14 | Wall | Experiencia | 3 | Telao e slideshow realtime |
-| 15 | Play | Experiencia | 4 | Jogos interativos |
-| 16 | Hub | Experiencia | 4 | Pagina central do evento |
-| 17 | Plans | Negocio | 5 | Catalogo de planos |
-| 18 | Billing | Negocio | 5 | Assinaturas e cobrancas |
-| 19 | Partners | Negocio | 5 | Camada B2B para parceiros |
-| 20 | Analytics | Suporte | 5 | Metricas e consolidados |
-| 21 | Audit | Suporte | 5 | Trilha de auditoria |
-| 22 | Notifications | Suporte | 5 | Avisos e alertas |
+| 9 | Telegram | Ingestao / Messaging | 2 | Core Telegram privado: webhook, idempotencia e sessao direta por codigo |
+| 10 | MediaProcessing | Processamento | 2 | Download, variantes, moderacao e publicacao |
+| 11 | ContentModeration | Processamento | 2 | Safety moderation e avaliacoes de risco por foto |
+| 12 | FaceSearch | Processamento | 2 | Configuracao, indexacao facial por evento e base vetorial inicial |
+| 13 | MediaIntelligence | Processamento | 2 | VLM rapido, prompts por evento e historico semantico por foto |
+| 14 | Gallery | Experiencia | 3 | Galeria ao vivo e curadoria |
+| 15 | Wall | Experiencia | 3 | Telao e slideshow realtime |
+| 16 | Play | Experiencia | 4 | Jogos interativos |
+| 17 | Hub | Experiencia | 4 | Pagina central do evento |
+| 18 | Plans | Negocio | 5 | Catalogo de planos |
+| 19 | Billing | Negocio | 5 | Assinaturas e cobrancas |
+| 20 | Partners | Negocio | 5 | Camada B2B para parceiros |
+| 21 | Analytics | Suporte | 5 | Metricas e consolidados |
+| 22 | Audit | Suporte | 5 | Trilha de auditoria |
+| 23 | Notifications | Suporte | 5 | Avisos e alertas |
 
 ## Dependencias entre Modulos
 
@@ -40,6 +41,8 @@ graph TD
     WhatsApp --> Organizations
     WhatsApp --> Events
     WhatsApp --> InboundMedia
+    Telegram --> Events
+    Telegram --> InboundMedia
     MediaProcessing --> InboundMedia
     MediaProcessing --> Events
     ContentModeration --> MediaProcessing

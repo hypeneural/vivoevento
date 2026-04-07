@@ -9,6 +9,7 @@ use App\Modules\MediaProcessing\Enums\ModerationStatus;
 use App\Modules\MediaProcessing\Http\Resources\EventMediaResource;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Queries\ListCatalogMediaQuery;
+use App\Modules\MediaProcessing\Services\EventMediaSenderContextService;
 use App\Shared\Http\BaseController;
 use App\Shared\Support\EventAccessService;
 use Illuminate\Http\JsonResponse;
@@ -45,6 +46,7 @@ class GalleryMediaController extends BaseController
         );
 
         $media = $query->query()->paginate($validated['per_page'] ?? 30);
+        app(EventMediaSenderContextService::class)->hydrateCollection($media->getCollection());
 
         return response()->json([
             'success' => true,
@@ -70,6 +72,7 @@ class GalleryMediaController extends BaseController
             ->orderByDesc('sort_order')
             ->orderByDesc('published_at')
             ->paginate(30);
+        app(EventMediaSenderContextService::class)->hydrateCollection($media->getCollection());
 
         return $this->paginated(EventMediaResource::collection($media));
     }

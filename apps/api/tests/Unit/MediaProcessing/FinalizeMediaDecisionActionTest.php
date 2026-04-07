@@ -90,3 +90,59 @@ it('queues face indexing when face search is enabled for the event', function ()
 
     expect($resolved->face_index_status)->toBe('queued');
 });
+
+it('approves ai moderation when safety is observe_only and returns review', function () {
+    $event = \App\Modules\Events\Models\Event::factory()->active()->create([
+        'moderation_mode' => 'ai',
+    ]);
+
+    \Database\Factories\EventContentModerationSettingFactory::new()->create([
+        'event_id' => $event->id,
+        'mode' => 'observe_only',
+        'enabled' => true,
+    ]);
+
+    $media = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'moderation_status' => ModerationStatus::Pending->value,
+        'safety_status' => 'review',
+        'vlm_status' => 'skipped',
+        'decision_source' => null,
+    ]);
+
+    $resolved = app(FinalizeMediaDecisionAction::class)->execute($media);
+
+    expect($resolved->moderation_status)->toBe(ModerationStatus::Approved)
+        ->and($resolved->decision_source)->toBe(MediaDecisionSource::AiSafety);
+});
+
+it('keeps ai moderation waiting for vlm gate when safety is observe_only and already resolved', function () {
+    $event = \App\Modules\Events\Models\Event::factory()->active()->create([
+        'moderation_mode' => 'ai',
+    ]);
+
+    \Database\Factories\EventContentModerationSettingFactory::new()->create([
+        'event_id' => $event->id,
+        'mode' => 'observe_only',
+        'enabled' => true,
+    ]);
+
+    \Database\Factories\EventMediaIntelligenceSettingFactory::new()->gate()->create([
+        'event_id' => $event->id,
+        'enabled' => true,
+    ]);
+
+    $media = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'moderation_status' => ModerationStatus::Pending->value,
+        'safety_status' => 'block',
+        'vlm_status' => 'queued',
+        'decision_source' => null,
+    ]);
+
+    $resolved = app(FinalizeMediaDecisionAction::class)->execute($media);
+
+    expect($resolved->moderation_status)->toBe(ModerationStatus::Pending)
+        ->and($resolved->decision_source)->toBe(MediaDecisionSource::AiVlm)
+        ->and($resolved->vlm_status)->toBe('queued');
+});

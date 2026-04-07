@@ -409,7 +409,7 @@ export default function AnalyticsPage() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <PageHeader
-        title={isEventMode ? 'Analytics do Evento' : 'Analytics'}
+        title={isEventMode ? 'Relatorios do Evento' : 'Relatorios'}
         description={isEventMode
           ? `${selectedEvent?.label || eventAnalytics?.event.title || 'Evento selecionado'} · ${periodLabel}`
           : `Visao geral por uso, midia e trafego · ${periodLabel}`}

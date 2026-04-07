@@ -30,8 +30,8 @@ export const PERMISSIONS = {
   HUB_MANAGE: 'hub.manage',
 
   // Business
-  PARTNERS_VIEW: 'partners.view',
-  PARTNERS_MANAGE: 'partners.manage',
+  PARTNERS_VIEW: 'partners.view.any',
+  PARTNERS_MANAGE: 'partners.manage.any',
   CLIENTS_VIEW: 'clients.view',
   CLIENTS_MANAGE: 'clients.manage',
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Events\Http\Controllers\EventController;
+use App\Modules\Events\Http\Controllers\EventIntakeBlacklistController;
 use App\Modules\Events\Http\Controllers\EventStatusController;
 use App\Modules\Events\Http\Controllers\EventBrandingController;
 use App\Modules\Events\Http\Controllers\EventQrController;
@@ -32,4 +33,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Moderation settings
     Route::patch('events/{event}/moderation-settings', [EventController::class, 'updateModerationSettings']);
+    Route::post('events/{event}/intake-blacklist/entries', [EventIntakeBlacklistController::class, 'store']);
+    Route::delete('events/{event}/intake-blacklist/entries/{entry}', [EventIntakeBlacklistController::class, 'destroy']);
 });

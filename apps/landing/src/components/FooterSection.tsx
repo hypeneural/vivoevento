@@ -1,4 +1,4 @@
-import { ArrowUpRight, Instagram, Linkedin, Zap } from "lucide-react";
+import { ArrowUpRight, Instagram, Linkedin, MessageCircle, Zap } from "lucide-react";
 import styles from "./FooterSection.module.scss";
 import { navItems } from "@/data/landing";
 import { siteConfig } from "@/config/site";
@@ -9,68 +9,66 @@ export default function FooterSection() {
 
   return (
     <footer className={styles.footer}>
-      <div className={`container ${styles.grid}`}>
-        <div className={styles.brandColumn}>
-          <div className={styles.logo}>
-            <span className={styles.mark}>
-              <Zap size={18} />
-            </span>
-            <div>
-              <strong>Evento Vivo</strong>
-              <p>Plataforma premium de experiências visuais ao vivo para eventos.</p>
-            </div>
-          </div>
+      <div className={`container ${styles.callout}`}>
+        <div className={styles.copy}>
+          <span className="eyebrow">Feche a operacao com produto visivel</span>
+          <h2>QR, galeria, jogos, telao e IA no mesmo fluxo.</h2>
+          <p>
+            A proposta precisa terminar simples: uma captura entra e o evento ganha exibicao,
+            engajamento, moderacao e memoria premium sem improviso.
+          </p>
+        </div>
 
-          <div className={styles.socials}>
-            <a href={siteConfig.instagramUrl} target="_blank" rel="noreferrer" aria-label="Instagram">
-              <Instagram size={18} />
-            </a>
-            {siteConfig.linkedinUrl ? (
-              <a href={siteConfig.linkedinUrl} target="_blank" rel="noreferrer" aria-label="LinkedIn">
-                <Linkedin size={18} />
-              </a>
-            ) : null}
+        <div className={styles.actions}>
+          <a className="button" data-variant="primary" href={siteConfig.primaryCtaUrl} target="_blank" rel="noreferrer">
+            Agendar demonstracao
+            <ArrowUpRight size={16} />
+          </a>
+          <a className={styles.inlineAction} href={siteConfig.whatsappUrl} target="_blank" rel="noreferrer">
+            <MessageCircle size={16} />
+            WhatsApp comercial
+          </a>
+        </div>
+      </div>
+
+      <div className={`container ${styles.meta}`}>
+        <div className={styles.brand}>
+          <span className={styles.mark}>
+            <Zap size={16} />
+          </span>
+          <div>
+            <strong>Evento Vivo</strong>
+            <p>Plataforma premium de experiencias visuais ao vivo para eventos.</p>
           </div>
         </div>
 
-        <div className={styles.linksColumn}>
-          <h3>Produto</h3>
-          <div className={styles.links}>
-            {navItems.map((item) => (
-              <button key={item.id} type="button" onClick={() => scrollToId(item.id)}>
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <nav className={styles.links} aria-label="Links do rodape">
+          {navItems.slice(0, 5).map((item) => (
+            <button key={item.id} type="button" onClick={() => scrollToId(item.id)}>
+              {item.label}
+            </button>
+          ))}
+        </nav>
 
-        <div className={styles.linksColumn}>
-          <h3>Comercial</h3>
-          <div className={styles.links}>
-            <a href={siteConfig.primaryCtaUrl} target="_blank" rel="noreferrer">
-              Agendar demonstracao
+        <div className={styles.contact}>
+          <a href={siteConfig.instagramUrl} target="_blank" rel="noreferrer" aria-label="Instagram">
+            <Instagram size={18} />
+          </a>
+          {siteConfig.linkedinUrl ? (
+            <a href={siteConfig.linkedinUrl} target="_blank" rel="noreferrer" aria-label="LinkedIn">
+              <Linkedin size={18} />
             </a>
-            <a href={siteConfig.whatsappUrl} target="_blank" rel="noreferrer">
-              Falar com especialista
-            </a>
-            <a href={siteConfig.adminUrl} target="_blank" rel="noreferrer">
-              Area do cliente
-            </a>
-          </div>
+          ) : null}
+          <span>{siteConfig.whatsappDisplay}</span>
         </div>
-
-        <a className={styles.backToTop} href="#top" onClick={(event) => {
-          event.preventDefault();
-          scrollToId("top");
-        }}>
-          Voltar ao topo
-          <ArrowUpRight size={16} />
-        </a>
       </div>
 
       <div className={`container ${styles.bottom}`}>
         <span>{new Date().getFullYear()} Evento Vivo. Todos os direitos reservados.</span>
-        <span>Suporte premium para operações ao vivo, QR Code, IA e experiências visuais.</span>
+        <button type="button" className={styles.backToTop} onClick={() => scrollToId("top")}>
+          Voltar ao topo
+          <ArrowUpRight size={14} />
+        </button>
       </div>
     </footer>
   );

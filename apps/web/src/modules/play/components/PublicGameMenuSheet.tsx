@@ -128,8 +128,8 @@ export function PublicGameMenuSheet({
                 </AccordionTrigger>
                 <AccordionContent className="space-y-4">
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <MetricCard label="Moves locais" value={localMoves} />
-                    <MetricCard label="Moves na API" value={sessionAnalytics?.total_moves ?? 0} />
+                    <MetricCard label="Jogadas no celular" value={localMoves} />
+                    <MetricCard label="Jogadas registradas" value={sessionAnalytics?.total_moves ?? 0} />
                     <MetricCard label="Tempo da ultima partida" value={formatElapsed(latestResult?.timeMs ?? null)} />
                     <MetricCard label="Status" value={sessionStatus} />
                   </div>
@@ -139,7 +139,7 @@ export function PublicGameMenuSheet({
                       <MetricCard label="Pares encontrados" value={`${memoryProgress.matchedPairs}/${memoryProgress.totalPairs}`} />
                       <MetricCard label="Progresso" value={`${Math.round(memoryProgress.completionRatio * 100)}%`} />
                       <MetricCard label="Erros" value={memoryProgress.mistakes} />
-                      <MetricCard label="Score preview" value={memoryProgress.scorePreview} />
+                      <MetricCard label="Pontuacao estimada" value={memoryProgress.scorePreview} />
                     </div>
                   ) : null}
 
@@ -148,17 +148,17 @@ export function PublicGameMenuSheet({
                       <MetricCard label="Pecas encaixadas" value={`${puzzleProgress.placed}/${puzzleProgress.total}`} />
                       <MetricCard label="Progresso" value={`${Math.round(puzzleProgress.completionRatio * 100)}%`} />
                       <MetricCard label="Combo" value={`x${puzzleProgress.combo}`} />
-                      <MetricCard label="Score preview" value={puzzleProgress.scorePreview} />
+                      <MetricCard label="Pontuacao estimada" value={puzzleProgress.scorePreview} />
                     </div>
                   ) : null}
 
                   {sessionAnalytics ? (
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <MetricCard label="Tipos de move" value={sessionAnalytics.unique_move_types} />
+                      <MetricCard label="Tipos de jogada" value={sessionAnalytics.unique_move_types} />
                       <MetricCard label="Janela de atividade" value={formatElapsed(sessionAnalytics.activity_window_ms)} />
-                      <MetricCard label="Mistakes" value={sessionAnalytics.mistakes ?? 0} />
+                      <MetricCard label="Erros" value={sessionAnalytics.mistakes ?? 0} />
                       <MetricCard
-                        label="Accuracy"
+                        label="Precisao"
                         value={sessionAnalytics.accuracy !== null && sessionAnalytics.accuracy !== undefined
                           ? `${Math.round(sessionAnalytics.accuracy * 100)}%`
                           : 'n/a'}
@@ -172,9 +172,9 @@ export function PublicGameMenuSheet({
                       <div className="mt-3 grid gap-3 sm:grid-cols-2">
                         <MetricCard label="Score" value={latestResult.score} />
                         <MetricCard label="Tempo" value={formatElapsed(latestResult.timeMs)} />
-                        <MetricCard label="Moves" value={latestResult.moves} />
+                        <MetricCard label="Jogadas" value={latestResult.moves} />
                         <MetricCard
-                          label="Accuracy"
+                          label="Precisao"
                           value={latestResult.accuracy !== undefined ? `${Math.round(latestResult.accuracy * 100)}%` : 'n/a'}
                         />
                       </div>
@@ -230,7 +230,7 @@ export function PublicGameMenuSheet({
                       label="Conclusao"
                       value={gameAnalytics ? `${Math.round(gameAnalytics.completion_rate)}%` : '0%'}
                     />
-                    <MetricCard label="Moves totais" value={gameAnalytics?.total_moves ?? 0} />
+                    <MetricCard label="Jogadas totais" value={gameAnalytics?.total_moves ?? 0} />
                   </div>
 
                   <Button
@@ -292,7 +292,7 @@ export function PublicGameMenuSheet({
 
                     <div className="flex items-center gap-2 text-sm text-white/75">
                       <Clock3 className="h-4 w-4 text-white/45" />
-                      slug publico: <span className="font-mono text-white/90">{gameResponse.game.slug}</span>
+                      endereco do jogo: <span className="font-mono text-white/90">{gameResponse.game.slug}</span>
                     </div>
                   </div>
 

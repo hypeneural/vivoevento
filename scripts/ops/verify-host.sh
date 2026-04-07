@@ -17,6 +17,8 @@ POSTGRES_HOST="${POSTGRES_HOST:-127.0.0.1}"
 POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 REDIS_HOST="${REDIS_HOST:-127.0.0.1}"
 REDIS_PORT="${REDIS_PORT:-6379}"
+TLS_CERT_PATH="${TLS_CERT_PATH:-/etc/ssl/certs/eventovivo-origin.crt}"
+TLS_KEY_PATH="${TLS_KEY_PATH:-/etc/ssl/private/eventovivo-origin.key}"
 USE_SUDO="${USE_SUDO:-1}"
 REQUIRE_SHARED_ENV="${REQUIRE_SHARED_ENV:-0}"
 
@@ -31,6 +33,8 @@ Options:
   --postgres-port PORT    Override 5432
   --redis-host HOST       Override 127.0.0.1
   --redis-port PORT       Override 6379
+  --tls-cert PATH         Override /etc/ssl/certs/eventovivo-origin.crt
+  --tls-key PATH          Override /etc/ssl/private/eventovivo-origin.key
   --require-shared-env    Fail if shared/.env is missing
   --no-sudo               Run commands directly
   --help                  Show this help
@@ -80,6 +84,14 @@ while [[ $# -gt 0 ]]; do
             REDIS_PORT="$2"
             shift 2
             ;;
+        --tls-cert)
+            TLS_CERT_PATH="$2"
+            shift 2
+            ;;
+        --tls-key)
+            TLS_KEY_PATH="$2"
+            shift 2
+            ;;
         --require-shared-env)
             REQUIRE_SHARED_ENV=1
             shift
@@ -118,6 +130,10 @@ run_as_root "$NODE_BIN" --version >/dev/null
 run_as_root "$NPM_BIN" --version >/dev/null
 run_as_root "$PSQL_BIN" --version >/dev/null
 
+log "Checking TLS assets required by nginx"
+[[ -f "$TLS_CERT_PATH" ]] || fail "missing TLS certificate: $TLS_CERT_PATH"
+[[ -f "$TLS_KEY_PATH" ]] || fail "missing TLS private key: $TLS_KEY_PATH"
+
 log "Validating nginx configuration"
 run_as_root "$NGINX_BIN" -t
 
@@ -148,11 +164,24 @@ run_as_root "$PG_ISREADY_BIN" -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" >/dev/null
 log "Checking app directory structure"
 [[ -d "$APP_ROOT/releases" ]] || fail "missing $APP_ROOT/releases"
 [[ -d "$APP_ROOT/shared/storage" ]] || fail "missing $APP_ROOT/shared/storage"
+[[ -d "$APP_ROOT/shared/storage/app/public" ]] || fail "missing $APP_ROOT/shared/storage/app/public"
 [[ -d "$APP_ROOT/shared/bootstrap-cache" ]] || fail "missing $APP_ROOT/shared/bootstrap-cache"
 [[ -d "$APP_ROOT/scripts" ]] || fail "missing $APP_ROOT/scripts"
+[[ -d "$APP_ROOT/shared/storage/framework/cache/data" ]] || fail "missing $APP_ROOT/shared/storage/framework/cache/data"
+[[ -d "$APP_ROOT/shared/storage/framework/sessions" ]] || fail "missing $APP_ROOT/shared/storage/framework/sessions"
+[[ -d "$APP_ROOT/shared/storage/framework/testing" ]] || fail "missing $APP_ROOT/shared/storage/framework/testing"
+[[ -d "$APP_ROOT/shared/storage/framework/views" ]] || fail "missing $APP_ROOT/shared/storage/framework/views"
 
 if [[ "$REQUIRE_SHARED_ENV" == "1" ]]; then
     [[ -f "$APP_ROOT/shared/.env" ]] || fail "missing $APP_ROOT/shared/.env"
+    [[ -f "$APP_ROOT/shared/apps-web.env.production" ]] || fail "missing $APP_ROOT/shared/apps-web.env.production"
+    [[ -f "$APP_ROOT/shared/apps-landing.env.production" ]] || fail "missing $APP_ROOT/shared/apps-landing.env.production"
+    grep -q '^VITE_API_BASE_URL=' "$APP_ROOT/shared/apps-web.env.production" \
+        || fail "missing VITE_API_BASE_URL in $APP_ROOT/shared/apps-web.env.production"
+    grep -q '^VITE_REVERB_HOST=' "$APP_ROOT/shared/apps-web.env.production" \
+        || fail "missing VITE_REVERB_HOST in $APP_ROOT/shared/apps-web.env.production"
+    grep -q '^VITE_ADMIN_URL=' "$APP_ROOT/shared/apps-landing.env.production" \
+        || fail "missing VITE_ADMIN_URL in $APP_ROOT/shared/apps-landing.env.production"
 fi
 
 log "Host verification completed"

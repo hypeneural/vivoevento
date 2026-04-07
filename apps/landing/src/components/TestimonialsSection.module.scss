@@ -1,4 +1,4 @@
-﻿@use '../styles/variables' as *;
+@use '../styles/variables' as *;
 @use '../styles/mixins' as *;
 
 .header {
@@ -17,9 +17,48 @@
 
 .card {
   @include surface(rgba(10, 16, 29, 0.82), $border-subtle, 18px);
+  overflow: hidden;
+  border-radius: $radius-md;
+}
+
+.visual {
+  position: relative;
+  overflow: hidden;
+  min-height: 13rem;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.visualOverlay {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: linear-gradient(180deg, transparent, rgba(5, 9, 19, 0.92));
+
+  span {
+    color: $c-white-64;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  strong {
+    font-size: 0.9rem;
+  }
+}
+
+.content {
   display: grid;
   gap: 1rem;
-  border-radius: $radius-md;
   padding: 1rem;
 }
 
@@ -47,21 +86,6 @@
     display: block;
     margin-top: 0.25rem;
     color: $c-white-48;
-  }
-}
-
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-
-  span {
-    padding: 0.35rem 0.6rem;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.04);
-    color: $c-white-64;
-    font-weight: 700;
-    font-size: 0.82rem;
   }
 }
 

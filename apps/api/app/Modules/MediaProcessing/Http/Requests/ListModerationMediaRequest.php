@@ -31,6 +31,7 @@ class ListModerationMediaRequest extends FormRequest
             ])],
             'featured' => ['nullable', 'boolean'],
             'pinned' => ['nullable', 'boolean'],
+            'sender_blocked' => ['nullable', 'boolean'],
             'orientation' => ['nullable', Rule::in(['portrait', 'landscape', 'square'])],
         ];
     }

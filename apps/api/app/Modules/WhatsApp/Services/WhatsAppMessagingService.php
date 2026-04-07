@@ -41,11 +41,14 @@ class WhatsAppMessagingService
 
         $message = $this->createOutboundMessage($instance, MessageType::Text, $data->phone, [
             'text_body' => $data->message,
+            'reply_to_provider_message_id' => $data->messageId,
             'payload_json' => [
                 'phone' => $data->phone,
                 'message' => $data->message,
                 'delayMessage' => $data->delayMessage,
                 'delayTyping' => $data->delayTyping,
+                'messageId' => $data->messageId,
+                'privateAnswer' => $data->privateAnswer,
             ],
         ]);
 

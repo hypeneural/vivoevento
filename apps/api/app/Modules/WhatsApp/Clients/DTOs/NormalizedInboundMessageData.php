@@ -47,6 +47,26 @@ final readonly class NormalizedInboundMessageData
         return $this->mediaUrl !== null;
     }
 
+    public function senderExternalId(): string
+    {
+        return $this->participantLid
+            ?? $this->senderPhone
+            ?? $this->chatId;
+    }
+
+    public function normalizedText(): ?string
+    {
+        $text = $this->text;
+
+        if ($text === null) {
+            return null;
+        }
+
+        $normalized = trim($text);
+
+        return $normalized === '' ? null : $normalized;
+    }
+
     public function chatDisplayName(): ?string
     {
         if ($this->isFromGroup()) {

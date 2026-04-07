@@ -3,6 +3,7 @@
 namespace App\Modules\Billing\Services;
 
 use App\Modules\Billing\Models\EventPackage;
+use Illuminate\Support\Arr;
 
 class EventPackageSnapshotService
 {
@@ -14,6 +15,43 @@ class EventPackageSnapshotService
             ->pluck('feature_value', 'feature_key')
             ->all();
 
+        return $this->buildFromFlatFeatureMap($flatFeatures, $this->packageContext($package));
+    }
+
+    public function buildManualOverride(
+        array $features = [],
+        array $limits = [],
+        ?EventPackage $package = null,
+    ): array {
+        $baseFlatFeatures = [];
+        $packageContext = null;
+
+        if ($package) {
+            $package->loadMissing(['prices', 'features']);
+
+            $baseFlatFeatures = $package->features
+                ->pluck('feature_value', 'feature_key')
+                ->all();
+
+            $packageContext = $this->packageContext($package);
+        }
+
+        $flatFeatures = array_replace(
+            $baseFlatFeatures,
+            $this->normalizeFlatMap($features),
+            $this->normalizeFlatMap($limits),
+        );
+
+        return $this->buildFromFlatFeatureMap($flatFeatures, $packageContext);
+    }
+
+    /**
+     * @param array<string, mixed> $flatFeatures
+     * @param array<string, mixed>|null $packageContext
+     * @return array<string, mixed>
+     */
+    public function buildFromFlatFeatureMap(array $flatFeatures, ?array $packageContext = null): array
+    {
         $modules = [
             'live' => $this->toBoolean($flatFeatures['live.enabled'] ?? $flatFeatures['live_gallery'] ?? $flatFeatures['modules.live'] ?? $flatFeatures['live'] ?? true),
             'wall' => $this->toBoolean($flatFeatures['wall.enabled'] ?? $flatFeatures['modules.wall'] ?? $flatFeatures['wall'] ?? false),
@@ -31,23 +69,16 @@ class EventPackageSnapshotService
             'white_label' => $this->toBoolean($flatFeatures['white_label.enabled'] ?? $flatFeatures['branding.white_label'] ?? $flatFeatures['white_label'] ?? false),
         ];
 
-        $defaultPrice = $package->prices->firstWhere('is_default', true)
-            ?? $package->prices->firstWhere('is_active', true)
-            ?? $package->prices->first();
+        [$grantFeatures, $grantLimits] = $this->splitGrantSnapshots($flatFeatures);
 
-        $grantFeatures = array_filter([
-            'live.enabled' => $modules['live'],
-            'wall.enabled' => $modules['wall'],
-            'play.enabled' => $modules['play'],
-            'hub.enabled' => $modules['hub'],
-            'gallery.watermark' => $branding['watermark'],
-            'white_label.enabled' => $branding['white_label'],
-        ], fn (mixed $value): bool => $value !== null);
-
-        $grantLimits = array_filter([
-            'media.retention_days' => $limits['retention_days'],
-            'media.max_photos' => $limits['max_photos'],
-        ], fn (mixed $value): bool => $value !== null);
+        $eventSnapshotBase = [
+            'catalog_type' => $packageContext['catalog_type'] ?? 'manual_override',
+            'package_id' => $packageContext['package_id'] ?? null,
+            'package_code' => $packageContext['package_code'] ?? null,
+            'package_name' => $packageContext['package_name'] ?? null,
+            'price_snapshot_cents' => $packageContext['price_snapshot_cents'] ?? null,
+            'currency' => $packageContext['currency'] ?? null,
+        ];
 
         return [
             'flat_features' => $flatFeatures,
@@ -55,37 +86,18 @@ class EventPackageSnapshotService
             'modules' => $modules,
             'limits' => $limits,
             'branding' => $branding,
-            'default_price' => $defaultPrice ? [
-                'id' => $defaultPrice->id,
-                'billing_mode' => $defaultPrice->billing_mode?->value,
-                'currency' => $defaultPrice->currency,
-                'amount_cents' => $defaultPrice->amount_cents,
-            ] : null,
+            'default_price' => $packageContext['default_price'] ?? null,
             'grant_features_snapshot' => $grantFeatures,
             'grant_limits_snapshot' => $grantLimits,
             'purchase_features_snapshot' => array_merge($grantFeatures, $grantLimits),
-            'event_snapshot' => array_filter(array_merge([
-                'catalog_type' => 'event_package',
-                'package_id' => $package->id,
-                'package_code' => $package->code,
-                'package_name' => $package->name,
-                'price_snapshot_cents' => $defaultPrice?->amount_cents,
-                'currency' => $defaultPrice?->currency,
-            ], $grantFeatures, $grantLimits), fn (mixed $value): bool => $value !== null),
+            'event_snapshot' => array_filter(array_merge(
+                $eventSnapshotBase,
+                $grantFeatures,
+                $grantLimits,
+            ), fn (mixed $value): bool => $value !== null),
             'order_item_snapshot' => [
-                'package' => [
-                    'id' => $package->id,
-                    'code' => $package->code,
-                    'name' => $package->name,
-                    'description' => $package->description,
-                    'target_audience' => $package->target_audience?->value,
-                ],
-                'price' => $defaultPrice ? [
-                    'id' => $defaultPrice->id,
-                    'billing_mode' => $defaultPrice->billing_mode?->value,
-                    'currency' => $defaultPrice->currency,
-                    'amount_cents' => $defaultPrice->amount_cents,
-                ] : null,
+                'package' => $packageContext['package'] ?? null,
+                'price' => $packageContext['default_price'] ?? null,
                 'modules' => $modules,
                 'limits' => $limits,
                 'branding' => $branding,
@@ -94,6 +106,69 @@ class EventPackageSnapshotService
         ];
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function normalizeFlatMap(array $payload): array
+    {
+        if ($payload === []) {
+            return [];
+        }
+
+        $hasNestedArrays = collect($payload)->contains(fn (mixed $value): bool => is_array($value));
+
+        $flat = $hasNestedArrays ? Arr::dot($payload) : $payload;
+
+        return collect($flat)
+            ->filter(fn (mixed $value): bool => $value !== null)
+            ->all();
+    }
+
+    /**
+     * @param array<string, mixed> $flatFeatures
+     * @return array{0: array<string, mixed>, 1: array<string, mixed>}
+     */
+    private function splitGrantSnapshots(array $flatFeatures): array
+    {
+        $grantFeatures = [];
+        $grantLimits = [];
+
+        foreach ($flatFeatures as $key => $value) {
+            if ($this->isLimitKey($key)) {
+                $grantLimits[$key] = $value;
+
+                continue;
+            }
+
+            $grantFeatures[$key] = $value;
+        }
+
+        return [$grantFeatures, $grantLimits];
+    }
+
+    private function isLimitKey(string $key): bool
+    {
+        if (str_starts_with($key, 'limits.')) {
+            return true;
+        }
+
+        return in_array($key, [
+            'media.retention_days',
+            'retention_days',
+            'media.max_photos',
+            'max_photos',
+            'events.max_active',
+            'max_active_events',
+            'channels.whatsapp_groups.max',
+            'channels.whatsapp.dedicated_instance.max_per_event',
+        ], true);
+    }
+
+    /**
+     * @param array<string, mixed> $flatFeatures
+     * @return array<string, mixed>
+     */
     private function nestFeatureMap(array $flatFeatures): array
     {
         $nested = [];
@@ -103,6 +178,38 @@ class EventPackageSnapshotService
         }
 
         return $nested;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function packageContext(EventPackage $package): array
+    {
+        $defaultPrice = $package->prices->firstWhere('is_default', true)
+            ?? $package->prices->firstWhere('is_active', true)
+            ?? $package->prices->first();
+
+        return [
+            'catalog_type' => 'event_package',
+            'package_id' => $package->id,
+            'package_code' => $package->code,
+            'package_name' => $package->name,
+            'price_snapshot_cents' => $defaultPrice?->amount_cents,
+            'currency' => $defaultPrice?->currency,
+            'default_price' => $defaultPrice ? [
+                'id' => $defaultPrice->id,
+                'billing_mode' => $defaultPrice->billing_mode?->value,
+                'currency' => $defaultPrice->currency,
+                'amount_cents' => $defaultPrice->amount_cents,
+            ] : null,
+            'package' => [
+                'id' => $package->id,
+                'code' => $package->code,
+                'name' => $package->name,
+                'description' => $package->description,
+                'target_audience' => $package->target_audience?->value,
+            ],
+        ];
     }
 
     private function toBoolean(mixed $value): bool

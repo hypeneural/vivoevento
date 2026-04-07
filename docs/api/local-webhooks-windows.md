@@ -29,6 +29,27 @@ Para o seu caso, as URLs publicas corretas sao:
 - Z-API delivery: `https://SEU-TUNNEL/api/v1/webhooks/whatsapp/zapi/{EXTERNAL_INSTANCE_ID}/delivery`
 - Pagar.me: `https://SEU-TUNNEL/api/v1/webhooks/billing/pagarme`
 
+## Producao atual
+
+Para a VPS de producao atras de `api.eventovivo.com.br`, os endpoints
+operacionais sao:
+
+- Z-API `Ao conectar`: `https://api.eventovivo.com.br/api/v1/webhooks/whatsapp/zapi/3BDB98A79042D03232CC1ABE514C6FD4/status`
+- Z-API `Ao desconectar`: `https://api.eventovivo.com.br/api/v1/webhooks/whatsapp/zapi/3BDB98A79042D03232CC1ABE514C6FD4/status`
+- Z-API `Ao receber`: `https://api.eventovivo.com.br/api/v1/webhooks/whatsapp/zapi/3BDB98A79042D03232CC1ABE514C6FD4/inbound`
+- Z-API `Receber status da mensagem`: `https://api.eventovivo.com.br/api/v1/webhooks/whatsapp/zapi/3BDB98A79042D03232CC1ABE514C6FD4/delivery`
+- Pagar.me: `https://api.eventovivo.com.br/api/v1/webhooks/billing/pagarme`
+
+Observacoes de producao:
+
+- o webhook do Pagar.me deve usar Basic Auth com as credenciais configuradas em
+  `/var/www/eventovivo/shared/.env`;
+- nao versionar senha de webhook em docs ou exemplos publicos;
+- a instancia Z-API de producao fica cadastrada no banco e deve usar as filas
+  `whatsapp-inbound`, `whatsapp-send` e `whatsapp-sync`;
+- o recebimento HTTP da Z-API ainda precisa de hardening adicional para rejeitar
+  callbacks sem token/header esperado.
+
 ## Z-API com URL unica
 
 Se a sua conta/painel da Z-API expoe apenas um campo para webhook de mensagens recebidas, use sempre:

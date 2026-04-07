@@ -24,5 +24,10 @@ return [
             env('BILLING_ACCESS_WHATSAPP_INSTANCE_ID', env('WHATSAPP_AUTH_INSTANCE_ID'))
         ),
         'allow_single_connected_fallback' => (bool) env('BILLING_PAYMENT_NOTIFICATIONS_ALLOW_SINGLE_CONNECTED_FALLBACK', true),
+        'pix_button' => [
+            'enabled' => (bool) env('BILLING_PAYMENT_NOTIFICATIONS_PIX_BUTTON_ENABLED', true),
+            'type' => env('BILLING_PAYMENT_NOTIFICATIONS_PIX_BUTTON_TYPE', 'EVP'),
+            'merchant_name' => env('BILLING_PAYMENT_NOTIFICATIONS_PIX_BUTTON_MERCHANT_NAME', 'Evento Vivo'),
+        ],
     ],
 ];

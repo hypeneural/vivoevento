@@ -27,7 +27,7 @@ export const SYSTEM_MODULES: Record<string, SystemModule> = {
   play: { key: 'play', label: 'Play', description: 'Minigames interativos', requiredPermission: 'play.manage', requiresOrgModule: true },
   hub: { key: 'hub', label: 'Hub', description: 'Página oficial do evento', requiredPermission: 'hub.manage', requiresOrgModule: true },
   whatsapp: { key: 'whatsapp', label: 'WhatsApp', description: 'Instâncias e conexão de WhatsApp', requiredPermission: 'channels.manage', requiresOrgModule: true },
-  partners: { key: 'partners', label: 'Parceiros', description: 'Gestão de parceiros', requiredPermission: 'partners.view', requiresOrgModule: false },
+  partners: { key: 'partners', label: 'Parceiros', description: 'Gestão de parceiros', requiredPermission: 'partners.view.any', requiresOrgModule: false },
   clients: { key: 'clients', label: 'Clientes', description: 'Gestão de clientes', requiredPermission: 'clients.view', requiresOrgModule: true },
   plans: { key: 'plans', label: 'Planos', description: 'Planos e billing', requiredPermission: 'plans.view', requiresOrgModule: false },
   analytics: { key: 'analytics', label: 'Analytics', description: 'Métricas e relatórios', requiredPermission: 'analytics.view', requiresOrgModule: true },
@@ -62,3 +62,13 @@ export function resolveModuleAccess(
 
   return 'granted';
 }
+
+SYSTEM_MODULES.wall.label = 'Telao';
+SYSTEM_MODULES.wall.description = 'Exibicao de fotos no telao do evento';
+SYSTEM_MODULES.play.label = 'Jogos';
+SYSTEM_MODULES.play.description = 'Jogos interativos com fotos do evento';
+SYSTEM_MODULES.hub.label = 'Links';
+SYSTEM_MODULES.hub.description = 'Pagina publica com os principais acessos do evento';
+SYSTEM_MODULES.plans.description = 'Planos e cobranca da conta';
+SYSTEM_MODULES.analytics.label = 'Relatorios';
+SYSTEM_MODULES.analytics.description = 'Metricas e relatorios de uso';

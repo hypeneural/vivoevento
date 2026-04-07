@@ -167,7 +167,15 @@ class ZApiWebhookNormalizer implements WhatsAppWebhookNormalizerInterface
         }
 
         if ($messageType === 'reaction') {
-            return $payload['reaction'] ?? null;
+            $reaction = $payload['reaction'] ?? null;
+
+            if (is_array($reaction)) {
+                return isset($reaction['value']) && is_scalar($reaction['value'])
+                    ? (string) $reaction['value']
+                    : null;
+            }
+
+            return is_scalar($reaction) ? (string) $reaction : null;
         }
 
         return $this->extractCaption($payload, $messageType);
@@ -213,7 +221,7 @@ class ZApiWebhookNormalizer implements WhatsAppWebhookNormalizerInterface
             $value = $payload[$key];
 
             if (is_numeric($value)) {
-                return CarbonImmutable::createFromTimestamp((int) $value)->utc();
+                return $this->timestampFromNumericValue($value);
             }
 
             if (is_string($value) && trim($value) !== '') {
@@ -222,6 +230,19 @@ class ZApiWebhookNormalizer implements WhatsAppWebhookNormalizerInterface
         }
 
         return CarbonImmutable::now()->utc();
+    }
+
+    private function timestampFromNumericValue(int|float|string $value): CarbonImmutable
+    {
+        $seconds = (float) $value;
+
+        if (abs($seconds) >= 1_000_000_000_000_000) {
+            $seconds /= 1_000_000;
+        } elseif (abs($seconds) > 9_999_999_999) {
+            $seconds /= 1_000;
+        }
+
+        return CarbonImmutable::createFromTimestamp((int) floor($seconds))->utc();
     }
 
     private function extractCaption(array $payload, string $messageType): ?string

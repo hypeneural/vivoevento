@@ -103,7 +103,12 @@ class ListCatalogMediaQuery
                         ->orWhere('original_filename', $like, $term)
                         ->orWhere('client_filename', $like, $term)
                         ->orWhereHas('event', fn (Builder $query) => $query->where('title', $like, $term))
-                        ->orWhereHas('inboundMessage', fn (Builder $query) => $query->where('sender_name', $like, $term));
+                        ->orWhereHas('inboundMessage', function (Builder $query) use ($like, $term) {
+                            $query->where('sender_name', $like, $term)
+                                ->orWhere('sender_phone', $like, $term)
+                                ->orWhere('sender_lid', $like, $term)
+                                ->orWhere('sender_external_id', $like, $term);
+                        });
                 });
             });
 
@@ -149,7 +154,7 @@ class ListCatalogMediaQuery
         match ($channel) {
             'upload' => $builder->whereIn('source_type', ['public_upload', 'upload', 'channel']),
             'link' => $builder->where('source_type', 'public_link'),
-            'whatsapp' => $builder->where('source_type', 'whatsapp'),
+            'whatsapp' => $builder->whereIn('source_type', ['whatsapp', 'whatsapp_group', 'whatsapp_direct']),
             'telegram' => $builder->where('source_type', 'telegram'),
             'qrcode' => $builder->where('source_type', 'qrcode'),
             default => null,

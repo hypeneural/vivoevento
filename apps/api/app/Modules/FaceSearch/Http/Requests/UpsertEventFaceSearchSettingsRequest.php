@@ -16,7 +16,7 @@ class UpsertEventFaceSearchSettingsRequest extends FormRequest
     {
         return [
             'enabled' => ['required', 'boolean'],
-            'provider_key' => ['required', 'string', 'in:noop'],
+            'provider_key' => ['required', 'string', 'in:noop,compreface'],
             'embedding_model_key' => ['required', 'string', 'max:120'],
             'vector_store_key' => ['required', 'string', 'in:pgvector'],
             'min_face_size_px' => ['required', 'integer', 'min:32', 'max:1024'],

@@ -60,7 +60,7 @@ Leitura pratica:
 
 ### Backend
 
-- PHP 8.3
+- PHP 8.3.x
 - Laravel 13
 - PostgreSQL 16
 - Redis 7
@@ -83,6 +83,14 @@ Leitura pratica:
 - `WhatsApp` tem borda forte, mas ainda nao fecha toda a ingestao fim a fim;
 - parte do admin ainda opera com mocks e precisa ser vista como superficie
   parcialmente integrada.
+
+Observacao importante de runtime:
+
+- o backend foi explicitamente travado em `php >=8.3 <8.4` no
+  [composer.json](../../apps/api/composer.json) para manter coerencia com o
+  host Ubuntu 24.04 da fase 1;
+- sem esse travamento, o Composer podia selecionar componentes `symfony/* 8.x`
+  que exigem `php >=8.4`, quebrando o primeiro deploy mesmo com a VPS correta.
 
 ## Principios operacionais
 
@@ -140,7 +148,12 @@ Nao recomendo colocar como caminho critico neste mesmo host:
 |   |-- .env
 |   |-- storage
 |   |   |-- app
+|   |   |   `-- public
 |   |   |-- framework
+|   |   |   |-- cache/data
+|   |   |   |-- sessions
+|   |   |   |-- testing
+|   |   |   `-- views
 |   |   `-- logs
 |   |-- bootstrap-cache
 |   `-- run
@@ -155,10 +168,18 @@ Nao recomendo colocar como caminho critico neste mesmo host:
 
 - `shared/storage` e obrigatorio porque parte do codigo ainda grava em disco
   `public` local;
+- `shared/storage/app/public` e obrigatorio quando `FILESYSTEM_DISK=public`
+  estiver ativo no go-live base;
 - a release nunca deve ser usada como storage primario de midia ou logs;
 - scripts de deploy e rollback devem viver fora das releases.
 - se `deploy.sh` rodar com o usuario `deploy`, o host precisa de um sudoers
   minimo para os `systemctl` usados no recycle de servicos.
+- numa VPS dedicada ao Evento Vivo, o pool padrao `www.conf` do PHP-FPM deve
+  ser desabilitado para evitar socket extra, workers ociosos e ambiguidade
+  operacional.
+- se o object storage externo ainda nao estiver disponivel no primeiro deploy,
+  a fase 1 pode operar com `FILESYSTEM_DISK=public` em cima de `shared/storage`;
+  quando S3 estiver pronto, o `.env` pode migrar para `FILESYSTEM_DISK=s3`.
 
 ## Cloudflare
 
@@ -209,8 +230,35 @@ Referencias oficiais:
 - https://developers.cloudflare.com/ssl/origin-configuration/origin-ca/
 - https://developers.cloudflare.com/network/websockets/
 - https://developers.cloudflare.com/workers/platform/limits/
+- https://developers.cloudflare.com/cache/how-to/purge-cache/
 - https://developers.cloudflare.com/support/troubleshooting/restoring-visitor-ips/restoring-original-visitor-ips/
 - https://www.cloudflare.com/ips/
+
+### Cache do admin SPA e Cloudflare
+
+O admin e uma SPA com service worker. Por isso, HTML e arquivos de bootstrap do
+PWA nao podem ser servidos com cache imutavel.
+
+Regras obrigatorias:
+
+- `/`, `/index.html`, `/sw.js` e `/manifest.webmanifest` devem responder com
+  `Cache-Control: no-cache, no-store, must-revalidate`;
+- assets versionados em `/assets/*.js` e `/assets/*.css` podem continuar com
+  cache longo e `immutable`;
+- depois de corrigir cache ou service worker, purgar pelo menos:
+  - `https://admin.eventovivo.com.br/sw.js`
+  - `https://admin.eventovivo.com.br/`
+  - os chunks antigos que ainda aparecerem como `CF-Cache-Status: HIT`
+- se houver muitos chunks antigos ou se o painel continuar servindo bundle
+  antigo, usar `Purge Everything` na zona como fallback operacional.
+
+Sintomas de cache errado:
+
+- o navegador carrega chunks removidos da release atual;
+- `curl` direto na origin retorna `404`, mas a URL publica via Cloudflare ainda
+  retorna `200` com `CF-Cache-Status: HIT`;
+- a tela do admin mostra erros de runtime que ja foram corrigidos na release
+  atual.
 
 ## Organizacao inicial da VPS
 
@@ -309,6 +357,8 @@ Observacao:
 - o estado atual das migrations ja executa `CREATE EXTENSION vector`, entao o
   host de producao precisa ter `pgvector` disponivel mesmo que `FaceSearch`
   fique desativado funcionalmente no primeiro go-live.
+- no Ubuntu 24.04, `postgresql.service` e um wrapper; use `pg_lsclusters` e
+  `pg_isready` como checagem real do cluster `16/main`.
 
 ### Redis
 
@@ -384,6 +434,7 @@ Consequencia:
 Fase 1:
 
 - manter `shared/storage` operacional;
+- garantir `shared/storage/app/public`;
 - servir o que ainda usa `public`;
 - garantir politica deterministica para `public/storage`, via `storage:link`
   na primeira instalacao ou passo idempotente equivalente no deploy;
@@ -686,15 +737,40 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
+    location = /sw.js {
+        expires off;
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        try_files /sw.js =404;
+    }
+
+    location = /manifest.webmanifest {
+        expires off;
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        try_files /manifest.webmanifest =404;
+    }
+
+    location = /index.html {
+        expires off;
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        try_files /index.html =404;
+    }
+
     location / {
+        expires off;
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
         try_files $uri $uri/ /index.html;
     }
 
+    location @admin_asset_not_found {
+        expires off;
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        return 404;
+    }
+
     location ~* \.(js|css|png|jpg|jpeg|gif|svg|webp|ico|woff|woff2)$ {
-        expires 30d;
         access_log off;
         add_header Cache-Control "public, immutable";
-        try_files $uri =404;
+        try_files $uri @admin_asset_not_found;
     }
 }
 ```
@@ -1102,6 +1178,8 @@ Exemplos:
 Antes do primeiro deploy, deixar pronto:
 
 - `/var/www/eventovivo/shared/.env`
+- `/var/www/eventovivo/shared/apps-web.env.production`
+- `/var/www/eventovivo/shared/apps-landing.env.production`
 - `/var/www/eventovivo/shared/storage`
 - banco criado
 - Redis pronto
@@ -1128,6 +1206,8 @@ Pode ser via `git clone`, `git archive`, `rsync` ou CI/CD.
 cd /var/www/eventovivo/releases/$RELEASE/apps/api
 
 ln -nfs /var/www/eventovivo/shared/.env .env
+ln -nfs /var/www/eventovivo/shared/apps-web.env.production ../web/.env.production.local
+ln -nfs /var/www/eventovivo/shared/apps-landing.env.production ../landing/.env.production.local
 rm -rf storage
 ln -nfs /var/www/eventovivo/shared/storage storage
 mkdir -p bootstrap/cache
@@ -1304,7 +1384,17 @@ O codigo tambem usa:
 - `whatsapp-send`
 - `whatsapp-sync`
 
-**Gap atual:** o Horizon ainda nao sobe supervisores para essas filas.
+Status em `2026-04-06`: o go-live base subiu sem depender dessas filas, mas o
+recorte operacional de Z-API/Pagar.me ja retomou `whatsapp-*` em producao.
+O Horizon agora sobe:
+
+- `supervisor-whatsapp-inbound`
+- `supervisor-whatsapp-send`
+- `supervisor-whatsapp-sync`
+
+Gap restante: o pipeline canonico completo `WhatsApp -> InboundMedia ->
+EventMedia` ainda precisa fechar os jobs de normalizacao/download para midia
+real em alto volume.
 
 ### Regra de ouro
 
@@ -1314,6 +1404,7 @@ Estas filas nao podem competir com jobs pesados:
 - `media-publish`
 - `broadcasts`
 - `webhooks`
+- `whatsapp-inbound`
 
 Essas sao as filas que protegem a experiencia ao vivo.
 
@@ -1452,10 +1543,9 @@ Minimo recomendado:
 
 ### P0 antes de chamar a stack de "fechada"
 
-1. `whatsapp-*` ainda nao tem supervisores Horizon dedicados.
-2. `NormalizeInboundMessageJob` e `DownloadInboundMediaJob` seguem em scaffold.
-3. upload publico ainda grava em disco `public` local.
-4. ha drift documental entre `Laravel 12` e `Laravel 13`.
+1. `NormalizeInboundMessageJob` e `DownloadInboundMediaJob` seguem em scaffold.
+2. upload publico ainda grava em disco `public` local.
+3. ha drift documental entre `Laravel 12` e `Laravel 13`.
 
 ### P1 para endurecimento operacional
 
@@ -1659,7 +1749,7 @@ Criterio de aceite:
 - [ ] observabilidade minima ligada
 - [ ] backup diario configurado
 - [ ] restore testado pelo menos uma vez
-- [ ] supervisores `whatsapp-*` planejados ou explicitamente fora do go-live
+- [x] supervisores `whatsapp-*` ativos em producao
 - [ ] politica de storage definida
 
 ## Conclusao

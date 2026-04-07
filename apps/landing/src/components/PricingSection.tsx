@@ -3,6 +3,12 @@ import styles from "./PricingSection.module.scss";
 import { pricingPlans } from "@/data/landing";
 import { siteConfig } from "@/config/site";
 
+const pricingSignals = [
+  ["evento unico", "implantacao guiada", "jogos e galeria"],
+  ["recorrencia", "padronizacao comercial", "suporte premium"],
+  ["alto volume", "rollout dedicado", "arquitetura pronta"],
+];
+
 export default function PricingSection() {
   return (
     <section id="precos" className={`section-shell ${styles.section}`}>
@@ -15,10 +21,26 @@ export default function PricingSection() {
         <div className={styles.grid}>
           {pricingPlans.map((plan, index) => (
             <article key={plan.name} className={`${styles.card} ${index === 1 ? styles.featured : ""}`}>
-              <span className={styles.badge}>{plan.badge}</span>
-              <h3>{plan.name}</h3>
-              <p className={styles.audience}>{plan.audience}</p>
-              <strong className={styles.price}>{plan.price}</strong>
+              <div className={styles.cardHeader}>
+                <span className={styles.badge}>{plan.badge}</span>
+                <div className={styles.signalRow}>
+                  {pricingSignals[index].map((signal) => (
+                    <span key={signal}>{signal}</span>
+                  ))}
+                </div>
+              </div>
+
+              <div className={styles.identity}>
+                <h3>{plan.name}</h3>
+                <p className={styles.audience}>{plan.audience}</p>
+                <strong className={styles.price}>{plan.price}</strong>
+              </div>
+
+              <div className={styles.storyPanel}>
+                <span>Como entra no comercial</span>
+                <strong>{index === 0 ? "Entrega premium por evento" : index === 1 ? "Receita recorrente para parceiros" : "Projeto critico com operacao robusta"}</strong>
+              </div>
+
               <ul className={styles.features}>
                 {plan.features.map((feature) => (
                   <li key={feature}>
@@ -27,6 +49,7 @@ export default function PricingSection() {
                   </li>
                 ))}
               </ul>
+
               <a className="button" data-variant={index === 1 ? "primary" : "secondary"} href={siteConfig.primaryCtaUrl} target="_blank" rel="noreferrer">
                 Falar sobre este plano
                 <ArrowUpRight size={16} />

@@ -2,7 +2,9 @@
 
 use App\Modules\Events\Models\Event;
 use App\Modules\Events\Models\EventModule;
+use App\Modules\Events\Models\EventMediaSenderBlacklist;
 use App\Modules\FaceSearch\Models\EventFaceSearchSetting;
+use App\Modules\InboundMedia\Models\InboundMessage;
 use App\Modules\MediaProcessing\Enums\ModerationStatus;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use Spatie\Activitylog\Models\Activity;
@@ -144,6 +146,215 @@ it('returns the moderation feed using cursor pagination metadata', function () {
         ->assertJsonCount(2, 'data')
         ->assertJsonPath('meta.per_page', 2)
         ->assertJsonPath('meta.stats', null);
+});
+
+it('treats whatsapp group and direct sources as the whatsapp channel in catalog filters', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    $groupMedia = EventMedia::factory()->published()->create([
+        'event_id' => $event->id,
+        'source_type' => 'whatsapp_group',
+    ]);
+
+    $directMedia = EventMedia::factory()->published()->create([
+        'event_id' => $event->id,
+        'source_type' => 'whatsapp_direct',
+    ]);
+
+    EventMedia::factory()->published()->create([
+        'event_id' => $event->id,
+        'source_type' => 'public_upload',
+    ]);
+
+    $response = $this->apiGet("/gallery?event_id={$event->id}&channel=whatsapp&publication_status=published");
+
+    $this->assertApiPaginated($response);
+
+    $ids = collect($response->json('data'))->pluck('id')->all();
+
+    expect($ids)->toContain($groupMedia->id, $directMedia->id)
+        ->and($ids)->toHaveCount(2)
+        ->and($response->json('data.0.channel'))->toBe('whatsapp')
+        ->and($response->json('data.1.channel'))->toBe('whatsapp');
+});
+
+it('returns sender moderation context in the feed and filters blocked senders', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+        'current_entitlements_json' => [
+            'channels' => [
+                'blacklist' => [
+                    'enabled' => true,
+                ],
+            ],
+        ],
+    ]);
+
+    $blockedInbound = InboundMessage::query()->create([
+        'event_id' => $event->id,
+        'provider' => 'zapi',
+        'message_id' => 'blocked-001',
+        'message_type' => 'image',
+        'chat_external_id' => '120363499999999999-group',
+        'sender_external_id' => '11111111111111@lid',
+        'sender_phone' => '554899991111',
+        'sender_lid' => '11111111111111@lid',
+        'sender_name' => 'Ana Martins',
+        'sender_avatar_url' => 'https://cdn.eventovivo.test/ana.jpg',
+        'status' => 'processed',
+        'received_at' => now()->subMinutes(10),
+    ]);
+
+    $blockedMedia = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'inbound_message_id' => $blockedInbound->id,
+        'source_type' => 'whatsapp_group',
+        'source_label' => 'Ana Martins',
+    ]);
+
+    EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'inbound_message_id' => InboundMessage::query()->create([
+            'event_id' => $event->id,
+            'provider' => 'zapi',
+            'message_id' => 'blocked-002',
+            'message_type' => 'image',
+            'chat_external_id' => '120363499999999999-group',
+            'sender_external_id' => '11111111111111@lid',
+            'sender_phone' => '554899991111',
+            'sender_lid' => '11111111111111@lid',
+            'sender_name' => 'Ana Martins',
+            'status' => 'processed',
+            'received_at' => now()->subMinutes(9),
+        ])->id,
+        'source_type' => 'whatsapp_group',
+        'source_label' => 'Ana Martins',
+    ]);
+
+    $unblockedInbound = InboundMessage::query()->create([
+        'event_id' => $event->id,
+        'provider' => 'zapi',
+        'message_id' => 'open-001',
+        'message_type' => 'image',
+        'chat_external_id' => '554899992222',
+        'sender_external_id' => '554899992222',
+        'sender_phone' => '554899992222',
+        'sender_name' => 'Caio Souza',
+        'status' => 'processed',
+        'received_at' => now()->subMinutes(8),
+    ]);
+
+    EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'inbound_message_id' => $unblockedInbound->id,
+        'source_type' => 'whatsapp_direct',
+        'source_label' => 'Caio Souza',
+    ]);
+
+    EventMediaSenderBlacklist::factory()->create([
+        'event_id' => $event->id,
+        'identity_type' => 'lid',
+        'identity_value' => '11111111111111@lid',
+        'normalized_phone' => null,
+        'is_active' => true,
+    ]);
+
+    $feedResponse = $this->apiGet('/media/feed?per_page=10');
+
+    $feedResponse->assertOk();
+
+    $feedItems = collect($feedResponse->json('data'));
+    $blockedItem = $feedItems->firstWhere('id', $blockedMedia->id);
+
+    expect($blockedItem)->not->toBeNull()
+        ->and($blockedItem['sender_name'])->toBe('Ana Martins')
+        ->and($blockedItem['sender_blocked'])->toBeTrue()
+        ->and($blockedItem['sender_blacklist_enabled'])->toBeTrue()
+        ->and($blockedItem['sender_recommended_identity_type'])->toBe('lid')
+        ->and($blockedItem['sender_avatar_url'])->toBe('https://cdn.eventovivo.test/ana.jpg');
+
+    $blockedOnlyResponse = $this->apiGet('/media/feed?per_page=10&sender_blocked=1');
+
+    $blockedOnlyResponse->assertOk()
+        ->assertJsonCount(2, 'data')
+        ->assertJsonPath('data.0.sender_blocked', true)
+        ->assertJsonPath('data.1.sender_blocked', true);
+
+    $detailResponse = $this->apiGet("/media/{$blockedMedia->id}");
+
+    $this->assertApiSuccess($detailResponse);
+    $detailResponse->assertJsonPath('data.sender_media_count', 2)
+        ->assertJsonPath('data.sender_blocked', true);
+});
+
+it('blocks and unblocks a sender directly from moderation actions', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+        'current_entitlements_json' => [
+            'channels' => [
+                'blacklist' => [
+                    'enabled' => true,
+                ],
+            ],
+        ],
+    ]);
+
+    $inbound = InboundMessage::query()->create([
+        'event_id' => $event->id,
+        'provider' => 'zapi',
+        'message_id' => 'block-action-001',
+        'message_type' => 'image',
+        'chat_external_id' => '120363499999999999-group',
+        'sender_external_id' => '11111111111111@lid',
+        'sender_phone' => '554899991111',
+        'sender_lid' => '11111111111111@lid',
+        'sender_name' => 'Ana Martins',
+        'status' => 'processed',
+        'received_at' => now()->subMinutes(5),
+    ]);
+
+    $media = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'inbound_message_id' => $inbound->id,
+        'source_type' => 'whatsapp_group',
+        'source_label' => 'Ana Martins',
+    ]);
+
+    $expiresAt = now()->addHours(6)->toIso8601String();
+
+    $blockResponse = $this->apiPost("/media/{$media->id}/sender-block", [
+        'reason' => 'Bloqueado pela equipe de moderacao',
+        'expires_at' => $expiresAt,
+    ]);
+
+    $this->assertApiSuccess($blockResponse);
+    $blockResponse->assertJsonPath('data.sender_blocked', true)
+        ->assertJsonPath('data.sender_block_reason', 'Bloqueado pela equipe de moderacao')
+        ->assertJsonPath('data.sender_recommended_identity_type', 'lid')
+        ->assertJsonPath('data.sender_media_count', 1);
+
+    $entry = EventMediaSenderBlacklist::query()->where('event_id', $event->id)->sole();
+
+    expect($entry->identity_type)->toBe('lid')
+        ->and($entry->identity_value)->toBe('11111111111111@lid')
+        ->and($entry->is_active)->toBeTrue();
+
+    $unblockResponse = $this->apiDelete("/media/{$media->id}/sender-block");
+
+    $unblockResponse->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.sender_blocked', false)
+        ->assertJsonPath('data.sender_blocking_entry_id', null);
+
+    expect($entry->fresh()->is_active)->toBeFalse();
 });
 
 it('updates media favorite and pin state from moderation actions', function () {

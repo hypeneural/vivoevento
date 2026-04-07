@@ -20,6 +20,13 @@ interface PlayAnalyticsPanelProps {
   games: PlayEventGame[];
 }
 
+function formatGameTypeLabel(name?: string | null, key?: string | null) {
+  if (name) return name;
+  if (key === 'memory') return 'Memoria';
+  if (key === 'puzzle') return 'Quebra-cabeca';
+  return key ?? 'Jogo';
+}
+
 function formatElapsed(value: number | null | undefined) {
   if (!value) return '0s';
 
@@ -78,9 +85,9 @@ export function PlayAnalyticsPanel({ eventId, games }: PlayAnalyticsPanelProps) 
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold tracking-tight">Analytics do Play</h2>
+        <h2 className="text-lg font-semibold tracking-tight">Relatorios dos jogos</h2>
         <p className="text-sm text-muted-foreground">
-          Visao administrativa das sessoes, ranking e comportamento por jogo com filtros por periodo.
+          Visao administrativa das partidas, ranking e comportamento por jogo com filtros por periodo.
         </p>
       </div>
 
@@ -144,12 +151,12 @@ export function PlayAnalyticsPanel({ eventId, games }: PlayAnalyticsPanelProps) 
       {analyticsQuery.isLoading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Carregando analytics do Play...
+          Carregando relatorios dos jogos...
         </div>
       ) : analyticsQuery.isError || !analytics ? (
         <Card className="border-white/70 bg-white/90 shadow-sm">
           <CardContent className="px-6 py-10 text-center text-sm text-destructive">
-            Nao foi possivel carregar os analytics do Play.
+            Nao foi possivel carregar os relatorios dos jogos.
           </CardContent>
         </Card>
       ) : (
@@ -157,7 +164,7 @@ export function PlayAnalyticsPanel({ eventId, games }: PlayAnalyticsPanelProps) 
           <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
             <StatsCard title="Sessoes" value={analytics.summary.total_sessions} icon={Activity} />
             <StatsCard title="Jogadores unicos" value={analytics.summary.unique_players} icon={Users} />
-            <StatsCard title="Moves totais" value={analytics.summary.total_moves} icon={TimerReset} />
+            <StatsCard title="Jogadas totais" value={analytics.summary.total_moves} icon={TimerReset} />
             <StatsCard title="Melhor score" value={analytics.summary.best_score ?? 0} icon={Trophy} />
           </div>
 
@@ -175,7 +182,7 @@ export function PlayAnalyticsPanel({ eventId, games }: PlayAnalyticsPanelProps) 
                   <ChartContainer
                     config={{
                       sessions: { label: 'Sessoes', color: '#22c55e' },
-                      total_moves: { label: 'Moves', color: '#0f172a' },
+                      total_moves: { label: 'Jogadas', color: '#0f172a' },
                     }}
                     className="h-[280px] w-full"
                   >
@@ -234,7 +241,7 @@ export function PlayAnalyticsPanel({ eventId, games }: PlayAnalyticsPanelProps) 
                     <div>
                       <p className="font-semibold">{item.game.title}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {item.game.game_type_name || item.game.game_type_key} · slug `{item.game.slug}`
+                        {formatGameTypeLabel(item.game.game_type_name, item.game.game_type_key)} - endereco `{item.game.slug}`
                       </p>
                     </div>
                     <Badge variant={item.game.is_active ? 'outline' : 'secondary'}>
@@ -252,7 +259,7 @@ export function PlayAnalyticsPanel({ eventId, games }: PlayAnalyticsPanelProps) 
                       <p className="mt-1 font-semibold">{Math.round(item.analytics.completion_rate)}%</p>
                     </div>
                     <div className="rounded-2xl bg-white p-3">
-                      <p className="text-xs text-muted-foreground">Moves</p>
+                      <p className="text-xs text-muted-foreground">Jogadas</p>
                       <p className="mt-1 font-semibold">{item.analytics.total_moves}</p>
                     </div>
                     <div className="rounded-2xl bg-white p-3">
@@ -277,7 +284,7 @@ export function PlayAnalyticsPanel({ eventId, games }: PlayAnalyticsPanelProps) 
                     <TableHead>Jogador</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Score</TableHead>
-                    <TableHead>Moves</TableHead>
+                    <TableHead>Jogadas</TableHead>
                     <TableHead>Tempo</TableHead>
                     <TableHead>Fim</TableHead>
                   </TableRow>
@@ -295,7 +302,7 @@ export function PlayAnalyticsPanel({ eventId, games }: PlayAnalyticsPanelProps) 
                         <TableCell>
                           <div>
                             <p className="font-medium">{session.game?.title || 'Jogo removido'}</p>
-                            <p className="text-xs text-muted-foreground">{session.game?.game_type_name || session.game?.game_type_key}</p>
+                            <p className="text-xs text-muted-foreground">{formatGameTypeLabel(session.game?.game_type_name, session.game?.game_type_key)}</p>
                           </div>
                         </TableCell>
                         <TableCell>

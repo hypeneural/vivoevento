@@ -1,5 +1,7 @@
 import Pusher from 'pusher-js';
 
+import { shouldDisableRealtimeInDev } from '@/lib/realtime';
+
 let pusherInstance: Pusher | null = null;
 
 const REVERB_KEY = import.meta.env.VITE_REVERB_APP_KEY || '';
@@ -31,6 +33,15 @@ export function createPlayPusher(): Pusher | null {
   }
 
   if (isReverb()) {
+    if (shouldDisableRealtimeInDev('PlayRealtime', {
+      key: REVERB_KEY,
+      host: REVERB_HOST,
+      port: REVERB_PORT,
+      scheme: REVERB_SCHEME,
+    })) {
+      return null;
+    }
+
     const forceTLS = REVERB_SCHEME === 'https';
 
     pusherInstance = new Pusher(key, {

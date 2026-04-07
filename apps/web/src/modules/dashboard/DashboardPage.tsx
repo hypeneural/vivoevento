@@ -14,7 +14,7 @@ import { EventStatusBadge } from '@/shared/components/StatusBadges';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { useTheme } from '@/app/providers/ThemeProvider';
-import { useDashboardStats } from './hooks/useDashboardStats';
+import { useDashboardStats, type DashboardData } from './hooks/useDashboardStats';
 import { EVENT_TYPE_LABELS } from '@/shared/types';
 
 // ─── Animation variants ───────────────────────────────────
@@ -81,6 +81,22 @@ function buildRevenueBreakdown(kpis: {
 }
 
 // ─── Skeleton Placeholder ─────────────────────────────────
+function hasDashboardData(value: DashboardData | undefined): value is DashboardData {
+  return Boolean(
+    value
+      && value.kpis
+      && value.changes
+      && value.charts
+      && Array.isArray(value.charts.uploads_per_hour)
+      && Array.isArray(value.charts.events_by_type)
+      && Array.isArray(value.charts.engagement_by_module)
+      && Array.isArray(value.recent_events)
+      && Array.isArray(value.moderation_queue)
+      && Array.isArray(value.top_partners)
+      && Array.isArray(value.alerts),
+  );
+}
+
 function SkeletonCard() {
   return (
     <div className="glass rounded-xl p-3.5 animate-pulse">
@@ -109,6 +125,7 @@ function SkeletonChart({ height = 200 }: { height?: number }) {
 export default function DashboardPage() {
   const { data, isLoading, isError } = useDashboardStats();
   const cs = useChartStyles();
+  const dashboardData = hasDashboardData(data) ? data : null;
 
   const tooltipStyle: React.CSSProperties = {
     background: cs.tooltipBg,
@@ -137,7 +154,7 @@ export default function DashboardPage() {
   }
 
   // ─── Error State ────────────────────────────────────────
-  if (isError || !data) {
+  if (isError || !dashboardData) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
         <div className="rounded-full bg-destructive/10 p-4">
@@ -154,7 +171,7 @@ export default function DashboardPage() {
     );
   }
 
-  const { kpis, changes, charts, recent_events, moderation_queue, top_partners, alerts } = data;
+  const { kpis, changes, charts, recent_events, moderation_queue, top_partners, alerts } = dashboardData;
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-4 sm:space-y-5">
@@ -446,7 +463,7 @@ export default function DashboardPage() {
               <Link to="/moderation"><ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />Moderar</Link>
             </Button>
             <Button variant="outline" size="sm" className="h-9 text-xs justify-start gap-1.5" asChild>
-              <Link to="/analytics"><TrendingUp className="h-3.5 w-3.5 text-blue-500" />Analytics</Link>
+              <Link to="/analytics"><TrendingUp className="h-3.5 w-3.5 text-blue-500" />Relatorios</Link>
             </Button>
             <Button variant="outline" size="sm" className="h-9 text-xs justify-start gap-1.5" asChild>
               <Link to="/settings"><Users2 className="h-3.5 w-3.5 text-amber-500" />Equipe</Link>

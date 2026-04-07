@@ -1,0 +1,30 @@
+{
+  "text": {
+    "message": "Teste de msg"
+  },
+  "type": "ReceivedCallback",
+  "phone": "120363499999999999-group",
+  "photo": null,
+  "fromMe": false,
+  "isEdit": false,
+  "status": "RECEIVED",
+  "chatLid": null,
+  "fromApi": false,
+  "isGroup": true,
+  "momment": 1775411001000,
+  "chatName": "Grupo Fixture Evento",
+  "broadcast": false,
+  "forwarded": false,
+  "messageId": "2A958180963854924D66",
+  "instanceId": "INSTANCE-FIXTURE-001",
+  "senderName": "Participante Fixture",
+  "senderPhoto": "https://cdn.fixture.test/zapi/sender-avatar.jpg",
+  "isNewsletter": false,
+  "isStatusReply": false,
+  "connectedPhone": "554899990000",
+  "participantLid": "11111111111111@lid",
+  "waitingMessage": false,
+  "participantPhone": "554899991111",
+  "referenceMessageId": "2A0FAD41C97ED0DF206A",
+  "messageExpirationSeconds": 0
+}

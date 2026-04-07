@@ -2,6 +2,8 @@
 
 namespace App\Modules\Dashboard\Queries;
 
+use App\Modules\MediaProcessing\Enums\MediaProcessingStatus;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -13,6 +15,7 @@ class AlertsQuery
     public function execute(int $organizationId): array
     {
         $alerts = [];
+        $today = CarbonImmutable::today()->toDateString();
 
         if (! Schema::hasTable('event_media')) {
             return $alerts;
@@ -52,8 +55,8 @@ class AlertsQuery
             JOIN events e ON em.event_id = e.id
             WHERE e.organization_id = ?
               AND e.deleted_at IS NULL
-              AND em.processing_status = 'error'
-        ", [$organizationId]);
+              AND em.processing_status = ?
+        ", [$organizationId, MediaProcessingStatus::Failed->value]);
 
         if ($errorCount && (int) $errorCount->c > 0) {
             $count = (int) $errorCount->c;
@@ -73,9 +76,9 @@ class AlertsQuery
             WHERE e.organization_id = ?
               AND e.deleted_at IS NULL
               AND e.status = 'active'
-              AND DATE(e.starts_at) = CURRENT_DATE
+              AND DATE(e.starts_at) = ?
               AND (SELECT COUNT(*) FROM event_media WHERE event_id = e.id) = 0
-        ", [$organizationId]);
+        ", [$organizationId, $today]);
 
         foreach ($todayEvents as $event) {
             $alerts[] = [

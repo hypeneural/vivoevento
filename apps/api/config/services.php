@@ -50,4 +50,12 @@ return [
         'retry_sleep_ms' => (int) env('PAGARME_RETRY_SLEEP_MS', 100),
     ],
 
+    'telegram' => [
+        'base_url' => env('TELEGRAM_BASE_URL', 'https://api.telegram.org'),
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
+        'webhook_secret_token' => env('TELEGRAM_WEBHOOK_SECRET_TOKEN'),
+        'timeout' => (int) env('TELEGRAM_TIMEOUT', 15),
+        'connect_timeout' => (int) env('TELEGRAM_CONNECT_TIMEOUT', 5),
+    ],
+
 ];

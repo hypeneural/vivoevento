@@ -150,6 +150,8 @@ class OrganizationController extends BaseController
 
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', Organization::class);
+
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:180'],
             'type' => ['nullable', Rule::enum(OrganizationType::class)],
@@ -178,6 +180,8 @@ class OrganizationController extends BaseController
 
     public function store(StoreOrganizationRequest $request, CreateOrganizationAction $action): JsonResponse
     {
+        $this->authorize('create', Organization::class);
+
         $organization = $action->execute($request->validated());
 
         return $this->created(new OrganizationResource($organization));
@@ -185,6 +189,8 @@ class OrganizationController extends BaseController
 
     public function show(Organization $organization): JsonResponse
     {
+        $this->authorize('view', $organization);
+
         $organization->loadCount(['clients', 'events']);
 
         return $this->success(new OrganizationResource($organization));
@@ -192,6 +198,8 @@ class OrganizationController extends BaseController
 
     public function update(UpdateOrganizationRequest $request, Organization $organization, UpdateOrganizationAction $action): JsonResponse
     {
+        $this->authorize('update', $organization);
+
         $organization = $action->execute($organization, $request->validated());
 
         return $this->success(new OrganizationResource($organization));
@@ -199,6 +207,8 @@ class OrganizationController extends BaseController
 
     public function destroy(Organization $organization): JsonResponse
     {
+        $this->authorize('delete', $organization);
+
         $organization->delete();
 
         return $this->noContent();

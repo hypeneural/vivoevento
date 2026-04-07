@@ -76,6 +76,8 @@ export default function PublicGalleryPage() {
                     src={item.thumbnail_url}
                     alt={item.caption || item.sender_name}
                     className="w-full object-cover"
+                    loading="lazy"
+                    decoding="async"
                   />
                 ) : (
                   <div className="flex h-48 items-center justify-center text-sm text-white/55">Sem preview</div>

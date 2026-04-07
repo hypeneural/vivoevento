@@ -18,7 +18,7 @@ export default function PublicHubPage() {
   if (!slug) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-slate-950 px-6 text-center text-white">
-        Link do hub invalido.
+        Link da pagina de links invalido.
       </div>
     );
   }
@@ -28,7 +28,7 @@ export default function PublicHubPage() {
       <div className="flex min-h-[100dvh] items-center justify-center bg-slate-950">
         <div className="flex items-center gap-2 text-sm text-white/70">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Carregando hub...
+          Carregando pagina de links...
         </div>
       </div>
     );
@@ -39,7 +39,7 @@ export default function PublicHubPage() {
       <div className="flex min-h-[100dvh] items-center justify-center bg-slate-950 px-6 text-center">
         <div className="max-w-sm space-y-3">
           <AlertTriangle className="mx-auto h-10 w-10 text-amber-400" />
-          <h1 className="text-xl font-semibold text-white">Hub indisponivel</h1>
+          <h1 className="text-xl font-semibold text-white">Pagina de links indisponivel</h1>
           <p className="text-sm text-white/65">Este link nao esta ativo no momento.</p>
         </div>
       </div>

@@ -1,9 +1,9 @@
-﻿@use '../styles/variables' as *;
+@use '../styles/variables' as *;
 @use '../styles/mixins' as *;
 
 .grid {
   display: grid;
-  gap: 1.7rem;
+  gap: 1.8rem;
   align-items: start;
 }
 
@@ -47,30 +47,110 @@
   }
 }
 
-.sourceStrip {
+.stageColumn {
+  @include surface(rgba(9, 15, 27, 0.86), $border-strong, 20px);
+  position: relative;
+  border-radius: $radius-lg;
+  padding: 1rem;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(135deg, rgba($c-accent-warm, 0.08), transparent 44%),
+      radial-gradient(circle at 88% 12%, rgba($c-accent, 0.14), transparent 26%);
+    pointer-events: none;
+  }
+}
+
+.stageHeader,
+.photoPicker,
+.modeTabs,
+.stageInfo,
+.stageFrame {
+  position: relative;
+  z-index: 1;
+}
+
+.stageHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.9rem;
+
+  span {
+    color: $c-accent-warm;
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  strong {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 1.12rem;
+    letter-spacing: -0.04em;
+  }
+}
+
+.stagePills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding: 0 0.7rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    color: $c-white-64;
+    font-size: 0.74rem;
+  }
+}
+
+.photoPicker {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.55rem;
+  margin-top: 1rem;
+
+  button {
+    @include button-reset;
+    overflow: hidden;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    min-height: 5rem;
+    background: rgba(255, 255, 255, 0.03);
+    transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  }
+
+  button:hover {
+    transform: translateY(-1px);
+  }
 
   img {
     width: 100%;
     aspect-ratio: 1;
-    border-radius: 18px;
     object-fit: cover;
-    border: 1px solid rgba(255, 255, 255, 0.08);
   }
 }
 
-.stageColumn {
-  @include surface(rgba(10, 16, 29, 0.82), $border-strong, 18px);
-  border-radius: $radius-lg;
-  padding: 1rem;
+.activeImage {
+  border-color: rgba($c-accent-warm, 0.24) !important;
+  box-shadow: 0 0 0 1px rgba($c-accent-warm, 0.16), $shadow-warm;
 }
 
 .modeTabs {
   display: inline-grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.55rem;
+  margin-top: 1rem;
   padding: 0.35rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.04);
@@ -94,11 +174,10 @@
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  background: rgba($c-accent-warm, 0.16);
+  background: rgba($c-accent-warm, 0.18);
   border: 1px solid rgba($c-accent-warm, 0.26);
 }
 
-.activeTab span:last-child,
 .activeTab > span {
   position: relative;
   z-index: 1;
@@ -106,15 +185,24 @@
 }
 
 .stageInfo {
+  @include surface(rgba(8, 13, 24, 0.72), 1px solid rgba(255, 255, 255, 0.06), 14px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
   margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 24px;
 
   strong {
     display: block;
-    font-size: 1.1rem;
+    font-size: 1.08rem;
     letter-spacing: -0.03em;
   }
 
   p {
+    max-width: 34rem;
     margin-top: 0.35rem;
     color: $c-white-64;
   }
@@ -138,32 +226,36 @@
 }
 
 .phoneFrame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
   border-radius: 30px;
   border: 1px solid rgba($c-accent-secondary, 0.16);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
-    rgba(4, 9, 16, 0.9);
-  min-height: 32rem;
+    rgba(4, 9, 16, 0.92);
+  min-height: 33rem;
   padding: 0.65rem;
 }
 
 .demoCanvas {
-  width: 100%;
-  height: 100%;
-  min-height: 30rem;
+  width: min(100%, 23.4rem);
+  aspect-ratio: 390 / 640;
 }
 
 .demoCanvas canvas {
   width: 100% !important;
-  height: 100% !important;
+  height: auto !important;
+  display: block;
+  margin: 0 auto;
   border-radius: 24px;
 }
 
 .loader {
   @include flex-center;
-  height: 100%;
-  min-height: 30rem;
+  width: min(100%, 23.4rem);
+  aspect-ratio: 390 / 640;
   border-radius: 24px;
   background:
     linear-gradient(135deg, rgba($c-accent-secondary, 0.12), rgba($c-accent-warm, 0.08)),
@@ -171,6 +263,98 @@
   color: $c-white-64;
   text-align: center;
   padding: 1.2rem;
+}
+
+.previewShell {
+  @include button-reset;
+  position: relative;
+  display: grid;
+  align-items: end;
+  width: min(100%, 23.4rem);
+  aspect-ratio: 390 / 640;
+  padding: 1rem;
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(5, 9, 19, 0.18)),
+    rgba(9, 15, 26, 0.94);
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.previewShell:hover {
+  transform: translateY(-2px);
+  border-color: rgba($c-accent, 0.18);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.22);
+}
+
+.previewBoard {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.previewBoard[data-mode='puzzle'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.previewBoard[data-mode='memory'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.previewTile,
+.memoryPreviewCard {
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: #132237;
+  min-height: 8.2rem;
+}
+
+.previewTile {
+  background-size: 300% 300%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.memoryPreviewCard {
+  @include button-reset;
+  position: relative;
+  min-height: 8.6rem;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  span {
+    position: absolute;
+    inset: auto 0 0 0;
+    padding: 0.6rem 0.75rem;
+    background: linear-gradient(180deg, transparent, rgba(5, 9, 19, 0.86));
+    color: $c-white;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+}
+
+.previewOverlay {
+  @include surface(rgba(8, 13, 24, 0.78), 1px solid rgba($c-accent, 0.16), 14px);
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 1rem;
+  padding: 0.95rem 1rem;
+  border-radius: 22px;
+
+  strong {
+    font-size: 1rem;
+    letter-spacing: -0.03em;
+  }
+
+  span {
+    color: $c-white-64;
+    font-size: 0.9rem;
+  }
 }
 
 .scorePanel {
@@ -194,7 +378,7 @@
   }
 
   strong {
-    max-width: 18rem;
+    max-width: 20rem;
     text-align: right;
     font-size: 0.92rem;
   }
@@ -202,7 +386,40 @@
 
 @media (min-width: 1120px) {
   .grid {
-    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+    grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
     gap: 2.2rem;
+  }
+}
+
+@media (max-width: 719px) {
+  .photoPicker {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .phoneFrame {
+    min-height: 26.25rem;
+  }
+
+  .demoCanvas,
+  .loader,
+  .previewShell {
+    width: min(100%, 19.8rem);
+  }
+
+  .previewTile,
+  .memoryPreviewCard {
+    min-height: 6.8rem;
+  }
+
+  .stageInfo {
+    align-items: start;
+  }
+
+  .scorePanel div {
+    flex-direction: column;
+  }
+
+  .scorePanel strong {
+    text-align: left;
   }
 }

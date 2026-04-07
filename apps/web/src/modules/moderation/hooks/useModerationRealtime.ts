@@ -50,7 +50,7 @@ export function useModerationRealtime({
     const pusher = createModerationPusher();
 
     if (!pusher) {
-      setConnectionStatus('error');
+      setConnectionStatus('idle');
       return undefined;
     }
 

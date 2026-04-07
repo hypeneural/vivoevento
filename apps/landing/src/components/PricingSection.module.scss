@@ -1,4 +1,4 @@
-﻿@use '../styles/variables' as *;
+@use '../styles/variables' as *;
 @use '../styles/mixins' as *;
 
 .header {
@@ -28,6 +28,11 @@
   box-shadow: $shadow-soft, $shadow-glow;
 }
 
+.cardHeader {
+  display: grid;
+  gap: 0.8rem;
+}
+
 .badge {
   justify-self: start;
   padding: 0.35rem 0.6rem;
@@ -40,7 +45,30 @@
   text-transform: uppercase;
 }
 
-.card h3 {
+.signalRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding: 0 0.7rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    color: $c-white-64;
+    font-size: 0.76rem;
+    font-weight: 800;
+  }
+}
+
+.identity {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.identity h3 {
   font-size: 1.3rem;
   letter-spacing: -0.03em;
 }
@@ -55,6 +83,27 @@
   letter-spacing: -0.04em;
 }
 
+.storyPanel {
+  @include surface(rgba(8, 13, 24, 0.72), 1px solid rgba(255, 255, 255, 0.06), 14px);
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.95rem;
+  border-radius: 22px;
+
+  span {
+    color: $c-white-48;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  strong {
+    font-size: 1rem;
+    letter-spacing: -0.03em;
+  }
+}
+
 .features {
   display: grid;
   gap: 0.65rem;
@@ -63,6 +112,9 @@
     display: grid;
     grid-template-columns: auto 1fr;
     gap: 0.6rem;
+    padding: 0.8rem 0.9rem;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.04);
     color: $c-white-80;
   }
 

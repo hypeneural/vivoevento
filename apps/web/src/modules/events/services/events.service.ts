@@ -10,6 +10,7 @@ import type {
   EventFormPayload,
   EventListItem,
   EventShareLinks,
+  EventTelegramOperationalStatus,
   ListEventsFilters,
   PaginatedEventsResponse,
 } from '../types';
@@ -60,6 +61,10 @@ export const eventsService = {
 
   async shareLinks(id: number | string) {
     return api.get<EventShareLinks>(`/events/${id}/share-links`);
+  },
+
+  async telegramOperationalStatus(id: number | string) {
+    return api.get<EventTelegramOperationalStatus>(`/events/${id}/telegram/operational-status`);
   },
 
   async listClients() {

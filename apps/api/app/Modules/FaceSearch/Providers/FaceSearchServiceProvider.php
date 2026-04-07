@@ -7,6 +7,9 @@ use App\Modules\FaceSearch\Services\FaceDetectionProviderManager;
 use App\Modules\FaceSearch\Services\FaceEmbeddingProviderInterface;
 use App\Modules\FaceSearch\Services\FaceEmbeddingProviderManager;
 use App\Modules\FaceSearch\Services\FaceVectorStoreInterface;
+use App\Modules\FaceSearch\Services\CompreFaceClient;
+use App\Modules\FaceSearch\Services\CompreFaceDetectionProvider;
+use App\Modules\FaceSearch\Services\CompreFaceEmbeddingProvider;
 use App\Modules\FaceSearch\Services\NullFaceDetectionProvider;
 use App\Modules\FaceSearch\Services\NullFaceEmbeddingProvider;
 use App\Modules\FaceSearch\Services\PgvectorFaceVectorStore;
@@ -17,17 +20,22 @@ class FaceSearchServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->singleton(CompreFaceClient::class);
+        $this->app->singleton(CompreFaceDetectionProvider::class);
+        $this->app->singleton(CompreFaceEmbeddingProvider::class);
         $this->app->singleton(NullFaceDetectionProvider::class);
         $this->app->singleton(NullFaceEmbeddingProvider::class);
         $this->app->singleton(PgvectorFaceVectorStore::class);
         $this->app->singleton(FaceDetectionProviderInterface::class, function ($app) {
             return new FaceDetectionProviderManager([
                 'noop' => $app->make(NullFaceDetectionProvider::class),
+                'compreface' => $app->make(CompreFaceDetectionProvider::class),
             ]);
         });
         $this->app->singleton(FaceEmbeddingProviderInterface::class, function ($app) {
             return new FaceEmbeddingProviderManager([
                 'noop' => $app->make(NullFaceEmbeddingProvider::class),
+                'compreface' => $app->make(CompreFaceEmbeddingProvider::class),
             ]);
         });
         $this->app->singleton(FaceVectorStoreInterface::class, fn ($app) => $app->make(PgvectorFaceVectorStore::class));

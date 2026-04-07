@@ -5,6 +5,8 @@ namespace App\Modules\Events\Http\Resources;
 use App\Modules\ContentModeration\Http\Resources\EventContentModerationSettingResource;
 use App\Modules\FaceSearch\Http\Resources\EventFaceSearchSettingResource;
 use App\Modules\MediaIntelligence\Http\Resources\EventMediaIntelligenceSettingResource;
+use App\Modules\Events\Support\EventIntakeBlacklistStateBuilder;
+use App\Modules\Events\Support\EventIntakeChannelsStateBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Storage;
@@ -16,6 +18,8 @@ class EventResource extends JsonResource
         $organizationName = $this->organization?->trade_name
             ?? $this->organization?->legal_name
             ?? $this->organization?->name;
+        $intakeState = app(EventIntakeChannelsStateBuilder::class)->build($this->resource);
+        $blacklistState = app(EventIntakeBlacklistStateBuilder::class)->build($this->resource);
 
         return [
             'id' => $this->id,
@@ -46,6 +50,9 @@ class EventResource extends JsonResource
             'upload_api_url' => $this->publicUploadApiUrl(),
             'retention_days' => $this->retention_days,
             'current_entitlements' => $this->current_entitlements_json,
+            'intake_defaults' => $intakeState['intake_defaults'],
+            'intake_channels' => $intakeState['intake_channels'],
+            'intake_blacklist' => $blacklistState['intake_blacklist'],
             'created_by' => $this->created_by,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

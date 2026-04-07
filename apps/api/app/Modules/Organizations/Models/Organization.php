@@ -3,6 +3,8 @@
 namespace App\Modules\Organizations\Models;
 
 use App\Modules\Organizations\Enums\OrganizationType;
+use App\Modules\Partners\Models\PartnerProfile;
+use App\Modules\Partners\Models\PartnerStat;
 use App\Shared\Concerns\HasAudit;
 use App\Shared\Enums\Status;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -111,6 +113,16 @@ class Organization extends Model
     public function invoices(): HasMany
     {
         return $this->hasMany(\App\Modules\Billing\Models\Invoice::class);
+    }
+
+    public function partnerProfile(): HasOne
+    {
+        return $this->hasOne(PartnerProfile::class);
+    }
+
+    public function partnerStats(): HasOne
+    {
+        return $this->hasOne(PartnerStat::class);
     }
 
     // ─── Helpers ──────────────────────────────────────────

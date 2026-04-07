@@ -77,7 +77,7 @@ export function buildMockSession(user: User): UserSession {
   const allPerms = [
     'dashboard.view', 'events.view', 'events.create', 'events.update',
     'channels.view', 'channels.manage', 'media.view', 'media.moderate', 'gallery.manage', 'wall.manage',
-    'play.manage', 'hub.manage', 'partners.view', 'partners.manage',
+    'play.manage', 'hub.manage', 'partners.view.any', 'partners.manage.any',
     'clients.view', 'clients.manage', 'plans.view', 'billing.manage',
     'analytics.view', 'audit.view', 'settings.manage', 'branding.manage',
     'integrations.manage', 'team.manage',
@@ -86,7 +86,7 @@ export function buildMockSession(user: User): UserSession {
   const rolePermMap: Record<string, string[]> = {
     super_admin: allPerms,
     platform_admin: allPerms.filter(p => !p.startsWith('billing')),
-    partner_owner: allPerms.filter(p => !['audit.view', 'partners.manage'].includes(p)),
+    partner_owner: allPerms.filter(p => !['audit.view', 'partners.manage.any'].includes(p)),
     partner_manager: ['dashboard.view', 'events.view', 'events.create', 'events.update', 'channels.view', 'channels.manage', 'media.view', 'media.moderate', 'gallery.manage', 'wall.manage', 'play.manage', 'hub.manage', 'analytics.view', 'settings.manage', 'team.manage'],
     event_operator: ['dashboard.view', 'events.view', 'channels.view', 'media.view', 'media.moderate', 'gallery.manage', 'wall.manage', 'play.manage'],
     financial: ['dashboard.view', 'plans.view', 'billing.manage', 'analytics.view'],

@@ -25,7 +25,14 @@ Scripts versionados de deploy por release para a VPS de producao.
 
 - `deploy.sh` assume release imutavel e symlink `current`
 - `storage:link` e tratado de forma deterministica no deploy
+- o build do admin remove assets Vite nao referenciados por `index.html` ou
+  `sw.js` da release atual, reduzindo o risco de chunk antigo sobreviver na
+  origin
+- `healthcheck.sh` tambem valida `storage/app/public` quando a fase 1 usa
+  `FILESYSTEM_DISK=public`
 - `smoke-test.sh` exige `/health/live` e `/health/ready` por padrao
+- se a Cloudflare continuar servindo `/sw.js` ou chunks antigos como
+  `CF-Cache-Status: HIT`, purgar o cache no painel antes de validar o navegador
 - `deploy.sh` e `rollback.sh` assumem que o usuario `deploy` tem acesso
   apenas ao sudoers minimo para os `systemctl` previstos
 - `rollback.sh` nao resolve migration destrutiva; isso continua sendo uma

@@ -72,29 +72,34 @@ export function resolveQuickFilter(
   statusFilter: string,
   featuredOnly: boolean,
   pinnedOnly: boolean,
+  blockedSenderOnly: boolean,
 ): ModerationQuickFilterKey | null {
-  if (!featuredOnly && !pinnedOnly && statusFilter === 'all') {
+  if (!featuredOnly && !pinnedOnly && !blockedSenderOnly && statusFilter === 'all') {
     return 'all';
   }
 
-  if (!featuredOnly && !pinnedOnly && statusFilter === 'pending_moderation') {
+  if (!featuredOnly && !pinnedOnly && !blockedSenderOnly && statusFilter === 'pending_moderation') {
     return 'pending_moderation';
   }
 
-  if (!featuredOnly && !pinnedOnly && statusFilter === 'approved') {
+  if (!featuredOnly && !pinnedOnly && !blockedSenderOnly && statusFilter === 'approved') {
     return 'approved';
   }
 
-  if (!featuredOnly && !pinnedOnly && statusFilter === 'rejected') {
+  if (!featuredOnly && !pinnedOnly && !blockedSenderOnly && statusFilter === 'rejected') {
     return 'rejected';
   }
 
-  if (featuredOnly && !pinnedOnly && statusFilter === 'all') {
+  if (featuredOnly && !pinnedOnly && !blockedSenderOnly && statusFilter === 'all') {
     return 'featured';
   }
 
-  if (pinnedOnly && !featuredOnly && statusFilter === 'all') {
+  if (pinnedOnly && !featuredOnly && !blockedSenderOnly && statusFilter === 'all') {
     return 'pinned';
+  }
+
+  if (blockedSenderOnly && !featuredOnly && !pinnedOnly && statusFilter === 'all') {
+    return 'blocked_sender';
   }
 
   return null;

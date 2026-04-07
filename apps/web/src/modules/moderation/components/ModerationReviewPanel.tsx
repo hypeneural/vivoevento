@@ -1,9 +1,12 @@
-import { Check, ChevronLeft, ChevronRight, Copy, ImageIcon, Pin, Star, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Copy, ImageIcon, Pin, ShieldBan, ShieldCheck, Star, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { AspectRatio } from '@/components/ui/aspect-ratio';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import type { ApiEventMediaDetail, ApiEventMediaItem } from '@/lib/api-types';
 import { ChannelBadge, MediaStatusBadge } from '@/shared/components/StatusBadges';
 
@@ -21,6 +24,10 @@ interface ModerationReviewPanelProps {
   canGoNext?: boolean;
   onPrevious?: () => void;
   onNext?: () => void;
+  senderBlockBusy?: boolean;
+  senderBlockDuration?: string;
+  onSenderBlockDurationChange?: (value: string) => void;
+  onSenderBlockToggle?: (checked: boolean) => void;
 }
 
 function hasAiEvaluations(media: ApiEventMediaItem | ApiEventMediaDetail): media is ApiEventMediaDetail {
@@ -41,6 +48,10 @@ export function ModerationReviewPanel({
   canGoNext = false,
   onPrevious,
   onNext,
+  senderBlockBusy = false,
+  senderBlockDuration = '7d',
+  onSenderBlockDurationChange,
+  onSenderBlockToggle,
 }: ModerationReviewPanelProps) {
   if (!media) {
     return (
@@ -71,6 +82,13 @@ export function ModerationReviewPanel({
         safety: null,
         vlm: null,
       };
+  const senderIdentity = media.sender_phone || media.sender_lid || media.sender_external_id || null;
+  const canManageSenderBlock = canModerate && !!media.sender_blacklist_enabled && !!media.sender_recommended_identity_value && !!onSenderBlockToggle;
+  const senderBlockSummary = media.sender_blocked
+    ? media.sender_block_expires_at
+      ? `Bloqueado ate ${formatDateTime(media.sender_block_expires_at)}`
+      : 'Bloqueio sem prazo definido'
+    : 'Remetente liberado para novas midias';
 
   return (
     <div className="overflow-hidden rounded-[28px] border border-border/60 bg-background/90 shadow-sm">
@@ -203,6 +221,87 @@ export function ModerationReviewPanel({
                 ? `Agrupada em ${media.duplicate_group_key}`
                 : 'Nenhuma similaridade relevante detectada ate agora'}
             </p>
+          </div>
+        </div>
+
+        <div className="space-y-3 rounded-3xl border border-border/60 bg-muted/20 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <Avatar className="h-12 w-12 border border-border/60">
+                <AvatarImage src={media.sender_avatar_url ?? undefined} alt={media.sender_name || 'Remetente'} />
+                <AvatarFallback>{(media.sender_name || 'EV').slice(0, 2).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">{media.sender_name || 'Convidado'}</p>
+                <p className="truncate text-xs text-muted-foreground">{senderIdentity || 'Sem identidade rastreavel'}</p>
+              </div>
+            </div>
+            <Badge className={media.sender_blocked ? 'border-0 bg-rose-600/95 text-white' : 'border-0 bg-emerald-600/95 text-white'}>
+              {media.sender_blocked ? <ShieldBan className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+              {media.sender_blocked ? 'Bloqueado' : 'Liberado'}
+            </Badge>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Midias deste remetente</p>
+              <p className="mt-1 text-sm font-medium">{media.sender_media_count ?? 0}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Identidade usada no bloqueio</p>
+              <p className="mt-1 text-sm font-medium">{media.sender_recommended_identity_value || 'Nao disponivel'}</p>
+            </div>
+            <div className="sm:col-span-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Estado do remetente</p>
+              <p className="mt-1 text-sm font-medium">{senderBlockSummary}</p>
+              {media.sender_block_reason ? (
+                <p className="mt-1 text-sm text-muted-foreground">Motivo: {media.sender_block_reason}</p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="grid gap-3 rounded-2xl border border-border/60 bg-background/70 p-4 sm:grid-cols-[minmax(0,1fr)_220px]">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold">Bloqueio rapido do remetente</p>
+              <p className="text-sm text-muted-foreground">
+                Ative o switch para bloquear novas midias deste autor sem sair da fila.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Prazo do bloqueio</p>
+              <Select
+                value={senderBlockDuration}
+                onValueChange={onSenderBlockDurationChange}
+                disabled={!canManageSenderBlock || senderBlockBusy || !!media.sender_blocked}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o prazo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="24h">24 horas</SelectItem>
+                  <SelectItem value="7d">7 dias</SelectItem>
+                  <SelectItem value="30d">30 dias</SelectItem>
+                  <SelectItem value="forever">Sem prazo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="sm:col-span-2 flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/20 p-3">
+              <div>
+                <p className="text-sm font-medium">{media.sender_blocked ? 'Remetente bloqueado' : 'Permitir remetente'}</p>
+                <p className="text-xs text-muted-foreground">
+                  {canManageSenderBlock
+                    ? 'O bloqueio vale para este evento e pode ser revertido depois.'
+                    : media.sender_blacklist_enabled
+                      ? 'Esta midia nao traz identidade suficiente para aplicar bloqueio rapido.'
+                      : 'O pacote atual deste evento nao habilita bloqueio por remetente.'}
+                </p>
+              </div>
+              <Switch
+                checked={!!media.sender_blocked}
+                disabled={!canManageSenderBlock || senderBlockBusy}
+                onCheckedChange={onSenderBlockToggle}
+              />
+            </div>
           </div>
         </div>
 

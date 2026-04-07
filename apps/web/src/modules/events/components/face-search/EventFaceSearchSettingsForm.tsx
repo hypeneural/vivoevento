@@ -28,7 +28,7 @@ import type { UpdateEventFaceSearchSettingsPayload } from '../../api';
 
 const faceSearchSettingsSchema = z.object({
   enabled: z.boolean(),
-  provider_key: z.enum(['noop']),
+  provider_key: z.enum(['noop', 'compreface']),
   embedding_model_key: z.string().trim().min(1, 'Informe o modelo de embedding.').max(120, 'Use ate 120 caracteres.'),
   vector_store_key: z.enum(['pgvector']),
   min_face_size_px: z.string().regex(/^\d+$/, 'Informe um numero inteiro valido.'),
@@ -56,7 +56,7 @@ function toFormValue(value: number) {
 function buildFormValues(settings: ApiEventFaceSearchSettings): FaceSearchSettingsFormValues {
   return {
     enabled: settings.enabled,
-    provider_key: 'noop',
+    provider_key: settings.provider_key === 'compreface' ? 'compreface' : 'noop',
     embedding_model_key: settings.embedding_model_key,
     vector_store_key: 'pgvector',
     min_face_size_px: String(settings.min_face_size_px),
@@ -194,10 +194,11 @@ export function EventFaceSearchSettingsForm({
                   </FormControl>
                   <SelectContent>
                     <SelectItem value="noop">Noop</SelectItem>
+                    <SelectItem value="compreface">CompreFace</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormDescription>
-                  O dominio ja nasce desacoplado para trocar a engine depois.
+                  CompreFace usa deteccao facial com `calculator` para embeddings.
                 </FormDescription>
                 <FormMessage />
               </FormItem>

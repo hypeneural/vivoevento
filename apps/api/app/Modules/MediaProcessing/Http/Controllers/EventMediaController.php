@@ -8,9 +8,11 @@ use App\Modules\MediaProcessing\Actions\BulkApproveEventMediaAction;
 use App\Modules\MediaProcessing\Actions\BulkRejectEventMediaAction;
 use App\Modules\MediaProcessing\Actions\BulkUpdateEventMediaFeaturedAction;
 use App\Modules\MediaProcessing\Actions\BulkUpdateEventMediaPinnedAction;
+use App\Modules\MediaProcessing\Actions\DeactivateEventMediaSenderBlockAction;
 use App\Modules\MediaProcessing\Actions\DeleteEventMediaAction;
 use App\Modules\MediaProcessing\Actions\RejectEventMediaAction;
 use App\Modules\MediaProcessing\Actions\ReprocessEventMediaStageAction;
+use App\Modules\MediaProcessing\Actions\UpsertEventMediaSenderBlockAction;
 use App\Modules\MediaProcessing\Enums\MediaReprocessStage;
 use App\Modules\MediaProcessing\Actions\UpdateEventMediaFeaturedAction;
 use App\Modules\MediaProcessing\Actions\UpdateEventMediaPinnedAction;
@@ -24,6 +26,7 @@ use App\Modules\MediaProcessing\Http\Requests\ListEventMediaRequest;
 use App\Modules\MediaProcessing\Http\Requests\ListModerationMediaRequest;
 use App\Modules\MediaProcessing\Http\Requests\ReprocessEventMediaStageRequest;
 use App\Modules\MediaProcessing\Http\Requests\ShowEventMediaPipelineMetricsRequest;
+use App\Modules\MediaProcessing\Http\Requests\UpsertEventMediaSenderBlockRequest;
 use App\Modules\MediaProcessing\Http\Requests\UpdateEventMediaFeaturedRequest;
 use App\Modules\MediaProcessing\Http\Requests\UpdateEventMediaPinnedRequest;
 use App\Modules\MediaProcessing\Http\Resources\EventMediaDetailResource;
@@ -35,6 +38,7 @@ use App\Modules\MediaProcessing\Queries\ListModerationMediaQuery;
 use App\Modules\MediaProcessing\Services\MediaAuditLogger;
 use App\Modules\MediaProcessing\Services\MediaPipelineMetricsService;
 use App\Modules\MediaProcessing\Services\ModerationBroadcasterService;
+use App\Modules\MediaProcessing\Services\EventMediaSenderContextService;
 use App\Shared\Http\BaseController;
 use App\Shared\Support\EventAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -109,6 +113,7 @@ class EventMediaController extends BaseController
             status: $validated['status'] ?? null,
             featured: array_key_exists('featured', $validated) ? (bool) $validated['featured'] : null,
             pinned: array_key_exists('pinned', $validated) ? (bool) $validated['pinned'] : null,
+            senderBlocked: array_key_exists('sender_blocked', $validated) ? (bool) $validated['sender_blocked'] : null,
             orientation: $validated['orientation'] ?? null,
         );
 
@@ -118,6 +123,8 @@ class EventMediaController extends BaseController
             cursor: $validated['cursor'] ?? null,
         );
         $includeStats = empty($validated['cursor']);
+
+        app(EventMediaSenderContextService::class)->hydrateCollection($page['items']);
 
         return response()->json([
             'success' => true,
@@ -174,16 +181,20 @@ class EventMediaController extends BaseController
 
         abort_unless($eventAccess->can($request->user(), $eventMedia->event, 'media.view'), 403);
 
+        $eventMedia = $eventMedia->load([
+            'event.faceSearchSettings',
+            'variants',
+            'processingRuns',
+            'inboundMessage',
+            'decisionOverriddenBy:id,name,email',
+            'latestSafetyEvaluation',
+            'latestVlmEvaluation',
+        ])->loadCount('faces');
+
+        app(EventMediaSenderContextService::class)->hydrateModel($eventMedia, includeMediaCount: true);
+
         return $this->success(new EventMediaDetailResource(
-            $eventMedia->load([
-                'event.faceSearchSettings',
-                'variants',
-                'processingRuns',
-                'inboundMessage',
-                'decisionOverriddenBy:id,name,email',
-                'latestSafetyEvaluation',
-                'latestVlmEvaluation',
-            ])->loadCount('faces')
+            $eventMedia
         ));
     }
 
@@ -271,6 +282,48 @@ class EventMediaController extends BaseController
         );
 
         $broadcaster->broadcastUpdated($eventMedia);
+
+        return $this->success(new EventMediaResource($eventMedia));
+    }
+
+    public function blockSender(
+        UpsertEventMediaSenderBlockRequest $request,
+        EventMedia $eventMedia,
+        EventAccessService $eventAccess,
+        UpsertEventMediaSenderBlockAction $action,
+        EventMediaSenderContextService $senderContext,
+    ): JsonResponse {
+        $eventMedia->loadMissing('event');
+
+        abort_unless($eventAccess->can($request->user(), $eventMedia->event, 'media.moderate'), 403);
+
+        $action->execute(
+            $eventMedia,
+            reason: $request->validated('reason'),
+            expiresAt: $request->validated('expires_at'),
+        );
+
+        $eventMedia = $eventMedia->fresh(['event', 'variants', 'inboundMessage']);
+        $senderContext->hydrateModel($eventMedia, includeMediaCount: true);
+
+        return $this->success(new EventMediaResource($eventMedia));
+    }
+
+    public function unblockSender(
+        Request $request,
+        EventMedia $eventMedia,
+        EventAccessService $eventAccess,
+        DeactivateEventMediaSenderBlockAction $action,
+        EventMediaSenderContextService $senderContext,
+    ): JsonResponse {
+        $eventMedia->loadMissing('event');
+
+        abort_unless($eventAccess->can($request->user(), $eventMedia->event, 'media.moderate'), 403);
+
+        $action->execute($eventMedia);
+
+        $eventMedia = $eventMedia->fresh(['event', 'variants', 'inboundMessage']);
+        $senderContext->hydrateModel($eventMedia, includeMediaCount: true);
 
         return $this->success(new EventMediaResource($eventMedia));
     }
@@ -485,6 +538,7 @@ class EventMediaController extends BaseController
             'status' => $filters['status'] ?? null,
             'featured' => array_key_exists('featured', $filters) ? (bool) $filters['featured'] : null,
             'pinned' => array_key_exists('pinned', $filters) ? (bool) $filters['pinned'] : null,
+            'sender_blocked' => array_key_exists('sender_blocked', $filters) ? (bool) $filters['sender_blocked'] : null,
             'orientation' => $filters['orientation'] ?? null,
         ]));
 

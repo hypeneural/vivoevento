@@ -153,8 +153,12 @@ usermod -a -G www-data "$DEPLOY_USER"
 log "Preparing app root at $APP_ROOT"
 mkdir -p \
     "$APP_ROOT/releases" \
-    "$APP_ROOT/shared/storage/app" \
-    "$APP_ROOT/shared/storage/framework" \
+    "$APP_ROOT/shared/storage/app/public" \
+    "$APP_ROOT/shared/storage/framework/cache" \
+    "$APP_ROOT/shared/storage/framework/cache/data" \
+    "$APP_ROOT/shared/storage/framework/sessions" \
+    "$APP_ROOT/shared/storage/framework/testing" \
+    "$APP_ROOT/shared/storage/framework/views" \
     "$APP_ROOT/shared/storage/logs" \
     "$APP_ROOT/shared/bootstrap-cache" \
     "$APP_ROOT/shared/run/reverb" \

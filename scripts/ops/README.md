@@ -22,3 +22,15 @@ Scripts de operacao do host Ubuntu 24.04 para a fase 1 da VPS.
 6. rodar `verify-host.sh`
 7. habilitar e iniciar os services da app apenas depois do primeiro deploy
    valido
+
+## Detalhe importante de storage
+
+Quando a fase 1 operar com `FILESYSTEM_DISK=public`, o host precisa garantir:
+
+- `shared/storage/app/public`
+- `shared/storage/framework/cache/data`
+- `shared/storage/framework/sessions`
+- `shared/storage/framework/testing`
+- `shared/storage/framework/views`
+
+Todos esses caminhos devem permanecer com ownership `deploy:www-data`.

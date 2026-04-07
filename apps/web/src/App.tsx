@@ -7,6 +7,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { ThemeProvider } from '@/app/providers/ThemeProvider';
 import { AuthProvider, useAuth } from '@/app/providers/AuthProvider';
 import { BrandingProvider } from '@/app/providers/BrandingProvider';
+import { ModuleGuard } from '@/app/guards/ModuleGuard';
 import { AdminLayout } from '@/app/layouts/AdminLayout';
 import { AdminWarmup } from '@/app/routing/AdminWarmup';
 import { routeImports } from '@/app/routing/route-preload';
@@ -119,12 +120,57 @@ function ProtectedRoutes() {
           <Route path="profile" element={<ProfilePage />} />
 
           {/* Business */}
-          <Route path="partners" element={<PartnersPage />} />
-          <Route path="clients" element={<ClientsPage />} />
-          <Route path="plans" element={<PlansPage />} />
-          <Route path="analytics" element={<AnalyticsPage />} />
-          <Route path="audit" element={<AuditPage />} />
-          <Route path="settings" element={<SettingsPage />} />
+          <Route
+            path="partners"
+            element={(
+              <ModuleGuard moduleKey="partners" requiredPermissions={['partners.manage.any', 'partners.view.any']}>
+                <PartnersPage />
+              </ModuleGuard>
+            )}
+          />
+          <Route
+            path="clients"
+            element={(
+              <ModuleGuard moduleKey="clients" requiredPermissions={['clients.view']}>
+                <ClientsPage />
+              </ModuleGuard>
+            )}
+          />
+          <Route
+            path="plans"
+            element={(
+              <ModuleGuard
+                moduleKey="plans"
+                requiredPermissions={['billing.view', 'billing.manage', 'billing.purchase', 'billing.manage_subscription', 'plans.view']}
+              >
+                <PlansPage />
+              </ModuleGuard>
+            )}
+          />
+          <Route
+            path="analytics"
+            element={(
+              <ModuleGuard moduleKey="analytics" requiredPermissions={['analytics.view']}>
+                <AnalyticsPage />
+              </ModuleGuard>
+            )}
+          />
+          <Route
+            path="audit"
+            element={(
+              <ModuleGuard moduleKey="audit" requiredPermissions={['audit.view']}>
+                <AuditPage />
+              </ModuleGuard>
+            )}
+          />
+          <Route
+            path="settings"
+            element={(
+              <ModuleGuard moduleKey="settings" requiredPermissions={['settings.manage']}>
+                <SettingsPage />
+              </ModuleGuard>
+            )}
+          />
           <Route path="settings/whatsapp" element={<WhatsAppInstancesPage />} />
           <Route path="settings/whatsapp/:id" element={<WhatsAppInstanceDetailPage />} />
 

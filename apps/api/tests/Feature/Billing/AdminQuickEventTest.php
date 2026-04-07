@@ -208,6 +208,147 @@ it('reuses existing organization and responsible user for manual override quick 
     Queue::assertNothingPushed();
 });
 
+it('allows super-admin to create a package-less manual override quick event with direct channel entitlements', function () {
+    Queue::fake();
+
+    [$admin] = $this->actingAsSuperAdmin();
+
+    $response = $this->apiPost('/admin/quick-events', [
+        'responsible_name' => 'Camila Andrade',
+        'whatsapp' => '(48) 99977-1111',
+        'email' => 'camila@example.com',
+        'organization_name' => 'Camila Cerimonial',
+        'organization_type' => 'direct_customer',
+        'event' => [
+            'title' => 'Evento Camila Free',
+            'event_type' => 'wedding',
+            'event_date' => '2026-10-20',
+            'city' => 'Florianopolis',
+        ],
+        'grant' => [
+            'source_type' => 'manual_override',
+            'reason' => 'Bonus free configurado pelo super admin',
+            'origin' => 'operacao',
+            'notes' => 'Evento liberado sem pacote para homologacao de canais.',
+            'features' => [
+                'wall' => ['enabled' => true],
+                'white_label' => ['enabled' => true],
+                'channels' => [
+                    'whatsapp_groups' => ['enabled' => true],
+                    'whatsapp_direct' => ['enabled' => true],
+                    'public_upload' => ['enabled' => true],
+                    'telegram' => ['enabled' => false],
+                    'blacklist' => ['enabled' => true],
+                    'whatsapp' => [
+                        'shared_instance' => ['enabled' => true],
+                        'dedicated_instance' => ['enabled' => true],
+                        'feedback' => [
+                            'reject_reply' => [
+                                'enabled' => true,
+                                'message' => 'Sua midia nao segue as diretrizes do evento.',
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            'limits' => [
+                'media' => [
+                    'retention_days' => 45,
+                    'max_photos' => 250,
+                ],
+                'channels' => [
+                    'whatsapp_groups' => ['max' => 10],
+                    'whatsapp' => [
+                        'dedicated_instance' => ['max_per_event' => 1],
+                    ],
+                ],
+            ],
+        ],
+    ]);
+
+    $this->assertApiSuccess($response, 201);
+
+    $grantId = $response->json('data.grant.id');
+    $eventId = $response->json('data.event.id');
+
+    expect($response->json('data.grant.source_type'))->toBe('manual_override');
+    expect($response->json('data.grant.package_id'))->toBeNull();
+    expect($response->json('data.grant.package_code'))->toBeNull();
+    expect($response->json('data.commercial_status.commercial_mode'))->toBe('manual_override');
+    expect($response->json('data.commercial_status.resolved_entitlements.channels.whatsapp_groups.enabled'))->toBeTrue();
+    expect($response->json('data.commercial_status.resolved_entitlements.channels.whatsapp_groups.max'))->toBe(10);
+    expect($response->json('data.commercial_status.resolved_entitlements.channels.whatsapp_direct.enabled'))->toBeTrue();
+    expect($response->json('data.commercial_status.resolved_entitlements.channels.public_upload.enabled'))->toBeTrue();
+    expect($response->json('data.commercial_status.resolved_entitlements.channels.blacklist.enabled'))->toBeTrue();
+    expect($response->json('data.commercial_status.resolved_entitlements.channels.whatsapp.dedicated_instance.enabled'))->toBeTrue();
+    expect($response->json('data.commercial_status.resolved_entitlements.channels.whatsapp.dedicated_instance.max_per_event'))->toBe(1);
+    expect($response->json('data.commercial_status.resolved_entitlements.channels.whatsapp.feedback.reject_reply.enabled'))->toBeTrue();
+    expect($response->json('data.commercial_status.resolved_entitlements.channels.whatsapp.feedback.reject_reply.message'))
+        ->toBe('Sua midia nao segue as diretrizes do evento.');
+
+    $this->assertDatabaseHas('event_access_grants', [
+        'id' => $grantId,
+        'event_id' => $eventId,
+        'source_type' => 'manual_override',
+        'package_id' => null,
+        'granted_by_user_id' => $admin->id,
+    ]);
+
+    $grant = EventAccessGrant::query()->findOrFail($grantId);
+    expect($grant->features_snapshot_json)->toMatchArray([
+        'wall.enabled' => true,
+        'white_label.enabled' => true,
+        'channels.whatsapp_groups.enabled' => true,
+        'channels.whatsapp_direct.enabled' => true,
+        'channels.public_upload.enabled' => true,
+        'channels.blacklist.enabled' => true,
+        'channels.whatsapp.dedicated_instance.enabled' => true,
+        'channels.whatsapp.feedback.reject_reply.enabled' => true,
+        'channels.whatsapp.feedback.reject_reply.message' => 'Sua midia nao segue as diretrizes do evento.',
+    ]);
+    expect($grant->limits_snapshot_json)->toMatchArray([
+        'media.retention_days' => 45,
+        'media.max_photos' => 250,
+        'channels.whatsapp_groups.max' => 10,
+        'channels.whatsapp.dedicated_instance.max_per_event' => 1,
+    ]);
+    expect($grant->metadata_json['package_code'] ?? null)->toBeNull();
+
+    $event = Event::query()->findOrFail($eventId);
+    expect($event->commercial_mode?->value)->toBe('manual_override');
+    expect($event->retention_days)->toBe(45);
+    expect($event->current_entitlements_json['channels']['whatsapp_groups']['enabled'] ?? null)->toBeTrue();
+    expect($event->current_entitlements_json['channels']['whatsapp_groups']['max'] ?? null)->toBe(10);
+    expect($event->current_entitlements_json['channels']['whatsapp']['feedback']['reject_reply']['message'] ?? null)
+        ->toBe('Sua midia nao segue as diretrizes do evento.');
+
+    Queue::assertNothingPushed();
+});
+
+it('requires direct snapshots when manual override is sent without a package', function () {
+    [$admin] = $this->actingAsSuperAdmin();
+
+    $response = $this->apiPost('/admin/quick-events', [
+        'responsible_name' => 'Bruno Costa',
+        'whatsapp' => '(48) 99988-1111',
+        'email' => 'bruno@example.com',
+        'organization_name' => 'Bruno Eventos',
+        'organization_type' => 'direct_customer',
+        'event' => [
+            'title' => 'Evento Bruno',
+            'event_type' => 'corporate',
+        ],
+        'grant' => [
+            'source_type' => 'manual_override',
+            'reason' => 'Tentativa sem snapshots',
+        ],
+    ]);
+
+    $this->assertApiValidationError($response, ['grant.features']);
+
+    expect(EventAccessGrant::query()->count())->toBe(0);
+});
+
 it('queues whatsapp access delivery when admin quick event requests access and a sender instance is configured', function () {
     Queue::fake();
 

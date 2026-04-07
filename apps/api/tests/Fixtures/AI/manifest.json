@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "created_at": "2026-04-07",
+  "status": "contract_ready_assets_pending",
+  "asset_root": ".",
+  "allowed_asset_extensions": [
+    "jpg",
+    "jpeg",
+    "png",
+    "webp"
+  ],
+  "required_fixture_fields": [
+    "id",
+    "path",
+    "event_id",
+    "person_id",
+    "expected_positive_set",
+    "quality_label",
+    "is_public_search_eligible",
+    "expected_moderation_bucket"
+  ],
+  "quality_labels": [
+    "good",
+    "blurred",
+    "dark",
+    "occluded",
+    "profile_extreme",
+    "small_face",
+    "mixed",
+    "unknown"
+  ],
+  "moderation_buckets": [
+    "safe",
+    "review",
+    "block",
+    "unknown"
+  ],
+  "privacy": {
+    "raw_customer_uploads_allowed": false,
+    "requires_anonymized_or_consented_assets": true,
+    "secrets_allowed": false,
+    "private_provider_logs_allowed": false
+  },
+  "groups": [
+    {
+      "key": "safety-safe",
+      "directory": "safety-safe",
+      "purpose": "Benign event photos used to validate safe moderation behavior.",
+      "min_entries_expected": 12,
+      "entries": []
+    },
+    {
+      "key": "safety-review-block",
+      "directory": "safety-review-block",
+      "purpose": "Controlled samples used to validate review/block moderation thresholds.",
+      "min_entries_expected": 8,
+      "entries": []
+    },
+    {
+      "key": "face-search-positive",
+      "directory": "face-search-positive",
+      "purpose": "Same anonymized or consented person across multiple photos in the same event.",
+      "min_entries_expected": 20,
+      "entries": []
+    },
+    {
+      "key": "face-search-negative",
+      "directory": "face-search-negative",
+      "purpose": "Different people with partially similar appearance for false-positive pressure.",
+      "min_entries_expected": 20,
+      "entries": []
+    },
+    {
+      "key": "face-search-low-quality",
+      "directory": "face-search-low-quality",
+      "purpose": "Blurred, dark, occluded, profile-extreme, and very small faces for quality gate tuning.",
+      "min_entries_expected": 20,
+      "entries": []
+    },
+    {
+      "key": "cross-event-isolation",
+      "directory": "cross-event-isolation",
+      "purpose": "Same or similar people across different events to validate event_id isolation.",
+      "min_entries_expected": 12,
+      "entries": []
+    }
+  ],
+  "notes": [
+    "Do not use this manifest as a benchmark until entries are populated with real anonymized or consented image assets.",
+    "The benchmark source of truth must be this manifest, not an ad-hoc local folder.",
+    "Provider smoke reports should copy provider/model/dimension/latency metadata to their own reports, not into this manifest."
+  ]
+}

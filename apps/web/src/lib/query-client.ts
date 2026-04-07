@@ -46,6 +46,7 @@ export const queryKeys = {
     list: (filters: Record<string, unknown>) => [...queryKeys.events.lists(), filters] as const,
     details: () => [...queryKeys.events.all(), 'detail'] as const,
     detail: (id: string) => [...queryKeys.events.details(), id] as const,
+    telegramOperationalStatus: (id: string) => [...queryKeys.events.detail(id), 'telegram-operational-status'] as const,
   },
 
   // Media

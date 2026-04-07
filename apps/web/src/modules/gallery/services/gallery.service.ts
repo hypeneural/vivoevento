@@ -37,4 +37,14 @@ export const galleryService = {
   async hide(eventId: number | string, mediaId: number | string) {
     return api.delete<ApiEventMediaItem>(`/events/${eventId}/gallery/${mediaId}`);
   },
+
+  async blockSender(mediaId: number | string, payload: { reason?: string; expires_at?: string | null }) {
+    return api.post<ApiEventMediaItem>(`/media/${mediaId}/sender-block`, {
+      body: payload,
+    });
+  },
+
+  async unblockSender(mediaId: number | string) {
+    return api.delete<ApiEventMediaItem>(`/media/${mediaId}/sender-block`);
+  },
 };

@@ -52,6 +52,8 @@ class Event extends Model
         'retention_days',
         'commercial_mode',
         'current_entitlements_json',
+        'default_whatsapp_instance_id',
+        'whatsapp_instance_mode',
         'purchased_plan_snapshot_json',
     ];
 
@@ -64,6 +66,7 @@ class Event extends Model
         'retention_days' => 'integer',
         'current_entitlements_json' => 'array',
         'purchased_plan_snapshot_json' => 'array',
+        'default_whatsapp_instance_id' => 'integer',
     ];
 
     protected function moderationMode(): Attribute
@@ -115,9 +118,34 @@ class Event extends Model
         return $this->hasMany(\App\Modules\Channels\Models\EventChannel::class);
     }
 
+    public function defaultWhatsAppInstance(): BelongsTo
+    {
+        return $this->belongsTo(\App\Modules\WhatsApp\Models\WhatsAppInstance::class, 'default_whatsapp_instance_id');
+    }
+
+    public function whatsappGroupBindings(): HasMany
+    {
+        return $this->hasMany(\App\Modules\WhatsApp\Models\WhatsAppGroupBinding::class);
+    }
+
+    public function whatsappInboxSessions(): HasMany
+    {
+        return $this->hasMany(\App\Modules\WhatsApp\Models\WhatsAppInboxSession::class);
+    }
+
+    public function mediaSenderBlacklists(): HasMany
+    {
+        return $this->hasMany(\App\Modules\Events\Models\EventMediaSenderBlacklist::class);
+    }
+
     public function media(): HasMany
     {
         return $this->hasMany(\App\Modules\MediaProcessing\Models\EventMedia::class);
+    }
+
+    public function inboundMessages(): HasMany
+    {
+        return $this->hasMany(\App\Modules\InboundMedia\Models\InboundMessage::class);
     }
 
     public function banners(): HasMany
@@ -217,6 +245,18 @@ class Event extends Model
     public function isAiModeration(): bool
     {
         return $this->moderation_mode === EventModerationMode::Ai;
+    }
+
+    public function isContentModerationObserveOnly(): bool
+    {
+        /** @var \App\Modules\ContentModeration\Models\EventContentModerationSetting|null $settings */
+        $settings = $this->relationLoaded('contentModerationSettings')
+            ? $this->contentModerationSettings
+            : $this->contentModerationSettings()->first();
+
+        return $this->isAiModeration()
+            && (bool) ($settings?->enabled ?? false)
+            && $settings?->mode === 'observe_only';
     }
 
     public function isAutoModeration(): bool

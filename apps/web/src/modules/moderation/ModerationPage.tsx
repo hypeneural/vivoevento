@@ -1,6 +1,7 @@
 import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
+import { useSearchParams } from 'react-router-dom';
 import {
   CheckCheck,
   CheckCircle2,
@@ -10,6 +11,7 @@ import {
   Loader2,
   Pin,
   Search,
+  ShieldBan,
   SlidersHorizontal,
   Sparkles,
   Star,
@@ -29,6 +31,8 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
 import type { ApiEventMediaDetail, ApiEventMediaItem } from '@/lib/api-types';
 import { queryKeys } from '@/lib/query-client';
+import { resolveSenderBlockExpiration } from '@/lib/sender-blocking';
+import { readSenderScopedPrefill } from '@/lib/sender-filters';
 import { eventsService } from '@/modules/events/services/events.service';
 import type { EventListItem } from '@/modules/events/types';
 import { EmptyState } from '@/shared/components/EmptyState';
@@ -147,17 +151,20 @@ export default function ModerationPage() {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const { can, meOrganization } = useAuth();
+  const [searchParams] = useSearchParams();
+  const prefilledScope = useMemo(() => readSenderScopedPrefill(searchParams), [searchParams]);
 
   const canView = can('media.view') || can('media.moderate');
   const canModerate = can('media.moderate');
 
   const [perPage, setPerPage] = useState<number>(MODERATION_PAGE_SIZE_OPTIONS[1]);
-  const [search, setSearch] = useState('');
-  const [eventFilter, setEventFilter] = useState('all');
+  const [search, setSearch] = useState(prefilledScope.search);
+  const [eventFilter, setEventFilter] = useState(prefilledScope.eventId);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [orientationFilter, setOrientationFilter] = useState<string>('all');
   const [featuredOnly, setFeaturedOnly] = useState(false);
   const [pinnedOnly, setPinnedOnly] = useState(false);
+  const [blockedSenderOnly, setBlockedSenderOnly] = useState(false);
   const [focusedMediaId, setFocusedMediaId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [selectionAnchorId, setSelectionAnchorId] = useState<number | null>(null);
@@ -167,6 +174,12 @@ export default function ModerationPage() {
   const [filtersPanelOpen, setFiltersPanelOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [isNearTop, setIsNearTop] = useState(true);
+  const [senderBlockDuration, setSenderBlockDuration] = useState('7d');
+
+  useEffect(() => {
+    setSearch(prefilledScope.search);
+    setEventFilter(prefilledScope.eventId);
+  }, [prefilledScope.eventId, prefilledScope.search]);
 
   const deferredSearch = useDeferredValue(search);
 
@@ -177,8 +190,9 @@ export default function ModerationPage() {
     status: statusFilter === 'all' ? undefined : statusFilter as ModerationStatusFilter,
     featured: featuredOnly ? true : undefined,
     pinned: pinnedOnly ? true : undefined,
+    sender_blocked: blockedSenderOnly ? true : undefined,
     orientation: orientationFilter === 'all' ? undefined : orientationFilter as ModerationOrientationFilter,
-  }), [deferredSearch, eventFilter, featuredOnly, orientationFilter, perPage, pinnedOnly, statusFilter]);
+  }), [blockedSenderOnly, deferredSearch, eventFilter, featuredOnly, orientationFilter, perPage, pinnedOnly, statusFilter]);
 
   const feedQueryKey = useMemo(() => queryKeys.media.feed(feedFilters), [feedFilters]);
 
@@ -197,14 +211,17 @@ export default function ModerationPage() {
     staleTime: 15_000,
   });
 
-  const events = (eventsQuery.data?.data ?? []) as EventListItem[];
+  const events = useMemo(
+    () => (eventsQuery.data?.data ?? []) as EventListItem[],
+    [eventsQuery.data?.data],
+  );
   const media = useMemo(() => flattenModerationPages(feedQuery.data), [feedQuery.data]);
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const selectedItems = useMemo(() => media.filter((item) => selectedSet.has(item.id)), [media, selectedSet]);
   const focusedMedia = useMemo(() => media.find((item) => item.id === focusedMediaId) ?? null, [focusedMediaId, media]);
   const focusedMediaIndex = useMemo(() => media.findIndex((item) => item.id === focusedMediaId), [focusedMediaId, media]);
   const stats = feedQuery.data?.pages[0]?.meta.stats ?? EMPTY_STATS;
-  const activeQuickFilter = resolveQuickFilter(statusFilter, featuredOnly, pinnedOnly);
+  const activeQuickFilter = resolveQuickFilter(statusFilter, featuredOnly, pinnedOnly, blockedSenderOnly);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const virtualGridRef = useRef<ModerationVirtualGridHandle | null>(null);
 
@@ -259,7 +276,7 @@ export default function ModerationPage() {
     observer.observe(node);
 
     return () => observer.disconnect();
-  }, [feedQuery.fetchNextPage, feedQuery.hasNextPage, feedQuery.isFetchingNextPage, media.length]);
+  }, [feedQuery, media.length]);
 
   const clearFilters = useCallback(() => {
     setSearch('');
@@ -268,6 +285,7 @@ export default function ModerationPage() {
     setOrientationFilter('all');
     setFeaturedOnly(false);
     setPinnedOnly(false);
+    setBlockedSenderOnly(false);
     setIncomingItems([]);
     setMobileFiltersOpen(false);
   }, []);
@@ -456,6 +474,39 @@ export default function ModerationPage() {
     },
   });
 
+  const senderBlockMutation = useMutation({
+    mutationFn: async (payload: { item: ApiEventMediaItem; shouldBlock: boolean; expiresAt: string | null }) => (
+      payload.shouldBlock
+        ? moderationService.blockSender(payload.item.id, {
+          reason: 'Bloqueado pela moderacao do evento.',
+          expires_at: payload.expiresAt,
+        })
+        : moderationService.unblockSender(payload.item.id)
+    ),
+    onSuccess: async (item, payload) => {
+      upsertFeedItems([item]);
+      queryClient.setQueryData(queryKeys.media.detail(String(item.id)), (current: ApiEventMediaDetail | ApiEventMediaItem | undefined) => (
+        current ? { ...current, ...item } : current
+      ));
+      await queryClient.invalidateQueries({ queryKey: queryKeys.media.detail(String(item.id)) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.events.detail(String(item.event_id)) });
+
+      toast({
+        title: payload.shouldBlock ? 'Remetente bloqueado' : 'Remetente desbloqueado',
+        description: payload.shouldBlock
+          ? 'Novas midias deste autor deixam de entrar no fluxo do evento.'
+          : 'O remetente voltou a poder enviar novas midias para este evento.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Falha ao atualizar o remetente',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const activeFilterTags = useMemo(() => {
     const tags: string[] = [];
 
@@ -465,15 +516,17 @@ export default function ModerationPage() {
     if (orientationFilter !== 'all') tags.push(MODERATION_ORIENTATION_OPTIONS.find((item) => item.value === orientationFilter)?.label ?? '');
     if (featuredOnly) tags.push('Somente favoritas');
     if (pinnedOnly) tags.push('Somente fixadas');
+    if (blockedSenderOnly) tags.push('Somente remetentes bloqueados');
 
     return tags.filter(Boolean);
-  }, [deferredSearch, eventFilter, events, featuredOnly, orientationFilter, pinnedOnly, statusFilter]);
+  }, [blockedSenderOnly, deferredSearch, eventFilter, events, featuredOnly, orientationFilter, pinnedOnly, statusFilter]);
 
   const applyQuickFilter = (key: typeof MODERATION_QUICK_FILTERS[number]['key']) => {
     if (key === 'all') {
       setStatusFilter('all');
       setFeaturedOnly(false);
       setPinnedOnly(false);
+      setBlockedSenderOnly(false);
       return;
     }
 
@@ -481,6 +534,7 @@ export default function ModerationPage() {
       setStatusFilter('all');
       setFeaturedOnly(true);
       setPinnedOnly(false);
+      setBlockedSenderOnly(false);
       return;
     }
 
@@ -488,12 +542,22 @@ export default function ModerationPage() {
       setStatusFilter('all');
       setFeaturedOnly(false);
       setPinnedOnly(true);
+      setBlockedSenderOnly(false);
+      return;
+    }
+
+    if (key === 'blocked_sender') {
+      setStatusFilter('all');
+      setFeaturedOnly(false);
+      setPinnedOnly(false);
+      setBlockedSenderOnly(true);
       return;
     }
 
     setStatusFilter(key);
     setFeaturedOnly(false);
     setPinnedOnly(false);
+    setBlockedSenderOnly(false);
   };
 
   const handleToggleSelection = useCallback((itemId: number, shiftKey: boolean) => {
@@ -523,6 +587,18 @@ export default function ModerationPage() {
   const runAction = useCallback((payload: ModerationMutationPayload) => {
     mutation.mutate(payload);
   }, [mutation]);
+
+  const runSenderBlockToggle = useCallback((checked: boolean) => {
+    if (!focusedMedia) {
+      return;
+    }
+
+    senderBlockMutation.mutate({
+      item: focusedMedia,
+      shouldBlock: checked,
+      expiresAt: checked ? resolveSenderBlockExpiration(senderBlockDuration) : null,
+    });
+  }, [focusedMedia, senderBlockDuration, senderBlockMutation]);
 
   const isItemBusy = useCallback((itemId: number, action?: ModerationMediaAction) => (
     mutation.isPending
@@ -757,8 +833,9 @@ export default function ModerationPage() {
                 <Select value={eventFilter} onValueChange={setEventFilter}><SelectTrigger className="xl:col-span-3"><SelectValue placeholder="Evento" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os eventos</SelectItem>{events.map((eventItem) => <SelectItem key={eventItem.id} value={String(eventItem.id)}>{eventItem.title}</SelectItem>)}</SelectContent></Select>
                 <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="xl:col-span-2"><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem>{MODERATION_STATUS_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select>
                 <Select value={orientationFilter} onValueChange={setOrientationFilter}><SelectTrigger className="xl:col-span-2"><SelectValue placeholder="Formato" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os formatos</SelectItem>{MODERATION_ORIENTATION_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select>
-                <Button type="button" variant={featuredOnly ? 'default' : 'outline'} className="xl:col-span-1" onClick={() => { setFeaturedOnly((current) => !current); setPinnedOnly(false); }}><Star className={cn('h-4 w-4', featuredOnly && 'fill-current')} />Favoritas</Button>
-                <Button type="button" variant={pinnedOnly ? 'default' : 'outline'} className="md:col-span-2 xl:col-span-1" onClick={() => { setPinnedOnly((current) => !current); setFeaturedOnly(false); }}><Pin className="h-4 w-4" />Fixadas</Button>
+                <Button type="button" variant={featuredOnly ? 'default' : 'outline'} className="xl:col-span-1" onClick={() => { setFeaturedOnly((current) => !current); setPinnedOnly(false); setBlockedSenderOnly(false); }}><Star className={cn('h-4 w-4', featuredOnly && 'fill-current')} />Favoritas</Button>
+                <Button type="button" variant={pinnedOnly ? 'default' : 'outline'} className="md:col-span-2 xl:col-span-1" onClick={() => { setPinnedOnly((current) => !current); setFeaturedOnly(false); setBlockedSenderOnly(false); }}><Pin className="h-4 w-4" />Fixadas</Button>
+                <Button type="button" variant={blockedSenderOnly ? 'default' : 'outline'} className="md:col-span-2 xl:col-span-2" onClick={() => { setBlockedSenderOnly((current) => !current); setFeaturedOnly(false); setPinnedOnly(false); setStatusFilter('all'); }}><ShieldBan className="h-4 w-4" />Bloqueados</Button>
               </div>
             </>
           ) : null}
@@ -807,16 +884,16 @@ export default function ModerationPage() {
               />
               {feedQuery.isFetchingNextPage ? <div className="border-t border-border/60 px-4 py-4 text-center text-sm text-muted-foreground"><Loader2 className="mx-auto mb-2 h-4 w-4 animate-spin" />Buscando mais fotos...</div> : feedQuery.isFetchNextPageError ? <div className="border-t border-border/60 px-4 py-4 text-center text-sm text-destructive"><p>Falha ao carregar o proximo bloco da fila.</p><Button type="button" size="sm" variant="outline" className="mt-3 rounded-full" onClick={() => feedQuery.fetchNextPage()}>Tentar novamente</Button></div> : !feedQuery.hasNextPage ? <div className="border-t border-border/60 px-4 py-4 text-center text-sm text-muted-foreground">Voce chegou ao fim do que foi carregado ate agora.</div> : null}
             </section>
-            <aside className="hidden xl:block"><div className="sticky top-20"><ModerationReviewPanel media={reviewMedia} canModerate={canModerate} isBusy={(action) => mutation.isPending && !!focusedMedia && mutation.variables?.items.some((item) => item.id === focusedMedia.id) && (!action || mutation.variables?.action === action)} onAction={(action) => focusedMedia && runAction({ action, items: [focusedMedia], desiredValue: action === 'favorite' ? !focusedMedia.is_featured : action === 'pin' ? !focusedMedia.is_pinned : undefined, mode: 'single' })} onOpenPreview={() => setPreviewOpen(true)} canGoPrevious={focusedMediaIndex > 0} canGoNext={focusedMediaIndex >= 0 && focusedMediaIndex < media.length - 1} onPrevious={() => focusMediaByOffset(-1)} onNext={() => focusMediaByOffset(1)} /></div></aside>
+            <aside className="hidden xl:block"><div className="sticky top-20"><ModerationReviewPanel media={reviewMedia} canModerate={canModerate} isBusy={(action) => mutation.isPending && !!focusedMedia && mutation.variables?.items.some((item) => item.id === focusedMedia.id) && (!action || mutation.variables?.action === action)} onAction={(action) => focusedMedia && runAction({ action, items: [focusedMedia], desiredValue: action === 'favorite' ? !focusedMedia.is_featured : action === 'pin' ? !focusedMedia.is_pinned : undefined, mode: 'single' })} onOpenPreview={() => setPreviewOpen(true)} canGoPrevious={focusedMediaIndex > 0} canGoNext={focusedMediaIndex >= 0 && focusedMediaIndex < media.length - 1} onPrevious={() => focusMediaByOffset(-1)} onNext={() => focusMediaByOffset(1)} senderBlockBusy={senderBlockMutation.isPending && !!focusedMedia && senderBlockMutation.variables?.item.id === focusedMedia.id} senderBlockDuration={senderBlockDuration} onSenderBlockDurationChange={setSenderBlockDuration} onSenderBlockToggle={runSenderBlockToggle} /></div></aside>
           </div>
         ) : null}
       </motion.div>
 
       <ModerationBulkActionBar selectedCount={selectedItems.length} canModerate={canModerate} isBusy={mutation.isPending} favoriteLabel={allSelectedFeatured ? 'Desfavoritar' : 'Favoritar'} pinLabel={allSelectedPinned ? 'Desafixar' : 'Fixar'} onClear={() => { setSelectedIds([]); setSelectionAnchorId(null); }} onAction={(action) => { if (!selectedItems.length) return; runAction({ action, items: selectedItems, desiredValue: action === 'favorite' ? !allSelectedFeatured : action === 'pin' ? !allSelectedPinned : undefined, mode: 'bulk' }); }} />
 
-      <Drawer open={mobileReviewOpen} onOpenChange={setMobileReviewOpen}><DrawerContent className="max-h-[92vh] rounded-t-[28px]"><DrawerHeader className="border-b border-border/60 px-5 pb-4 text-left"><DrawerTitle>Revisao rapida</DrawerTitle><DrawerDescription>Confira a midia atual e decida sem sair do feed.</DrawerDescription></DrawerHeader><div className="overflow-y-auto px-4 py-4"><ModerationReviewPanel media={reviewMedia} canModerate={canModerate} isBusy={(action) => mutation.isPending && !!focusedMedia && mutation.variables?.items.some((item) => item.id === focusedMedia.id) && (!action || mutation.variables?.action === action)} onAction={(action) => focusedMedia && runAction({ action, items: [focusedMedia], desiredValue: action === 'favorite' ? !focusedMedia.is_featured : action === 'pin' ? !focusedMedia.is_pinned : undefined, mode: 'single' })} onOpenPreview={() => setPreviewOpen(true)} canGoPrevious={focusedMediaIndex > 0} canGoNext={focusedMediaIndex >= 0 && focusedMediaIndex < media.length - 1} onPrevious={() => focusMediaByOffset(-1)} onNext={() => focusMediaByOffset(1)} /></div></DrawerContent></Drawer>
+      <Drawer open={mobileReviewOpen} onOpenChange={setMobileReviewOpen}><DrawerContent className="max-h-[92vh] rounded-t-[28px]"><DrawerHeader className="border-b border-border/60 px-5 pb-4 text-left"><DrawerTitle>Revisao rapida</DrawerTitle><DrawerDescription>Confira a midia atual e decida sem sair do feed.</DrawerDescription></DrawerHeader><div className="overflow-y-auto px-4 py-4"><ModerationReviewPanel media={reviewMedia} canModerate={canModerate} isBusy={(action) => mutation.isPending && !!focusedMedia && mutation.variables?.items.some((item) => item.id === focusedMedia.id) && (!action || mutation.variables?.action === action)} onAction={(action) => focusedMedia && runAction({ action, items: [focusedMedia], desiredValue: action === 'favorite' ? !focusedMedia.is_featured : action === 'pin' ? !focusedMedia.is_pinned : undefined, mode: 'single' })} onOpenPreview={() => setPreviewOpen(true)} canGoPrevious={focusedMediaIndex > 0} canGoNext={focusedMediaIndex >= 0 && focusedMediaIndex < media.length - 1} onPrevious={() => focusMediaByOffset(-1)} onNext={() => focusMediaByOffset(1)} senderBlockBusy={senderBlockMutation.isPending && !!focusedMedia && senderBlockMutation.variables?.item.id === focusedMedia.id} senderBlockDuration={senderBlockDuration} onSenderBlockDurationChange={setSenderBlockDuration} onSenderBlockToggle={runSenderBlockToggle} /></div></DrawerContent></Drawer>
 
-      <Drawer open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}><DrawerContent className="max-h-[92vh] rounded-t-[28px]"><DrawerHeader className="border-b border-border/60 px-5 pb-4 text-left"><DrawerTitle>Filtros avancados</DrawerTitle><DrawerDescription>Ajuste o recorte da fila sem perder o contexto da moderacao.</DrawerDescription></DrawerHeader><div className="grid gap-3 overflow-y-auto px-4 py-4"><Select value={eventFilter} onValueChange={setEventFilter}><SelectTrigger><SelectValue placeholder="Evento" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os eventos</SelectItem>{events.map((eventItem) => <SelectItem key={eventItem.id} value={String(eventItem.id)}>{eventItem.title}</SelectItem>)}</SelectContent></Select><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem>{MODERATION_STATUS_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Select value={orientationFilter} onValueChange={setOrientationFilter}><SelectTrigger><SelectValue placeholder="Formato" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os formatos</SelectItem>{MODERATION_ORIENTATION_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Select value={String(perPage)} onValueChange={(value) => setPerPage(Number(value))}><SelectTrigger><SelectValue placeholder="Densidade" /></SelectTrigger><SelectContent>{MODERATION_PAGE_SIZE_OPTIONS.map((option) => <SelectItem key={option} value={String(option)}>{option} por bloco</SelectItem>)}</SelectContent></Select><div className="grid grid-cols-2 gap-2"><Button type="button" variant={featuredOnly ? 'default' : 'outline'} className="rounded-2xl" onClick={() => { setFeaturedOnly((current) => !current); setPinnedOnly(false); }}><Star className={cn('h-4 w-4', featuredOnly && 'fill-current')} />Favoritas</Button><Button type="button" variant={pinnedOnly ? 'default' : 'outline'} className="rounded-2xl" onClick={() => { setPinnedOnly((current) => !current); setFeaturedOnly(false); }}><Pin className="h-4 w-4" />Fixadas</Button></div><div className="flex flex-wrap gap-2 pt-2"><Button type="button" className="rounded-full" onClick={() => setMobileFiltersOpen(false)}>Aplicar</Button><Button type="button" variant="outline" className="rounded-full" onClick={clearFilters}>Limpar filtros</Button></div></div></DrawerContent></Drawer>
+      <Drawer open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}><DrawerContent className="max-h-[92vh] rounded-t-[28px]"><DrawerHeader className="border-b border-border/60 px-5 pb-4 text-left"><DrawerTitle>Filtros avancados</DrawerTitle><DrawerDescription>Ajuste o recorte da fila sem perder o contexto da moderacao.</DrawerDescription></DrawerHeader><div className="grid gap-3 overflow-y-auto px-4 py-4"><Select value={eventFilter} onValueChange={setEventFilter}><SelectTrigger><SelectValue placeholder="Evento" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os eventos</SelectItem>{events.map((eventItem) => <SelectItem key={eventItem.id} value={String(eventItem.id)}>{eventItem.title}</SelectItem>)}</SelectContent></Select><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem>{MODERATION_STATUS_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Select value={orientationFilter} onValueChange={setOrientationFilter}><SelectTrigger><SelectValue placeholder="Formato" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os formatos</SelectItem>{MODERATION_ORIENTATION_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Select value={String(perPage)} onValueChange={(value) => setPerPage(Number(value))}><SelectTrigger><SelectValue placeholder="Densidade" /></SelectTrigger><SelectContent>{MODERATION_PAGE_SIZE_OPTIONS.map((option) => <SelectItem key={option} value={String(option)}>{option} por bloco</SelectItem>)}</SelectContent></Select><div className="grid grid-cols-2 gap-2"><Button type="button" variant={featuredOnly ? 'default' : 'outline'} className="rounded-2xl" onClick={() => { setFeaturedOnly((current) => !current); setPinnedOnly(false); setBlockedSenderOnly(false); }}><Star className={cn('h-4 w-4', featuredOnly && 'fill-current')} />Favoritas</Button><Button type="button" variant={pinnedOnly ? 'default' : 'outline'} className="rounded-2xl" onClick={() => { setPinnedOnly((current) => !current); setFeaturedOnly(false); setBlockedSenderOnly(false); }}><Pin className="h-4 w-4" />Fixadas</Button><Button type="button" variant={blockedSenderOnly ? 'default' : 'outline'} className="col-span-2 rounded-2xl" onClick={() => { setBlockedSenderOnly((current) => !current); setFeaturedOnly(false); setPinnedOnly(false); setStatusFilter('all'); }}><ShieldBan className="h-4 w-4" />Remetentes bloqueados</Button></div><div className="flex flex-wrap gap-2 pt-2"><Button type="button" className="rounded-full" onClick={() => setMobileFiltersOpen(false)}>Aplicar</Button><Button type="button" variant="outline" className="rounded-full" onClick={clearFilters}>Limpar filtros</Button></div></div></DrawerContent></Drawer>
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}><DialogContent className="max-w-5xl"><DialogHeader><DialogTitle>{focusedMedia?.event_title || 'Preview da midia'}</DialogTitle><DialogDescription>{focusedMedia ? `${focusedMedia.sender_name} - ${formatDateTime(focusedMedia.created_at)}` : 'Visualizacao ampliada'}</DialogDescription></DialogHeader>{focusedMedia?.preview_url || focusedMedia?.thumbnail_url ? <div className="overflow-hidden rounded-[24px] border border-border/60 bg-muted"><img src={focusedMedia.preview_url || focusedMedia.thumbnail_url || undefined} alt={focusedMedia.caption || focusedMedia.event_title || 'Midia ampliada'} className="max-h-[70vh] w-full object-contain" loading="lazy" decoding="async" /></div> : <div className="flex h-80 items-center justify-center rounded-[24px] border border-dashed border-border/60 bg-muted/30 text-muted-foreground"><ImageIcon className="h-10 w-10" /></div>}</DialogContent></Dialog>
     </>

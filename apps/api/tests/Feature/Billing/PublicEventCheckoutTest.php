@@ -22,6 +22,9 @@ beforeEach(function () {
     config()->set('billing.gateways.event_package', 'manual');
     config()->set('billing.payment_notifications.enabled', true);
     config()->set('billing.payment_notifications.allow_single_connected_fallback', true);
+    config()->set('billing.payment_notifications.pix_button.enabled', true);
+    config()->set('billing.payment_notifications.pix_button.type', 'EVP');
+    config()->set('billing.payment_notifications.pix_button.merchant_name', 'Evento Vivo');
 });
 
 it('creates a lightweight direct-customer checkout with pending billing order', function () {
@@ -373,6 +376,10 @@ it('queues a whatsapp notification when pagarme pix is generated locally', funct
     $this->assertApiSuccess($response, 201);
 
     $orderId = $response->json('data.checkout.id');
+    expect($response->json('data.checkout.payment.whatsapp.pix_generated.status'))->toBe('pending');
+    expect($response->json('data.checkout.payment.whatsapp.pix_generated.recipient_phone'))->toBe('5548999881111');
+    expect($response->json('data.checkout.payment.whatsapp.pix_generated.pix_button_enabled'))->toBeNull();
+    expect($response->json('data.checkout.payment.whatsapp.pix_generated.pix_button_message_id'))->toBeNull();
 
     $this->assertDatabaseHas('billing_order_notifications', [
         'billing_order_id' => $orderId,
@@ -389,6 +396,7 @@ it('queues a whatsapp notification when pagarme pix is generated locally', funct
         ->firstOrFail();
 
     expect($notification->whatsapp_message_id)->not()->toBeNull();
+    expect(data_get($notification->context_json, 'delivery.pix_button_message_id'))->not()->toBeNull();
 
     $this->assertDatabaseHas('whatsapp_messages', [
         'id' => $notification->whatsapp_message_id,
@@ -396,7 +404,115 @@ it('queues a whatsapp notification when pagarme pix is generated locally', funct
         'recipient_phone' => '5548999881111',
     ]);
 
-    Queue::assertPushed(SendWhatsAppMessageJob::class);
+    $this->assertDatabaseHas('whatsapp_messages', [
+        'id' => data_get($notification->context_json, 'delivery.pix_button_message_id'),
+        'instance_id' => $instance->id,
+        'recipient_phone' => '5548999881111',
+        'type' => 'pix',
+    ]);
+
+    Queue::assertPushedTimes(SendWhatsAppMessageJob::class, 2);
+});
+
+it('keeps only the text notification when the whatsapp provider does not support pix button', function () {
+    Queue::fake();
+
+    $this->seedPermissions();
+
+    $instance = WhatsAppInstance::factory()->evolution()->connected()->create([
+        'is_default' => true,
+    ]);
+
+    config()->set('billing.gateways.event_package', 'pagarme');
+    config()->set('billing.payment_notifications.whatsapp_instance_id', $instance->id);
+    config()->set('services.pagarme', [
+        'base_url' => 'https://api.pagar.me/core/v5/',
+        'secret_key' => 'sk_test_7611662845434f72bdb0986b69d54ce1',
+        'public_key' => 'pk_test_jGWvy7PhpBukl396',
+        'statement_descriptor' => 'EVENTOVIVO',
+        'pix_expires_in' => 1800,
+        'timeout' => 15,
+        'connect_timeout' => 5,
+        'retry_times' => 1,
+        'retry_sleep_ms' => 0,
+    ]);
+
+    Http::preventStrayRequests();
+
+    Http::fake([
+        'https://api.pagar.me/core/v5/orders' => Http::response([
+            'id' => 'or_test_notify_evolution_123',
+            'code' => 'gateway-order-notify-evolution-123',
+            'status' => 'pending',
+            'charges' => [
+                [
+                    'id' => 'ch_test_notify_evolution_123',
+                    'status' => 'pending',
+                    'payment_method' => 'pix',
+                    'last_transaction' => [
+                        'id' => 'pix_tx_notify_evolution_123',
+                        'qr_code' => '00020101021226890014br.gov.bcb.pix2567pix.example/qr/notify-evolution-123',
+                        'qr_code_url' => 'https://pagar.me/qr/ch_test_notify_evolution_123.png',
+                        'expires_at' => '2026-04-05T20:00:00Z',
+                    ],
+                ],
+            ],
+        ], 200),
+    ]);
+
+    $package = createPublicEventPackage([
+        'target_audience' => EventPackageAudience::DirectCustomer->value,
+        'amount_cents' => 24900,
+    ]);
+
+    $response = $this->apiPost('/public/event-checkouts', [
+        'responsible_name' => 'Mariana Alves',
+        'whatsapp' => '(48) 99988-1111',
+        'email' => 'mariana@example.com',
+        'package_id' => $package->id,
+        'event' => [
+            'title' => 'Casamento Mariana & Rafael',
+            'event_type' => 'wedding',
+        ],
+        'payer' => [
+            'name' => 'Mariana Alves',
+            'email' => 'mariana@example.com',
+            'document' => '12345678909',
+            'document_type' => 'CPF',
+            'phone' => '(48) 99988-1111',
+            'address' => [
+                'street' => 'Rua Exemplo',
+                'number' => '123',
+                'district' => 'Centro',
+                'zip_code' => '88000000',
+                'city' => 'Florianopolis',
+                'state' => 'SC',
+                'country' => 'BR',
+            ],
+        ],
+        'payment' => [
+            'method' => 'pix',
+            'pix' => [
+                'expires_in' => 1800,
+            ],
+        ],
+    ]);
+
+    $this->assertApiSuccess($response, 201);
+
+    $notification = BillingOrderNotification::query()
+        ->where('billing_order_id', $response->json('data.checkout.id'))
+        ->where('notification_type', 'pix_generated')
+        ->firstOrFail();
+
+    expect($response->json('data.checkout.payment.whatsapp.pix_generated.status'))->toBe('pending');
+    expect($response->json('data.checkout.payment.whatsapp.pix_generated.pix_button_enabled'))->toBeNull();
+    expect($response->json('data.checkout.payment.whatsapp.pix_generated.pix_button_message_id'))->toBeNull();
+    expect(data_get($notification->context_json, 'delivery.pix_button_enabled'))->toBeFalse();
+    expect(data_get($notification->context_json, 'delivery.pix_button_message_id'))->toBeNull();
+
+    $this->assertDatabaseCount('whatsapp_messages', 1);
+    Queue::assertPushedTimes(SendWhatsAppMessageJob::class, 1);
 });
 
 it('accepts a credit-card checkout contract and persists the selected payment method', function () {

@@ -43,7 +43,8 @@ class RolesAndPermissionsSeeder extends Seeder
             // Analytics
             'analytics.view',
             // Partners
-            'partners.manage',
+            'partners.view.any',
+            'partners.manage.any',
             // Settings
             'settings.manage',
             // White Label

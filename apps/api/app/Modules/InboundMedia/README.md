@@ -1,27 +1,30 @@
 # InboundMedia Module
 
 ## Responsabilidade
-Recepção, normalização e rastreamento de mídia recebida via webhooks.
+Recepcao, normalizacao e rastreamento da midia recebida por canais que ja chegaram ao envelope canonico de intake.
 
 ## Entidades
-- **ChannelWebhookLog** — log bruto de cada webhook recebido
-- **InboundMessage** — mensagem normalizada pronta para processamento
+- **ChannelWebhookLog** - log bruto de cada webhook recebido
+- **InboundMessage** - mensagem normalizada pronta para processamento
 
 ## Fluxo
-1. Webhook chega → `ProcessInboundWebhookJob` (fila: webhooks)
-2. Log salvo → `NormalizeInboundMessageJob` (fila: webhooks)
-3. Mensagem normalizada → dispatch para MediaProcessing
+1. Webhook ou transporte provider-aware chega -> `ProcessInboundWebhookJob` (fila: webhooks)
+2. Log salvo -> `NormalizeInboundMessageJob` (fila: webhooks)
+3. Mensagem normalizada -> dispatch para MediaProcessing
 
 ## Rotas
-| Método | Rota | Descrição |
+| Metodo | Rota | Descricao |
 |--------|------|-----------|
-| POST | /api/v1/webhooks/telegram | Webhook Telegram |
+| GET | /api/v1/public/events/{uploadSlug}/upload | Formulario/link publico de upload |
+| POST | /api/v1/public/events/{uploadSlug}/upload | Upload publico direto para o evento |
 
-Observacao:
+## Observacoes
 
 - o webhook Z-API foi migrado para o modulo `WhatsApp`;
-- rota atual: `/api/v1/webhooks/whatsapp/{provider}/{instanceKey}/inbound`.
+- o webhook do Telegram foi movido para o modulo `Telegram`;
+- rota atual de WhatsApp inbound: `/api/v1/webhooks/whatsapp/{provider}/{instanceKey}/inbound`;
+- rota atual de Telegram inbound privado: `/api/v1/webhooks/telegram`.
 
-## Dependências
+## Dependencias
 - Channels (resolver evento pelo canal)
 - MediaProcessing (dispatch de download)

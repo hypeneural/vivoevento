@@ -25,6 +25,13 @@ import {
 } from '@/modules/play/utils/game-settings';
 import { buildEventPlayGameUrl } from '@/modules/play/utils/public-links';
 
+function formatGameTypeLabel(name?: string | null, key?: string | null) {
+  if (name) return name;
+  if (key === 'memory') return 'Memoria';
+  if (key === 'puzzle') return 'Quebra-cabeca';
+  return key ?? 'Jogo';
+}
+
 type EventPlayGameCardProps = {
   eventId: string;
   eventSlug: string;
@@ -142,7 +149,7 @@ export function EventPlayGameCard({
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <CardTitle className="text-base">{game.title}</CardTitle>
-                <Badge variant="outline">{game.game_type_name || game.game_type_key}</Badge>
+                <Badge variant="outline">{formatGameTypeLabel(game.game_type_name, game.game_type_key)}</Badge>
                 <Badge variant={draft.is_active ? 'outline' : 'secondary'}>
                   {draft.is_active ? 'Ativo' : 'Inativo'}
                 </Badge>
@@ -157,7 +164,7 @@ export function EventPlayGameCard({
             </div>
 
             <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-              <span className="rounded-full bg-slate-100 px-3 py-1">{formatMetricLabel('Assets', selectedMediaIds.length)}</span>
+              <span className="rounded-full bg-slate-100 px-3 py-1">{formatMetricLabel('Fotos', selectedMediaIds.length)}</span>
               <span className="rounded-full bg-slate-100 px-3 py-1">{formatMetricLabel('Sessoes', game.sessions_count ?? 0)}</span>
               <span className="rounded-full bg-slate-100 px-3 py-1">{formatMetricLabel('Jogadores no ranking', game.rankings_count ?? 0)}</span>
             </div>
@@ -184,7 +191,7 @@ export function EventPlayGameCard({
 
         <PlayPublicLinkField
           label="Pagina publica do jogo"
-          description="Esse link abre o jogo direto para o convidado, sem passar pelo hub do evento."
+          description="Esse link abre o jogo direto para o convidado, sem passar pela pagina principal do evento."
           url={publicUrl}
           compact
         />
@@ -204,7 +211,7 @@ export function EventPlayGameCard({
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Slug publico</Label>
+                  <Label>Endereco publico</Label>
                   <Input value={draft.slug} onChange={(event) => setDraft((current) => ({ ...current, slug: event.target.value }))} />
                 </div>
 
@@ -248,7 +255,7 @@ export function EventPlayGameCard({
               {game.game_type_key === 'puzzle' ? (
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>Grid</Label>
+                    <Label>Tamanho do tabuleiro</Label>
                     <Select value={draft.gridSize} onValueChange={(value: GameDraft['gridSize']) => setDraft((current) => ({ ...current, gridSize: value }))}>
                       <SelectTrigger>
                         <SelectValue />
@@ -261,7 +268,7 @@ export function EventPlayGameCard({
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Tolerancia de snap</Label>
+                    <Label>Tolerancia de encaixe</Label>
                     <Input
                       type="number"
                       value={draft.dragTolerance}
@@ -270,7 +277,7 @@ export function EventPlayGameCard({
                   </div>
 
                   <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4">
-                    <Label htmlFor={`snap-${game.id}`}>Snap habilitado</Label>
+                    <Label htmlFor={`snap-${game.id}`}>Encaixe automatico</Label>
                     <Switch
                       id={`snap-${game.id}`}
                       checked={draft.snapEnabled}
@@ -279,7 +286,7 @@ export function EventPlayGameCard({
                   </div>
 
                   <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4">
-                    <Label htmlFor={`reference-${game.id}`}>Mostrar referencia</Label>
+                    <Label htmlFor={`reference-${game.id}`}>Mostrar imagem de referencia</Label>
                     <Switch
                       id={`reference-${game.id}`}
                       checked={draft.showReferenceImage}
@@ -313,7 +320,7 @@ export function EventPlayGameCard({
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Preview inicial (seg)</Label>
+                    <Label>Mostrar cartas no inicio (seg)</Label>
                     <Input
                       type="number"
                       value={draft.showPreviewSeconds}
@@ -322,7 +329,7 @@ export function EventPlayGameCard({
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Delay de retorno (ms)</Label>
+                    <Label>Tempo para virar novamente (ms)</Label>
                     <Input
                       type="number"
                       value={draft.flipBackDelayMs}
@@ -352,7 +359,7 @@ export function EventPlayGameCard({
                 <div>
                   <p className="text-sm font-semibold">Fotos vinculadas</p>
                   <p className="text-xs text-muted-foreground">
-                    Se nada for selecionado, o backend usa as fotos aprovadas ou publicadas do evento como fallback.
+                    Se nada for selecionado, o sistema usa automaticamente as fotos aprovadas ou publicadas do evento.
                   </p>
                 </div>
 
@@ -367,7 +374,7 @@ export function EventPlayGameCard({
                   ) : (
                     <Image className="mr-1.5 h-4 w-4" />
                   )}
-                  Sincronizar assets
+                  Atualizar fotos
                 </Button>
               </div>
 

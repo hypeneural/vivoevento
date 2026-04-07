@@ -168,14 +168,14 @@ class AnalyzeContentSafetyJob implements ShouldBeUnique, ShouldQueue
             $media->fresh(['event', 'variants', 'inboundMessage']),
         );
 
-        $freshMedia = $media->fresh(['event.mediaIntelligenceSettings']);
+        $freshMedia = $media->fresh(['event.mediaIntelligenceSettings', 'event.contentModerationSettings']);
 
         if (! $degradationPolicy->vlmEnabled() && in_array($freshMedia->vlm_status, [null, 'queued'], true)) {
             $freshMedia->forceFill([
                 'vlm_status' => 'skipped',
             ])->save();
 
-            $freshMedia = $freshMedia->fresh(['event.mediaIntelligenceSettings']);
+            $freshMedia = $freshMedia->fresh(['event.mediaIntelligenceSettings', 'event.contentModerationSettings']);
 
             Log::channel((string) config('observability.queue_log_channel', config('logging.default')))
                 ->warning('media_pipeline.degraded', [
@@ -236,6 +236,10 @@ class AnalyzeContentSafetyJob implements ShouldBeUnique, ShouldQueue
             return false;
         }
 
+        if ($media->event?->isContentModerationObserveOnly()) {
+            return ! in_array($media->safety_status, [null, 'queued'], true);
+        }
+
         return in_array($media->safety_status, ['pass', 'skipped'], true);
     }
 
@@ -245,6 +249,6 @@ class AnalyzeContentSafetyJob implements ShouldBeUnique, ShouldQueue
             && app(MediaPipelineDegradationPolicy::class)->vlmEnabled()
             && (bool) ($media->event?->mediaIntelligenceSettings?->enabled ?? false)
             && ($media->event?->mediaIntelligenceSettings?->mode === 'gate')
-            && in_array($media->safety_status, ['pass', 'skipped'], true);
+            && $this->shouldRunVlm($media);
     }
 }

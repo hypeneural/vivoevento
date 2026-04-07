@@ -7,7 +7,9 @@ use App\Modules\Billing\Enums\EntitlementMergeStrategy;
 use App\Modules\Events\Enums\EventType;
 use App\Modules\Organizations\Enums\OrganizationType;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreAdminQuickEventRequest extends FormRequest
 {
@@ -16,7 +18,7 @@ class StoreAdminQuickEventRequest extends FormRequest
         $user = $this->user();
 
         return $user !== null
-            && ($user->hasAnyRole(['super-admin', 'platform-admin']) || $user->can('partners.manage'));
+            && ($user->hasAnyRole(['super-admin', 'platform-admin']) || $user->can('partners.manage.any'));
     }
 
     protected function prepareForValidation(): void
@@ -61,13 +63,45 @@ class StoreAdminQuickEventRequest extends FormRequest
                     EventAccessGrantSourceType::ManualOverride->value,
                 ]),
             ],
-            'grant.package_id' => ['required', 'integer', 'exists:event_packages,id'],
+            'grant.package_id' => [
+                'nullable',
+                'integer',
+                'exists:event_packages,id',
+                Rule::requiredIf(fn (): bool => $this->input('grant.source_type') === EventAccessGrantSourceType::Bonus->value),
+            ],
             'grant.merge_strategy' => ['nullable', Rule::enum(EntitlementMergeStrategy::class)],
             'grant.starts_at' => ['nullable', 'date'],
             'grant.ends_at' => ['nullable', 'date', 'after_or_equal:grant.starts_at'],
             'grant.reason' => ['required', 'string', 'max:160'],
             'grant.origin' => ['nullable', 'string', 'max:120'],
             'grant.notes' => ['nullable', 'string', 'max:2000'],
+            'grant.features' => ['nullable', 'array'],
+            'grant.limits' => ['nullable', 'array'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $grant = $this->input('grant', []);
+            $sourceType = $grant['source_type'] ?? null;
+
+            if ($sourceType !== EventAccessGrantSourceType::ManualOverride->value) {
+                return;
+            }
+
+            $hasPackage = filled($grant['package_id'] ?? null);
+            $hasFeatures = Arr::dot((array) ($grant['features'] ?? [])) !== [];
+            $hasLimits = Arr::dot((array) ($grant['limits'] ?? [])) !== [];
+
+            if ($hasPackage || $hasFeatures || $hasLimits) {
+                return;
+            }
+
+            $validator->errors()->add(
+                'grant.features',
+                'Manual override sem pacote precisa informar features ou limits.'
+            );
+        });
     }
 }

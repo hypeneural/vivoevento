@@ -29,7 +29,7 @@ class AccessStateBuilderService
             'play' => $permissions->contains('play.view') && ($featureFlags['play_memory'] || $featureFlags['play_puzzle']),
             'hub' => $permissions->contains('hub.view') && $featureFlags['hub'],
             'whatsapp' => $permissions->contains('channels.manage') && $featureFlags['whatsapp_ingestion'],
-            'partners' => $permissions->contains('partners.manage'),
+            'partners' => $permissions->contains('partners.view.any') || $permissions->contains('partners.manage.any'),
             'clients' => $permissions->contains('clients.view'),
             'plans' => $permissions->contains('plans.view') || $permissions->contains('billing.view'),
             'analytics' => $permissions->contains('analytics.view'),

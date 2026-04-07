@@ -7,7 +7,9 @@ use App\Modules\Billing\Enums\BillingOrderNotificationType;
 use App\Modules\Billing\Models\BillingOrder;
 use App\Modules\Billing\Models\BillingOrderNotification;
 use App\Modules\Billing\Models\Payment;
+use App\Modules\WhatsApp\Clients\DTOs\SendPixButtonData;
 use App\Modules\WhatsApp\Clients\DTOs\SendTextData;
+use App\Modules\WhatsApp\Models\WhatsAppInstance;
 use App\Modules\WhatsApp\Models\WhatsAppMessage;
 use App\Modules\WhatsApp\Services\WhatsAppMessagingService;
 use App\Shared\Support\PhoneNumber;
@@ -194,7 +196,17 @@ class BillingPaymentStatusNotificationService
                     ),
                 );
 
-                $this->attachBillingContextToMessage($message, $order, $notification);
+                $this->attachBillingContextToMessage($message, $order, $notification, [
+                    'delivery_variant' => 'text',
+                ]);
+
+                $pixButtonOutcome = $this->dispatchPixButtonSafely(
+                    instance: $instance,
+                    phone: $phone,
+                    order: $order,
+                    notification: $notification,
+                );
+                $pixButtonMessage = $pixButtonOutcome['message'];
 
                 $notification->forceFill([
                     'status' => 'queued',
@@ -206,6 +218,11 @@ class BillingPaymentStatusNotificationService
                         'delivery' => [
                             'reason' => null,
                             'message_id' => $message->id,
+                            'text_message_id' => $message->id,
+                            'pix_button_message_id' => $pixButtonMessage?->id,
+                            'pix_button_enabled' => $this->shouldAttemptPixButton($notification, $instance, $order),
+                            'pix_button_value_source' => $pixButtonMessage ? 'gateway_qr_code' : null,
+                            'pix_button_error' => $pixButtonOutcome['error'],
                             'instance_id' => $instance->id,
                         ],
                     ]),
@@ -238,6 +255,7 @@ class BillingPaymentStatusNotificationService
         WhatsAppMessage $message,
         BillingOrder $order,
         BillingOrderNotification $notification,
+        array $extraContext = [],
     ): void {
         $payload = $message->payload_json ?? [];
         $payload['context'] = array_filter([
@@ -246,6 +264,7 @@ class BillingPaymentStatusNotificationService
             'billing_order_uuid' => $order->uuid,
             'notification_type' => $notification->notification_type?->value,
             'event_id' => $order->event_id,
+            ...$extraContext,
         ], fn (mixed $value): bool => $value !== null);
 
         $message->forceFill([
@@ -324,6 +343,103 @@ class BillingPaymentStatusNotificationService
         }
 
         return implode("\n", $lines);
+    }
+
+    private function dispatchPixButtonIfApplicable(
+        WhatsAppInstance $instance,
+        string $phone,
+        BillingOrder $order,
+        BillingOrderNotification $notification,
+    ): ?WhatsAppMessage {
+        if (! $this->shouldAttemptPixButton($notification, $instance, $order)) {
+            return null;
+        }
+
+        $pixCopyPasteCode = $this->pixCopyPasteCode($order);
+
+        if (! filled($pixCopyPasteCode)) {
+            return null;
+        }
+
+        $message = $this->messagingService->sendPixButton(
+            $instance,
+            new SendPixButtonData(
+                phone: $phone,
+                pixKey: $pixCopyPasteCode,
+                type: $this->configuredPixButtonType(),
+                merchantName: $this->configuredPixButtonMerchantName(),
+            ),
+        );
+
+        $this->attachBillingContextToMessage($message, $order, $notification, [
+            'delivery_variant' => 'pix_button',
+        ]);
+
+        return $message;
+    }
+
+    /**
+     * @return array{message: ?WhatsAppMessage, error: ?string}
+     */
+    private function dispatchPixButtonSafely(
+        WhatsAppInstance $instance,
+        string $phone,
+        BillingOrder $order,
+        BillingOrderNotification $notification,
+    ): array {
+        try {
+            return [
+                'message' => $this->dispatchPixButtonIfApplicable(
+                    instance: $instance,
+                    phone: $phone,
+                    order: $order,
+                    notification: $notification,
+                ),
+                'error' => null,
+            ];
+        } catch (\Throwable $exception) {
+            Log::warning('Billing pix button notification failed after text dispatch.', [
+                'billing_order_id' => $order->id,
+                'billing_order_uuid' => $order->uuid,
+                'notification_type' => $notification->notification_type?->value,
+                'target_phone' => $phone,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return [
+                'message' => null,
+                'error' => $exception->getMessage(),
+            ];
+        }
+    }
+
+    private function shouldAttemptPixButton(
+        BillingOrderNotification $notification,
+        WhatsAppInstance $instance,
+        ?BillingOrder $order = null,
+    ): bool {
+        if (! config('billing.payment_notifications.pix_button.enabled', true)) {
+            return false;
+        }
+
+        if ($notification->notification_type !== BillingOrderNotificationType::PixGenerated) {
+            return false;
+        }
+
+        if ($instance->providerKeyValue() !== 'zapi') {
+            return false;
+        }
+
+        return $order === null || filled($this->pixCopyPasteCode($order));
+    }
+
+    private function pixCopyPasteCode(BillingOrder $order): ?string
+    {
+        $payment = $this->latestPayment($order);
+
+        $qrCode = $payment?->qr_code ?? data_get($order->metadata_json, 'gateway.qr_code');
+
+        return filled($qrCode) ? (string) $qrCode : null;
     }
 
     private function buildPaymentPaidMessage(BillingOrder $order): string
@@ -412,6 +528,18 @@ class BillingPaymentStatusNotificationService
     private function allowSingleConnectedFallback(): bool
     {
         return (bool) config('billing.payment_notifications.allow_single_connected_fallback', true);
+    }
+
+    private function configuredPixButtonType(): string
+    {
+        return strtoupper((string) config('billing.payment_notifications.pix_button.type', 'EVP'));
+    }
+
+    private function configuredPixButtonMerchantName(): ?string
+    {
+        $merchantName = trim((string) config('billing.payment_notifications.pix_button.merchant_name', 'Evento Vivo'));
+
+        return $merchantName !== '' ? $merchantName : null;
     }
 
     /**

@@ -11,7 +11,7 @@ class ChannelWebhookLog extends Model
     use HasFactory;
 
     protected $fillable = [
-        'event_channel_id', 'provider', 'message_id', 'detected_type',
+        'event_channel_id', 'provider', 'provider_update_id', 'message_id', 'detected_type',
         'routing_status', 'payload_json', 'error_message', 'inbound_message_id',
     ];
 

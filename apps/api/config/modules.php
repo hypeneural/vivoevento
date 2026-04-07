@@ -33,6 +33,7 @@ return [
         'Channels'        => App\Modules\Channels\Providers\ChannelsServiceProvider::class,
         'InboundMedia'    => App\Modules\InboundMedia\Providers\InboundMediaServiceProvider::class,
         'WhatsApp'        => App\Modules\WhatsApp\Providers\WhatsAppServiceProvider::class,
+        'Telegram'        => App\Modules\Telegram\Providers\TelegramServiceProvider::class,
         'MediaProcessing' => App\Modules\MediaProcessing\Providers\MediaProcessingServiceProvider::class,
         'ContentModeration' => App\Modules\ContentModeration\Providers\ContentModerationServiceProvider::class,
         'FaceSearch' => App\Modules\FaceSearch\Providers\FaceSearchServiceProvider::class,

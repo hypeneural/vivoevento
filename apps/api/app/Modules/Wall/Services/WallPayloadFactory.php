@@ -21,7 +21,8 @@ class WallPayloadFactory
     {
         return [
             'id' => $this->mediaIdentifier($media),
-            'url' => $this->mediaAssets->resolve($media),
+            'url' => $this->mediaAssets->wall($media),
+            'original_url' => $this->mediaAssets->original($media),
             'type' => $media->media_type ?? 'image',
             'sender_name' => $this->resolveSenderName($media),
             'sender_key' => $this->resolveSenderKey($media),
@@ -29,6 +30,9 @@ class WallPayloadFactory
             'caption' => trim((string) ($media->caption ?? '')),
             'duplicate_cluster_key' => $media->duplicate_group_key,
             'is_featured' => (bool) $media->is_featured,
+            'width' => $media->width,
+            'height' => $media->height,
+            'orientation' => $this->resolveOrientation($media),
             'created_at' => ($media->published_at ?? $media->created_at)?->toIso8601String(),
         ];
     }
@@ -121,5 +125,25 @@ class WallPayloadFactory
         }
 
         return 'media:'.$media->id;
+    }
+
+    private function resolveOrientation(EventMedia $media): ?string
+    {
+        $width = (int) ($media->width ?? 0);
+        $height = (int) ($media->height ?? 0);
+
+        if ($width <= 0 || $height <= 0) {
+            return null;
+        }
+
+        if ($height > $width) {
+            return 'vertical';
+        }
+
+        if ($width > $height) {
+            return 'horizontal';
+        }
+
+        return 'squareish';
     }
 }

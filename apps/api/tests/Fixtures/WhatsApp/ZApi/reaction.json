@@ -1,0 +1,35 @@
+{
+  "type": "ReceivedCallback",
+  "phone": "554899993333",
+  "photo": null,
+  "fromMe": false,
+  "isEdit": false,
+  "status": "RECEIVED",
+  "chatLid": "136988250345720@lid",
+  "fromApi": false,
+  "isGroup": false,
+  "momment": 1775406780000,
+  "chatName": "Contato Fixture",
+  "reaction": {
+    "time": 1775406779681,
+    "value": "❤️",
+    "reactionBy": "136988250345720",
+    "referencedMessage": {
+      "phone": "11111111111111@lid",
+      "fromMe": true,
+      "messageId": "3EB0ACBD3BB14EE661D29C",
+      "participant": null
+    }
+  },
+  "broadcast": false,
+  "forwarded": false,
+  "messageId": "3AE8D8308E8BCA1BD215",
+  "instanceId": "INSTANCE-FIXTURE-001",
+  "senderName": "Contato Fixture",
+  "senderPhoto": null,
+  "isNewsletter": false,
+  "isStatusReply": false,
+  "connectedPhone": "554899990000",
+  "participantLid": null,
+  "waitingMessage": false
+}

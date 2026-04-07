@@ -14,6 +14,8 @@ ordem real de execucao, com foco em:
 Referencias primarias:
 
 - [docs/architecture/billing-pagarme-v5-single-event-checkout.md](./billing-pagarme-v5-single-event-checkout.md)
+- [docs/architecture/billing-admin-customer-onboarding-discovery.md](./billing-admin-customer-onboarding-discovery.md)
+- [docs/architecture/billing-admin-customer-onboarding-execution-plan.md](./billing-admin-customer-onboarding-execution-plan.md)
 - `https://docs.pagar.me/reference/criar-pedido-2`
 - `https://docs.pagar.me/reference/pix-2`
 - `https://docs.pagar.me/reference/cart%C3%A3o-de-cr%C3%A9dito-1`
@@ -40,6 +42,8 @@ Regra simples:
 - a doc de arquitetura continua sendo a fonte de diagnostico, contrato e
   direcao tecnica;
 - este arquivo vira a fonte de backlog, sequenciamento e criterios de aceite;
+- a jornada administrativa de onboarding comercial sem `Event` fica em docs
+  separadas e nao deve virar desvio deste plano;
 - se surgir duvida de payload, status, evento, tokenizacao ou simulador, a
   referencia final e sempre a documentacao oficial v5 da Pagar.me;
 - nenhuma task de codigo fecha sem TTD;
@@ -86,19 +90,26 @@ Estado consolidado em `2026-04-05`:
 - [x] `M6-T2` troubleshooting interno por refresh autenticado com `GET /orders/{id}` e `GET /charges/{id}`
 - [x] `M6-T3` retry operacional seguro do mesmo `BillingOrder`, com lock local e reaproveitamento da mesma `Idempotency-Key`
 - [x] `M7-T1` `.env` local preparado com credenciais de homologacao e Basic Auth do webhook
-- [~] `M7-T2` homologacao manual parcial validou Pix sucesso/falha, cartao PSP aprovado, recusa do emissor, antifraude, retry real de idempotencia, replay real de webhook com hostname fixo e executou os cenarios tardios com divergencia frente ao simulador oficial de cartao
-- [~] `M7-T3` evidencia operacional parcial ja existe nos logs, responses locais, ids reais de homologacao, replay real do hook `hook_NQnjE65KiRIyVeKA`, retry real de idempotencia e dossie da divergencia dos simuladores de cartao
-- [~] `M8-T1` onboarding publico agora exposto na UI com CTA para o painel e ramo de login para identidade existente; retomada automatica do checkout apos autenticacao ainda pendente
+- [x] `M7-T2` homologacao real consolidada validou Pix sucesso/falha, cartao PSP aprovado, recusa do emissor, antifraude, retry real de idempotencia, replay real de webhook com hostname fixo, cancelamento Pix, estorno de cartao e o dossie direto dos simuladores `0036`, `0044` e `0069`
+- [x] `M7-T3` evidencia operacional consolidada em reports JSON versionaveis por caminho conhecido, ids reais de homologacao, replay real do hook `hook_NQnjE65KiRIyVeKA`, retry real de idempotencia e dossie final da divergencia entre o simulador de cartao Gateway e o fluxo PSP desta conta
+- [x] `M8-T1` onboarding publico refinado com CTA para o painel, ramo de login para identidade existente e retomada segura apos autenticacao, com Pix retomado automaticamente e cartao exigindo novo preenchimento dos campos sensiveis
 - [x] `M8-T2` UX de Pix refinada com contador visual, copia do codigo, CTA do QR e timeline local, mantendo polling e retomada por estado local salvo
-- [x] `M8-T3` UX de cartao refinada com mascaras, agrupamento em blocos, preview seguro, hint de bandeira e feedback inline de `processing` e `failed`
-- [x] `M8-T4` notificacoes de status ao cliente via Z-API `send-text`, deduplicadas pela maquina de estados local e persistidas em `billing_order_notifications`
+- [x] `M8-T3` UX de cartao refinada com mascaras, agrupamento em blocos, preview seguro, hint de bandeira, checklist visual, prefill assistido do telefone do pagador e validacao mais guiada antes da tokenizacao
+- [x] `M8-T4` notificacoes de status ao cliente via Z-API, deduplicadas pela maquina de estados local e persistidas em `billing_order_notifications`, com `send-text` em todos os status e `send-button-pix` adicional em `pix_generated` quando a instancia resolvida usa `zapi`
+
+Revalidacao completa executada no fim da rodada:
+
+- [x] `cd apps/api && php artisan test` verde
+- [x] `cd apps/web && npm run test` verde
+- [x] `cd apps/web && npm run type-check` verde
+- [x] `php artisan billing:pagarme:homologate --scenario=all --poll-attempts=2 --poll-sleep-ms=1000` verde, com report agregado em:
+  - `apps/api/storage/app/pagarme-homologation/20260405-210058-all.json`
 
 Proximo foco recomendado:
 
-1. fechar a parte restante de `M8-T1`, principalmente retomada automatica apos autenticacao;
-2. fechar os cenarios pendentes de `M7-T2`: cancelamento/estorno em homologacao;
-3. consolidar `M7-T3` com o dossie final para suporte da Pagar.me sobre a divergencia do simulador de cartao;
-4. decidir a politica de produto para `chargeback` antes de abrir uma segunda rodada de notificacoes ativas.
+1. decidir a politica de produto para `chargeback` antes de abrir uma segunda rodada de notificacoes ativas;
+2. avaliar uma segunda rodada de UX para transformar o checkout em jornada visual ainda mais orientada a conversao, sem reabrir o contrato tecnico atual;
+3. se o time quiser escalar a homologacao, transformar o comando `billing:pagarme:homologate` em trilha operacional padrao com arquivo de evidencias anexado ao release checklist.
 
 ## Regra de TTD obrigatoria
 
@@ -138,6 +149,8 @@ Estas decisoes devem ser tratadas como travadas para a fase 1:
 - `GET /api/v1/public/event-checkouts/{uuid}` deve ler somente estado local;
 - `POST /api/v1/public/event-checkouts/{uuid}/confirm` fica como fallback do
   provider `manual`, nao como fluxo feliz da Pagar.me;
+- a compra unica de `event_package` nao tem cancelamento pelo usuario na UI publica;
+- cancelamento e estorno dessa compra acontecem internamente no backoffice ou no painel da Pagar.me e chegam ao `eventovivo` por webhook;
 - webhook entra pela rota publica do billing, responde rapido e processa em
   fila `billing`;
 - backend nao recebe PAN/CVV/nome/vencimento de cartao;
@@ -164,6 +177,8 @@ Antes de chamar a integracao de pronta, estes artefatos devem existir no repo:
 | `apps/api/app/Modules/Billing/Services/Pagarme/PagarmeCustomerNormalizer.php` | Normalizacao de `customer` |
 | `apps/api/app/Modules/Billing/Services/Pagarme/PagarmeWebhookNormalizer.php` ou parsing dedicado no provider | Normalizacao de webhook |
 | `apps/api/app/Modules/Billing/Services/Pagarme/PagarmeStatusMapper.php` | Mapa de status externo -> interno |
+| `apps/api/app/Modules/Billing/Services/Pagarme/PagarmeHomologationService.php` | Probes diretos de homologacao e dossie operacional |
+| `apps/api/app/Modules/Billing/Console/Commands/PagarmeHomologationCommand.php` | Runner para gerar evidencias JSON reais da conta |
 | `apps/api/app/Modules/Billing/Jobs/ProcessBillingWebhookJob.php` | Processamento assincrono de webhook |
 | migrations em `apps/api/database/migrations/` | Campos novos de order/payment/event |
 | testes unitarios em `apps/api/tests/Unit/Billing/Pagarme/` | Cobertura das pecas puras |
@@ -1320,14 +1335,20 @@ Estado atual:
   simuladores oficiais;
 - Pix sucesso/falha e cartao PSP aprovado/recusa ja foram validados;
 - os cenarios tardios do simulador de cartao ja foram executados em
-  `2026-04-05`, mas divergiram do comportamento publicado na doc oficial;
+  `2026-04-05`, e a divergencia foi consolidada com probe direto salvo em JSON;
 - o retry real da mesma `Idempotency-Key` ja foi validado diretamente na v5 em
   `2026-04-05 09:25 BRT`, retornando o mesmo `order_id` mesmo com body alterado;
 - o replay real do webhook foi revalidado no mesmo dia, depois da troca para
   `https://webhooks-local.eventovivo.com.br/api/v1/webhooks/billing/pagarme`;
 - o hook real `hook_NQnjE65KiRIyVeKA` respondeu `200` para o hostname fixo e a
   reentrega oficial via `POST /hooks/{hook_id}/retry` bateu no mesmo registro
-  local sem duplicar `Payment` nem `EventPurchase`.
+  local sem duplicar `Payment` nem `EventPurchase`;
+- o cancelamento Pix e o estorno real de cartao ja foram validados por
+  `billing:pagarme:homologate`, com reports em:
+  - `apps/api/storage/app/pagarme-homologation/20260405-185658-pix-cancel.json`
+  - `apps/api/storage/app/pagarme-homologation/20260405-185659-card-refund.json`
+  - `apps/api/storage/app/pagarme-homologation/20260405-185925-simulator-dossier.json`
+  - `apps/api/storage/app/pagarme-homologation/20260405-210058-all.json`
 
 Subtasks:
 
@@ -1339,21 +1360,25 @@ Subtasks:
 6. [x] rodar cartao `processing -> failed` e registrar a divergencia observada;
 7. [x] rodar cartao antifraude PSP com `document = 11111111111`;
 8. [x] rodar `chargeback` e registrar a divergencia observada;
-9. [ ] rodar cancelamento/estorno em homologacao;
+9. [x] rodar cancelamento/estorno em homologacao;
 10. [x] reenviar o mesmo webhook real;
 11. [x] repetir criacao com a mesma `Idempotency-Key` real.
 
 Checklist de TTD:
 
-- [ ] nao aplicar correcoes manuais sem antes converter o problema em teste
+- [x] nao aplicar correcoes manuais sem antes converter o problema em teste
       automatizado falhando;
-- [ ] se um cenario manual falhar, abrir primeiro um teste automatizado que
+- [x] se um cenario manual falhar, abrir primeiro um teste automatizado que
       reproduza o bug antes de corrigir.
 
 Criterio de aceite:
 
-- a integracao prova, na conta de homologacao, que o comportamento automatizado
-  bate com os simuladores oficiais, inclusive nos cenarios tardios e de replay.
+- a integracao prova, na conta de homologacao, o comportamento real do fluxo
+  PSP usado pelo `eventovivo`, incluindo replay, idempotencia, cancelamento Pix
+  e estorno de cartao;
+- qualquer divergencia frente ao simulador de cartao Gateway fica registrada
+  com ids reais, snapshots oficiais e contexto suficiente para follow-up com a
+  Pagar.me.
 
 Dependencias:
 
@@ -1369,23 +1394,25 @@ Referencia na arquitetura:
 
 Estado atual:
 
-- ja existe evidencia operacional parcial com:
+- existe evidencia operacional consolidada com:
   - `billing_order_uuid`, `gateway_order_id` e `gateway_charge_id` reais dos
-    cenarios `0036`, `0044`, `0069` e do retry de idempotencia;
+    cenarios `0036`, `0044`, `0069`, do retry de idempotencia, do Pix
+    cancelado e do cartao estornado;
   - `hook_id = hook_NQnjE65KiRIyVeKA` com replay real validado no hostname
     fixo `webhooks-local.eventovivo.com.br`;
   - prova objetiva de que a reentrega real atualiza o mesmo
-    `BillingGatewayEvent` sem duplicar `Payment` nem `EventPurchase`.
+    `BillingGatewayEvent` sem duplicar `Payment` nem `EventPurchase`;
+  - reports JSON gerados pelo comando `billing:pagarme:homologate`.
 
 Subtasks:
 
-1. registrar para cada caso:
+1. [x] registrar para cada caso:
    - payload de entrada
    - resposta local
    - estado final no banco
    - payload de webhook
    - resultado de UX
-2. registrar os ids reais de:
+2. [x] registrar os ids reais de:
    - `billing_order_uuid`
    - `gateway_order_id`
    - `gateway_charge_id`
@@ -1401,7 +1428,10 @@ Checklist de TTD:
 Criterio de aceite:
 
 - existe prova objetiva de que a integracao esta pronta para seguir para staging
-  ou primeira subida controlada.
+  ou primeira subida controlada;
+- existe dossie suficiente para explicar por que `0036`, `0044` e `0069`
+  divergiram da doc do simulador de cartao Gateway sem confundir isso com bug
+  do fluxo PSP validado em homologacao.
 
 Dependencias:
 
@@ -1430,8 +1460,8 @@ Estado atual:
   `onboarding.next_path`;
 - a pagina publica atual ja mostra o bloco de onboarding, o CTA para abrir o
   painel do evento e o ramo de login para identidade ja cadastrada;
-- a retomada automatica do checkout depois da autenticacao ainda nao foi
-  fechada.
+- a retomada depois da autenticacao agora usa um rascunho seguro no browser e
+  continua a jornada com a conta ja autenticada.
 
 Subtasks:
 
@@ -1451,16 +1481,24 @@ Subtasks:
    - retomada do checkout depois da autenticacao
 5. usar `onboarding.title`, `onboarding.description` e `onboarding.next_path`
    na composicao da interface.
+6. garantir seguranca na retomada:
+   - nunca persistir PAN, CVV ou validade do cartao
+   - retomar automaticamente apenas Pix
+   - restaurar cartao apenas com os campos seguros
 
 Checklist de TTD:
 
-- [ ] expandir `PublicEventCheckoutPage.test.tsx` com o estado de onboarding
+ - [x] expandir `PublicEventCheckoutPage.test.tsx` com o estado de onboarding
       explicito apos criacao do checkout;
-- [ ] criar teste para CTA de continuar no painel usando `next_path`;
-- [ ] criar teste para erro de identidade existente com CTA de login;
-- [ ] rodar:
-  - `cd apps/web && npm run test -- PublicEventCheckoutPage`
-  - `cd apps/web && npm run type-check`
+ - [x] manter cobertura do CTA visual de continuidade no onboarding;
+ - [x] criar teste para erro de identidade existente com CTA de login;
+ - [x] criar teste para retomada automatica de Pix apos autenticacao;
+ - [x] criar teste para retomada segura de cartao sem persistir campos
+      sensiveis;
+ - [x] rodar:
+   - `cd apps/web && npm run test -- PublicEventCheckoutPage login-navigation`
+   - `cd apps/web && npm run type-check`
+   - `cd apps/api && php artisan test --filter=PublicEventCheckoutTest`
 
 Criterio de aceite:
 
@@ -1472,7 +1510,10 @@ Status da rodada atual:
 - [x] onboarding visual exposto na pagina publica;
 - [x] CTA real para abrir o painel do evento com `next_path`;
 - [x] tratamento do caso de identidade existente com CTA de login;
-- [ ] retomada automatica do checkout depois da autenticacao.
+- [x] retomada segura do checkout depois da autenticacao:
+  - Pix reenvia automaticamente o checkout com a conta autenticada
+  - cartao restaura somente os campos seguros e exige novo preenchimento dos
+    dados sensiveis.
 
 Dependencias:
 
@@ -1571,6 +1612,11 @@ Implementacao atual:
 - [x] agrupamento do formulario em `pagador`, `endereco de cobranca` e
   `cartao`;
 - [x] preview seguro do cartao com hint visual de bandeira;
+- [x] checklist visual de prontidao antes da tokenizacao;
+- [x] prefill assistido de `payer_phone` a partir do WhatsApp, sem persistir
+  dado sensivel;
+- [x] validacao mais guiada para CPF, telefone do pagador, CEP, UF, numero do
+  cartao, validade, CVV e nome completo do titular;
 - [x] feedback inline para `processing`, `failed`, `paid` e estados revertidos;
 - [x] backend segue recebendo apenas `card_token`.
 
@@ -1588,6 +1634,8 @@ Criterio de aceite:
 
 - o formulario de cartao fica mais claro e seguro para o usuario sem quebrar o
   contrato PCI/tokenizacao da Pagar.me.
+- o usuario consegue enxergar o que falta antes de tentar pagar, em vez de
+  descobrir tudo apenas depois do submit.
 
 Dependencias:
 
@@ -1639,8 +1687,14 @@ Implementacao entregue:
 4. os triggers de `paid`, `failed` e `refunded` nasceram nas actions locais de
    mudanca de estado;
 5. a mensagem outbound continua usando `WhatsAppMessagingService` e Z-API
-   `send-text`, mas agora com contexto do billing tambem salvo em
-   `whatsapp_messages.payload_json.context`.
+   `send-text`, com contexto do billing salvo em
+   `whatsapp_messages.payload_json.context`;
+6. no `pix_generated`, quando a instancia resolvida usa `zapi`, o servico agora
+   enfileira tambem `send-button-pix` com o mesmo valor copia-e-cola retornado
+   em `qr_code`, para reduzir friccao na copia pelo WhatsApp.
+7. o payload local do checkout agora expoe o resumo dessas notificacoes em
+   `checkout.payment.whatsapp`, para a UI mostrar que o Pix tambem foi enviado
+   ao WhatsApp do comprador.
 
 Checklist de TTD:
 
@@ -1650,6 +1704,8 @@ Checklist de TTD:
 - [x] criar teste para replay de webhook nao duplicar notificacao;
 - [x] criar teste para `pix_generated`;
 - [x] criar teste para `refunded`;
+- [x] expor o resumo do envio de WhatsApp no payload local do checkout;
+- [x] refletir essa evidencia na UI publica do Pix;
 - [x] rodar:
   - `cd apps/api && php artisan test --filter=Billing`
   - `cd apps/api && php artisan test --filter=BillingWebhookTest`

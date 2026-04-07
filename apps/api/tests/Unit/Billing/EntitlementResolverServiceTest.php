@@ -211,3 +211,85 @@ it('keeps the subscription baseline active while a canceled subscription is stil
     expect($resolved['resolved_entitlements']['modules']['wall'])->toBeTrue();
     expect($resolved['resolved_entitlements']['limits']['retention_days'])->toBe(90);
 });
+
+it('materializes channel entitlements from a package-less manual override grant', function () {
+    $organization = \App\Modules\Organizations\Models\Organization::factory()->create();
+
+    $event = Event::factory()->create([
+        'organization_id' => $organization->id,
+        'commercial_mode' => 'none',
+    ]);
+
+    EventAccessGrant::factory()
+        ->forEvent($event)
+        ->create([
+            'source_type' => EventAccessGrantSourceType::ManualOverride->value,
+            'merge_strategy' => EntitlementMergeStrategy::Replace->value,
+            'priority' => EventAccessGrantSourceType::ManualOverride->defaultPriority(),
+            'features_snapshot_json' => [
+                'channels.whatsapp_groups.enabled' => true,
+                'channels.whatsapp_direct.enabled' => true,
+                'channels.public_upload.enabled' => true,
+                'channels.blacklist.enabled' => true,
+                'channels.whatsapp.shared_instance.enabled' => true,
+                'channels.whatsapp.dedicated_instance.enabled' => true,
+                'channels.whatsapp.feedback.reject_reply.enabled' => true,
+                'channels.whatsapp.feedback.reject_reply.message' => 'Sua midia nao segue as diretrizes do evento.',
+            ],
+            'limits_snapshot_json' => [
+                'channels.whatsapp_groups.max' => 5,
+                'channels.whatsapp.dedicated_instance.max_per_event' => 1,
+            ],
+        ]);
+
+    $resolved = app(EntitlementResolverService::class)->resolve($event);
+
+    expect($resolved['commercial_mode'])->toBe('manual_override');
+    expect($resolved['resolved_entitlements']['channels']['whatsapp_groups']['enabled'])->toBeTrue();
+    expect($resolved['resolved_entitlements']['channels']['whatsapp_groups']['max'])->toBe(5);
+    expect($resolved['resolved_entitlements']['channels']['whatsapp_direct']['enabled'])->toBeTrue();
+    expect($resolved['resolved_entitlements']['channels']['public_upload']['enabled'])->toBeTrue();
+    expect($resolved['resolved_entitlements']['channels']['blacklist']['enabled'])->toBeTrue();
+    expect($resolved['resolved_entitlements']['channels']['whatsapp']['shared_instance']['enabled'])->toBeTrue();
+    expect($resolved['resolved_entitlements']['channels']['whatsapp']['dedicated_instance']['enabled'])->toBeTrue();
+    expect($resolved['resolved_entitlements']['channels']['whatsapp']['dedicated_instance']['max_per_event'])->toBe(1);
+    expect($resolved['resolved_entitlements']['channels']['whatsapp']['feedback']['reject_reply']['enabled'])->toBeTrue();
+    expect($resolved['resolved_entitlements']['channels']['whatsapp']['feedback']['reject_reply']['message'])
+        ->toBe('Sua midia nao segue as diretrizes do evento.');
+});
+
+it('maps the legacy channels.whatsapp flag to the default whatsapp channel capabilities', function () {
+    $organization = \App\Modules\Organizations\Models\Organization::factory()->create();
+
+    $plan = Plan::create([
+        'code' => 'starter-whatsapp',
+        'name' => 'Starter WhatsApp',
+        'audience' => 'b2b',
+        'status' => 'active',
+    ]);
+
+    $plan->features()->createMany([
+        ['feature_key' => 'wall.enabled', 'feature_value' => 'true'],
+        ['feature_key' => 'channels.whatsapp', 'feature_value' => 'true'],
+    ]);
+
+    Subscription::create([
+        'organization_id' => $organization->id,
+        'plan_id' => $plan->id,
+        'status' => 'active',
+        'billing_cycle' => 'monthly',
+        'starts_at' => now(),
+        'renews_at' => now()->addMonth(),
+    ]);
+
+    $event = Event::factory()->create([
+        'organization_id' => $organization->id,
+        'commercial_mode' => 'none',
+    ]);
+
+    $resolved = app(EntitlementResolverService::class)->resolve($event);
+
+    expect($resolved['resolved_entitlements']['channels']['whatsapp_groups']['enabled'])->toBeTrue();
+    expect($resolved['resolved_entitlements']['channels']['whatsapp_direct']['enabled'])->toBeTrue();
+    expect($resolved['resolved_entitlements']['channels']['whatsapp']['shared_instance']['enabled'])->toBeTrue();
+});

@@ -52,6 +52,8 @@ O modulo nao conhece os detalhes do provider no controller. A resolucao sempre p
 | WhatsAppInboundEvent | `whatsapp_inbound_events` | Payload bruto de webhook |
 | WhatsAppDispatchLog | `whatsapp_dispatch_logs` | Log de envio |
 | WhatsAppGroupBinding | `whatsapp_group_bindings` | Grupo -> evento |
+| WhatsAppInboxSession | `whatsapp_inbox_sessions` | Sessao privada de intake por codigo |
+| WhatsAppMessageFeedback | `whatsapp_message_feedbacks` | Idempotencia e trilha de feedback automatico |
 
 ## Rotas
 
@@ -203,6 +205,27 @@ O modulo nao conhece os detalhes do provider no controller. A resolucao sempre p
   `instance_id + direction + provider_message_id`.
 - `WhatsAppInboundRouter` faz lookup rapido e refetch seguro em caso de
   corrida de insert.
+
+## Intake comercialmente consciente
+
+- grupos so entram no intake do evento quando existe `whatsapp_group_binding`
+  ativo e o evento continua apto comercialmente a usar `whatsapp_group`;
+- grupos tambem podem ser autovinculados pelo proprio chat com
+  `#ATIVAR#<group_bind_code>`, desde que a instancia correta esteja no grupo e
+  o remetente nao esteja bloqueado na blacklist do evento;
+- DM privada so entra no intake do evento quando existe `media_inbox_code`
+  valido e uma `whatsapp_inbox_session` ativa para o remetente;
+- a abertura da sessao DM agora tambem respeita a blacklist do evento por
+  telefone normalizado e identidade raw (`@lid`);
+- replies operacionais de ativacao/encerramento usam `send-text` com
+  `messageId`, seguindo o contrato oficial da Z-API para resposta em thread;
+- feedback automatico por fase agora existe para o ciclo de vida da midia:
+  - relogio ao entrar na fila
+  - coracao ao publicar
+  - bloqueio/rejeicao com reacao negativa e reply textual
+- o payload encaminhado ao `InboundMedia` agora carrega `_event_context` com
+  `event_id`, `event_channel_id`, `intake_source`, `provider_message_id` e
+  identidades do remetente.
 
 ## Requisitos de infraestrutura
 

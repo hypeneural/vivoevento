@@ -15,7 +15,7 @@ export function PublicGameMemoryStatus({ progress }: PublicGameMemoryStatusProps
     <div className="rounded-3xl border border-sky-500/20 bg-sky-500/8 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-white">Progresso do memory</p>
+          <p className="text-sm font-semibold text-white">Progresso do jogo da memoria</p>
           <p className="text-xs text-white/65">
             {progress.matchedPairs}/{progress.totalPairs} pares encontrados
           </p>
@@ -23,7 +23,7 @@ export function PublicGameMemoryStatus({ progress }: PublicGameMemoryStatusProps
 
         <div className="flex flex-wrap gap-2">
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/75">
-            Preview {progress.scorePreview}
+            Pontuacao estimada {progress.scorePreview}
           </span>
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/75">
             Acerto {accuracyPercent}%
@@ -50,7 +50,7 @@ export function PublicGameMemoryStatus({ progress }: PublicGameMemoryStatusProps
         <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
           <div className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-white/45">
             <Gauge className="h-3.5 w-3.5" />
-            Moves
+            Jogadas
           </div>
           <p className="mt-2 text-lg font-semibold text-white">{progress.moves}</p>
         </div>

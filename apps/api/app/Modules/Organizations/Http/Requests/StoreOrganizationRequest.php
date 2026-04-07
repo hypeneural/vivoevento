@@ -3,6 +3,7 @@
 namespace App\Modules\Organizations\Http\Requests;
 
 use App\Modules\Organizations\Enums\OrganizationType;
+use App\Modules\Organizations\Models\Organization;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -10,7 +11,7 @@ class StoreOrganizationRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true; // Handled by Policy
+        return (bool) $this->user()?->can('create', Organization::class);
     }
 
     public function rules(): array

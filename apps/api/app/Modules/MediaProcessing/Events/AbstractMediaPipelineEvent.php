@@ -13,7 +13,7 @@ abstract class AbstractMediaPipelineEvent implements ShouldDispatchAfterCommit
     use SerializesModels;
 
     public function __construct(
-        public readonly int $eventMediaId,
+        public int $eventMediaId,
     ) {}
 
     public static function fromMedia(EventMedia $media): static

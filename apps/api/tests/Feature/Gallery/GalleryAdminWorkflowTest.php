@@ -2,6 +2,8 @@
 
 use App\Modules\Events\Models\Event;
 use App\Modules\Events\Models\EventModule;
+use App\Modules\Events\Models\EventMediaSenderBlacklist;
+use App\Modules\InboundMedia\Models\InboundMessage;
 use App\Modules\MediaProcessing\Enums\ModerationStatus;
 use App\Modules\MediaProcessing\Enums\PublicationStatus;
 use App\Modules\MediaProcessing\Models\EventMedia;
@@ -202,4 +204,59 @@ it('hides published gallery media and propagates the wall removal event', functi
 
     expect($activity)->not->toBeNull()
         ->and($activity?->causer_id)->toBe($user->id);
+});
+
+it('returns sender context in gallery catalog and allows sender identity search', function () {
+    [, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+        'current_entitlements_json' => [
+            'channels' => [
+                'blacklist' => [
+                    'enabled' => true,
+                ],
+            ],
+        ],
+    ]);
+
+    $inbound = InboundMessage::query()->create([
+        'event_id' => $event->id,
+        'provider' => 'zapi',
+        'message_id' => 'gallery-zapi-001',
+        'message_type' => 'image',
+        'chat_external_id' => '120363499999999999-group',
+        'sender_external_id' => '11111111111111@lid',
+        'sender_phone' => '554899991111',
+        'sender_lid' => '11111111111111@lid',
+        'sender_name' => 'Ana Martins',
+        'sender_avatar_url' => 'https://cdn.eventovivo.test/ana.jpg',
+        'status' => 'processed',
+        'received_at' => now()->subMinutes(5),
+    ]);
+
+    $media = EventMedia::factory()->approved()->create([
+        'event_id' => $event->id,
+        'inbound_message_id' => $inbound->id,
+        'publication_status' => PublicationStatus::Hidden->value,
+        'source_type' => 'whatsapp',
+    ]);
+
+    EventMediaSenderBlacklist::factory()->create([
+        'event_id' => $event->id,
+        'identity_type' => 'lid',
+        'identity_value' => '11111111111111@lid',
+        'is_active' => true,
+    ]);
+
+    $response = $this->apiGet("/gallery?event_id={$event->id}&search=11111111111111@lid");
+
+    $this->assertApiPaginated($response);
+    $response->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $media->id)
+        ->assertJsonPath('data.0.sender_name', 'Ana Martins')
+        ->assertJsonPath('data.0.sender_lid', '11111111111111@lid')
+        ->assertJsonPath('data.0.sender_avatar_url', 'https://cdn.eventovivo.test/ana.jpg')
+        ->assertJsonPath('data.0.sender_blocked', true)
+        ->assertJsonPath('data.0.sender_recommended_identity_type', 'lid');
 });

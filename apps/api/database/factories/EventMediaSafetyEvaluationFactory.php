@@ -27,6 +27,10 @@ class EventMediaSafetyEvaluationFactory extends Factory
                 'nudity' => 0.0,
                 'violence' => 0.0,
             ],
+            'provider_categories_json' => null,
+            'provider_category_scores_json' => null,
+            'provider_category_input_types_json' => null,
+            'normalized_provider_json' => null,
             'reason_codes_json' => [],
             'raw_response_json' => [
                 'provider' => 'noop',

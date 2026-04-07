@@ -1,5 +1,9 @@
 # Billing And Subscriptions Execution Plan
 
+> Backlog integrado: a ordem oficial de execucao que cruza Billing,
+> Entitlements, CRUD do evento e WhatsApp agora esta em
+> [event-whatsapp-commercial-execution-plan.md](./event-whatsapp-commercial-execution-plan.md).
+
 ## Objetivo
 
 Este documento transforma a discovery em ordem real de execucao.
@@ -775,6 +779,47 @@ Status atualizado em 2026-04-03:
   - `queued` com instancia configurada
   - `unavailable` sem sender operacional.
 
+Status atualizado em 2026-04-06:
+
+- `grant.package_id` passou a ser opcional para `manual_override`;
+- o super admin agora consegue criar evento free/bonus com snapshots diretos de
+  feature e limite, sem depender de `package_id`;
+- o resolver comercial passou a materializar os canais operacionais de intake
+  no entitlement resolvido do evento;
+- isso cobre a granularidade comercial necessaria para intake de midia via
+  WhatsApp.
+
+Capacidades de canal que ja podem ser sobrescritas no proprio grant:
+
+- `channels.whatsapp_groups.enabled`
+- `channels.whatsapp_groups.max`
+- `channels.whatsapp_direct.enabled`
+- `channels.public_upload.enabled`
+- `channels.telegram.enabled`
+- `channels.whatsapp.dedicated_instance.enabled`
+- `channels.blacklist.enabled`
+- `channels.whatsapp.feedback.reject_reply.enabled`
+- `channels.whatsapp.feedback.reject_reply.message`
+
+Escopo remanescente:
+
+- a camada comercial desta jornada ficou coberta;
+- nenhuma mudanca adicional de billing foi necessaria nesta etapa; a rodada de
+  `2026-04-06` se concentrou em TDD/regressao da camada operacional de
+  evento/WhatsApp;
+- as pendencias operacionais de CRUD, webhook, blacklist e feedback rapido agora
+  vivem nos planos:
+  - `docs/architecture/event-whatsapp-commercial-execution-plan.md`
+  - `docs/architecture/whatsapp-zapi-webhook-execution-plan.md`
+- as pendencias operacionais remanescentes agora estao concentradas em:
+  - homologacao real final da Z-API
+  - onboarding/provisioning de instancia dedicada por evento
+- a convergencia final de testes entre evento, galeria e moderacao ficou
+  fechada na rodada de `2026-04-06`, sem necessidade de nova alteracao na
+  camada de billing
+- o eventual provisioning/onboarding de uma instancia WhatsApp dedicada segue
+  como jornada operacional do modulo WhatsApp/Eventos, nao do billing.
+
 ## M5 - Financeiro real e gateway
 
 Objetivo:
@@ -1239,6 +1284,18 @@ Motivo:
 
 - sem essas duas pecas, o sistema continua sem motor oficial para trial, bonus e compra direta;
 - com elas, o frontend passa a ler direito de uso do evento em vez de inferir demais a partir da conta.
+
+## Nota operacional de validacao em 2026-04-06
+
+Na homologacao local do evento `31`, o caminho correto de excecao comercial foi
+usar `EventAccessGrant` com `source_type = manual_override`, sem `package_id`,
+para materializar `current_entitlements_json` com canais de WhatsApp, upload
+publico, blacklist e feedback de rejeicao.
+
+Esse caso reforca a decisao do plano: o CRUD do evento e o intake nao devem
+inferir capacidades diretamente da assinatura da organizacao quando existe
+override manual do super admin. Eles devem consumir sempre o read model
+resolvido em `current_entitlements_json`.
 
 ## Veredito De Execucao
 

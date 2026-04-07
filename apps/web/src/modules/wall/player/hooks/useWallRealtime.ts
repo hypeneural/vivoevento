@@ -29,6 +29,26 @@ interface UseWallRealtimeOptions {
   onPlayerCommand: (payload: WallPlayerCommandPayload) => void;
 }
 
+function mapConnectionState(current: string, hasConnectedOnce: boolean): WallConnectionStatus {
+  if (current === 'connected') {
+    return 'connected';
+  }
+
+  if (current === 'connecting' || current === 'initialized') {
+    return hasConnectedOnce ? 'reconnecting' : 'connecting';
+  }
+
+  if (current === 'disconnected') {
+    return 'disconnected';
+  }
+
+  if (current === 'unavailable' || current === 'failed') {
+    return 'error';
+  }
+
+  return 'idle';
+}
+
 export function useWallRealtime({
   code,
   onNewMedia,
@@ -73,25 +93,20 @@ export function useWallRealtime({
     }
 
     const channelName = `wall.${code}`;
-    let hasConnectedOnce = false;
+    let hasConnectedOnce = pusher.connection.state === 'connected';
 
     // Connection state tracking
     const handleStateChange = (states: { current: string; previous: string }) => {
       const { current } = states;
 
       if (current === 'connected') {
-        setConnectionStatus('connected');
         hasConnectedOnce = true;
-      } else if (current === 'connecting') {
-        setConnectionStatus(hasConnectedOnce ? 'reconnecting' : 'connecting');
-      } else if (current === 'disconnected') {
-        setConnectionStatus('disconnected');
-      } else if (current === 'unavailable' || current === 'failed') {
-        setConnectionStatus('error');
       }
+
+      setConnectionStatus(mapConnectionState(current, hasConnectedOnce));
     };
 
-    setConnectionStatus('connecting');
+    setConnectionStatus(mapConnectionState(pusher.connection.state, hasConnectedOnce));
     pusher.connection.bind('state_change', handleStateChange);
 
     // Subscribe to the public channel

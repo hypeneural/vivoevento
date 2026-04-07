@@ -14,7 +14,7 @@ Ela complementa:
 
 - `[x]` concluido
 - `[ ]` pendente
-- atualizada em `2026-04-05`
+- atualizada em `2026-04-06`
 
 ## Snapshot da rodada
 
@@ -30,10 +30,101 @@ Ela complementa:
 - [x] `M2-T4` executado
 - [x] `M2-T5` executado
 - [x] `M2-T6` executado
-- [x] `M3` explicitamente fora do go-live atual
-- [ ] `M4` pendente
-- [ ] `M5` pendente
+- [x] `M3` originalmente fora do go-live base
+- [x] recorte operacional de `M3` retomado em producao para Z-API/Pagar.me
+- [x] `M4` concluido na VPS real
+- [x] `M5` concluido
 - [ ] `M6` pendente
+
+## Execucao real da VPS
+
+Status: go-live base funcional em `2026-04-06` no host `vmi3206619`.
+
+- [x] acessar a VPS Ubuntu 24.04 por SSH
+- [x] validar versoes e candidatos de pacotes base no host
+- [x] confirmar acesso de rede do host para GitHub
+- [x] detectar que o clone remoto ainda nao continha os artefatos mais recentes da VPS
+- [x] enviar a arvore local validada para `/tmp/eventovivo-bootstrap`
+- [x] executar `bootstrap-host.sh --enable-ufw`
+- [x] confirmar `nginx`, `php8.3-fpm`, `redis-server`, `postgresql` e `fail2ban` ativos apos bootstrap
+- [x] confirmar `deploy` e estrutura `/var/www/eventovivo`
+- [x] executar `install-configs.sh --repo-root /tmp/eventovivo-bootstrap`
+- [x] confirmar instalacao de:
+  - `nginx.conf`, `sites-enabled` e `cloudflare-real-ip.conf`
+  - `eventovivo.conf` do PHP-FPM
+  - drop-ins de Redis e PostgreSQL
+  - units `systemd`
+  - `sudoers` do `deploy`
+  - scripts em `/var/www/eventovivo/scripts`
+- [x] reiniciar Redis e PostgreSQL para aplicar os baselines
+- [x] validar:
+  - `php-fpm8.3 -tt`
+  - `systemd-analyze verify`
+  - `visudo -cf /etc/sudoers.d/eventovivo-deploy-systemctl`
+  - `redis-cli ping`
+  - `pg_isready`
+- [x] reaplicar `install-configs.sh` com a versao que desabilita o pool `www` padrao do PHP-FPM
+- [x] instalar certificado de origem em `/etc/ssl/certs/eventovivo-origin.crt`
+- [x] instalar chave de origem em `/etc/ssl/private/eventovivo-origin.key`
+- [x] validar `nginx -t`
+- [x] criar banco, usuario e extensoes da app
+- [x] criar `/var/www/eventovivo/shared/.env`
+- [x] rodar `verify-host.sh --require-shared-env`
+- [x] executar primeiro deploy
+- [x] habilitar `eventovivo-horizon`, `eventovivo-reverb` e `eventovivo-scheduler.timer`
+- [x] rodar smoke test
+- [x] validar `Horizon`, `Reverb` e `eventovivo-scheduler.timer` ativos apos o deploy
+- [x] validar zero failed jobs no baseline operacional
+- [x] validar backlog zerado nas filas base:
+  - `webhooks`
+  - `media-fast`
+  - `media-process`
+  - `media-publish`
+  - `broadcasts`
+  - `default`
+  - `notifications`
+  - `analytics`
+  - `billing`
+- [x] validar handshake websocket `101` com `REVERB_APP_KEY` real da VPS
+- [x] publicar hotfix do admin para `/login` na release `20260406_130951`
+- [x] corrigir o unit real do `Reverb` para remover `ExecStop` incorreto
+- [x] criar `super-admin` de producao com organizacao ativa
+- [x] validar login real via `POST /api/v1/auth/login`
+- [x] validar sessao real via `GET /api/v1/auth/me`
+- [x] validar rollback com segunda release valida (`20260406_130951` <-> `20260406_133407`)
+- [x] alinhar `deploy.sh` e `rollback.sh` para reciclagem via `systemctl reload`
+- [x] publicar hotfix do admin para payloads reais de `dashboard`, `play` e
+  `plans` na release `20260406_182927`
+- [x] validar APIs reais de `dashboard`, `play`, `plans` e `audit` com token do
+  `super-admin`
+- [x] confirmar que o audit mostra eventos `auth.login` na primeira pagina
+- [x] ajustar cache do admin no Nginx para nao cachear `/`, `/index.html`,
+  `/sw.js` e `/manifest.webmanifest`
+- [x] ajustar service worker do admin para nao manter runtime cache de scripts
+  e styles do painel
+- [x] ajustar `deploy.sh` para podar assets Vite do admin nao referenciados pelo
+  build atual
+- [x] validar que a origin ja retorna `404` para chunk antigo removido
+- [x] corrigir `sites-enabled/eventovivo-admin.conf` para symlink real apontando
+  para `sites-available`
+- [x] remover backup antigo de `sites-enabled` para eliminar conflito de
+  `server_name`
+- [x] validar que asset removido na origin retorna `404` com `no-store`
+- [x] validar que asset atual na origin retorna `public, immutable`
+- [x] validar que `/sw.js` na origin retorna `no-store`
+- [x] endurecer `install-configs.sh` para substituir arquivo regular em
+  `sites-enabled` por symlink real
+- [x] confirmar release ativa `/var/www/eventovivo/releases/20260406_182927`
+- [x] confirmar `nginx`, `php8.3-fpm`, `eventovivo-horizon`,
+  `eventovivo-reverb` e `eventovivo-scheduler.timer` ativos apos o hotfix
+- [x] confirmar zero failed jobs apos o hotfix
+- [x] confirmar backlog `0` em `webhooks`, `media-fast`, `media-process`,
+  `media-publish`, `broadcasts`, `default`, `notifications`, `analytics` e
+  `billing`
+- [ ] purgar cache da Cloudflare para `/sw.js` e chunks antigos ainda servidos
+  como `CF-Cache-Status: HIT`
+- [ ] validar em navegador limpo, apos purge, que `/`, `/play`, `/plans` e
+  `/audit` nao disparam erro de console
 
 ## Ultima revisao antes da VPS
 
@@ -49,7 +140,7 @@ Status: concluida em `2026-04-05`.
 - [x] revisar `verify-host.sh` cobrindo tambem `composer`, `node`, `npm` e `psql`
 - [x] desabilitar o site default do Nginx na instalacao dos templates
 - [x] revisar execution plan e runbook com a sequencia `M4 -> M5`
-- [ ] executar validacoes de host na Ubuntu real
+- [x] executar validacoes de host na Ubuntu real
 
 ## Preflight local antes da VPS
 
@@ -119,6 +210,8 @@ Status: concluido nesta rodada.
 - [x] versionar os ranges atuais do Cloudflare com observacao de resync
 - [x] criar [deploy/nginx/sites/eventovivo-landing.conf](./../../deploy/nginx/sites/eventovivo-landing.conf)
 - [x] criar [deploy/nginx/sites/eventovivo-admin.conf](./../../deploy/nginx/sites/eventovivo-admin.conf)
+- [x] proteger `/`, `/index.html`, `/sw.js` e `/manifest.webmanifest` do admin
+  contra cache imutavel
 - [x] criar [deploy/nginx/sites/eventovivo-api.conf](./../../deploy/nginx/sites/eventovivo-api.conf)
 - [x] criar [deploy/nginx/sites/eventovivo-ws.conf](./../../deploy/nginx/sites/eventovivo-ws.conf)
 - [x] incluir rate limit basico da API no template
@@ -126,7 +219,7 @@ Status: concluido nesta rodada.
 - [x] incluir restore do IP real do Cloudflare
 - [x] alinhar a estrategia de proxies com o bootstrap do Laravel
 - [x] manter os 4 hosts publicos do desenho aprovado
-- [ ] validar `nginx -t` em um host Ubuntu 24.04 real
+- [x] validar `nginx -t` em um host Ubuntu 24.04 real
 
 ### M1-T3 - Versionar templates de PHP-FPM, systemd e logrotate
 
@@ -146,8 +239,8 @@ Status: concluido nesta rodada.
 - [x] incluir `UMask=0002` nos services long-lived
 - [x] incluir `ExecReload` nos services em que faz sentido
 - [x] criar [deploy/logrotate/eventovivo](./../../deploy/logrotate/eventovivo)
-- [ ] validar `php-fpm8.3 -tt` em um host Ubuntu 24.04 real
-- [ ] validar `systemd-analyze verify` em um host Ubuntu 24.04 real
+- [x] validar `php-fpm8.3 -tt` em um host Ubuntu 24.04 real
+- [x] validar `systemd-analyze verify` em um host Ubuntu 24.04 real
 
 ### M1-T4 - Fechar o contrato de ambientes
 
@@ -186,6 +279,8 @@ Status: concluido nesta rodada.
 - [x] validar shell syntax com `bash -n`
 - [x] alinhar `deploy.sh` com release imutavel, symlink `current`,
   `storage:link`, warmup e recycle de servicos
+- [x] alinhar `deploy.sh` para remover assets Vite do admin nao referenciados
+  pelo build atual
 - [x] alinhar `install-configs.sh` com backup de arquivos e instalacao dos
   templates em `/etc`
 
@@ -310,19 +405,37 @@ Status: concluido nesta rodada.
 
 ## M3 - WhatsApp para producao
 
-Status: fora do go-live atual e nao bloqueante para `M4` e `M5`.
+Status: o go-live base subiu sem depender de `M3`, mas em `2026-04-06` o recorte
+operacional minimo de Z-API foi retomado para o evento bonificado da Umalu.
 
 - [ ] fechar autenticidade por provider
 - [ ] persistir payload bruto cedo com quarentena/retencao
 - [ ] fechar `InboundMedia\\Jobs\\ProcessInboundWebhookJob`
 - [ ] fechar `NormalizeInboundMessageJob`
 - [ ] fechar `DownloadInboundMediaJob`
-- [ ] auditar a fiacao real de `whatsapp-*`
-- [ ] adicionar supervisores `whatsapp-*` quando a ponta a ponta estiver pronta
+- [x] auditar a fiacao real de `whatsapp-*`
+- [x] adicionar supervisores `whatsapp-*` no Horizon:
+  - `supervisor-whatsapp-inbound`
+  - `supervisor-whatsapp-send`
+  - `supervisor-whatsapp-sync`
+- [x] configurar `.env` de producao com filas dedicadas:
+  - `WHATSAPP_QUEUE_INBOUND=whatsapp-inbound`
+  - `WHATSAPP_QUEUE_SEND=whatsapp-send`
+  - `WHATSAPP_QUEUE_SYNC=whatsapp-sync`
+- [x] cadastrar provider `zapi` em producao
+- [x] cadastrar instancia Z-API `3BDB98A79042D03232CC1ABE514C6FD4` como ativa, default e conectada
+- [x] validar status remoto da Z-API com HTTP `200`
+- [x] validar POST publico em `/status` retornando `200 {"status":"received"}`
+- [x] validar consumo do job em `whatsapp-inbound` com `processing_status=processed`
+- [x] validar `queue:failed` sem falhas apos o webhook de status
+- [x] validar backlog `0` em:
+  - `queues:whatsapp-inbound`
+  - `queues:whatsapp-send`
+  - `queues:whatsapp-sync`
 
 ## M4 - Bootstrap da VPS
 
-Status: pendente.
+Status: concluido na VPS real.
 
 Artefatos de repo prontos para esta fase:
 
@@ -334,32 +447,49 @@ Artefatos de repo prontos para esta fase:
 - [x] tratar `postgresql-16-pgvector` como requisito do bootstrap padrao
 - [x] simplificar include do Redis para arquivo explicito em `install-configs.sh`
 
-- [ ] endurecer Ubuntu 24.04
-- [ ] instalar runtime base
-- [ ] instalar PostgreSQL 16 e Redis 7
-- [ ] preparar `/var/www/eventovivo`
-- [ ] instalar configs versionadas do repo
-- [ ] instalar certificado de origem antes do `nginx -t`
-- [ ] reiniciar Redis e PostgreSQL para aplicar os baselines locais
-- [ ] manter site default do Nginx desabilitado
-- [ ] instalar units para habilitacao no primeiro deploy
-- [ ] fechar Cloudflare e DNS
+- [x] endurecer Ubuntu 24.04
+- [x] instalar runtime base
+- [x] instalar PostgreSQL 16 e Redis 7
+- [x] preparar `/var/www/eventovivo`
+- [x] instalar configs versionadas do repo
+- [x] instalar certificado de origem antes do `nginx -t`
+- [x] reiniciar Redis e PostgreSQL para aplicar os baselines locais
+- [x] manter site default do Nginx desabilitado
+- [x] instalar units para habilitacao no primeiro deploy
+- [x] fechar o apontamento DNS proxied para `@`, `www`, `admin`, `api` e `ws`
+- [x] criar banco, usuario e extensoes da app
+- [x] criar `/var/www/eventovivo/shared/.env`
+- [ ] criar `/var/www/eventovivo/shared/apps-web.env.production`
+- [ ] criar `/var/www/eventovivo/shared/apps-landing.env.production`
+- [x] alinhar `FILESYSTEM_DISK=public` na VPS para o go-live base enquanto o object storage externo nao estiver pronto
+- [x] rodar `verify-host.sh --require-shared-env`
 
 ## M5 - Primeiro deploy funcional
 
-Status: pendente.
+Status: concluido, com rollback validado entre duas releases boas.
 
-- [ ] criar primeira release
-- [ ] linkar `.env` e `shared/storage`
-- [ ] instalar dependencias
-- [ ] buildar frontends
-- [ ] aquecer caches
-- [ ] rodar migrations
-- [ ] executar healthcheck
-- [ ] trocar symlink `current`
-- [ ] reciclar processos
-- [ ] rodar smoke test minimo completo
-- [ ] testar rollback real
+- [x] criar primeira release valida
+- [x] linkar `.env` e `shared/storage`
+- [x] linkar `shared/apps-web.env.production` no build do admin
+- [x] linkar `shared/apps-landing.env.production` no build da landing
+- [x] instalar dependencias
+- [x] buildar frontends
+- [x] validar no healthcheck o `VITE_API_BASE_URL` compilado no admin
+- [x] podar assets Vite do admin nao referenciados pelo build atual
+- [x] aquecer caches
+- [x] rodar migrations
+- [x] executar healthcheck
+- [x] trocar symlink `current`
+- [x] reciclar processos
+- [x] rodar smoke test minimo completo
+- [x] criar segunda release valida para servir de alvo do rollback
+- [x] validar login real com `super-admin`
+- [x] validar `/api/v1/dashboard/stats` com token real
+- [x] validar `/api/v1/events?module=play&per_page=24` com token real
+- [x] validar `/api/v1/plans` com token real
+- [x] validar `/api/v1/audit` exibindo `auth.login`
+- [x] testar rollback real
+- [x] restaurar a release final apos o rollback validado
 
 ## M6 - Throughput e capacidade
 
@@ -385,15 +515,37 @@ Ordem sugerida da proxima rodada:
 - [x] executar `M2-T5`
 - [x] concluir `M2-T6`
 - [x] decidir que `M3` fica fora do go-live atual
-- [ ] iniciar `M4` com bootstrap real da VPS
+- [x] iniciar `M4` com bootstrap real da VPS
+- [x] concluir os bloqueios restantes de `M4`
+- [x] executar `M5-T4` para validar rollback real
+- [x] configurar credenciais Pagar.me de producao no `.env` da VPS
+- [x] rebuildar admin com `VITE_PAGARME_PUBLIC_KEY` de producao
+- [x] validar Basic Auth do webhook Pagar.me via action local da app
+- [x] validar POST sem Basic Auth no Pagar.me retornando `401`
+- [x] criar organizacao parceira `Umalu Eventos`
+- [x] criar evento bonificado `Ana Clara e Joao Paulo - 11.04.2026`
+- [x] ativar modulos `live`, `wall`, `play` e `hub`
+- [x] ativar canais `public_upload_link` e `whatsapp_direct`
+- [x] criar usuario de acesso da Umalu como `partner-owner`
+- [x] validar login real da Umalu em `POST /api/v1/auth/login`
+- [x] criar plano interno `bonus-full-umalu` e assinatura `bonus` ativa para a organizacao
+- [x] validar que o acesso da Umalu libera `wall`, `play` e `whatsapp`
+- [x] ativar canal `whatsapp_group` com codigo de vinculacao por `#ATIVAR#`
+- [x] validar APIs publicas do evento:
+  - upload API `200`
+  - hub API `200`
+  - pagina publica de upload `200`
+- [ ] validar upload publico real em producao
+- [ ] validar publish -> wall ponta a ponta em producao
 
 ## Sequencia pronta para execucao na VPS
 
 ### Etapa 1 - Bootstrap do host
 
-- [ ] clonar o repo temporariamente na VPS
-- [ ] executar `sudo bash scripts/ops/bootstrap-host.sh --enable-ufw`
-- [ ] confirmar instalacao de:
+- [x] clonar ou staging da arvore de bootstrap na VPS
+- [x] detectar que o clone remoto estava desatualizado e subir a arvore local validada para `/tmp/eventovivo-bootstrap`
+- [x] executar `sudo bash scripts/ops/bootstrap-host.sh --enable-ufw`
+- [x] confirmar instalacao de:
   - `nginx`
   - `php8.3-fpm`
   - `php8.3-opcache`
@@ -403,13 +555,13 @@ Ordem sugerida da proxima rodada:
   - `node`
   - `npm`
   - `composer`
-- [ ] confirmar usuario `deploy`
-- [ ] confirmar estrutura `/var/www/eventovivo`
+- [x] confirmar usuario `deploy`
+- [x] confirmar estrutura `/var/www/eventovivo`
 
 ### Etapa 2 - Instalar templates versionados
 
-- [ ] executar `sudo bash scripts/ops/install-configs.sh --repo-root "<repo>"`
-- [ ] confirmar instalacao de:
+- [x] executar `sudo bash scripts/ops/install-configs.sh --repo-root "<repo>"`
+- [x] confirmar instalacao de:
   - `nginx.conf`
   - `cloudflare-real-ip.conf`
   - vhosts `landing`, `admin`, `api`, `ws`
@@ -419,34 +571,36 @@ Ordem sugerida da proxima rodada:
   - sudoers minimo do usuario `deploy`
   - units `systemd`
   - `logrotate`
-- [ ] confirmar remocao de `/etc/nginx/sites-enabled/default`
-- [ ] confirmar `systemctl daemon-reload`
+- [x] confirmar remocao de `/etc/nginx/sites-enabled/default`
+- [x] confirmar `systemctl daemon-reload`
+- [x] confirmar remocao do pool padrao `www.conf` do PHP-FPM
 
 ### Etapa 3 - Instalar segredos e validar host
 
-- [ ] instalar `eventovivo-origin.crt` e `eventovivo-origin.key`
-- [ ] reiniciar `redis-server`
-- [ ] reiniciar `postgresql`
-- [ ] criar `/var/www/eventovivo/shared/.env`
-- [ ] preencher segredos com base em `deploy/examples/apps-api.env.production.example`
-- [ ] executar `sudo bash /var/www/eventovivo/scripts/verify-host.sh --require-shared-env`
-- [ ] validar:
-  - `nginx -t`
-  - `php-fpm8.3 -tt`
-  - `systemd-analyze verify`
-  - `redis-cli ping`
-  - `pg_isready`
-  - `composer --version`
-  - `node --version`
-  - `npm --version`
-  - `psql --version`
+- [x] instalar `eventovivo-origin.crt` e `eventovivo-origin.key`
+- [x] reiniciar `redis-server`
+- [x] reiniciar `postgresql`
+- [x] criar `/var/www/eventovivo/shared/.env`
+- [x] preencher segredos internos base com geracao local no host a partir de `deploy/examples/apps-api.env.production.example`
+- [x] executar `sudo bash /var/www/eventovivo/scripts/verify-host.sh --require-shared-env`
+- [x] validar:
+  - [x] `nginx -t`
+  - [x] `php-fpm8.3 -tt`
+  - [x] `systemd-analyze verify`
+  - [x] `redis-cli ping`
+  - [x] `pg_isready`
+  - [x] `composer --version`
+  - [x] `node --version`
+  - [x] `npm --version`
+  - [x] `psql --version`
 
 ### Etapa 4 - Fechar Cloudflare e subir primeiro deploy
 
-- [ ] criar registros `A` proxied para `@`, `www`, `admin`, `api` e `ws`
+- [x] criar registros `A` proxied para `@`, `www`, `admin`, `api` e `ws`
 - [ ] ativar `Full (strict)`
-- [ ] executar `bash scripts/deploy/deploy.sh`
-- [ ] habilitar `eventovivo-horizon.service`, `eventovivo-reverb.service` e `eventovivo-scheduler.timer`
-- [ ] confirmar que o usuario `deploy` consegue reciclar apenas os `systemctl` previstos
-- [ ] executar `bash /var/www/eventovivo/scripts/smoke-test.sh`
-- [ ] validar wall, upload e websocket
+- [x] executar `bash scripts/deploy/deploy.sh`
+- [x] habilitar `eventovivo-horizon.service`, `eventovivo-reverb.service` e `eventovivo-scheduler.timer`
+- [x] confirmar que o usuario `deploy` consegue reciclar apenas os `systemctl` previstos
+- [x] executar `bash /var/www/eventovivo/scripts/smoke-test.sh`
+- [x] validar websocket
+- [ ] validar upload publico e wall com fluxo funcional completo

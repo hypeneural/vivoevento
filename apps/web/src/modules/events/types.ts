@@ -1,3 +1,5 @@
+import type { EventIntakeBlacklist, EventIntakeChannels, EventIntakeDefaults } from './intake';
+
 export type ApiEventStatus = 'draft' | 'scheduled' | 'active' | 'paused' | 'ended' | 'archived';
 export type ApiEventType = 'wedding' | 'birthday' | 'fifteen' | 'corporate' | 'fair' | 'graduation' | 'other';
 export type EventModuleKey = 'live' | 'wall' | 'play' | 'hub';
@@ -11,7 +13,7 @@ export type EventCommercialMode = 'none' | 'subscription_covered' | 'trial' | 's
 export interface EventFaceSearchSettings {
   id: number | null;
   event_id: number;
-  provider_key: 'noop' | string;
+  provider_key: 'noop' | 'compreface' | string;
   embedding_model_key: string;
   vector_store_key: 'pgvector' | string;
   enabled: boolean;
@@ -123,6 +125,9 @@ export interface EventDetailItem extends EventListItem {
   organization_slug: string | null;
   module_count: number;
   current_entitlements?: Record<string, unknown> | null;
+  intake_defaults?: EventIntakeDefaults | null;
+  intake_channels?: EventIntakeChannels | null;
+  intake_blacklist?: EventIntakeBlacklist | null;
   content_moderation?: EventContentModerationSettings | null;
   face_search?: EventFaceSearchSettings | null;
   media_intelligence?: EventMediaIntelligenceSettings | null;
@@ -138,6 +143,57 @@ export interface EventShareLinks {
   hub_url: string | null;
   play_url?: string | null;
   upload_slug: string;
+}
+
+export interface EventTelegramOperationalSignal {
+  id: number;
+  provider_update_id?: string | null;
+  chat_external_id: string | null;
+  sender_external_id: string | null;
+  sender_name?: string | null;
+  signal: string | null;
+  old_status?: string | null;
+  new_status?: string | null;
+  occurred_at?: string | null;
+  created_at?: string | null;
+}
+
+export interface EventTelegramOperationalStatus {
+  enabled: boolean;
+  configured: boolean;
+  healthy: boolean;
+  error_message: string | null;
+  channel: {
+    id: number;
+    status: string;
+    bot_username: string | null;
+    media_inbox_code: string | null;
+    session_ttl_minutes: number | null;
+    allow_private: boolean;
+    v1_allowed_updates: string[];
+  } | null;
+  bot: {
+    ok: boolean;
+    id: string | null;
+    username: string | null;
+    is_bot: boolean;
+    can_join_groups: boolean;
+    can_read_all_group_messages: boolean;
+  };
+  webhook: {
+    ok: boolean;
+    url: string | null;
+    pending_update_count: number;
+    has_custom_certificate: boolean;
+    ip_address: string | null;
+    last_error_at: string | null;
+    last_error_message: string | null;
+    max_connections: number | null;
+    allowed_updates: string[];
+    expected_allowed_updates: string[];
+    matches_expected_allowed_updates: boolean;
+  };
+  recent_operational_signals: EventTelegramOperationalSignal[];
 }
 
 export interface PaginatedEventsResponse {
@@ -173,6 +229,9 @@ export interface EventFormPayload {
     allow_public_selfie_search?: boolean;
     selfie_retention_hours?: number;
   };
+  intake_defaults?: EventIntakeDefaults;
+  intake_channels?: EventIntakeChannels;
+  intake_blacklist?: Pick<EventIntakeBlacklist, 'entries'>;
 }
 
 export interface EventCreateResponse {
@@ -187,6 +246,9 @@ export interface EventCreateResponse {
   public_url: string | null;
   upload_url: string | null;
   upload_api_url: string | null;
+  intake_defaults?: EventIntakeDefaults | null;
+  intake_channels?: EventIntakeChannels | null;
+  intake_blacklist?: EventIntakeBlacklist | null;
   modules: Record<EventModuleKey, boolean>;
   links: {
     public_hub: string | null;
@@ -255,10 +317,10 @@ export const EVENT_TYPE_LABELS: Record<ApiEventType, string> = {
 };
 
 export const EVENT_MODULE_LABELS: Record<EventModuleKey, string> = {
-  live: 'Live',
-  wall: 'Wall',
-  play: 'Play',
-  hub: 'Hub',
+  live: 'Galeria ao vivo',
+  wall: 'Telao',
+  play: 'Jogos',
+  hub: 'Links',
 };
 
 export const EVENT_VISIBILITY_LABELS: Record<EventVisibility, string> = {

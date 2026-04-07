@@ -21,6 +21,13 @@ Escopo desta primeira entrega:
 - cancelamento/estorno administrativo por `charge_id`.
 - retry operacional seguro do mesmo `BillingOrder` com a mesma `Idempotency-Key`.
 
+Jornada relacionada, mas separada deste escopo:
+
+- o onboarding comercial administrativo sem `Event`, com Pix avulso e
+  associacao futura a evento, fica documentado em:
+  - [billing-admin-customer-onboarding-discovery.md](./billing-admin-customer-onboarding-discovery.md)
+  - [billing-admin-customer-onboarding-execution-plan.md](./billing-admin-customer-onboarding-execution-plan.md)
+
 Fora de escopo nesta fase:
 
 - assinatura recorrente;
@@ -50,12 +57,27 @@ O `eventovivo` ja tem a fundacao correta para isso:
 Os gaps restantes para Pagar.me v5, depois da rodada atual, sao estes:
 
 - `POST /public/event-checkouts/{uuid}/confirm` continua existindo e deve ser tratado apenas como fallback manual para providers legados;
-- os cenarios do simulador de cartao `4000000000000036`, `4000000000000044` e `4000000000000069` nao reproduziram, nesta conta e neste fluxo PSP com `customer_id + card_id`, a maquina de estados publicada na doc oficial;
-- a homologacao real de cancelamento/estorno administrativo ainda precisa ser rodada no ambiente da conta de teste;
-- a politica final de negocio para `chargeback` e cancelamento de compra unica ainda precisa ser fechada no produto;
-- a pagina publica ainda usa pouco o `onboarding`, `token` e `next_path` que o backend ja devolve;
+- os cenarios do simulador de cartao `4000000000000036`, `4000000000000044` e `4000000000000069` continuam divergindo da doc oficial nesta conta, mas a propria doc os classifica no simulador de cartao nao financeiro e manda usar o Simulador PSP para fluxos financeiros;
+- a politica final de negocio para `chargeback` ainda precisa ser fechada no produto;
+- o cancelamento da compra unica ficou fechado assim:
+  - nao existe cancelamento pelo usuario na UI publica
+  - se o time cancelar no painel Pagar.me, o `eventovivo` reflete isso por webhook no painel local
+  - pedido pendente cancelado no gateway vira `canceled` localmente
+  - cobranca ja paga estornada no gateway vira `refunded` localmente e revoga o acesso;
+- a pagina publica ainda pode evoluir para uma jornada em etapas, mas ja consome `onboarding`, `token` e `next_path` de forma util;
 - a notificacao ativa ao cliente ja existe para `pix_generated`, `paid`, `failed` e `refunded`, mas `chargeback` segue pendente de politica de produto;
-- a UX de Pix e cartao ja esta bem mais forte, mas a retomada automatica apos autenticacao e alguns detalhes finais de onboarding ainda estao pendentes.
+- no `pix_generated`, o checkout agora manda `send-text` com resumo do pedido e, quando a instancia de WhatsApp resolvida e `zapi`, tambem enfileira `send-button-pix` com o valor copia-e-cola do `qr_code` para reduzir friccao no WhatsApp;
+- o endpoint local do checkout agora tambem expoe `checkout.payment.whatsapp`, para a UI informar que o Pix foi enviado ao WhatsApp do comprador e se houve envio adicional do botao Pix;
+- a UX de Pix e cartao ja esta bem mais forte; o gap principal agora e refino de produto, nao continuidade tecnica da retomada.
+
+Revalidacao completa executada no fim desta rodada:
+
+- `cd apps/api && php artisan test` -> verde
+- `cd apps/web && npm run test` -> verde
+- `cd apps/web && npm run type-check` -> verde
+- `php artisan billing:pagarme:homologate --scenario=all --poll-attempts=2 --poll-sleep-ms=1000` -> verde
+- consolidado salvo em:
+  - `apps/api/storage/app/pagarme-homologation/20260405-210058-all.json`
 
 Conclusao pratica:
 
@@ -81,11 +103,13 @@ Conclusao pratica:
 - `apps/api/app/Modules/Billing/Actions/ActivatePaidEventPackageOrderAction.php`
 - `apps/api/app/Modules/Billing/Actions/MarkBillingOrderAsPaidAction.php`
 - `apps/api/app/Modules/Billing/Actions/CancelBillingOrderAction.php`
+- `apps/api/app/Modules/Billing/Console/Commands/PagarmeHomologationCommand.php`
 - `apps/api/app/Modules/Billing/Services/BillingGatewayInterface.php`
 - `apps/api/app/Modules/Billing/Services/BillingGatewayManager.php`
 - `apps/api/app/Modules/Billing/Services/ManualBillingGateway.php`
 - `apps/api/app/Modules/Billing/Services/Pagarme/PagarmeClient.php`
 - `apps/api/app/Modules/Billing/Services/Pagarme/PagarmeBillingGateway.php`
+- `apps/api/app/Modules/Billing/Services/Pagarme/PagarmeHomologationService.php`
 - `apps/api/app/Modules/Billing/Services/Pagarme/PagarmeStatusMapper.php`
 - `apps/api/app/Modules/Billing/Http/Controllers/BillingWebhookController.php`
 - `apps/api/app/Modules/Billing/Http/Controllers/BillingOrderController.php`
@@ -186,11 +210,14 @@ Gaps objetivos restantes:
 
 1. `POST /public/event-checkouts/{uuid}/confirm` ainda existe por retrocompatibilidade e precisa ficar explicitamente fora do fluxo feliz da Pagar.me;
 2. os cenarios tardios do simulador de cartao de credito divergiram do comportamento publicado pela doc oficial nesta conta;
-3. a homologacao administrativa de cancelamento/estorno ainda precisa ser rodada na conta de teste;
-4. a politica final de negocio para `chargeback` de compra unica ainda precisa ser fechada no produto;
-5. a pagina publica ainda nao trata de forma explicita o onboarding do usuario ja criado no backend;
-6. a trilha de notificacao ativa ao cliente por WhatsApp ja existe para `pix_generated`, `paid`, `failed` e `refunded`, mas `chargeback` segue fora da primeira rodada;
-7. a UX do checkout ja cobre mascara, contexto e feedback visual forte, mas a retomada apos autenticacao ainda nao esta fechada no fluxo inteiro.
+3. a politica final de negocio para `chargeback` de compra unica ainda precisa ser fechada no produto;
+4. a pagina publica ainda pode evoluir para uma jornada em etapas, mas ja trata de forma explicita o onboarding do usuario criado no backend;
+5. a trilha de notificacao ativa ao cliente por WhatsApp ja existe para `pix_generated`, `paid`, `failed` e `refunded`, mas `chargeback` segue fora da primeira rodada;
+6. no Pix, o `BillingPaymentStatusNotificationService` agora tenta dois outbounds quando a instancia e `zapi`:
+   - `send-text` com valor, expiracao, link do QR e copia-e-cola
+   - `send-button-pix` com o mesmo valor copia-e-cola vindo de `qr_code`, para teste de UX mais fluida no WhatsApp
+7. a UX do checkout ja cobre mascara, contexto, feedback visual forte e retomada segura apos autenticacao; o que sobra e refinamento comercial da jornada;
+8. vale abrir um follow-up com a Pagar.me se o time quiser confirmacao formal sobre a aplicabilidade de `0036`, `0044` e `0069` no contexto PSP usado aqui.
 
 ### 1.3 O que os testes atuais ja provam
 
@@ -210,6 +237,10 @@ Os testes de frontend em `apps/web/src/modules/billing/PublicEventCheckoutPage.t
 
 - a pagina publica real do checkout existe em React/SPA;
 - Pix mostra QR Code local e faz polling apenas no endpoint local de status;
+- o conflito de identidade vira ramo de continuidade com CTA seguro para login;
+- a retomada apos autenticacao usa rascunho seguro:
+  - Pix pode ser retomado automaticamente
+  - cartao nao persiste PAN, CVV nem validade;
 - cartao tokeniza fora do backend e envia apenas `card_token` para `/public/event-checkouts`;
 - cartao mostra falha imediata com `acquirer_message`;
 - cartao suporta `processing -> paid` sem heuristica fraca no navegador.
@@ -1418,7 +1449,73 @@ Se for necessario reentregar um webhook ja criado, a referencia v5 expoe `POST /
 | Processing -> falha | `4000000000000044` | `pending` -> `failed` |
 | Chargeback | `4000000000000069` | `paid` -> `chargedback` |
 
-### 15.8 Observacao real da homologacao em 2026-04-05
+### 15.8 Validacao real de cancelamento e estorno em 2026-04-05
+
+Para fechar `M7-T2`, eu adicionei um probe operacional direto do gateway:
+
+- comando: `php artisan billing:pagarme:homologate`
+- service: `PagarmeHomologationService`
+- saida versionavel por caminho conhecido em `apps/api/storage/app/pagarme-homologation/`
+
+Casos reais executados:
+
+Pix cancelado por `DELETE /charges/{charge_id}`
+
+- comando:
+  - `php artisan billing:pagarme:homologate --scenario=pix-cancel --poll-attempts=2 --poll-sleep-ms=1000`
+- report:
+  - `apps/api/storage/app/pagarme-homologation/20260405-185658-pix-cancel.json`
+- ids reais:
+  - `gateway_order_id = or_Pjepz7cRwcWPM3Lv`
+  - `gateway_charge_id = ch_W86MLK7fqPuvEkx9`
+- resultado observado:
+  - criacao: `order.status = pending`, `charge.status = pending`, `last_transaction.status = waiting_payment`
+  - resposta imediata do `DELETE /charges/ch_W86MLK7fqPuvEkx9`: `charge.status = processing`, `last_transaction.status = pending_refund`
+  - snapshots seguintes: `order.status = canceled`, `charge.status = canceled`, `last_transaction.status = refunded`
+
+Cartao estornado por `DELETE /charges/{charge_id}`
+
+- comando:
+  - `php artisan billing:pagarme:homologate --scenario=card-refund --poll-attempts=2 --poll-sleep-ms=1000`
+- report:
+  - `apps/api/storage/app/pagarme-homologation/20260405-185659-card-refund.json`
+- ids reais:
+  - `gateway_order_id = or_vK67XjUm2CPkWGZz`
+  - `gateway_charge_id = ch_okAOJQkMujFxbNqP`
+- resultado observado:
+  - criacao: `order.status = paid`, `charge.status = paid`
+  - resposta imediata do `DELETE /charges/ch_okAOJQkMujFxbNqP`: `charge.status = canceled`, `last_transaction.status = refunded`
+  - snapshots seguintes: `order.status = canceled`, `charge.status = canceled`, `last_transaction.status = refunded`
+
+Revalidacao agregada da rodada atual:
+
+- comando:
+  - `php artisan billing:pagarme:homologate --scenario=all --poll-attempts=2 --poll-sleep-ms=1000`
+- report:
+  - `apps/api/storage/app/pagarme-homologation/20260405-210058-all.json`
+- resumo observado:
+  - Pix cancelado permaneceu consistente com `order.status = canceled`,
+    `charge.status = canceled` e `last_transaction.status = refunded`
+  - cartao estornado permaneceu consistente com `order.status = canceled`,
+    `charge.status = canceled` e `last_transaction.status = refunded`
+  - o dossie dos simuladores `0036`, `0044` e `0069` continuou reproduzindo o
+    mesmo mismatch de contexto do fluxo PSP desta conta
+
+Conclusao operacional:
+
+- o contrato oficial de cancelamento por `DELETE /charges/{charge_id}` foi confirmado na pratica;
+- Pix e cartao podem passar por estado intermediario antes de convergir no snapshot final;
+- para conciliacao local, `charge.status` e `last_transaction.status` precisam ser lidos juntos, principalmente em cancelamento e estorno.
+
+Politica operacional fechada para compra unica no `eventovivo`:
+
+- o checkout publico nao expoe botao de cancelamento para o comprador;
+- cancelamento ou estorno de compra unica acontecem internamente no backoffice ou no painel da Pagar.me;
+- quando o pedido ainda nao foi pago, o `order.canceled` recebido por webhook passa o pedido local para `canceled`;
+- quando a cobranca ja foi paga e depois revertida, `charge.refunded` ou `charge.partial_canceled` passam o pedido local para `refunded` e revogam a compra/grant do evento;
+- `charge.chargedback` continua existindo no estado tecnico local, mas a resposta de produto e notificacao para esse caso ainda depende de decisao comercial.
+
+### 15.9 Observacao real da homologacao dos simuladores `0036`, `0044` e `0069`
 
 Na rodada de homologacao executada em `2026-04-05`, eu revalidei os cenarios
 com o fluxo real do `eventovivo`:
@@ -1449,17 +1546,50 @@ Os resultados observados foram estes:
   - polling local entre `2026-04-05 00:33:38 BRT` e `2026-04-05 00:34:33 BRT`: permaneceu `paid`
   - `GET /orders/or_1VW4zztl5i3j430m` e `GET /charges/ch_b0jdxoPUquMREVQD`: permaneceram `paid`
 
-Isso diverge da maquina de estados publicada na pagina oficial do simulador de
-cartao de credito. A inferencia mais segura aqui e:
+Para tirar a duvida de contexto, eu rodei um probe direto contra a v5 com o
+comando:
 
-- a documentacao oficial continua sendo a referencia contratual;
-- mas, nesta conta e neste caminho PSP com `customer_id + card_id`, os numeros
-  do simulador de cartao nao reproduziram os estados tardios esperados;
-- antes de tratar isso como comportamento definitivo, vale confirmar com o
-  suporte da Pagar.me se esses numeros se aplicam integralmente ao fluxo PSP
-  tokenizado que esta em uso no `eventovivo`.
+- `php artisan billing:pagarme:homologate --scenario=simulator-dossier --poll-attempts=3 --poll-sleep-ms=1000`
 
-### 15.9 Validacao real de idempotencia em 2026-04-05
+Report gerado:
+
+- `apps/api/storage/app/pagarme-homologation/20260405-185925-simulator-dossier.json`
+- `apps/api/storage/app/pagarme-homologation/20260405-210058-all.json`
+
+Resumo real do probe direto:
+
+- `4000000000000036`
+  - `gateway_order_id = or_qeYr6X2uJFZBV5vk`
+  - `gateway_charge_id = ch_y0V19oGPcVCg98w5`
+  - criacao: `order.status = paid`, `charge.status = paid`
+  - snapshot final: `order.status = paid`, `charge.status = paid`, `last_transaction.status = captured`
+- `4000000000000044`
+  - `gateway_order_id = or_DN96nJpTZphmv68R`
+  - `gateway_charge_id = ch_7k1gr9nU5zH2Wd3n`
+  - criacao: `order.status = paid`, `charge.status = paid`
+  - snapshot final: `order.status = paid`, `charge.status = paid`, `last_transaction.status = captured`
+- `4000000000000069`
+  - `gateway_order_id = or_j6nz7qPi3hQY4RVp`
+  - `gateway_charge_id = ch_47BjgbDh0IDq9plM`
+  - criacao: `order.status = paid`, `charge.status = paid`
+  - snapshot final: `order.status = paid`, `charge.status = paid`, `last_transaction.status = captured`
+
+Conclusao tecnica mais segura:
+
+- a divergencia ficou confirmada duas vezes:
+  - no fluxo real do checkout do `eventovivo`
+  - no probe direto contra a API v5, sem depender do frontend nem do webhook local
+- a propria doc oficial do `Simulador de Cartao de Credito` o descreve como
+  simulador nao financeiro e orienta usar o `Simulador PSP` para fluxos
+  financeiros de cartao;
+- entao, hoje, a explicacao mais forte nao e bug da maquina de estados local;
+- a explicacao mais forte e mismatch de contexto entre o simulador Gateway e o
+  fluxo PSP desta conta.
+
+Se o time precisar fechar isso com o suporte da Pagar.me, o dossie ja esta
+pronto com ids reais, snapshots oficiais e report JSON anexavel.
+
+### 15.10 Validacao real de idempotencia em 2026-04-05
 
 Na homologacao real, eu rodei `POST /orders` diretamente contra a Pagar.me com
 a mesma `Idempotency-Key = eventovivo-idem-20260405092541` e com corpo
@@ -1479,7 +1609,7 @@ Isso confirma, na pratica, o contrato oficial que a doc v5 descreve:
 - mesmo com body diferente, a mesma chave continua apontando para um unico
   pedido.
 
-### 15.10 Replay real de webhook validado em 2026-04-05
+### 15.11 Replay real de webhook validado em 2026-04-05
 
 Na primeira tentativa do dia, o replay real do provider ainda falhou porque a
 dashboard apontava para o Pinggy expirado
@@ -1605,10 +1735,13 @@ Conclusao pratica:
 - o cadastro do usuario ja esta integrado ao checkout;
 - a rodada atual ja expôs esse onboarding na pagina publica, com CTA para abrir
   o painel do evento e ramo de login quando a identidade ja existe;
-- o que ainda falta e transformar isso em continuidade completa, especialmente
-  na retomada depois da autenticacao;
-- hoje a pagina ainda funciona mais como formulario tecnico do que como jornada
-  comercial final.
+- a retomada apos autenticacao agora esta fechada de forma segura:
+  - Pix pode ser retomado automaticamente com a conta autenticada
+  - cartao restaura apenas os campos seguros e exige novo preenchimento dos
+    dados sensiveis;
+- o que ainda falta agora e refinamento de produto:
+  - transformar a tela em jornada em etapas
+  - reduzir ainda mais a friccao visual do onboarding.
 
 ### 19.2 Melhorias reais de onboarding
 
@@ -1629,11 +1762,16 @@ O primeiro corte de UX que faz sentido e este:
    - "este WhatsApp ja possui cadastro"
    - CTA para login/OTP
    - retomada do checkout depois da autenticacao
+5. garantir que a retomada seja segura:
+   - sem persistir PAN, CVV ou validade
+   - com auto-resume apenas para Pix
+   - com restauracao manual assistida para cartao
 
 Veredito:
 
 - o backend ja resolve o cadastro tecnico;
-- a melhoria real e a orquestracao visual da jornada e da retomada.
+- a retomada tecnica agora esta fechada;
+- a melhoria real daqui para frente e a orquestracao visual da jornada.
 
 ### 19.3 Melhorias reais de UX para Pix
 
@@ -1654,7 +1792,6 @@ de arquitetura:
 
 O gap que ainda sobra aqui nao e de gateway, e de refinamento de produto:
 
-- reforcar visualmente a retomada apos autenticacao;
 - deixar a mensagem de eventual consistency ainda mais explicita;
 - integrar notificacao proativa ao cliente quando a confirmacao chegar.
 
@@ -1690,6 +1827,7 @@ Hoje o modulo `WhatsApp` ja tem a base tecnica para outbound:
 - `WhatsAppMessagingService`;
 - `SendWhatsAppMessageJob`;
 - provider Z-API com `send-text`;
+- suporte adicional a `send-button-pix` quando a instancia resolvida usa `zapi`;
 - fila dedicada `whatsapp-send`.
 
 Esse corte agora ja foi implementado assim:
@@ -1705,10 +1843,12 @@ Esse corte agora ja foi implementado assim:
    - `MarkBillingOrderAsPaidAction` para `payment_paid`
    - `FailBillingOrderAction` para `payment_failed`
    - `RefundBillingOrderAction` para `payment_refunded`
-5. o outbound continua usando `WhatsAppMessagingService` + Z-API `send-text`;
+5. o outbound continua usando `WhatsAppMessagingService`, com `send-text` em todos os casos e `send-button-pix` adicional em `pix_generated` quando o provider e `zapi`;
 6. o `whatsapp_messages.payload_json.context` agora carrega identificacao do
    pedido e do tipo de notificacao;
-7. `chargeback` continua fora da primeira rodada, aguardando politica de
+7. o payload local do checkout agora devolve o resumo dessas notificacoes em
+   `checkout.payment.whatsapp`, sem consultar Z-API nem gateway diretamente;
+8. `chargeback` continua fora da primeira rodada, aguardando politica de
    produto.
 
 Variaveis novas para o ambiente:

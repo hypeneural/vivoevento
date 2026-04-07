@@ -21,6 +21,27 @@ class MediaAssetUrlService
         return $this->thumbnail($media);
     }
 
+    public function wall(EventMedia $media): ?string
+    {
+        if (! $media->relationLoaded('variants')) {
+            $media->load('variants');
+        }
+
+        $preferredVariants = $media->media_type === 'video'
+            ? ['wall', 'gallery']
+            : ['wall', 'gallery'];
+
+        foreach ($preferredVariants as $variantKey) {
+            $variant = $media->variants->firstWhere('variant_key', $variantKey);
+
+            if ($variant?->path) {
+                return $this->assets->toPublicUrl($variant->path, $variant->disk ?: 'public');
+            }
+        }
+
+        return $this->original($media);
+    }
+
     public function thumbnail(EventMedia $media): ?string
     {
         if (! $media->relationLoaded('variants')) {

@@ -1,6 +1,7 @@
 import Pusher from 'pusher-js';
 
 import { getToken } from '@/lib/api';
+import { shouldDisableRealtimeInDev } from '@/lib/realtime';
 
 let pusherInstance: Pusher | null = null;
 
@@ -61,6 +62,15 @@ export function createWallManagerPusher() {
   };
 
   if (isReverb()) {
+    if (shouldDisableRealtimeInDev('WallManager', {
+      key: REVERB_KEY,
+      host: REVERB_HOST,
+      port: REVERB_PORT,
+      scheme: REVERB_SCHEME,
+    })) {
+      return null;
+    }
+
     const forceTLS = REVERB_SCHEME === 'https';
 
     pusherInstance = new Pusher(key, {

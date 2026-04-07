@@ -84,6 +84,30 @@ cleanup_old_releases() {
     done
 }
 
+prune_unreferenced_vite_assets() {
+    local dist_dir="$1"
+    local sw_file="$dist_dir/sw.js"
+    local index_file="$dist_dir/index.html"
+
+    [[ -d "$dist_dir/assets" ]] || return 0
+    [[ -f "$sw_file" ]] || return 0
+
+    while IFS= read -r asset; do
+        local rel_path="${asset#"$dist_dir"/}"
+
+        if grep -F --quiet "\"$rel_path\"" "$sw_file"; then
+            continue
+        fi
+
+        if [[ -f "$index_file" ]] && grep -F --quiet "$rel_path" "$index_file"; then
+            continue
+        fi
+
+        log "Removing unreferenced admin artifact: $rel_path"
+        rm -f -- "$asset"
+    done < <(find "$dist_dir/assets" -type f \( -name '*.js' -o -name '*.css' \))
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --app-root)
@@ -142,6 +166,8 @@ RELEASE_DIR="$APP_ROOT/releases/$RELEASE_NAME"
 API_DIR="$RELEASE_DIR/apps/api"
 WEB_DIR="$RELEASE_DIR/apps/web"
 LANDING_DIR="$RELEASE_DIR/apps/landing"
+WEB_ENV_FILE="${WEB_ENV_FILE:-$APP_ROOT/shared/apps-web.env.production}"
+LANDING_ENV_FILE="${LANDING_ENV_FILE:-$APP_ROOT/shared/apps-landing.env.production}"
 HEALTHCHECK_SCRIPT="$SCRIPT_DIR/healthcheck.sh"
 SMOKE_TEST_SCRIPT="$SCRIPT_DIR/smoke-test.sh"
 
@@ -150,8 +176,12 @@ SMOKE_TEST_SCRIPT="$SCRIPT_DIR/smoke-test.sh"
 
 mkdir -p \
     "$APP_ROOT/releases" \
-    "$APP_ROOT/shared/storage/app" \
-    "$APP_ROOT/shared/storage/framework" \
+    "$APP_ROOT/shared/storage/app/public" \
+    "$APP_ROOT/shared/storage/framework/cache" \
+    "$APP_ROOT/shared/storage/framework/cache/data" \
+    "$APP_ROOT/shared/storage/framework/sessions" \
+    "$APP_ROOT/shared/storage/framework/testing" \
+    "$APP_ROOT/shared/storage/framework/views" \
     "$APP_ROOT/shared/storage/logs" \
     "$APP_ROOT/shared/bootstrap-cache" \
     "$APP_ROOT/scripts"
@@ -159,19 +189,30 @@ mkdir -p \
 log "Creating release at $RELEASE_DIR"
 mkdir -p "$RELEASE_DIR"
 
+rsync_args=(
+    -a
+    --exclude '.git'
+    --exclude '.github'
+    --exclude '.idea'
+    --exclude '.vscode'
+    --exclude 'node_modules'
+    --exclude 'vendor'
+    --exclude 'apps/api/storage'
+    --exclude 'apps/api/bootstrap/cache'
+)
+
+if [[ "$RUN_BUILD" == "1" ]]; then
+    rsync_args+=(
+        --exclude 'apps/web/dist'
+        --exclude 'apps/landing/dist'
+    )
+else
+    [[ -f "$SOURCE_DIR/apps/web/dist/index.html" ]] || fail "missing admin dist in source while build is skipped"
+    [[ -f "$SOURCE_DIR/apps/landing/dist/index.html" ]] || fail "missing landing dist in source while build is skipped"
+fi
+
 log "Syncing source code from $SOURCE_DIR"
-rsync -a \
-    --exclude '.git' \
-    --exclude '.github' \
-    --exclude '.idea' \
-    --exclude '.vscode' \
-    --exclude 'node_modules' \
-    --exclude 'vendor' \
-    --exclude 'apps/api/storage' \
-    --exclude 'apps/api/bootstrap/cache' \
-    --exclude 'apps/web/dist' \
-    --exclude 'apps/landing/dist' \
-    "$SOURCE_DIR/" "$RELEASE_DIR/"
+rsync "${rsync_args[@]}" "$SOURCE_DIR/" "$RELEASE_DIR/"
 
 [[ -d "$API_DIR" ]] || fail "release is missing apps/api"
 [[ -d "$WEB_DIR" ]] || fail "release is missing apps/web"
@@ -182,6 +223,12 @@ ln -sfn "$APP_ROOT/shared/.env" "$API_DIR/.env"
 rm -rf "$API_DIR/storage"
 ln -sfn "$APP_ROOT/shared/storage" "$API_DIR/storage"
 mkdir -p "$API_DIR/bootstrap/cache"
+
+log "Linking shared frontend build env files"
+[[ -f "$WEB_ENV_FILE" ]] || fail "missing admin frontend env: $WEB_ENV_FILE"
+[[ -f "$LANDING_ENV_FILE" ]] || fail "missing landing frontend env: $LANDING_ENV_FILE"
+ln -sfn "$WEB_ENV_FILE" "$WEB_DIR/.env.production.local"
+ln -sfn "$LANDING_ENV_FILE" "$LANDING_DIR/.env.production.local"
 
 log "Installing PHP dependencies"
 (
@@ -215,6 +262,8 @@ if [[ "$RUN_BUILD" == "1" ]]; then
     )
 fi
 
+prune_unreferenced_vite_assets "$WEB_DIR/dist"
+
 log "Warming Laravel caches"
 (
     cd "$API_DIR"
@@ -237,26 +286,20 @@ if [[ "$RUN_MIGRATIONS" == "1" ]]; then
 fi
 
 log "Running release healthcheck"
-"$HEALTHCHECK_SCRIPT" "$RELEASE_DIR"
+bash "$HEALTHCHECK_SCRIPT" "$RELEASE_DIR"
 
 log "Switching current symlink"
 ln -sfn "$RELEASE_DIR" "$APP_ROOT/current"
 
 log "Recycling long-lived processes"
-(
-    cd "$APP_ROOT/current/apps/api"
-    "$PHP_BIN" artisan horizon:terminate || true
-    "$PHP_BIN" artisan reverb:restart || true
-)
-
 run_systemctl reload php8.3-fpm
 run_systemctl reload nginx
-run_systemctl restart eventovivo-horizon
-run_systemctl restart eventovivo-reverb
+run_systemctl reload eventovivo-horizon
+run_systemctl reload eventovivo-reverb
 
 if [[ "$RUN_SMOKE_TEST" == "1" ]]; then
     log "Running smoke test"
-    "$SMOKE_TEST_SCRIPT"
+    bash "$SMOKE_TEST_SCRIPT"
 fi
 
 cleanup_old_releases "$KEEP_RELEASES"

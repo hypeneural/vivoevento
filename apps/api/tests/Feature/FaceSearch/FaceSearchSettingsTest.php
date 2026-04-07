@@ -60,6 +60,38 @@ it('updates face search settings for an event', function () {
     ]);
 });
 
+it('accepts compreface as the face search provider', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    $response = $this->apiPatch("/events/{$event->id}/face-search/settings", [
+        'enabled' => true,
+        'provider_key' => 'compreface',
+        'embedding_model_key' => 'compreface-face-v1',
+        'vector_store_key' => 'pgvector',
+        'min_face_size_px' => 112,
+        'min_quality_score' => 0.72,
+        'search_threshold' => 0.28,
+        'top_k' => 80,
+        'allow_public_selfie_search' => false,
+        'selfie_retention_hours' => 12,
+    ]);
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.provider_key', 'compreface')
+        ->assertJsonPath('data.embedding_model_key', 'compreface-face-v1');
+
+    $this->assertDatabaseHas('event_face_search_settings', [
+        'event_id' => $event->id,
+        'enabled' => true,
+        'provider_key' => 'compreface',
+        'embedding_model_key' => 'compreface-face-v1',
+    ]);
+});
+
 it('validates that public selfie search requires face search enabled', function () {
     [$user, $organization] = $this->actingAsOwner();
 

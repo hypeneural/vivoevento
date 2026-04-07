@@ -236,6 +236,13 @@ class EvolutionWhatsAppProvider implements WhatsAppProviderInterface
                 'text' => $data->message,
             ],
             'options' => $options !== [] ? $options : null,
+            'quoted' => $data->messageId !== null ? [
+                'key' => [
+                    'remoteJid' => $this->normalizeRemoteJid($data->phone),
+                    'id' => $data->messageId,
+                    'fromMe' => false,
+                ],
+            ] : null,
         ], static fn ($value) => $value !== null && $value !== []);
 
         $response = $this->client->sendText($instance, $payload);

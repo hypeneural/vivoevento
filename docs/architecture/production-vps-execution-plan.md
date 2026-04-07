@@ -27,12 +27,41 @@ Snapshot da rodada atual:
 - `M2-T4` e `M2-T5`: concluidos
 - `M2-T6`: concluido
 - `M2`: fechado no repositorio, incluindo constraint forte para inbound WhatsApp
-- `M3`: explicitamente fora do go-live atual
+- `M3`: fora do go-live base, mas recorte operacional de Z-API/Pagar.me retomado em producao em `2026-04-06`
+- `M4`: concluido na VPS real
+- validacoes reais de host confirmaram `nginx -t`, `php-fpm8.3 -tt`, `systemd-analyze verify`, `redis-cli ping` e `pg_isready`
+- banco, extensoes, `.env` base e certificado de origem ja foram criados na VPS real
+- o pool `www` padrao do PHP-FPM foi removido na VPS dedicada
+- `M5-T1` ate `M5-T4`: concluidos na VPS real
+- smoke test minimo ja validou landing, admin, `/up`, `/health/live`, `/health/ready` e handshake websocket
+- validacao operacional pos-deploy confirmou `Horizon`, `Reverb` e `eventovivo-scheduler.timer` ativos
+- validacao operacional pos-deploy confirmou zero failed jobs e backlog zerado nas filas base
+- hotfix do admin para `/login` foi publicado na release `20260406_130951`
+- o unit do `Reverb` foi endurecido apos validacao real, removendo o `ExecStop` incorreto que referenciava `MAINPID`
+- `super-admin` de producao foi criado e validado por `auth/login` + `auth/me`
+- rollback validado entre as releases `20260406_130951` e `20260406_133407`, com smoke test incluindo login real
+- os scripts de `deploy` e `rollback` foram alinhados para reciclar `Horizon` e `Reverb` por `systemctl reload`
+- hotfix do admin para payloads reais de `dashboard`, `play` e `plans` foi
+  publicado na release `20260406_182927`;
+- release ativa confirmada apos o hotfix:
+  `/var/www/eventovivo/releases/20260406_182927`;
+- o vhost do admin foi ajustado para nao cachear `/`, `/index.html`, `/sw.js`
+  e `/manifest.webmanifest`;
+- o deploy do admin agora remove assets Vite nao referenciados pelo build atual;
+- validacao real confirmou que `/api/v1/dashboard/stats`,
+  `/api/v1/events?module=play&per_page=24`, `/api/v1/plans` e
+  `/api/v1/audit` retornam payloads coerentes para o `super-admin`;
+- usuario da Umalu criado como `partner-owner`, login real validado e acesso
+  liberado por plano interno `bonus-full-umalu`;
+- canais do evento bonificado ficaram ativos para `public_upload_link`,
+  `whatsapp_direct` e `whatsapp_group`;
+- pendencia operacional pos-hotfix: purgar cache da Cloudflare para `/sw.js` e
+  chunks antigos ainda servidos como `CF-Cache-Status: HIT`;
 - preflight local antes da VPS executado:
   - scripts validados com `bash -n`
   - health/queue/horizon validados em testes
   - `apps/web` e `apps/landing` validados com `type-check` e `build`
-- proxima frente recomendada: preparar e executar `M4`, depois seguir para `M5`
+- proxima frente recomendada: fechar as validacoes funcionais restantes de upload publico e publish -> wall
 
 Este plano existe para responder 6 perguntas de execucao:
 
@@ -357,6 +386,10 @@ Subtasks:
    - variavel apenas de dev/local
 5. deixar explicito quais segredos devem viver apenas em
    `/var/www/eventovivo/shared/.env`.
+6. deixar explicito que o build de `apps/web` e `apps/landing` depende de
+   arquivos dedicados fora da release:
+   - `/var/www/eventovivo/shared/apps-web.env.production`
+   - `/var/www/eventovivo/shared/apps-landing.env.production`
 
 Criterio de aceite:
 
@@ -684,8 +717,9 @@ Observacao:
 - este milestone e obrigatorio apenas se `WhatsApp inbound` entrar no primeiro
   go-live;
 - se a fase 1 subir sem esse canal, M3 pode ficar para a rodada seguinte.
-- nesta rodada, `M3` esta explicitamente fora do go-live atual e nao bloqueia
-  `M4` nem `M5`.
+- nesta rodada, o go-live base subiu sem depender de `M3`;
+- depois do go-live base, o recorte operacional minimo de Z-API/Pagar.me foi
+  retomado em producao para o evento bonificado da Umalu Eventos.
 
 ### TASK M3-T1 - Validar autenticidade e persistir o payload cedo
 
@@ -762,8 +796,12 @@ Estado atual:
 
 - alguns jobs do modulo ja despacham para `whatsapp-inbound`, `whatsapp-send` e
   `whatsapp-sync`;
-- o backlog ainda nao esta coerente ponta a ponta porque a ponte para o
-  pipeline canonico segue incompleta.
+- em `2026-04-06`, foram adicionados supervisores dedicados para essas filas no
+  Horizon;
+- em producao, o POST de status da Z-API foi validado e consumido em
+  `whatsapp-inbound` com `processing_status=processed`;
+- a ponte canonica completa `WhatsApp -> InboundMedia -> EventMedia` ainda segue
+  como trabalho de fechamento para midia inbound real de foto.
 
 Subtasks:
 
@@ -773,12 +811,17 @@ Subtasks:
 3. adicionar supervisores `whatsapp-*` no Horizon apenas depois da auditoria;
 4. colocar observabilidade dedicada para essas filas;
 5. validar que o backlog de WhatsApp nao compete com wall e publish.
+6. cadastrar a instancia Z-API de producao no banco com provider, tokens e
+   URLs de webhook documentadas.
+7. validar endpoint de status com callback seguro antes de liberar inbound real.
 
 Criterio de aceite:
 
 - existe consistencia entre nome da fila, ponto de dispatch, supervisor e
   monitoracao;
 - o throughput de WhatsApp nao sacrifica lanes sagradas.
+- em producao, `queues:whatsapp-inbound`, `queues:whatsapp-send` e
+  `queues:whatsapp-sync` ficam com backlog controlado apos callback de teste.
 
 Dependencias:
 
@@ -854,10 +897,12 @@ Subtasks:
 1. criar `/var/www/eventovivo`;
 2. criar `releases`, `shared` e `scripts`;
 3. criar `/var/www/eventovivo/shared/.env`;
-4. preparar `shared/storage`;
-5. preparar `shared/bootstrap-cache`;
-6. instalar segredos da aplicacao e acessos de provider;
-7. validar permissao de `deploy` e `www-data`.
+4. criar `/var/www/eventovivo/shared/apps-web.env.production`;
+5. criar `/var/www/eventovivo/shared/apps-landing.env.production`;
+6. preparar `shared/storage`;
+7. preparar `shared/bootstrap-cache`;
+8. instalar segredos da aplicacao e acessos de provider;
+9. validar permissao de `deploy` e `www-data`.
 
 Criterio de aceite:
 
@@ -876,22 +921,24 @@ Subtasks:
 
 1. instalar configs de Nginx;
 2. instalar pool do PHP-FPM;
-3. instalar units do systemd;
-4. instalar sudoers minimo do usuario `deploy`;
-5. instalar `logrotate`;
-6. validar:
+3. desabilitar o pool padrao `www.conf` do PHP-FPM no host dedicado;
+4. instalar units do systemd;
+5. instalar sudoers minimo do usuario `deploy`;
+6. instalar `logrotate`;
+7. validar:
    - `nginx -t`
    - `php-fpm8.3 -tt`
    - `systemd-analyze verify`
    - `redis-cli ping`
    - `pg_isready`
-7. manter o site default do Nginx desabilitado;
-8. preparar units para habilitacao apenas depois do primeiro deploy
+8. manter o site default do Nginx desabilitado;
+9. preparar units para habilitacao apenas depois do primeiro deploy
    bem-sucedido.
 
 Criterio de aceite:
 
 - o host passa a depender de templates versionados, nao de configuracao manual.
+- o host nao mantem um segundo pool PHP-FPM padrao sem uso.
 
 Dependencias:
 
@@ -934,18 +981,27 @@ Subtasks:
 
 1. copiar ou clonar o repo para uma release nova;
 2. linkar `shared/.env` e `shared/storage`;
-3. instalar dependencias da API;
-4. buildar `apps/web` e `apps/landing`;
-5. aquecer caches do Laravel;
-6. rodar migrations compativeis com zero-downtime;
-7. executar `healthcheck.sh`;
-8. trocar o symlink `current`.
+3. linkar os envs de build do frontend:
+   - `shared/apps-web.env.production`
+   - `shared/apps-landing.env.production`
+4. instalar dependencias da API;
+5. buildar `apps/web` e `apps/landing`;
+6. validar no healthcheck que o dist do admin contem:
+   - `VITE_API_BASE_URL`
+   - `VITE_REVERB_HOST`
+7. remover assets Vite do admin que nao sejam referenciados por `index.html`
+   ou `sw.js` da release atual;
+8. rodar migrations compativeis com zero-downtime;
+9. executar `healthcheck.sh`;
+10. trocar o symlink `current`.
 
 Observacao operacional:
 
 - build na propria VPS e aceitavel na fase 1;
 - se tempo de build ou consumo de CPU comecarem a competir com o produto,
   mover build para CI e publicar artefato vira prioridade.
+- depois de hotfix em service worker ou cache do admin, validar headers da
+  origin e purgar a Cloudflare se o edge continuar servindo chunks antigos.
 
 Criterio de aceite:
 
@@ -969,6 +1025,7 @@ Subtasks:
    - `eventovivo-horizon.service`
    - `eventovivo-reverb.service`
    - `eventovivo-scheduler.timer`
+   com `enable --now`
 6. conferir que o sudoers do usuario `deploy` cobre apenas os `systemctl`
    esperados;
 7. conferir `systemctl status` dos servicos;
@@ -1015,6 +1072,14 @@ Subtasks:
 2. reciclar servicos;
 3. rodar smoke test reduzido;
 4. documentar o tempo e os passos do rollback.
+
+Observacao operacional:
+
+- rollback validado em producao entre as releases `20260406_130951` e
+  `20260406_133407`;
+- a validacao incluiu `smoke-test.sh` com login real do `super-admin`,
+  `/health/live`, `/health/ready` e handshake websocket;
+- a release final ativa apos o teste voltou para `20260406_133407`.
 
 Criterio de aceite:
 

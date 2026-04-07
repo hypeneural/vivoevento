@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { listEvents } from '@/modules/events/api';
+import { EVENT_MODULE_LABELS, EVENT_STATUS_LABELS } from '@/modules/events/types';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { StatsCard } from '@/shared/components/StatsCard';
 
@@ -27,30 +28,30 @@ export default function PlayHubPage() {
     queryKey: ['play-events'],
     queryFn: () => listEvents({ module: 'play', per_page: 24 }),
   });
+  const events = Array.isArray(eventsQuery.data?.data) ? eventsQuery.data.data : [];
+  const hasMalformedEventsResponse = Boolean(eventsQuery.data && !Array.isArray(eventsQuery.data.data));
 
   const stats = useMemo(() => {
-    const events = eventsQuery.data?.data ?? [];
-
     return {
       total: events.length,
       active: events.filter((event) => event.status === 'active').length,
       withMedia: events.filter((event) => (event.media_count ?? 0) > 0).length,
       publicReady: events.filter((event) => !!event.slug).length,
     };
-  }, [eventsQuery.data?.data]);
+  }, [events]);
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Play"
-        description="Selecione um evento com Play ativo para configurar catalogo, jogos, assets e ranking."
+        title="Jogos"
+        description="Selecione um evento para configurar os jogos, escolher as fotos e acompanhar o ranking."
       />
 
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <StatsCard title="Eventos com Play" value={stats.total} icon={Gamepad2} />
+        <StatsCard title="Eventos com jogos" value={stats.total} icon={Gamepad2} />
         <StatsCard title="Eventos ativos" value={stats.active} icon={Sparkles} />
-        <StatsCard title="Com fotos elegiveis" value={stats.withMedia} icon={PlaySquare} />
-        <StatsCard title="Hub publico pronto" value={stats.publicReady} icon={ExternalLink} />
+        <StatsCard title="Com fotos prontas" value={stats.withMedia} icon={PlaySquare} />
+        <StatsCard title="Pagina publica pronta" value={stats.publicReady} icon={ExternalLink} />
       </div>
 
       <Card className="border-white/70 bg-white/90 shadow-sm">
@@ -61,20 +62,20 @@ export default function PlayHubPage() {
           {eventsQuery.isLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Carregando eventos com Play...
+              Carregando eventos com jogos...
             </div>
-          ) : eventsQuery.isError ? (
-            <p className="text-sm text-destructive">Nao foi possivel carregar os eventos com Play.</p>
-          ) : (eventsQuery.data?.data.length ?? 0) === 0 ? (
+          ) : eventsQuery.isError || hasMalformedEventsResponse ? (
+            <p className="text-sm text-destructive">Nao foi possivel carregar os eventos com jogos.</p>
+          ) : events.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center">
-              <p className="text-sm font-medium">Nenhum evento com Play ativo foi encontrado.</p>
+              <p className="text-sm font-medium">Nenhum evento com jogos ativos foi encontrado.</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Ative o modulo Play no evento e volte para configurar os jogos.
+                Ative o modulo Jogos no evento e volte para configurar esta area.
               </p>
             </div>
           ) : (
             <div className="grid gap-4 lg:grid-cols-2">
-              {eventsQuery.data?.data.map((event) => (
+              {events.map((event) => (
                 <Card key={event.id} className="overflow-hidden border-slate-200 shadow-none">
                   <div className="relative h-36 bg-slate-950">
                     {event.cover_image_url ? (
@@ -88,7 +89,7 @@ export default function PlayHubPage() {
                     <div className="relative flex h-full flex-col justify-between px-5 py-4 text-white">
                       <div className="flex items-center justify-between gap-3">
                         <Badge variant="secondary" className="bg-white/10 text-white hover:bg-white/10">
-                          {event.status}
+                          {EVENT_STATUS_LABELS[event.status] ?? event.status}
                         </Badge>
                         <div className="flex items-center gap-1 text-xs text-white/70">
                           <CalendarDays className="h-3.5 w-3.5" />
@@ -99,7 +100,7 @@ export default function PlayHubPage() {
                       <div className="space-y-1">
                         <p className="text-lg font-semibold">{event.title}</p>
                         <p className="text-xs text-white/70">
-                          {event.location_name || 'Local a definir'} · slug `{event.slug}`
+                          {event.location_name || 'Local a definir'} - endereco do evento `{event.slug}`
                         </p>
                       </div>
                     </div>
@@ -113,10 +114,10 @@ export default function PlayHubPage() {
                       </div>
                       <div className="rounded-2xl bg-slate-50 p-3">
                         <p className="text-xs text-muted-foreground">Modulos</p>
-                        <p className="mt-1 font-semibold">{event.enabled_modules?.join(', ') || 'play'}</p>
+                        <p className="mt-1 font-semibold">{event.enabled_modules?.map((module) => EVENT_MODULE_LABELS[module]).join(', ') || 'Jogos'}</p>
                       </div>
                       <div className="rounded-2xl bg-slate-50 p-3">
-                        <p className="text-xs text-muted-foreground">Publico</p>
+                        <p className="text-xs text-muted-foreground">Pagina publica</p>
                         <p className="mt-1 font-semibold">{event.slug ? 'Pronto' : 'Pendente'}</p>
                       </div>
                     </div>
@@ -125,7 +126,7 @@ export default function PlayHubPage() {
                       <Button asChild>
                         <Link to={`/events/${event.id}/play`}>
                           <Gamepad2 className="mr-1.5 h-4 w-4" />
-                          Gerenciar Play
+                          Configurar jogos
                         </Link>
                       </Button>
 
@@ -138,7 +139,7 @@ export default function PlayHubPage() {
                       <Button asChild variant="outline">
                         <Link to={`/e/${event.slug}/play`} target="_blank" rel="noreferrer">
                           <ExternalLink className="mr-1.5 h-4 w-4" />
-                          Hub publico
+                          Pagina de jogos
                         </Link>
                       </Button>
                     </div>

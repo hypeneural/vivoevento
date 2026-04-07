@@ -33,9 +33,12 @@ export interface WallEventSummary {
   status: WallPublicStatus;
 }
 
+export type MediaOrientation = 'vertical' | 'horizontal' | 'squareish';
+
 export interface WallMediaItem {
   id: string;
   url: string | null;
+  original_url?: string | null;
   type: WallMediaType;
   sender_name?: string | null;
   sender_key?: string | null;
@@ -43,6 +46,9 @@ export interface WallMediaItem {
   caption?: string | null;
   duplicate_cluster_key?: string | null;
   is_featured: boolean;
+  width?: number | null;
+  height?: number | null;
+  orientation?: MediaOrientation | null;
   created_at?: string | null;
 }
 

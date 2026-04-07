@@ -12,9 +12,9 @@ interface PublicLinkCardProps {
 }
 
 const IDENTIFIER_LABELS: Record<ApiEventPublicLink['identifier_type'], string> = {
-  slug: 'Slug publico',
-  upload_slug: 'Slug de envio',
-  wall_code: 'Codigo do wall',
+  slug: 'Endereco publico',
+  upload_slug: 'Endereco de envio',
+  wall_code: 'Codigo do telao',
 };
 
 export function PublicLinkCard({ link, onCopy }: PublicLinkCardProps) {

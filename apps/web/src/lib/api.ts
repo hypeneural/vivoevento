@@ -137,7 +137,14 @@ async function handleResponse<T>(response: Response, unwrapData = true): Promise
   }
 
   if (!isJson) {
-    return (await response.text()) as T;
+    const text = await response.text();
+    const preview = text.replace(/\s+/g, ' ').trim().slice(0, 180);
+
+    throw new ApiError(502, {
+      message: 'API returned a non-JSON response. Check VITE_API_BASE_URL and origin routing.',
+      response_content_type: contentType,
+      response_preview: preview,
+    });
   }
 
   const json = await response.json();

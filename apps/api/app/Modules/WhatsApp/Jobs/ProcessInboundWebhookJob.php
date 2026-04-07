@@ -159,6 +159,12 @@ class ProcessInboundWebhookJob implements ShouldQueue
         $normalized = $normalizer->normalize($this->payload, $instance);
 
         $inboundEvent->update(['normalized_json' => $normalized->toArray()]);
+
+        if ($this->shouldIgnoreReceivedCallback($normalized)) {
+            $inboundEvent->markIgnored();
+            return;
+        }
+
         $inboundRouter->route($normalized, $instance);
         $inboundEvent->markProcessed();
     }
@@ -312,7 +318,7 @@ class ProcessInboundWebhookJob implements ShouldQueue
             $value = $this->payload[$key];
 
             if (is_numeric($value)) {
-                return CarbonImmutable::createFromTimestamp((int) $value)->utc();
+                return $this->timestampFromNumericValue($value);
             }
 
             if (is_string($value) && trim($value) !== '') {
@@ -321,5 +327,31 @@ class ProcessInboundWebhookJob implements ShouldQueue
         }
 
         return CarbonImmutable::now()->utc();
+    }
+
+    private function timestampFromNumericValue(int|float|string $value): CarbonImmutable
+    {
+        $seconds = (float) $value;
+
+        if (abs($seconds) >= 1_000_000_000_000_000) {
+            $seconds /= 1_000_000;
+        } elseif (abs($seconds) > 9_999_999_999) {
+            $seconds /= 1_000;
+        }
+
+        return CarbonImmutable::createFromTimestamp((int) floor($seconds))->utc();
+    }
+
+    private function shouldIgnoreReceivedCallback(\App\Modules\WhatsApp\Clients\DTOs\NormalizedInboundMessageData $normalized): bool
+    {
+        if (isset($this->payload['notification'])) {
+            return true;
+        }
+
+        if ($normalized->messageType === 'reaction') {
+            return true;
+        }
+
+        return false;
     }
 }

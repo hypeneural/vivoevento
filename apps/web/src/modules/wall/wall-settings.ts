@@ -193,11 +193,11 @@ export function buildWallSelectionSummary(
   const phaseImpact = describePhaseImpact(settings.event_phase ?? 'flow');
 
   return [
-    `${modeLabel} em ${phaseLabel}: ate ${policy.max_eligible_items_per_sender} midias elegiveis por remetente antes do backlog gradual.`,
-    `Cada item tenta no maximo ${policy.max_replays_per_item} replay(s) antes do fallback de continuidade.`,
-    `Replay adaptativo em fila baixa/media/alta: ${policy.replay_interval_low_minutes}/${policy.replay_interval_medium_minutes}/${policy.replay_interval_high_minutes} min.`,
+    `${modeLabel} em ${phaseLabel}: ate ${policy.max_eligible_items_per_sender} midias por pessoa entram de cada vez na disputa pelo telao.`,
+    `Cada foto ou video pode voltar no maximo ${policy.max_replays_per_item} vez(es) antes de o sistema abrir espaco para novas reprises.`,
+    `Tempo minimo para repetir com fila curta/media/cheia: ${policy.replay_interval_low_minutes}/${policy.replay_interval_medium_minutes}/${policy.replay_interval_high_minutes} min.`,
     `Faixas de volume: ate ${policy.low_volume_max_items} itens para fila baixa e ate ${policy.medium_volume_max_items} para fila media.`,
-    `Cooldown de ${policy.sender_cooldown_seconds}s e limite de ${policy.sender_window_limit} por ${policy.sender_window_minutes} min.`,
+    `Espera minima de ${policy.sender_cooldown_seconds}s e limite de ${policy.sender_window_limit} aparicoes por ${policy.sender_window_minutes} min.`,
     phaseImpact,
     policy.avoid_same_sender_if_alternative_exists
       ? 'Evita repetir o mesmo remetente quando houver alternativa.'
@@ -245,14 +245,14 @@ function labelForPhase(phase: ApiWallEventPhase): string {
 function describePhaseImpact(phase: ApiWallEventPhase): string {
   switch (phase) {
     case 'reception':
-      return 'A fase de recepcao endurece fairness e segura um pouco o replay para o inicio da festa.';
+      return 'A fase de recepcao segura um pouco as repeticoes para distribuir melhor as primeiras fotos.';
     case 'party':
-      return 'A fase de festa acelera o ritmo efetivo e flexibiliza replay e cooldown para acompanhar o pico da noite.';
+      return 'A fase de festa acelera o ritmo e flexibiliza as repeticoes para acompanhar o pico da noite.';
     case 'closing':
       return 'A fase de encerramento desacelera a troca e abre mais espaco para reprises finais.';
     case 'flow':
     default:
-      return 'A fase de fluxo mantem o comportamento base do modo escolhido.';
+      return 'A fase de fluxo mantem o comportamento padrao do modo escolhido.';
   }
 }
 

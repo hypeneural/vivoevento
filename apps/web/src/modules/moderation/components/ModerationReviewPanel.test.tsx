@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -35,6 +35,19 @@ const media: ApiEventMediaDetail = {
   duplicate_group_key: null,
   is_duplicate_candidate: false,
   sender_name: 'Maria',
+  sender_avatar_url: 'https://example.test/avatar.jpg',
+  sender_phone: '554899999999',
+  sender_lid: '11111111111111@lid',
+  sender_external_id: '11111111111111@lid',
+  sender_blocked: true,
+  sender_blocking_entry_id: 8,
+  sender_block_reason: 'Bloqueado pela equipe',
+  sender_block_expires_at: '2026-04-09T18:00:00Z',
+  sender_blacklist_enabled: true,
+  sender_recommended_identity_type: 'lid',
+  sender_recommended_identity_value: '11111111111111@lid',
+  sender_recommended_normalized_phone: null,
+  sender_media_count: 4,
   caption: 'Legenda atual',
   thumbnail_url: 'https://example.test/thumb.jpg',
   preview_url: 'https://example.test/preview.jpg',
@@ -100,5 +113,31 @@ describe('ModerationReviewPanel', () => {
     expect(screen.getByText(/legenda ia: entrada especial na festa\./i)).toBeInTheDocument();
     expect(screen.getByText('festa')).toBeInTheDocument();
     expect(screen.getByText('violence: 0.030')).toBeInTheDocument();
+    expect(screen.getByText(/midias deste remetente/i)).toBeInTheDocument();
+    expect(screen.getByText('11111111111111@lid')).toBeInTheDocument();
+    expect(screen.getByText(/bloqueado ate/i)).toBeInTheDocument();
+  });
+
+  it('allows toggling the sender block switch from the review panel', () => {
+    const onSenderBlockToggle = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <ModerationReviewPanel
+          media={media}
+          canModerate
+          isBusy={() => false}
+          onAction={vi.fn()}
+          onOpenPreview={vi.fn()}
+          senderBlockDuration="7d"
+          onSenderBlockDurationChange={vi.fn()}
+          onSenderBlockToggle={onSenderBlockToggle}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('switch'));
+
+    expect(onSenderBlockToggle).toHaveBeenCalledWith(false);
   });
 });

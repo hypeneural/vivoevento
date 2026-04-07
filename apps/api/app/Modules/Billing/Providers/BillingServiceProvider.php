@@ -3,6 +3,7 @@ namespace App\Modules\Billing\Providers;
 
 use App\Modules\Billing\Actions\SyncEventEntitlementsAction;
 use App\Modules\Billing\Actions\SyncOrganizationEventEntitlementsAction;
+use App\Modules\Billing\Console\Commands\PagarmeHomologationCommand;
 use App\Modules\Billing\Models\EventAccessGrant;
 use App\Modules\Billing\Models\EventPurchase;
 use App\Modules\Billing\Models\Subscription;
@@ -22,6 +23,12 @@ class BillingServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                PagarmeHomologationCommand::class,
+            ]);
+        }
+
         $routeFile = __DIR__ . '/../routes/api.php';
         if (file_exists($routeFile)) {
             Route::prefix(config('modules.api_prefix') . '/' . config('modules.api_version'))

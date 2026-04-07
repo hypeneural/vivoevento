@@ -50,6 +50,12 @@ Broadcast::channel('organization.{organizationId}.moderation', function ($user, 
         ->exists();
 });
 
+Broadcast::channel('user.{userId}.notifications', function ($user, int $userId) {
+    return $user instanceof User
+        && $user->id === $userId
+        && $user->can('notifications.view');
+});
+
 Broadcast::channel('event.{eventId}.play', function ($user, int $eventId) use ($authorizeEventChannel) {
     return $user instanceof User
         && $authorizeEventChannel($user, $eventId, 'play.view');

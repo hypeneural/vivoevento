@@ -23,6 +23,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('media/{eventMedia}/reprocess/{stage}', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'reprocess']);
     Route::patch('media/{eventMedia}/favorite', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'updateFeatured']);
     Route::patch('media/{eventMedia}/pin', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'updatePinned']);
+    Route::post('media/{eventMedia}/sender-block', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'blockSender']);
+    Route::delete('media/{eventMedia}/sender-block', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'unblockSender']);
     Route::delete('media/{eventMedia}', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'destroy']);
     Route::get('events/{event}/media/pipeline-metrics', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'pipelineMetrics']);
 });

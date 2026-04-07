@@ -38,7 +38,10 @@ export function resolvePrimaryMediaFit(
   layout: RenderableLayout,
   media: WallRuntimeItem,
 ): 'contain' | 'cover' {
-  if (layout === 'split' && media.orientation === 'horizontal') return 'cover';
+  if (media.type === 'video' && layout === 'split' && media.orientation === 'horizontal') {
+    return 'cover';
+  }
+
   return 'contain';
 }
 

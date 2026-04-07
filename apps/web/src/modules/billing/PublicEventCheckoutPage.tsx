@@ -42,6 +42,168 @@ const RESUME_DRAFT_STORAGE_KEY = 'eventovivo.public-event-checkout.resume-draft'
 const POLLING_INTERVAL_MS = 5000;
 const AUTH_RESUME_SEARCH_VALUE = 'auth';
 
+function digitsOnly(value: string | null | undefined) {
+  return (value ?? '').replace(/\D+/g, '');
+}
+
+function normalizeStateCode(value: string) {
+  return value.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase();
+}
+
+function hasTwoWords(value: string) {
+  return value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .length >= 2;
+}
+
+function isValidCpf(value: string) {
+  const digits = digitsOnly(value);
+
+  if (digits.length !== 11 || /^(\d)\1+$/.test(digits)) {
+    return false;
+  }
+
+  let sum = 0;
+
+  for (let index = 0; index < 9; index += 1) {
+    sum += Number(digits[index]) * (10 - index);
+  }
+
+  let remainder = (sum * 10) % 11;
+
+  if (remainder === 10) {
+    remainder = 0;
+  }
+
+  if (remainder !== Number(digits[9])) {
+    return false;
+  }
+
+  sum = 0;
+
+  for (let index = 0; index < 10; index += 1) {
+    sum += Number(digits[index]) * (11 - index);
+  }
+
+  remainder = (sum * 10) % 11;
+
+  if (remainder === 10) {
+    remainder = 0;
+  }
+
+  return remainder === Number(digits[10]);
+}
+
+function isValidCardNumber(value: string) {
+  const digits = digitsOnly(value);
+
+  if (digits.length < 13 || digits.length > 19) {
+    return false;
+  }
+
+  let sum = 0;
+  let shouldDouble = false;
+
+  for (let index = digits.length - 1; index >= 0; index -= 1) {
+    let digit = Number(digits[index]);
+
+    if (shouldDouble) {
+      digit *= 2;
+
+      if (digit > 9) {
+        digit -= 9;
+      }
+    }
+
+    sum += digit;
+    shouldDouble = !shouldDouble;
+  }
+
+  return sum % 10 === 0;
+}
+
+function isValidCardExpiry(month: string, year: string) {
+  const normalizedMonth = digitsOnly(month);
+  const normalizedYear = digitsOnly(year);
+
+  if (normalizedMonth.length !== 2 || (normalizedYear.length !== 2 && normalizedYear.length !== 4)) {
+    return false;
+  }
+
+  const monthNumber = Number(normalizedMonth);
+
+  if (monthNumber < 1 || monthNumber > 12) {
+    return false;
+  }
+
+  const fullYear = normalizedYear.length === 2 ? 2000 + Number(normalizedYear) : Number(normalizedYear);
+
+  if (!Number.isFinite(fullYear)) {
+    return false;
+  }
+
+  const now = new Date();
+  const expiry = new Date(fullYear, monthNumber, 0, 23, 59, 59, 999);
+
+  return expiry.getTime() >= now.getTime();
+}
+
+function buildCardChecklist(values: CheckoutFormValues) {
+  const items = [
+    {
+      key: 'payer_document',
+      label: 'CPF valido do pagador',
+      done: isValidCpf(values.payer_document),
+    },
+    {
+      key: 'payer_phone',
+      label: 'Telefone do pagador com DDD',
+      done: digitsOnly(values.payer_phone).length >= 10,
+    },
+    {
+      key: 'billing_address',
+      label: 'Endereco de cobranca completo',
+      done: Boolean(
+        values.address_street.trim()
+        && values.address_number.trim()
+        && values.address_district.trim()
+        && digitsOnly(values.address_zip_code).length === 8
+        && values.address_city.trim()
+        && normalizeStateCode(values.address_state).length === 2,
+      ),
+    },
+    {
+      key: 'card_number',
+      label: 'Numero do cartao valido',
+      done: isValidCardNumber(values.card_number),
+    },
+    {
+      key: 'card_holder_name',
+      label: 'Nome e sobrenome do titular',
+      done: hasTwoWords(values.card_holder_name),
+    },
+    {
+      key: 'card_expiry',
+      label: 'Validade vigente',
+      done: isValidCardExpiry(values.card_exp_month, values.card_exp_year),
+    },
+    {
+      key: 'card_cvv',
+      label: 'CVV com 3 ou 4 digitos',
+      done: [3, 4].includes(digitsOnly(values.card_cvv).length),
+    },
+  ] as const;
+
+  return {
+    items,
+    completed: items.filter((item) => item.done).length,
+    total: items.length,
+    ready: items.every((item) => item.done),
+  };
+}
+
 const checkoutFormSchema = z.object({
   responsible_name: z.string().trim().min(3, 'Informe o nome do responsável.'),
   whatsapp: z.string().trim().min(8, 'Informe um WhatsApp válido.'),
@@ -69,30 +231,106 @@ const checkoutFormSchema = z.object({
   card_exp_year: z.string().trim().optional().default(''),
   card_cvv: z.string().trim().optional().default(''),
 }).superRefine((values, ctx) => {
+  if (digitsOnly(values.whatsapp).length < 10) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Informe um WhatsApp com DDD.',
+      path: ['whatsapp'],
+    });
+  }
+
   if (values.payment_method !== 'credit_card') return;
 
   if (!values.email) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Informe o e-mail principal para checkout com cartão.', path: ['email'] });
   }
 
-  for (const field of [
-    'payer_document',
-    'payer_phone',
-    'address_street',
-    'address_number',
-    'address_district',
-    'address_zip_code',
-    'address_city',
-    'address_state',
-    'card_number',
-    'card_holder_name',
-    'card_exp_month',
-    'card_exp_year',
-    'card_cvv',
-  ] as const) {
-    if (!values[field]) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Campo obrigatório para checkout com cartão.', path: [field] });
+  const requiredMessages = {
+    payer_document: 'Informe o CPF do pagador.',
+    payer_phone: 'Informe o telefone do pagador.',
+    address_street: 'Informe a rua de cobrança.',
+    address_number: 'Informe o número do endereço.',
+    address_district: 'Informe o bairro.',
+    address_zip_code: 'Informe o CEP.',
+    address_city: 'Informe a cidade de cobrança.',
+    address_state: 'Informe a UF do endereço.',
+    card_number: 'Informe o número do cartão.',
+    card_holder_name: 'Informe o nome do titular.',
+    card_exp_month: 'Informe o mês da validade.',
+    card_exp_year: 'Informe o ano da validade.',
+    card_cvv: 'Informe o CVV.',
+  } satisfies Record<string, string>;
+
+  for (const [field, message] of Object.entries(requiredMessages)) {
+    const fieldValue = values[field as keyof CheckoutFormValues];
+
+    if (typeof fieldValue === 'string' && !fieldValue.trim()) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message, path: [field] });
     }
+  }
+
+  if (values.payer_document && !isValidCpf(values.payer_document)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Informe um CPF válido para o pagador.',
+      path: ['payer_document'],
+    });
+  }
+
+  if (values.payer_phone && digitsOnly(values.payer_phone).length < 10) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Informe um telefone do pagador com DDD.',
+      path: ['payer_phone'],
+    });
+  }
+
+  if (values.address_zip_code && digitsOnly(values.address_zip_code).length !== 8) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'O CEP deve ter 8 dígitos.',
+      path: ['address_zip_code'],
+    });
+  }
+
+  if (values.address_state && normalizeStateCode(values.address_state).length !== 2) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Use a UF com 2 letras.',
+      path: ['address_state'],
+    });
+  }
+
+  if (values.card_holder_name && !hasTwoWords(values.card_holder_name)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Informe nome e sobrenome do titular.',
+      path: ['card_holder_name'],
+    });
+  }
+
+  if (values.card_number && !isValidCardNumber(values.card_number)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Informe um número de cartão válido.',
+      path: ['card_number'],
+    });
+  }
+
+  if ((values.card_exp_month || values.card_exp_year) && !isValidCardExpiry(values.card_exp_month, values.card_exp_year)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Informe uma validade vigente para o cartão.',
+      path: ['card_exp_year'],
+    });
+  }
+
+  if (values.card_cvv && ![3, 4].includes(digitsOnly(values.card_cvv).length)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'O CVV deve ter 3 ou 4 dígitos.',
+      path: ['card_cvv'],
+    });
   }
 });
 
@@ -152,10 +390,6 @@ function formatRemainingTime(expiresAt: string | null | undefined, nowMs: number
   const seconds = remainingSeconds % 60;
 
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-}
-
-function digitsOnly(value: string | null | undefined) {
-  return (value ?? '').replace(/\D+/g, '');
 }
 
 function formatCpf(value: string) {
@@ -569,14 +803,24 @@ export default function PublicEventCheckoutPage({
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutFormSchema),
     defaultValues: initialCheckoutFormValues,
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
   });
 
   const paymentMethod = form.watch('payment_method');
   const selectedPackageId = form.watch('package_id');
   const deferredPackageId = useDeferredValue(selectedPackageId);
+  const responsibleName = form.watch('responsible_name');
+  const whatsapp = form.watch('whatsapp');
+  const email = form.watch('email');
+  const eventTitle = form.watch('event_title');
   const payerDocument = form.watch('payer_document');
   const payerPhone = form.watch('payer_phone');
+  const addressStreet = form.watch('address_street');
+  const addressNumber = form.watch('address_number');
+  const addressDistrict = form.watch('address_district');
   const addressZipCode = form.watch('address_zip_code');
+  const addressCity = form.watch('address_city');
   const cardNumber = form.watch('card_number');
   const cardHolderName = form.watch('card_holder_name');
   const cardExpMonth = form.watch('card_exp_month');
@@ -587,6 +831,50 @@ export default function PublicEventCheckoutPage({
   const cardPreviewNumber = cardNumber || '0000 0000 0000 0000';
   const cardPreviewHolder = cardHolderName || 'NOME NO CARTAO';
   const cardPreviewExpiry = cardExpMonth && cardExpYear ? `${cardExpMonth}/${cardExpYear}` : 'MM/AA';
+  const cardChecklist = useMemo(
+    () => buildCardChecklist({
+      ...initialCheckoutFormValues,
+      responsible_name: responsibleName,
+      whatsapp,
+      email,
+      event_title: eventTitle,
+      payment_method: paymentMethod,
+      payer_document: payerDocument,
+      payer_phone: payerPhone,
+      address_street: addressStreet,
+      address_number: addressNumber,
+      address_district: addressDistrict,
+      address_zip_code: addressZipCode,
+      address_city: addressCity,
+      address_state: addressState,
+      card_number: cardNumber,
+      card_holder_name: cardHolderName,
+      card_exp_month: cardExpMonth,
+      card_exp_year: cardExpYear,
+      card_cvv: cardCvv,
+    }),
+    [
+      addressCity,
+      addressDistrict,
+      addressNumber,
+      addressState,
+      addressStreet,
+      addressZipCode,
+      cardCvv,
+      cardExpMonth,
+      cardExpYear,
+      cardHolderName,
+      cardNumber,
+      email,
+      eventTitle,
+      payerDocument,
+      payerPhone,
+      paymentMethod,
+      responsibleName,
+      whatsapp,
+    ],
+  );
+  const cardChecklistProgress = Math.round((cardChecklist.completed / cardChecklist.total) * 100);
 
   const packagesQuery = useQuery({
     queryKey: ['public-event-packages'],
@@ -608,6 +896,26 @@ export default function PublicEventCheckoutPage({
       form.setValue('package_id', String(packages[0].id), { shouldDirty: false, shouldTouch: false });
     }
   }, [form, packagesQuery.data]);
+
+  useEffect(() => {
+    if (paymentMethod !== 'credit_card') {
+      return;
+    }
+
+    if (digitsOnly(payerPhone).length > 0) {
+      return;
+    }
+
+    if (digitsOnly(whatsapp).length < 10) {
+      return;
+    }
+
+    form.setValue('payer_phone', formatPhone(whatsapp), {
+      shouldDirty: false,
+      shouldTouch: false,
+      shouldValidate: false,
+    });
+  }, [form, payerPhone, paymentMethod, whatsapp]);
 
   const checkoutQuery = useQuery({
     queryKey: ['public-event-checkout', checkoutUuid],
@@ -751,6 +1059,7 @@ export default function PublicEventCheckoutPage({
   const pixPayment = checkoutResponse?.checkout.payment.method === 'pix'
     ? checkoutResponse.checkout.payment.pix
     : null;
+  const pixWhatsappNotification = checkoutResponse?.checkout.payment.whatsapp.pix_generated ?? null;
   const pixExpiresAt = pixPayment?.expires_at ?? checkoutResponse?.checkout.payment.expires_at ?? null;
   const pixExpiresLabel = formatRemainingTime(pixExpiresAt, nowMs);
   const pixTimeline = buildPixTimeline(checkoutResponse);
@@ -966,6 +1275,36 @@ export default function PublicEventCheckoutPage({
             <Card className="border-white/10 bg-white/[0.05] shadow-xl shadow-slate-950/30 backdrop-blur">
               <CardContent className="p-5 md:p-6">
                 <form className="space-y-6" onSubmit={form.handleSubmit(handleSubmit)}>
+                  <section className="grid gap-3 xl:grid-cols-3">
+                    <div className="rounded-[26px] border border-white/10 bg-white/[0.04] p-4">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-200/75">Etapa 1</p>
+                      <p className="mt-2 text-base font-semibold text-white">Conta e evento</p>
+                      <p className="mt-2 text-sm text-slate-300">
+                        {responsibleName.trim() && eventTitle.trim()
+                          ? `${responsibleName.trim()} ja iniciou ${eventTitle.trim()}.`
+                          : 'Preencha quem esta comprando e qual evento sera ativado.'}
+                      </p>
+                    </div>
+                    <div className="rounded-[26px] border border-white/10 bg-white/[0.04] p-4">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-sky-200/75">Etapa 2</p>
+                      <p className="mt-2 text-base font-semibold text-white">Pagamento guiado</p>
+                      <p className="mt-2 text-sm text-slate-300">
+                        {paymentMethod === 'credit_card'
+                          ? cardChecklist.ready
+                            ? 'Os dados criticos do cartao ja estao prontos para tokenizacao segura.'
+                            : `Faltam ${cardChecklist.total - cardChecklist.completed} ajustes para tokenizar o cartao com seguranca.`
+                          : 'Pix gera QR Code imediatamente e continua conciliando pelo status local.'}
+                      </p>
+                    </div>
+                    <div className="rounded-[26px] border border-white/10 bg-white/[0.04] p-4">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-amber-200/75">Etapa 3</p>
+                      <p className="mt-2 text-base font-semibold text-white">Acompanhamento local</p>
+                      <p className="mt-2 text-sm text-slate-300">
+                        Depois da criacao do pedido, esta tela acompanha apenas o estado local reconciliado por webhook.
+                      </p>
+                    </div>
+                  </section>
+
                   <section className="space-y-4">
                     <div className="space-y-2">
                       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300/80">Responsável</p>
@@ -1099,10 +1438,12 @@ export default function PublicEventCheckoutPage({
                                     inputMode="tel"
                                     maxLength={15}
                                     className="h-12 border-white/10 bg-white/5 text-white"
+                                    placeholder="Usamos seu WhatsApp como base"
                                     {...form.register('payer_phone')}
                                     value={payerPhone}
                                     onChange={(event) => updateMaskedField('payer_phone', formatPhone(event.target.value))}
                                   />
+                                  <p className="text-xs text-slate-400">Se voce preferir, pode manter o mesmo numero do WhatsApp acima.</p>
                                   <FieldError message={form.formState.errors.payer_phone?.message} />
                                 </div>
                               </div>
@@ -1263,6 +1604,58 @@ export default function PublicEventCheckoutPage({
                           </div>
 
                           <div className="space-y-4">
+                            <div className="rounded-[28px] border border-emerald-300/12 bg-emerald-400/10 p-4">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="space-y-1">
+                                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-100/80">Checklist do pagamento</p>
+                                  <h3 className="text-lg font-semibold text-white">Tudo o que precisa ficar pronto antes da tokenizacao</h3>
+                                </div>
+                                <Badge variant="outline" className="border-emerald-200/20 bg-white/10 text-emerald-50">
+                                  {cardChecklist.completed}/{cardChecklist.total}
+                                </Badge>
+                              </div>
+
+                              <div className="mt-4 h-2 overflow-hidden rounded-full bg-black/20">
+                                <div
+                                  className={cn(
+                                    'h-full rounded-full transition-all',
+                                    cardChecklist.ready ? 'bg-emerald-300' : 'bg-gradient-to-r from-emerald-300 via-sky-300 to-amber-300',
+                                  )}
+                                  style={{ width: `${cardChecklistProgress}%` }}
+                                />
+                              </div>
+
+                              <div className="mt-4 space-y-2">
+                                {cardChecklist.items.map((item) => (
+                                  <div
+                                    key={item.key}
+                                    className={cn(
+                                      'flex items-center justify-between gap-3 rounded-2xl border px-3 py-2 text-sm',
+                                      item.done
+                                        ? 'border-emerald-200/20 bg-emerald-300/10 text-emerald-50'
+                                        : 'border-white/10 bg-black/10 text-slate-200',
+                                    )}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      {item.done ? (
+                                        <CheckCircle2 className="h-4 w-4 text-emerald-200" />
+                                      ) : (
+                                        <CircleEllipsis className="h-4 w-4 text-amber-200" />
+                                      )}
+                                      <span>{item.label}</span>
+                                    </div>
+                                    <span className="text-[11px] uppercase tracking-[0.16em] opacity-70">
+                                      {item.done ? 'ok' : 'ajustar'}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+
+                              <p className="mt-4 text-sm text-emerald-50/85">
+                                Quando tudo ficar pronto, a Pagar.me recebe os dados do cartao no navegador e o backend segue apenas com <code className="rounded bg-black/20 px-1.5 py-0.5 text-[12px]">card_token</code>.
+                              </p>
+                            </div>
+
                             <div className={cn('relative overflow-hidden rounded-[30px] border border-white/10 bg-gradient-to-br p-5 text-white shadow-2xl shadow-slate-950/30', cardBrand?.surfaceClassName ?? 'from-white/15 via-white/5 to-slate-950')}>
                               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.18),transparent_40%)]" />
                               <div className="relative space-y-6">
@@ -1421,6 +1814,14 @@ export default function PublicEventCheckoutPage({
                       </Button>
                     ) : null}
                   </div>
+
+                  <p className="text-sm text-slate-400">
+                    {paymentMethod === 'credit_card'
+                      ? cardChecklist.ready
+                        ? 'Os dados do cartao estao consistentes. Na proxima etapa a tokenizacao acontece no navegador e o pedido segue para conciliacao local.'
+                        : `Antes de pagar com cartao, faltam ${cardChecklist.total - cardChecklist.completed} ajustes no checklist acima.`
+                      : 'No Pix, o QR Code e exibido na resposta sincronamente e a confirmacao final continua chegando por webhook.'}
+                  </p>
                 </form>
               </CardContent>
             </Card>
@@ -1482,6 +1883,24 @@ export default function PublicEventCheckoutPage({
                       Expira em {pixExpiresLabel}
                     </div>
                   ) : null}
+                  {pixWhatsappNotification && (
+                    <div className="rounded-[28px] border border-emerald-300/15 bg-emerald-400/10 p-4 text-sm text-emerald-50">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-200/80">WhatsApp</p>
+                      <p className="mt-2 font-medium">
+                        {pixWhatsappNotification.status === 'queued' || pixWhatsappNotification.status === 'pending'
+                          ? 'Tambem enviamos este Pix para o seu WhatsApp.'
+                          : 'Tentamos enviar este Pix para o seu WhatsApp.'}
+                      </p>
+                      <p className="mt-1 text-emerald-100/85">
+                        {pixWhatsappNotification.recipient_phone
+                          ? `Numero usado: ${pixWhatsappNotification.recipient_phone}.`
+                          : 'O envio usa o mesmo numero informado no checkout.'}{' '}
+                        {pixWhatsappNotification.pix_button_message_id
+                          ? 'O envio incluiu o botao de copiar o Pix.'
+                          : 'O envio principal foi por texto.'}
+                      </p>
+                    </div>
+                  )}
                   <div className="rounded-[28px] border border-white/10 bg-white p-4 text-slate-950">
                     <div className="flex justify-center">
                       <QRCodeSVG value={checkoutResponse.checkout.payment.pix.qr_code || ''} size={192} />

@@ -50,6 +50,10 @@ export function moderationItemMatchesFilters(media: ApiEventMediaItem, filters: 
     return false;
   }
 
+  if (typeof filters.sender_blocked === 'boolean' && !!media.sender_blocked !== filters.sender_blocked) {
+    return false;
+  }
+
   if (filters.orientation && media.orientation !== filters.orientation) {
     return false;
   }
@@ -59,6 +63,9 @@ export function moderationItemMatchesFilters(media: ApiEventMediaItem, filters: 
     const haystack = [
       media.event_title,
       media.sender_name,
+      media.sender_phone,
+      media.sender_lid,
+      media.sender_external_id,
       media.caption,
       media.event_slug,
     ]

@@ -115,6 +115,26 @@ it('processes zapi received callbacks as inbound messages with participant ident
         ->and($chat->is_group)->toBeTrue();
 });
 
+it('normalizes zapi numeric millisecond timestamps on received callbacks', function () {
+    $instance = WhatsAppInstance::factory()->create([
+        'external_instance_id' => 'INSTANCE-001',
+    ]);
+
+    $this->postJson(
+        "/api/v1/webhooks/whatsapp/zapi/{$instance->external_instance_id}/inbound",
+        makeReceivedCallbackPayload([
+            'messageId' => '3EB0NUMERICMS0001',
+            'momment' => 1775392658000,
+        ]),
+    )->assertOk();
+
+    $message = WhatsAppMessage::query()
+        ->where('provider_message_id', '3EB0NUMERICMS0001')
+        ->sole();
+
+    expect($message->received_at?->toIso8601String())->toBe('2026-04-05T12:37:38+00:00');
+});
+
 it('updates outbound message status from zapi message status callbacks without creating inbound messages', function () {
     $instance = WhatsAppInstance::factory()->create([
         'external_instance_id' => 'INSTANCE-001',
@@ -159,6 +179,56 @@ it('updates outbound message status from zapi message status callbacks without c
         ->and(data_get($event->normalized_json, 'callback_type'))->toBe('MessageStatusCallback')
         ->and(data_get($event->normalized_json, 'message_status'))->toBe('READ')
         ->and(data_get($event->normalized_json, 'message_ids'))->toBe(['4A196C7DE3AE65FE6A66']);
+});
+
+it('normalizes zapi numeric microsecond timestamps on message status callbacks', function () {
+    $instance = WhatsAppInstance::factory()->create([
+        'external_instance_id' => 'INSTANCE-001',
+    ]);
+
+    $chat = $instance->chats()->create([
+        'external_chat_id' => '120363424631089763-group',
+        'type' => ChatType::Group,
+        'group_id' => '120363424631089763-group',
+        'display_name' => 'Grupo Status Real',
+        'is_group' => true,
+    ]);
+
+    $message = WhatsAppMessage::create([
+        'instance_id' => $instance->id,
+        'chat_id' => $chat->id,
+        'direction' => MessageDirection::Outbound,
+        'provider_message_id' => '3AE862B1ED1EEC107BDC',
+        'type' => MessageType::Text,
+        'text_body' => 'Mensagem enviada',
+        'status' => MessageStatus::Sent,
+        'recipient_phone' => '120363424631089763-group',
+        'payload_json' => ['messageId' => '3AE862B1ED1EEC107BDC'],
+        'sent_at' => now()->subMinute(),
+    ]);
+
+    $this->postJson(
+        "/api/v1/webhooks/whatsapp/zapi/{$instance->external_instance_id}/delivery",
+        makeMessageStatusCallbackPayload([
+            'phone' => '120363424631089763-group',
+            'status' => 'READ_BY_ME',
+            'ids' => ['3AE862B1ED1EEC107BDC'],
+            'isGroup' => true,
+            'momment' => 1775501632404000,
+            'participant' => '554896553954',
+            'participantDevice' => 39,
+        ]),
+    )->assertOk();
+
+    $event = WhatsAppInboundEvent::query()
+        ->where('provider_message_id', '3AE862B1ED1EEC107BDC')
+        ->sole();
+
+    expect($event->processing_status)->toBe(InboundEventStatus::Processed)
+        ->and($event->error_message)->toBeNull()
+        ->and(data_get($event->normalized_json, 'message_status'))->toBe('READ_BY_ME')
+        ->and(data_get($event->normalized_json, 'occurred_at'))->toBe('2026-04-06T18:53:52+00:00')
+        ->and($message->refresh()->status)->toBe(MessageStatus::Read);
 });
 
 it('updates the instance lifecycle from zapi connected and disconnected callbacks', function () {

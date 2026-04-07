@@ -49,6 +49,7 @@ export function WallPlayerRoot({ code }: { code: string }) {
     isSyncing,
     errorMessage,
     connectionStatus,
+    lastSyncAt,
   } = useWallPlayer(code);
 
   const { reducedEffects, modeLabel } = usePerformanceMode();
@@ -82,6 +83,7 @@ export function WallPlayerRoot({ code }: { code: string }) {
       <ConnectionOverlay
         connectionStatus={connectionStatus}
         isSyncing={isSyncing}
+        lastSyncAt={lastSyncAt}
       />
 
       {/* ─── State-based rendering ────────────────────────── */}

@@ -6,7 +6,17 @@ type LazyRivePanelProps = {
   artboard?: string;
   className?: string;
   fallback: ReactNode;
+  enabled?: boolean;
 };
+
+function looksLikeHtmlSnippet(buffer: ArrayBuffer) {
+  const preview = new TextDecoder()
+    .decode(buffer.slice(0, 32))
+    .trim()
+    .toLowerCase();
+
+  return preview.startsWith("<!doctype") || preview.startsWith("<html") || preview.startsWith("<");
+}
 
 export default function LazyRivePanel({
   src,
@@ -14,6 +24,7 @@ export default function LazyRivePanel({
   artboard,
   className,
   fallback,
+  enabled = true,
 }: LazyRivePanelProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [shouldLoad, setShouldLoad] = useState(false);
@@ -38,14 +49,30 @@ export default function LazyRivePanel({
   }, []);
 
   useEffect(() => {
+    if (!enabled) {
+      setAssetAvailable(false);
+      return;
+    }
+
     if (!shouldLoad || assetAvailable !== null) return;
 
     let isMounted = true;
+    const controller = new AbortController();
 
-    fetch(src, { method: "HEAD" })
-      .then((response) => {
+    fetch(src, {
+      method: "GET",
+      signal: controller.signal,
+      headers: {
+        Range: "bytes=0-31",
+      },
+    })
+      .then(async (response) => {
+        const contentType = response.headers.get("content-type") || "";
+        const buffer = await response.arrayBuffer();
+        const validBinary = response.ok && !contentType.includes("text/html") && !looksLikeHtmlSnippet(buffer);
+
         if (isMounted) {
-          setAssetAvailable(response.ok);
+          setAssetAvailable(validBinary);
         }
       })
       .catch(() => {
@@ -56,8 +83,9 @@ export default function LazyRivePanel({
 
     return () => {
       isMounted = false;
+      controller.abort();
     };
-  }, [assetAvailable, shouldLoad, src]);
+  }, [assetAvailable, enabled, shouldLoad, src]);
 
   const Player = useMemo(() => lazy(() => import("./RivePlayer")), []);
 

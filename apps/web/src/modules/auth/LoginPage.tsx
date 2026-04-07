@@ -21,6 +21,7 @@ export default function LoginPage() {
   const location = useLocation();
   const { login, loginMock, availableUsers, isLoading, refreshSession } = useAuth();
   const { toast } = useToast();
+  const loginReturnPath = resolveLoginReturnPath(location.search, '/');
 
   const [step, setStep] = useState<AuthStep>('method');
   const [loginValue, setLoginValue] = useState('');
@@ -412,7 +413,6 @@ export default function LoginPage() {
     : registerNextPath === '/events/create'
       ? 'Criar meu evento'
       : 'Continuar';
-  const loginReturnPath = resolveLoginReturnPath(location.search, '/');
   const registerNextHint = registerNextPath === '/plans'
     ? 'Proximo passo: selecionar o plano ideal para liberar a ativacao do seu primeiro evento.'
     : registerNextPath === '/events/create'

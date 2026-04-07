@@ -141,6 +141,11 @@ class WhatsAppInstance extends Model
         return $this->hasMany(WhatsAppGroupBinding::class, 'instance_id');
     }
 
+    public function inboxSessions(): HasMany
+    {
+        return $this->hasMany(WhatsAppInboxSession::class, 'instance_id');
+    }
+
     public function isConnected(): bool
     {
         return $this->normalizedStatus() === InstanceStatus::Connected;

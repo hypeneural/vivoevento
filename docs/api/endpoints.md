@@ -54,7 +54,7 @@
 | POST | `/api/v1/webhooks/whatsapp/{provider}/{instanceKey}/inbound` | WhatsAppWebhookController@inbound | Webhook inbound de mensagens do WhatsApp, incluindo fotos |
 | POST | `/api/v1/webhooks/whatsapp/{provider}/{instanceKey}/status` | WhatsAppWebhookController@status | Webhook de status do provider/instância |
 | POST | `/api/v1/webhooks/whatsapp/{provider}/{instanceKey}/delivery` | WhatsAppWebhookController@delivery | Webhook de delivery/read receipts |
-| POST | `/api/v1/webhooks/telegram` | TelegramWebhookController@handle | Webhook Telegram |
+| POST | `/api/v1/webhooks/telegram` | TelegramWebhookController@handle | Webhook Telegram privado, validado por `secret_token` no modulo Telegram |
 
 ## Media
 | Método | Rota | Controller | Descrição |

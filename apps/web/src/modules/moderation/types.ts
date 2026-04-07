@@ -17,7 +17,8 @@ export type ModerationQuickFilterKey =
   | 'approved'
   | 'rejected'
   | 'featured'
-  | 'pinned';
+  | 'pinned'
+  | 'blocked_sender';
 
 export interface ModerationListFilters {
   per_page?: number;
@@ -27,6 +28,7 @@ export interface ModerationListFilters {
   status?: ModerationStatusFilter;
   featured?: boolean;
   pinned?: boolean;
+  sender_blocked?: boolean;
   orientation?: ModerationOrientationFilter;
 }
 
@@ -74,6 +76,7 @@ export const MODERATION_QUICK_FILTERS: ModerationQuickFilterOption[] = [
   { key: 'rejected', label: 'Reprovadas', helper: 'Bloqueadas' },
   { key: 'featured', label: 'Favoritas', helper: 'Com destaque visual' },
   { key: 'pinned', label: 'Fixadas', helper: 'No topo da galeria' },
+  { key: 'blocked_sender', label: 'Remetente bloqueado', helper: 'Somente autores bloqueados' },
 ];
 
 export const MODERATION_PAGE_SIZE_OPTIONS = [18, 24, 36, 48] as const;

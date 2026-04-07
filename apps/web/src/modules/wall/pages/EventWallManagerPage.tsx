@@ -40,6 +40,7 @@ import { queryKeys } from '@/lib/query-client';
 import { PageHeader } from '@/shared/components/PageHeader';
 
 import { getEventDetail } from '@/modules/events/api';
+import { EVENT_STATUS_LABELS } from '@/modules/events/types';
 
 import { HelpLabel, HelpTooltip } from '../components/WallManagerHelp';
 import { WallManagerSection } from '../components/WallManagerSection';
@@ -179,10 +180,10 @@ export default function EventWallManagerPage() {
   );
 
   const headerDescription = useMemo(() => {
-    if (!event) return 'Carregando contexto do evento e configuracao do telao.';
+    if (!event) return 'Carregando dados do evento e do telao.';
 
     return [
-      event.status === 'active' ? 'Evento ativo' : `Evento ${event.status}`,
+      EVENT_STATUS_LABELS[event.status] ?? event.status,
       event.location_name,
     ].filter(Boolean).join(' - ');
   }, [event]);
@@ -345,13 +346,13 @@ export default function EventWallManagerPage() {
       });
 
       toast({
-        title: 'Comando enviado ao player',
+        title: 'Comando enviado para a tela',
         description: payload.message,
       });
     } catch (error) {
       toast({
         title: 'Falha ao enviar comando',
-        description: error instanceof Error ? error.message : 'Nao foi possivel enviar o comando ao player do wall.',
+        description: error instanceof Error ? error.message : 'Nao foi possivel enviar o comando para a tela.',
         variant: 'destructive',
       });
     }
@@ -395,9 +396,9 @@ export default function EventWallManagerPage() {
   if (!event.module_flags.wall) {
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-        <PageHeader title={`Telao / ${event.title}`} description="Este evento nao tem o modulo de telao habilitado." />
+        <PageHeader title={`Telao / ${event.title}`} description="Este evento ainda nao tem o modulo Telao habilitado." />
         <div className="rounded-3xl border border-dashed border-border bg-muted/30 px-6 py-12 text-center text-sm text-muted-foreground">
-          Habilite o modulo Wall no evento antes de configurar o telao.
+          Habilite o modulo Telao no evento antes de configurar esta exibicao.
         </div>
       </motion.div>
     );
@@ -508,35 +509,35 @@ export default function EventWallManagerPage() {
 
           <WallManagerSection
             title="Diagnostico operacional"
-            description="Resumo agregado do wall e status por aparelho para operacao em evento real."
+            description="Resumo do que esta acontecendo no telao e nas telas conectadas."
           >
             <div className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 <CompactMetricCard
-                  label="Saude do wall"
+                  label="Situacao do telao"
                   value={formatWallHealthLabel(diagnosticsSummary?.health_status ?? 'idle')}
-                  detail={diagnosticsQuery.isFetching ? 'Atualizando diagnostico...' : 'Diagnostico agregado por aparelho e wall.'}
+                  detail={diagnosticsQuery.isFetching ? 'Atualizando status...' : 'Resumo consolidado das telas conectadas.'}
                   tone={healthTone(diagnosticsSummary?.health_status ?? 'idle')}
                 />
                 <CompactMetricCard
-                  label="Players online"
+                  label="Telas conectadas"
                   value={`${diagnosticsSummary?.online_players ?? 0}/${diagnosticsSummary?.total_players ?? 0}`}
-                  detail={`${diagnosticsSummary?.offline_players ?? 0} offline e ${diagnosticsSummary?.degraded_players ?? 0} degradado(s).`}
+                  detail={`${diagnosticsSummary?.offline_players ?? 0} sem conexao e ${diagnosticsSummary?.degraded_players ?? 0} com instabilidade.`}
                 />
                 <CompactMetricCard
-                  label="Assets do runtime"
+                  label="Fotos prontas"
                   value={String(diagnosticsSummary?.ready_count ?? 0)}
-                  detail={`Loading ${diagnosticsSummary?.loading_count ?? 0} | Error ${diagnosticsSummary?.error_count ?? 0} | Stale ${diagnosticsSummary?.stale_count ?? 0}`}
+                  detail={`Carregando ${diagnosticsSummary?.loading_count ?? 0} | Com erro ${diagnosticsSummary?.error_count ?? 0} | Desatualizadas ${diagnosticsSummary?.stale_count ?? 0}`}
                 />
                 <CompactMetricCard
-                  label="Ultimo heartbeat"
+                  label="Ultimo sinal"
                   value={formatTimestampLabel(diagnosticsSummary?.last_seen_at)}
-                  detail={diagnosticsSummary?.updated_at ? `Agregado em ${formatTimestampLabel(diagnosticsSummary.updated_at)}` : 'Aguardando primeiro snapshot do player.'}
+                  detail={diagnosticsSummary?.updated_at ? `Atualizado em ${formatTimestampLabel(diagnosticsSummary.updated_at)}` : 'Aguardando o primeiro sinal da tela.'}
                 />
                 <CompactMetricCard
                   label="Cache local"
                   value={formatPercentLabel(diagnosticsSummary?.cache_hit_rate_avg ?? 0)}
-                  detail={`Quota max ${formatBytes(diagnosticsSummary?.cache_usage_bytes_max)} / ${formatBytes(diagnosticsSummary?.cache_quota_bytes_max)} | Stale ${diagnosticsSummary?.cache_stale_fallback_count ?? 0}`}
+                  detail={`Maior uso ${formatBytes(diagnosticsSummary?.cache_usage_bytes_max)} de ${formatBytes(diagnosticsSummary?.cache_quota_bytes_max)} | Desatualizadas ${diagnosticsSummary?.cache_stale_fallback_count ?? 0}`}
                   tone={diagnosticsSummary && (diagnosticsSummary.cache_hit_rate_avg ?? 0) < 35 ? 'degraded' : 'default'}
                 />
               </div>
@@ -544,9 +545,9 @@ export default function EventWallManagerPage() {
               <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="space-y-1">
-                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Comandos operacionais do player</p>
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Acoes de manutencao</p>
                     <p className="text-sm text-muted-foreground">
-                      Use estes comandos quando o player estiver degradado, com cache inconsistente ou precisando revalidar os assets do evento.
+                      Use estes comandos quando a exibicao travar, demorar para atualizar ou mostrar fotos antigas.
                     </p>
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -566,7 +567,7 @@ export default function EventWallManagerPage() {
                       disabled={isBusy}
                     >
                       <RefreshCw className="mr-1.5 h-4 w-4" />
-                      Revalidar assets
+                      Atualizar fotos
                     </Button>
                     <Button
                       variant="outline"
@@ -575,7 +576,7 @@ export default function EventWallManagerPage() {
                       disabled={isBusy}
                     >
                       <RotateCcw className="mr-1.5 h-4 w-4" />
-                      Reinicializar player
+                      Reiniciar exibicao
                     </Button>
                   </div>
                 </div>
@@ -584,7 +585,7 @@ export default function EventWallManagerPage() {
               {diagnosticsQuery.isLoading && !diagnosticsSummary ? (
                 <div className="flex min-h-[96px] items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 text-sm text-muted-foreground">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Carregando diagnostico do wall...
+                  Carregando status do telao...
                 </div>
               ) : null}
 
@@ -596,7 +597,7 @@ export default function EventWallManagerPage() {
                 </div>
               ) : (
                 <div className="rounded-2xl border border-dashed border-border/60 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
-                  Ainda nao ha heartbeat do player. Abra o telao em um navegador para comecar a ver status por aparelho.
+                  Ainda nao recebemos sinal desta tela. Abra o telao em um navegador para acompanhar o status por aparelho.
                 </div>
               )}
             </div>
@@ -633,10 +634,10 @@ export default function EventWallManagerPage() {
             title={(
               <span className="flex items-center gap-2">
                 <RefreshCw className="h-4 w-4" />
-                Simulacao do comportamento
+                Previsao da fila
               </span>
             )}
-            description="Preview da ordem provavel usando o draft atual das configuracoes sobre a fila real do evento."
+            description="Mostra a ordem mais provavel de exibicao com a fila atual do evento e as configuracoes que voce esta ajustando."
           >
             <div className="space-y-4">
               <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
@@ -654,7 +655,7 @@ export default function EventWallManagerPage() {
               {simulationQuery.isLoading && !simulationSummary ? (
                 <div className="flex min-h-[120px] items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 text-sm text-muted-foreground">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Simulando a ordem do selector...
+                  Calculando a proxima ordem de exibicao...
                 </div>
               ) : simulationQuery.isError ? (
                 <div className="rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-4 text-sm text-destructive">
@@ -676,7 +677,7 @@ export default function EventWallManagerPage() {
                     <CompactMetricCard
                       label="Intensidade do frescor"
                       value={formatLevelLabel(simulationSummary.freshness_intensity)}
-                      detail="Quanto o wall tende a parecer ao vivo com o preset atual."
+                      detail="Quanto o telao tende a parecer realmente ao vivo com a configuracao atual."
                     />
                     <CompactMetricCard
                       label="Nivel de fairness"
@@ -687,12 +688,12 @@ export default function EventWallManagerPage() {
 
                   <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
                     <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                      Ordem provavel dos proximos {simulationPreview.length} slides
+                      Ordem mais provavel das proximas {simulationPreview.length} exibicoes
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {simulationPreview.map((slide) => (
                         <span key={`${slide.position}-${slide.item_id}`} className="rounded-full border border-border/60 bg-background px-3 py-1.5 text-xs text-foreground/85">
-                          {slide.eta_seconds}s | {slide.sender_name}{slide.is_replay ? ' | replay' : ''}
+                          {slide.eta_seconds}s | {slide.sender_name}{slide.is_replay ? ' | reprise' : ''}
                         </span>
                       ))}
                     </div>
@@ -701,14 +702,14 @@ export default function EventWallManagerPage() {
                   {simulationExplanation.length > 0 ? (
                     <div className="space-y-2 rounded-2xl border border-border/60 bg-muted/20 p-4">
                       {simulationExplanation.map((line) => (
-                        <p key={line} className="text-sm leading-relaxed text-muted-foreground">{line}</p>
+                        <p key={line} className="text-sm leading-relaxed text-muted-foreground">{formatSimulationExplanation(line)}</p>
                       ))}
                     </div>
                   ) : null}
                 </>
               ) : (
                 <div className="rounded-2xl border border-dashed border-border/60 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
-                  Ajuste o draft do wall para gerar a simulacao com a fila atual do evento.
+                  Ajuste as configuracoes do telao para ver a previsao com a fila atual do evento.
                 </div>
               )}
             </div>
@@ -727,7 +728,7 @@ export default function EventWallManagerPage() {
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <HelpLabel helpKey="selectionMode" className="text-sm">Preset de selecao</HelpLabel>
+                  <HelpLabel helpKey="selectionMode" className="text-sm">Comportamento base</HelpLabel>
                   <Select value={wallSettings.selection_mode} onValueChange={handleSelectionModeChange}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione o modo" />
@@ -809,15 +810,15 @@ export default function EventWallManagerPage() {
                   </span>
                 </div>
                 <p className="mt-2 text-[11px] text-muted-foreground">
-                  Se todos os itens estourarem esse limite, o player relaxa a regra para nao matar o wall em evento com pouco conteudo.
+                  Se todas as fotos atingirem esse limite, a tela libera novas reprises para a exibicao nao ficar vazia.
                 </p>
               </div>
 
               <div className="space-y-4 rounded-2xl border border-border/60 bg-background/60 p-4">
                 <div>
-                  <HelpLabel helpKey="replayAdaptiveSection">Replay adaptativo por volume</HelpLabel>
+                  <HelpLabel helpKey="replayAdaptiveSection">Repeticao por volume da fila</HelpLabel>
                   <p className="text-[11px] text-muted-foreground">
-                    Esses thresholds sairam da engine e agora ficam persistidos no wall para o comportamento nao variar por aparelho.
+                    Esse ajuste fica salvo no telao para manter o mesmo comportamento em qualquer aparelho conectado.
                   </p>
                 </div>
 
@@ -861,7 +862,7 @@ export default function EventWallManagerPage() {
 
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div className="space-y-2">
-                    <HelpLabel helpKey="replayIntervalLow" className="text-sm">Replay na fila baixa</HelpLabel>
+                    <HelpLabel helpKey="replayIntervalLow" className="text-sm">Repeticao com fila curta</HelpLabel>
                     <Select
                       value={String(wallSettings.selection_policy.replay_interval_low_minutes)}
                       onValueChange={(value) => updateSelectionPolicy('replay_interval_low_minutes', Number(value))}
@@ -878,7 +879,7 @@ export default function EventWallManagerPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <HelpLabel helpKey="replayIntervalMedium" className="text-sm">Replay na fila media</HelpLabel>
+                    <HelpLabel helpKey="replayIntervalMedium" className="text-sm">Repeticao com fila media</HelpLabel>
                     <Select
                       value={String(wallSettings.selection_policy.replay_interval_medium_minutes)}
                       onValueChange={(value) => updateSelectionPolicy('replay_interval_medium_minutes', Number(value))}
@@ -895,7 +896,7 @@ export default function EventWallManagerPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <HelpLabel helpKey="replayIntervalHigh" className="text-sm">Replay na fila alta</HelpLabel>
+                    <HelpLabel helpKey="replayIntervalHigh" className="text-sm">Repeticao com fila cheia</HelpLabel>
                     <Select
                       value={String(wallSettings.selection_policy.replay_interval_high_minutes)}
                       onValueChange={(value) => updateSelectionPolicy('replay_interval_high_minutes', Number(value))}
@@ -1212,9 +1213,9 @@ function PlayerRuntimeCard({ player }: { player: ApiWallDiagnosticsPlayer }) {
     <div className={`rounded-2xl border p-4 ${playerCardClass(player.health_status)}`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-sm font-semibold">Player {shortPlayerId(player.player_instance_id)}</p>
+          <p className="text-sm font-semibold">Tela {shortPlayerId(player.player_instance_id)}</p>
           <p className="text-xs text-muted-foreground">
-            Ultimo heartbeat {formatTimestampLabel(player.last_seen_at)}
+            Ultimo sinal {formatTimestampLabel(player.last_seen_at)}
           </p>
         </div>
         <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-medium ${healthBadgeClass(player.health_status)}`}>
@@ -1223,16 +1224,16 @@ function PlayerRuntimeCard({ player }: { player: ApiWallDiagnosticsPlayer }) {
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <RuntimeStat label="Runtime" value={player.runtime_status} />
-        <RuntimeStat label="Conexao" value={player.connection_status} />
-        <RuntimeStat label="Remetente atual" value={player.current_sender_key ?? 'Sem item atual'} />
+        <RuntimeStat label="Exibicao" value={formatRuntimeStatus(player.runtime_status)} />
+        <RuntimeStat label="Conexao" value={formatConnectionStatus(player.connection_status)} />
+        <RuntimeStat label="Ultimo envio na tela" value={player.current_sender_key ?? 'Nenhum item agora'} />
         <RuntimeStat
-          label="Assets"
+          label="Fotos"
           value={`R${player.ready_count} | L${player.loading_count} | E${player.error_count} | S${player.stale_count}`}
         />
-        <RuntimeStat label="Hit rate" value={formatPercentLabel(player.cache_hit_rate)} />
+        <RuntimeStat label="Uso do cache" value={formatPercentLabel(player.cache_hit_rate)} />
         <RuntimeStat
-          label="Quota"
+          label="Espaco local"
           value={`${formatBytes(player.cache_usage_bytes)} / ${formatBytes(player.cache_quota_bytes)}`}
         />
       </div>
@@ -1242,19 +1243,19 @@ function PlayerRuntimeCard({ player }: { player: ApiWallDiagnosticsPlayer }) {
           Cache {player.cache_enabled ? 'ativo' : 'desligado'}
         </span>
         <span className="rounded-full border border-border/60 bg-background px-3 py-1">
-          Persistencia {formatPersistentStorage(player.persistent_storage)}
+          Armazenamento {formatPersistentStorage(player.persistent_storage)}
         </span>
         <span className="rounded-full border border-border/60 bg-background px-3 py-1">
-          Hits {player.cache_hit_count} | Misses {player.cache_miss_count} | Stale {player.cache_stale_fallback_count}
+          Acertos {player.cache_hit_count} | Falhas {player.cache_miss_count} | Desatualizados {player.cache_stale_fallback_count}
         </span>
         {player.last_sync_at ? (
           <span className="rounded-full border border-border/60 bg-background px-3 py-1">
-            Ultimo sync {formatTimestampLabel(player.last_sync_at)}
+            Ultima atualizacao {formatTimestampLabel(player.last_sync_at)}
           </span>
         ) : null}
         {player.last_fallback_reason ? (
           <span className="rounded-full border border-border/60 bg-background px-3 py-1">
-            Fallback {player.last_fallback_reason}
+            Motivo da troca {formatFallbackReason(player.last_fallback_reason)}
           </span>
         ) : null}
       </div>
@@ -1348,28 +1349,94 @@ function formatWallHealthLabel(value: ApiWallDiagnosticsSummary['health_status']
     case 'healthy':
       return 'Saudavel';
     case 'degraded':
-      return 'Degradado';
+      return 'Com instabilidade';
     case 'offline':
-      return 'Offline';
+      return 'Sem conexao';
     default:
-      return 'Sem players';
+      return 'Nenhuma tela conectada';
   }
 }
 
 function formatPlayerHealthLabel(value: ApiWallDiagnosticsPlayer['health_status']) {
   if (value === 'healthy') return 'Saudavel';
-  if (value === 'degraded') return 'Degradado';
-  return 'Offline';
+  if (value === 'degraded') return 'Com instabilidade';
+  return 'Sem conexao';
+}
+
+function formatRuntimeStatus(value?: string | null) {
+  switch (value) {
+    case 'booting':
+      return 'Iniciando';
+    case 'loading':
+      return 'Carregando';
+    case 'playing':
+      return 'Exibindo';
+    case 'paused':
+      return 'Pausado';
+    case 'error':
+      return 'Com erro';
+    case 'idle':
+      return 'Aguardando';
+    default:
+      return formatLooseLabel(value, 'Sem dado');
+  }
+}
+
+function formatConnectionStatus(value?: string | null) {
+  switch (value) {
+    case 'connected':
+      return 'Conectado';
+    case 'reconnecting':
+      return 'Reconectando';
+    case 'disconnected':
+      return 'Desconectado';
+    case 'offline':
+      return 'Offline';
+    default:
+      return formatLooseLabel(value, 'Sem dado');
+  }
+}
+
+function formatFallbackReason(value?: string | null) {
+  return formatLooseLabel(value, 'Sem detalhe');
+}
+
+function formatLooseLabel(value?: string | null, fallback = 'Sem dado') {
+  if (!value) {
+    return fallback;
+  }
+
+  const normalized = value.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+
+  if (!normalized) {
+    return fallback;
+  }
+
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function formatSimulationExplanation(line: string) {
+  return line
+    .replace(
+      'a simulacao usou a fila real atual do evento com o draft das configuracoes do wall.',
+      'a previsao usou a fila atual do evento com as configuracoes que voce esta ajustando no telao.',
+    )
+    .replace(/\bsimulacao\b/gi, 'previsao')
+    .replace(/\bdraft das configuracoes do wall\b/gi, 'configuracoes que voce esta ajustando no telao')
+    .replace(/\bdraft\b/gi, 'rascunho')
+    .replace(/\bwall\b/gi, 'telao')
+    .replace(/\bselector\b/gi, 'organizador da fila')
+    .replace(/\breplay\b/gi, 'reprise');
 }
 
 function formatPersistentStorage(value: ApiWallPersistentStorage) {
   switch (value) {
     case 'localstorage':
-      return 'LocalStorage';
+      return 'Memoria do navegador';
     case 'indexeddb':
-      return 'IndexedDB';
+      return 'Banco local do navegador';
     case 'cache_api':
-      return 'Cache API';
+      return 'Cache do navegador';
     case 'unavailable':
       return 'Indisponivel';
     case 'unknown':

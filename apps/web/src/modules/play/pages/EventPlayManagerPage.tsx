@@ -136,7 +136,7 @@ export default function EventPlayManagerPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['event-play-manager', id] });
       toast({
-        title: 'Play atualizado',
+        title: 'Jogos atualizados',
         description: 'As configuracoes gerais do modulo foram salvas.',
       });
     },
@@ -231,7 +231,7 @@ export default function EventPlayManagerPage() {
   if (managerQuery.isError || !managerQuery.data) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center text-sm text-destructive">
-        Nao foi possivel carregar a gestao do Play para este evento.
+        Nao foi possivel carregar a area de jogos deste evento.
       </div>
     );
   }
@@ -242,8 +242,8 @@ export default function EventPlayManagerPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Play - ${manager.event.title}`}
-        description="Organize os jogos do evento com links publicos visiveis, configuracao clara e assets separados por card."
+        title={`Jogos - ${manager.event.title}`}
+        description="Organize os jogos do evento com links publicos claros, configuracao simples e fotos separadas por jogo."
         actions={(
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline">
@@ -254,7 +254,7 @@ export default function EventPlayManagerPage() {
             <Button asChild>
               <Link to={`/e/${manager.event.slug}/play`} target="_blank" rel="noreferrer">
                 <ExternalLink className="mr-1.5 h-4 w-4" />
-                Abrir hub publico
+                Abrir pagina de jogos
               </Link>
             </Button>
           </div>
@@ -264,8 +264,8 @@ export default function EventPlayManagerPage() {
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <StatsCard title="Jogos configurados" value={managerStats.totalGames} icon={Gamepad2} />
         <StatsCard title="Jogos ativos" value={managerStats.activeGames} icon={LayoutGrid} />
-        <StatsCard title="Assets vinculados" value={managerStats.assetsLinked} icon={Image} />
-        <StatsCard title="Fotos elegiveis" value={managerStats.publishedAssets} icon={Puzzle} />
+        <StatsCard title="Fotos escolhidas" value={managerStats.assetsLinked} icon={Image} />
+        <StatsCard title="Fotos prontas" value={managerStats.publishedAssets} icon={Puzzle} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
@@ -273,13 +273,13 @@ export default function EventPlayManagerPage() {
           <CardHeader className="space-y-1 pb-3">
             <CardTitle className="text-base">Links publicos e atalhos</CardTitle>
             <p className="text-sm text-muted-foreground">
-              O hub do evento e os links diretos de cada jogo ficam visiveis aqui, com copiar e abrir em um clique.
+              A pagina principal dos jogos e os links diretos de cada jogo ficam visiveis aqui, com copiar e abrir em um clique.
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
             <PlayPublicLinkField
-              label="Hub publico do Play"
-              description="Use este endereco para divulgar a home publica de jogos do evento."
+              label="Pagina principal dos jogos"
+              description="Use este endereco para divulgar a pagina publica de jogos do evento."
               url={hubUrl}
             />
 
@@ -288,7 +288,7 @@ export default function EventPlayManagerPage() {
                 <div>
                   <p className="text-sm font-semibold">Links diretos dos jogos</p>
                   <p className="text-xs text-muted-foreground">
-                    Mesmo jogos inativos continuam com slug visivel para configuracao e validacao.
+                    Mesmo jogos inativos continuam com o endereco visivel para configuracao e conferencia.
                   </p>
                 </div>
                 <Badge variant="outline">{manager.games.length} jogos</Badge>
@@ -304,7 +304,7 @@ export default function EventPlayManagerPage() {
                     <PlayPublicLinkField
                       key={game.id}
                       label={game.title}
-                      description={game.is_active ? 'Link publico pronto para divulgacao.' : 'Slug configurado, mas o jogo ainda esta inativo.'}
+                      description={game.is_active ? 'Link publico pronto para divulgacao.' : 'Endereco configurado, mas o jogo ainda esta inativo.'}
                       url={buildEventPlayGameUrl(manager.event.slug, game.slug)}
                       compact
                     />
@@ -352,8 +352,8 @@ export default function EventPlayManagerPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Slug</Label>
-                <Input placeholder="Opcional. Se vazio, o backend gera." {...createForm.register('slug')} />
+                <Label>Endereco</Label>
+                <Input placeholder="Opcional. Se vazio, o sistema cria automaticamente." {...createForm.register('slug')} />
               </div>
 
               <div className="space-y-2">
@@ -386,7 +386,7 @@ export default function EventPlayManagerPage() {
               </div>
 
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-muted-foreground">
-                O backend continua gerando sessao publica, runtime de assets e ranking por jogo. Depois da criacao, o card do jogo concentra todo o restante.
+                O sistema cria automaticamente a sessao publica, prepara as fotos do jogo e organiza o ranking. Depois da criacao, o restante fica no card do jogo.
               </div>
 
               <Button type="submit" disabled={createGameMutation.isPending || enabledCatalog.length === 0}>
@@ -415,7 +415,7 @@ export default function EventPlayManagerPage() {
             <CardContent className="px-6 py-10 text-center">
               <p className="text-sm font-medium">Nenhum jogo configurado ainda.</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                Crie o primeiro jogo usando o bloco acima para ativar a camada publica do Play.
+                Crie o primeiro jogo usando o bloco acima para ativar a pagina publica de jogos.
               </p>
             </CardContent>
           </Card>
@@ -436,21 +436,21 @@ export default function EventPlayManagerPage() {
         <CardHeader className="space-y-1 pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <Settings2 className="h-4 w-4" />
-            Modulo Play do evento
+            Modulo Jogos do evento
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Configuracoes globais, catalogo liberado e analytics avancados ficam organizados aqui embaixo para nao competir com os jogos.
+            Configuracoes gerais, jogos liberados e relatorios ficam organizados aqui embaixo para nao competir com os cards dos jogos.
           </p>
         </CardHeader>
         <CardContent>
           <Accordion type="single" collapsible defaultValue="settings" className="w-full">
             <AccordionItem value="settings">
-              <AccordionTrigger>Configuracoes gerais do modulo</AccordionTrigger>
+              <AccordionTrigger>Configuracoes gerais</AccordionTrigger>
               <AccordionContent>
                 <form className="space-y-5" onSubmit={settingsForm.handleSubmit((values) => updateSettingsMutation.mutate(values))}>
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                     <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <Label htmlFor="play-enabled">Play ativo no evento</Label>
+                      <Label htmlFor="play-enabled">Jogos ativos no evento</Label>
                       <Controller
                         name="is_enabled"
                         control={settingsForm.control}
@@ -461,7 +461,7 @@ export default function EventPlayManagerPage() {
                     </div>
 
                     <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <Label htmlFor="memory-enabled">Catalogo Memory</Label>
+                      <Label htmlFor="memory-enabled">Liberar jogo da memoria</Label>
                       <Controller
                         name="memory_enabled"
                         control={settingsForm.control}
@@ -472,7 +472,7 @@ export default function EventPlayManagerPage() {
                     </div>
 
                     <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <Label htmlFor="puzzle-enabled">Catalogo Puzzle</Label>
+                      <Label htmlFor="puzzle-enabled">Liberar quebra-cabeca</Label>
                       <Controller
                         name="puzzle_enabled"
                         control={settingsForm.control}
@@ -494,7 +494,7 @@ export default function EventPlayManagerPage() {
                     </div>
 
                     <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <Label htmlFor="play-auto-assets">Fallback automatico de assets</Label>
+                      <Label htmlFor="play-auto-assets">Usar fotos do evento automaticamente</Label>
                       <Controller
                         name="auto_refresh_assets"
                         control={settingsForm.control}
@@ -507,12 +507,12 @@ export default function EventPlayManagerPage() {
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="memory-card-count">Pares padrao do Memory</Label>
+                      <Label htmlFor="memory-card-count">Pares padrao do jogo da memoria</Label>
                       <Input id="memory-card-count" type="number" {...settingsForm.register('memory_card_count', { valueAsNumber: true })} />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="puzzle-piece-count">Pecas base do Puzzle</Label>
+                      <Label htmlFor="puzzle-piece-count">Pecas padrao do quebra-cabeca</Label>
                       <Input id="puzzle-piece-count" type="number" {...settingsForm.register('puzzle_piece_count', { valueAsNumber: true })} />
                     </div>
                   </div>
@@ -530,7 +530,7 @@ export default function EventPlayManagerPage() {
             </AccordionItem>
 
             <AccordionItem value="catalog">
-              <AccordionTrigger>Catalogo disponivel</AccordionTrigger>
+              <AccordionTrigger>Jogos disponiveis</AccordionTrigger>
               <AccordionContent>
                 <div className="grid gap-4 md:grid-cols-2">
                   {manager.catalog.map((item) => {
@@ -555,7 +555,7 @@ export default function EventPlayManagerPage() {
             </AccordionItem>
 
             <AccordionItem value="analytics">
-              <AccordionTrigger>Analytics do Play</AccordionTrigger>
+              <AccordionTrigger>Relatorios dos jogos</AccordionTrigger>
               <AccordionContent>
                 <PlayAnalyticsPanel eventId={id} games={manager.games} />
               </AccordionContent>

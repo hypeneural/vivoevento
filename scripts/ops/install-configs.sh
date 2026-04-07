@@ -10,6 +10,7 @@ RELOAD_SYSTEMD="${RELOAD_SYSTEMD:-1}"
 PG_VERSION="${PG_VERSION:-16}"
 REDIS_MAIN_CONF="${REDIS_MAIN_CONF:-/etc/redis/redis.conf}"
 REDIS_CONF_DIR="${REDIS_CONF_DIR:-/etc/redis/redis.conf.d}"
+PHP_FPM_POOL_DIR="${PHP_FPM_POOL_DIR:-/etc/php/8.3/fpm/pool.d}"
 
 usage() {
     cat <<'EOF'
@@ -67,6 +68,7 @@ ensure_symlink() {
 
     backup_if_present "$link_path"
     mkdir -p "$(dirname "$link_path")"
+    rm -f "$link_path"
     ln -sfn "$target" "$link_path"
 }
 
@@ -120,6 +122,21 @@ require_root
 [[ -d "$REPO_ROOT/deploy" ]] || fail "deploy directory not found under: $REPO_ROOT"
 
 mkdir -p "$BACKUP_ROOT" "$APP_ROOT/scripts"
+mkdir -p \
+    "$APP_ROOT/shared/storage/app/public" \
+    "$APP_ROOT/shared/storage/framework/cache/data" \
+    "$APP_ROOT/shared/storage/framework/sessions" \
+    "$APP_ROOT/shared/storage/framework/testing" \
+    "$APP_ROOT/shared/storage/framework/views" \
+    "$APP_ROOT/shared/storage/logs" \
+    "$APP_ROOT/shared/bootstrap-cache" \
+    "$APP_ROOT/shared/run/reverb"
+chown -R deploy:www-data \
+    "$APP_ROOT/shared/storage" \
+    "$APP_ROOT/shared/bootstrap-cache" \
+    "$APP_ROOT/shared/run/reverb" \
+    "$APP_ROOT/scripts"
+find "$APP_ROOT/shared/storage" -type d -exec chmod 775 {} \;
 
 log "Installing Nginx configuration"
 install_file "$REPO_ROOT/deploy/nginx/nginx.conf" "/etc/nginx/nginx.conf"
@@ -143,6 +160,12 @@ fi
 log "Installing PHP runtime configuration"
 install_file "$REPO_ROOT/deploy/php/opcache-production.ini" "/etc/php/8.3/fpm/conf.d/99-eventovivo-opcache.ini"
 install_file "$REPO_ROOT/deploy/php-fpm/eventovivo.conf" "/etc/php/8.3/fpm/pool.d/eventovivo.conf"
+
+if [[ -f "$PHP_FPM_POOL_DIR/www.conf" ]]; then
+    log "Disabling default PHP-FPM www pool for the dedicated host"
+    backup_if_present "$PHP_FPM_POOL_DIR/www.conf"
+    rm -f "$PHP_FPM_POOL_DIR/www.conf"
+fi
 
 log "Installing Redis configuration"
 mkdir -p "$REDIS_CONF_DIR"

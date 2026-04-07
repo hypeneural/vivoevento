@@ -14,7 +14,7 @@ export function PublicGamePuzzleStatus({ progress }: PublicGamePuzzleStatusProps
     <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/8 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-white">Progresso do puzzle</p>
+          <p className="text-sm font-semibold text-white">Progresso do quebra-cabeca</p>
           <p className="text-xs text-white/65">
             {progress.placed}/{progress.total} pecas encaixadas
           </p>
@@ -22,7 +22,7 @@ export function PublicGamePuzzleStatus({ progress }: PublicGamePuzzleStatusProps
 
         <div className="flex flex-wrap gap-2">
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/75">
-            Preview {progress.scorePreview}
+            Pontuacao estimada {progress.scorePreview}
           </span>
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/75">
             Combo x{progress.combo}

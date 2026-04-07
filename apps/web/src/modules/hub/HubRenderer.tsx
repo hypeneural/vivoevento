@@ -69,7 +69,7 @@ export function HubRenderer({
   const secondary = event.secondary_color ?? tokens.page_accent;
   const badgeLabel = builder.blocks.hero.show_badge
     ? previewMode
-      ? (hub.is_enabled ? 'Hub ativo' : 'Hub pausado')
+      ? (hub.is_enabled ? 'Links ativos' : 'Links pausados')
       : 'Evento Vivo'
     : null;
 
@@ -183,7 +183,7 @@ export function HubRenderer({
                   backgroundColor: hexToRgba(tokens.surface_background, 0.3),
                 }}
               >
-                Nenhum link publico foi configurado ainda.
+                Nenhum link publico foi configurado ainda nesta pagina.
               </div>
             </div>
           ) : null}

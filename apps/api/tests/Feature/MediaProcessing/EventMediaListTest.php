@@ -193,6 +193,15 @@ it('shows the latest safety and vlm evaluations in the media detail payload', fu
         'blocked' => false,
         'reason_codes_json' => [],
         'category_scores_json' => ['nudity' => 0.01, 'violence' => 0.03],
+        'provider_categories_json' => ['violence' => false, 'sexual' => false],
+        'provider_category_scores_json' => ['violence' => 0.03, 'sexual' => 0.01],
+        'provider_category_input_types_json' => ['violence' => ['image']],
+        'normalized_provider_json' => [
+            'categories' => ['violence' => false, 'sexual' => false],
+            'category_scores' => ['violence' => 0.03, 'sexual' => 0.01],
+            'category_applied_input_types' => ['violence' => ['image']],
+            'input_path_used' => 'image_url',
+        ],
         'completed_at' => now(),
     ]);
 
@@ -222,6 +231,9 @@ it('shows the latest safety and vlm evaluations in the media detail payload', fu
     $response->assertJsonPath('data.latest_safety_evaluation.id', $latestSafety->id)
         ->assertJsonPath('data.latest_safety_evaluation.decision', 'pass')
         ->assertJsonPath('data.latest_safety_evaluation.category_scores.violence', 0.03)
+        ->assertJsonPath('data.latest_safety_evaluation.provider_category_scores.violence', 0.03)
+        ->assertJsonPath('data.latest_safety_evaluation.provider_category_input_types.violence.0', 'image')
+        ->assertJsonPath('data.latest_safety_evaluation.normalized_provider.input_path_used', 'image_url')
         ->assertJsonPath('data.latest_vlm_evaluation.id', $latestVlm->id)
         ->assertJsonPath('data.latest_vlm_evaluation.decision', 'approve')
         ->assertJsonPath('data.latest_vlm_evaluation.reason', 'Imagem compativel com o evento.')

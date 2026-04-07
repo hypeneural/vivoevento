@@ -3,6 +3,7 @@ import {
   DEFAULT_WALL_SELECTION_POLICY,
   hasWallItemReplayBudget,
   isWallItemReplayMature,
+  mediaToRuntimeItem,
   pickNextWallItemId,
   resolveWallReplayIntervalMs,
   resolveWallReplayVolume,
@@ -271,5 +272,29 @@ describe('wall selectors', () => {
 
     expect(eligibleIds).toHaveLength(2);
     expect(eligibleIds).toEqual(expect.arrayContaining(['spent_item_a', 'spent_item_b']));
+  });
+
+  it('hydrates runtime dimensions and orientation directly from the wall payload', () => {
+    const runtimeItem = mediaToRuntimeItem({
+      id: 'media_vertical',
+      url: 'https://cdn.example.com/media-vertical.webp',
+      original_url: 'https://cdn.example.com/media-vertical-original.jpg',
+      type: 'image',
+      sender_name: 'Ana',
+      sender_key: 'sender-ana',
+      source_type: 'whatsapp',
+      caption: 'Vertical',
+      duplicate_cluster_key: null,
+      is_featured: false,
+      width: 1080,
+      height: 1920,
+      orientation: 'vertical',
+      created_at: '2026-04-01T10:00:00Z',
+    });
+
+    expect(runtimeItem.width).toBe(1080);
+    expect(runtimeItem.height).toBe(1920);
+    expect(runtimeItem.orientation).toBe('vertical');
+    expect(runtimeItem.original_url).toBe('https://cdn.example.com/media-vertical-original.jpg');
   });
 });

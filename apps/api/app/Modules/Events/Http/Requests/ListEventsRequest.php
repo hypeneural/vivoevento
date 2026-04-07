@@ -2,6 +2,7 @@
 
 namespace App\Modules\Events\Http\Requests;
 
+use App\Modules\Events\Enums\EventCommercialMode;
 use App\Modules\Events\Enums\EventStatus;
 use App\Modules\Events\Enums\EventType;
 use Illuminate\Foundation\Http\FormRequest;
@@ -21,6 +22,7 @@ class ListEventsRequest extends FormRequest
             'client_id' => ['nullable', 'integer', 'exists:clients,id'],
             'status' => ['nullable', Rule::in(array_map(static fn (EventStatus $status) => $status->value, EventStatus::cases()))],
             'event_type' => ['nullable', Rule::in(array_map(static fn (EventType $type) => $type->value, EventType::cases()))],
+            'commercial_mode' => ['nullable', Rule::in(array_map(static fn (EventCommercialMode $mode) => $mode->value, EventCommercialMode::cases()))],
             'module' => ['nullable', 'string', Rule::in(['live', 'wall', 'play', 'hub'])],
             'search' => ['nullable', 'string', 'max:180'],
             'date_from' => ['nullable', 'date'],

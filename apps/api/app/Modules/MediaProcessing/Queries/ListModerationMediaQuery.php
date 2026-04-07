@@ -24,6 +24,7 @@ class ListModerationMediaQuery
         private readonly ?string $status = null,
         private readonly ?bool $featured = null,
         private readonly ?bool $pinned = null,
+        private readonly ?bool $senderBlocked = null,
         private readonly ?string $orientation = null,
     ) {}
 
@@ -49,13 +50,56 @@ class ListModerationMediaQuery
                         ->orWhere('source_label', $like, $term)
                         ->orWhere('original_filename', $like, $term)
                         ->orWhereHas('event', fn (Builder $query) => $query->where('title', $like, $term))
-                        ->orWhereHas('inboundMessage', fn (Builder $query) => $query->where('sender_name', $like, $term));
+                        ->orWhereHas('inboundMessage', function (Builder $query) use ($like, $term) {
+                            $query->where('sender_name', $like, $term)
+                                ->orWhere('sender_phone', $like, $term)
+                                ->orWhere('sender_lid', $like, $term)
+                                ->orWhere('sender_external_id', $like, $term);
+                        });
                 });
             })
             ->when($this->featured !== null, fn (Builder $builder) => $builder->where('is_featured', $this->featured))
             ->when($this->pinned !== null, function (Builder $builder) {
                 $operator = $this->pinned ? '>' : '=';
                 $builder->where('sort_order', $operator, 0);
+            })
+            ->when($this->senderBlocked !== null, function (Builder $builder) {
+                $method = $this->senderBlocked ? 'whereHas' : 'whereDoesntHave';
+
+                $builder->{$method}('inboundMessage', function (Builder $inboundQuery) {
+                    $inboundQuery->whereExists(function ($blacklistQuery) {
+                        $blacklistQuery->selectRaw('1')
+                            ->from('event_media_sender_blacklists as blacklist')
+                            ->whereColumn('blacklist.event_id', 'event_media.event_id')
+                            ->where('blacklist.is_active', true)
+                            ->where(function ($activeQuery) {
+                                $activeQuery->whereNull('blacklist.expires_at')
+                                    ->orWhere('blacklist.expires_at', '>', now());
+                            })
+                            ->where(function ($matchQuery) {
+                                $matchQuery
+                                    ->where(function ($lidQuery) {
+                                        $lidQuery
+                                            ->where('blacklist.identity_type', 'lid')
+                                            ->whereColumn('blacklist.identity_value', 'inbound_messages.sender_lid');
+                                    })
+                                    ->orWhere(function ($externalIdQuery) {
+                                        $externalIdQuery
+                                            ->where('blacklist.identity_type', 'external_id')
+                                            ->whereColumn('blacklist.identity_value', 'inbound_messages.sender_external_id');
+                                    })
+                                    ->orWhere(function ($phoneQuery) {
+                                        $phoneQuery
+                                            ->where('blacklist.identity_type', 'phone')
+                                            ->where(function ($candidateQuery) {
+                                                $candidateQuery
+                                                    ->whereColumn('blacklist.identity_value', 'inbound_messages.sender_phone')
+                                                    ->orWhereColumn('blacklist.normalized_phone', 'inbound_messages.sender_phone');
+                                            });
+                                    });
+                            });
+                    });
+                });
             })
             ->when($this->orientation, function (Builder $builder) {
                 match ($this->orientation) {

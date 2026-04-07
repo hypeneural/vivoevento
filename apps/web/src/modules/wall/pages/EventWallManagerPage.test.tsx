@@ -236,8 +236,8 @@ describe('EventWallManagerPage', () => {
     renderPage();
 
     expect(await screen.findByText(/Diagnostico operacional/i)).toBeInTheDocument();
-    expect(screen.getByText(/Simulacao do comportamento/i)).toBeInTheDocument();
-    expect(screen.getByText(/Player player-alpha/i)).toBeInTheDocument();
+    expect(screen.getByText(/Previsao da fila/i)).toBeInTheDocument();
+    expect(screen.getByText(/Tela player-alpha/i)).toBeInTheDocument();
 
     await waitFor(() => {
       expect(simulateEventWallMock).toHaveBeenCalled();

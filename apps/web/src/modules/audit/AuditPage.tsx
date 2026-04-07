@@ -23,13 +23,14 @@ import { queryKeys } from '@/lib/query-client';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { PageHeader } from '@/shared/components/PageHeader';
 
+import { formatAuditDescription, formatAuditEventLabel, formatAuditFieldLabel } from './audit-copy';
 import { AuditPagination } from './components/AuditPagination';
 import { auditService } from './services/audit.service';
 import type { AuditEntry } from './types';
 
 const CATEGORY_LABELS: Record<string, string> = {
   security: 'Seguranca',
-  billing: 'Billing',
+  billing: 'Cobranca',
   event: 'Evento',
   organization: 'Organizacao',
   customer: 'Cliente',
@@ -259,7 +260,7 @@ export default function AuditPage() {
           <div className="relative xl:col-span-4">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Buscar por descricao, ator ou contexto"
+              placeholder="Buscar por atividade, responsavel ou contexto"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               className="pl-9"
@@ -268,10 +269,10 @@ export default function AuditPage() {
 
           <Select value={actorId} onValueChange={setActorId}>
             <SelectTrigger className="xl:col-span-2">
-              <SelectValue placeholder="Ator" />
+              <SelectValue placeholder="Responsavel" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos os atores</SelectItem>
+              <SelectItem value="all">Todos os responsaveis</SelectItem>
               {(auditFiltersQuery.data?.actors ?? []).map((actor) => (
                 <SelectItem key={actor.id} value={String(actor.id)}>
                   {actor.name}
@@ -296,13 +297,13 @@ export default function AuditPage() {
 
           <Select value={activityEvent} onValueChange={setActivityEvent}>
             <SelectTrigger className="xl:col-span-2">
-              <SelectValue placeholder="Evento tecnico" />
+              <SelectValue placeholder="Tipo de atividade" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os eventos</SelectItem>
               {(auditFiltersQuery.data?.activity_events ?? []).map((option) => (
                 <SelectItem key={option} value={option}>
-                  {option}
+                  {formatAuditEventLabel(option)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -310,7 +311,7 @@ export default function AuditPage() {
 
           <Select value={perPage} onValueChange={setPerPage}>
             <SelectTrigger className="xl:col-span-2">
-              <SelectValue placeholder="Pagina" />
+              <SelectValue placeholder="Itens por pagina" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="15">15 por pagina</SelectItem>
@@ -330,7 +331,7 @@ export default function AuditPage() {
 
           <div className="xl:col-span-4">
             <Input
-              placeholder="Batch UUID para correlacao"
+              placeholder="Codigo do lote para localizar atividades relacionadas"
               value={batchUuid}
               onChange={(event) => setBatchUuid(event.target.value)}
             />
@@ -339,14 +340,14 @@ export default function AuditPage() {
           <div className="flex items-center justify-between rounded-2xl border border-border/60 bg-background/70 px-4 py-2.5 xl:col-span-4">
             <div>
               <p className="text-sm font-medium">Somente com alteracoes</p>
-              <p className="text-xs text-muted-foreground">Mostra apenas registros com diff saneado.</p>
+              <p className="text-xs text-muted-foreground">Mostra apenas registros que tiveram alteracoes.</p>
             </div>
             <Switch checked={hasChanges} onCheckedChange={setHasChanges} />
           </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          <span>Atualizacao automatica a cada 30s</span>
+          <span>Atualizacao automatica a cada 30 segundos</span>
           <Button variant="ghost" size="sm" className="h-auto px-0 text-xs" onClick={resetFilters}>
             Limpar filtros
           </Button>
@@ -357,7 +358,7 @@ export default function AuditPage() {
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="glass rounded-2xl border border-border/60 p-4">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Pagina atual</p>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Registros na pagina</p>
               <p className="mt-2 text-2xl font-semibold">{entries.length}</p>
             </div>
 
@@ -367,7 +368,7 @@ export default function AuditPage() {
             </div>
 
             <div className="glass rounded-2xl border border-border/60 p-4">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">Atores visiveis</p>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Responsaveis visiveis</p>
               <p className="mt-2 text-2xl font-semibold">{uniqueActors}</p>
             </div>
           </div>
@@ -375,8 +376,8 @@ export default function AuditPage() {
           <div className="glass overflow-hidden rounded-3xl border border-border/60">
             <div className="flex items-center justify-between border-b border-border/60 px-4 py-4">
               <div>
-                <h2 className="text-sm font-semibold">Timeline</h2>
-                <p className="text-xs text-muted-foreground">Sequencia cronologica dos eventos auditados.</p>
+                <h2 className="text-sm font-semibold">Historico</h2>
+                <p className="text-xs text-muted-foreground">Sequencia cronologica das atividades registradas.</p>
               </div>
 
               {auditQuery.isFetching && !auditQuery.isLoading ? (
@@ -394,7 +395,7 @@ export default function AuditPage() {
                 <EmptyState
                   icon={Activity}
                   title="Falha ao carregar auditoria"
-                  description={auditQuery.error instanceof Error ? auditQuery.error.message : 'Nao foi possivel consultar a trilha agora.'}
+                  description={auditQuery.error instanceof Error ? auditQuery.error.message : 'Nao foi possivel consultar o historico agora.'}
                   action={<Button onClick={() => auditQuery.refetch()}>Tentar novamente</Button>}
                 />
               ) : entries.length === 0 ? (
@@ -413,71 +414,76 @@ export default function AuditPage() {
                       </div>
 
                       <div className="space-y-3">
-                        {group.items.map((entry) => (
-                          <button
-                            key={entry.id}
-                            type="button"
-                            onClick={() => setSelectedEntryId(entry.id)}
-                            className={cn(
-                              'w-full rounded-2xl border p-4 text-left transition-colors',
-                              selectedEntryId === entry.id
-                                ? 'border-primary/50 bg-primary/5'
-                                : 'border-border/60 hover:bg-muted/20',
-                            )}
-                          >
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <Badge variant="outline" className={cn('text-[10px]', CATEGORY_STYLES[entry.category] || CATEGORY_STYLES.system)}>
-                                    {CATEGORY_LABELS[entry.category] || 'Sistema'}
-                                  </Badge>
-                                  <Badge variant="outline" className={cn('text-[10px]', SEVERITY_STYLES[entry.severity] || SEVERITY_STYLES.low)}>
-                                    {SEVERITY_LABELS[entry.severity] || 'Baixa'}
-                                  </Badge>
-                                  <Badge variant="outline" className="text-[10px]">
-                                    {entry.subject.type_label}
-                                  </Badge>
-                                  {entry.activity_event && (
-                                    <Badge variant="secondary" className="text-[10px] font-mono">
-                                      {entry.activity_event}
+                        {group.items.map((entry) => {
+                          const descriptionLabel = formatAuditDescription(entry.description, entry.subject.type);
+                          const activityEventLabel = formatAuditEventLabel(entry.activity_event);
+
+                          return (
+                            <button
+                              key={entry.id}
+                              type="button"
+                              onClick={() => setSelectedEntryId(entry.id)}
+                              className={cn(
+                                'w-full rounded-2xl border p-4 text-left transition-colors',
+                                selectedEntryId === entry.id
+                                  ? 'border-primary/50 bg-primary/5'
+                                  : 'border-border/60 hover:bg-muted/20',
+                              )}
+                            >
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <Badge variant="outline" className={cn('text-[10px]', CATEGORY_STYLES[entry.category] || CATEGORY_STYLES.system)}>
+                                      {CATEGORY_LABELS[entry.category] || 'Sistema'}
                                     </Badge>
-                                  )}
-                                  {entry.changes.count > 0 && (
-                                    <Badge variant="secondary" className="text-[10px]">
-                                      {entry.changes.count} campo(s)
+                                    <Badge variant="outline" className={cn('text-[10px]', SEVERITY_STYLES[entry.severity] || SEVERITY_STYLES.low)}>
+                                      {SEVERITY_LABELS[entry.severity] || 'Baixa'}
                                     </Badge>
-                                  )}
+                                    <Badge variant="outline" className="text-[10px]">
+                                      {entry.subject.type_label}
+                                    </Badge>
+                                    {entry.activity_event && (
+                                      <Badge variant="secondary" className="text-[10px]">
+                                        {activityEventLabel}
+                                      </Badge>
+                                    )}
+                                    {entry.changes.count > 0 && (
+                                      <Badge variant="secondary" className="text-[10px]">
+                                        {entry.changes.count} campo(s)
+                                      </Badge>
+                                    )}
+                                  </div>
+
+                                  <p className="mt-3 text-sm font-medium leading-6">
+                                    {descriptionLabel}
+                                  </p>
+
+                                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                    <span>{entry.actor?.name || 'Sistema'}</span>
+                                    <span>/</span>
+                                    <span>{entry.subject.label}</span>
+                                    {entry.related_event && (
+                                      <>
+                                        <span>/</span>
+                                        <span>{entry.related_event.title}</span>
+                                      </>
+                                    )}
+                                    {entry.organization && (
+                                      <>
+                                        <span>/</span>
+                                        <span>{entry.organization.name}</span>
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
 
-                                <p className="mt-3 text-sm font-medium leading-6">
-                                  {entry.description}
-                                </p>
-
-                                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                  <span>{entry.actor?.name || 'Sistema'}</span>
-                                  <span>/</span>
-                                  <span>{entry.subject.label}</span>
-                                  {entry.related_event && (
-                                    <>
-                                      <span>/</span>
-                                      <span>{entry.related_event.title}</span>
-                                    </>
-                                  )}
-                                  {entry.organization && (
-                                    <>
-                                      <span>/</span>
-                                      <span>{entry.organization.name}</span>
-                                    </>
-                                  )}
-                                </div>
+                                <span className="shrink-0 text-xs text-muted-foreground">
+                                  {formatDateTime(entry.created_at)}
+                                </span>
                               </div>
-
-                              <span className="shrink-0 text-xs text-muted-foreground">
-                                {formatDateTime(entry.created_at)}
-                              </span>
-                            </div>
-                          </button>
-                        ))}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -503,7 +509,7 @@ export default function AuditPage() {
             <div className="border-b border-border/60 pb-4">
               <h2 className="text-sm font-semibold">Detalhes do registro</h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Contexto saneado, ator, escopo e diffs do item selecionado.
+                Contexto seguro, responsavel, escopo e alteracoes do item selecionado.
               </p>
             </div>
 
@@ -512,7 +518,7 @@ export default function AuditPage() {
                 <EmptyState
                   icon={Activity}
                   title="Selecione um item"
-                  description="Escolha um registro da timeline para inspecionar o contexto detalhado."
+                  description="Escolha um registro do historico para inspecionar o contexto detalhado."
                 />
               </div>
             ) : (
@@ -531,17 +537,17 @@ export default function AuditPage() {
                   </div>
 
                   <div>
-                    <p className="text-sm font-semibold leading-6">{selectedEntry.description}</p>
+                    <p className="text-sm font-semibold leading-6">{formatAuditDescription(selectedEntry.description, selectedEntry.subject.type)}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(selectedEntry.created_at)}</p>
                     {selectedEntry.activity_event && (
-                      <p className="mt-2 font-mono text-[11px] text-muted-foreground">{selectedEntry.activity_event}</p>
+                      <p className="mt-2 text-[11px] text-muted-foreground">{formatAuditEventLabel(selectedEntry.activity_event)}</p>
                     )}
                   </div>
                 </div>
 
                 <div className="grid gap-3 rounded-2xl border border-border/60 bg-background/70 p-4">
                   <div>
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Ator</p>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Responsavel</p>
                     <p className="mt-1 text-sm font-medium">{selectedEntry.actor?.name || 'Sistema'}</p>
                     {selectedEntry.actor?.email && (
                       <p className="text-xs text-muted-foreground">{selectedEntry.actor.email}</p>
@@ -581,7 +587,7 @@ export default function AuditPage() {
 
                   {selectedEntry.batch_uuid && (
                     <div>
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Batch</p>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Codigo do lote</p>
                       <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{selectedEntry.batch_uuid}</p>
                     </div>
                   )}
@@ -593,7 +599,7 @@ export default function AuditPage() {
                     <div className="flex flex-wrap gap-2">
                       {selectedEntry.changes.fields.map((field) => (
                         <Badge key={field} variant="secondary" className="text-[10px]">
-                          {field}
+                          {formatAuditFieldLabel(field)}
                         </Badge>
                       ))}
                     </div>

@@ -84,6 +84,24 @@ it('returns different modules for viewer vs owner', function () {
     expect($viewerModules)->not->toContain('settings');
 });
 
+it('exposes the partners module when the user has partners.view.any without partners.manage.any', function () {
+    [$user, $organization] = $this->actingAsViewer();
+
+    $user->givePermissionTo('partners.view.any');
+
+    $response = $this->apiGet('/access/matrix');
+
+    $this->assertApiSuccess($response);
+
+    $enabledModules = collect($response->json('data.modules'))
+        ->where('enabled', true)
+        ->pluck('key')
+        ->all();
+
+    expect($response->json('data.permissions'))->toContain('partners.view.any');
+    expect($enabledModules)->toContain('partners');
+});
+
 it('rejects access matrix for unauthenticated user', function () {
     $response = $this->apiGet('/access/matrix');
 

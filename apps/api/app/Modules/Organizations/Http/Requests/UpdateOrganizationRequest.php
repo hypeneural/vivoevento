@@ -2,13 +2,17 @@
 
 namespace App\Modules\Organizations\Http\Requests;
 
+use App\Modules\Organizations\Models\Organization;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateOrganizationRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        $organization = $this->route('organization');
+
+        return $organization instanceof Organization
+            && (bool) $this->user()?->can('update', $organization);
     }
 
     public function rules(): array

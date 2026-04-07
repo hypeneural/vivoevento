@@ -1,9 +1,9 @@
-﻿@use '../styles/variables' as *;
+@use '../styles/variables' as *;
 @use '../styles/mixins' as *;
 
 .grid {
   display: grid;
-  gap: 1.6rem;
+  gap: 1.55rem;
   align-items: start;
 }
 
@@ -19,12 +19,30 @@
 
 .flowRail {
   @include surface(rgba(10, 16, 29, 0.78), $border-subtle, 18px);
+  position: relative;
   border-radius: $radius-md;
   padding: 1rem;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(135deg, rgba($c-accent, 0.06), transparent 42%),
+      radial-gradient(circle at 92% 10%, rgba($c-accent-warm, 0.12), transparent 28%);
+    pointer-events: none;
+  }
+}
+
+.flowTrack,
+.flowList,
+.signalBoard {
+  position: relative;
+  z-index: 1;
 }
 
 .flowTrack {
-  position: relative;
   height: 0.5rem;
   margin-bottom: 1rem;
   border-radius: 999px;
@@ -49,38 +67,178 @@
 }
 
 .flowStep {
+  @include button-reset;
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 0.8rem;
   align-items: start;
-  padding: 0.9rem;
-  border-radius: 20px;
+  width: 100%;
+  padding: 0.95rem;
+  border-radius: 22px;
+  border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.04);
+  text-align: left;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
 
-  h3 {
-    font-size: 1rem;
-    letter-spacing: -0.03em;
-  }
+.flowStep:hover {
+  border-color: rgba($c-accent, 0.14);
+  background: rgba($c-accent, 0.06);
+}
 
-  p {
-    margin-top: 0.35rem;
-    color: $c-white-64;
-    font-size: 0.92rem;
-  }
+.activeStep {
+  border-color: rgba($c-accent, 0.18);
+  background: linear-gradient(135deg, rgba($c-accent, 0.12), rgba($c-accent-secondary, 0.08));
+  box-shadow: 0 14px 36px rgba(115, 236, 255, 0.1);
 }
 
 .flowIcon {
   @include flex-center;
-  width: 2rem;
-  height: 2rem;
+  width: 2.1rem;
+  height: 2.1rem;
   border-radius: 50%;
   background: rgba($c-accent, 0.12);
   border: 1px solid rgba($c-accent, 0.2);
   color: $c-accent;
 }
 
+.flowContent {
+  min-width: 0;
+
+  p {
+    margin-top: 0.4rem;
+    color: $c-white-64;
+    font-size: 0.92rem;
+  }
+}
+
+.flowHeading {
+  display: grid;
+  gap: 0.28rem;
+
+  h3 {
+    font-size: 1rem;
+    letter-spacing: -0.03em;
+  }
+
+  span {
+    color: $c-accent;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+}
+
+.signalBoard {
+  @include surface(rgba(7, 11, 20, 0.76), 1px solid rgba(255, 255, 255, 0.06), 16px);
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 24px;
+}
+
+.signalHeader {
+  display: grid;
+  gap: 0.4rem;
+
+  span {
+    color: $c-accent;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  strong {
+    font-size: 1.18rem;
+    letter-spacing: -0.04em;
+  }
+
+  p {
+    color: $c-white-64;
+    font-size: 0.94rem;
+  }
+}
+
+.signalStats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.signalStat {
+  padding: 0.85rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+
+  span {
+    display: block;
+    color: $c-white-48;
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  strong {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 0.92rem;
+    letter-spacing: -0.02em;
+  }
+}
+
+.routeList {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.routeItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  min-height: 3rem;
+  padding: 0 0.9rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+
+  span {
+    color: $c-white-80;
+    font-weight: 700;
+  }
+
+  strong {
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+}
+
+.routeItem[data-state='idle'] strong {
+  color: $c-white-48;
+}
+
+.routeItem[data-state='live'] {
+  border: 1px solid rgba($c-accent, 0.16);
+}
+
+.routeItem[data-state='live'] strong {
+  color: $c-accent;
+}
+
+.routeItem[data-state='ready'] strong {
+  color: $c-accent-green;
+}
+
 .galleryColumn {
-  @include surface(rgba(10, 16, 29, 0.82), $border-strong, 18px);
+  @include surface(rgba(10, 16, 29, 0.84), $border-strong, 18px);
   border-radius: $radius-lg;
   padding: 1rem;
 }
@@ -91,7 +249,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 1rem;
 }
 
 .liveBadge {
@@ -107,14 +264,68 @@
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  color: $c-white-64;
-  font-weight: 700;
+  min-height: 2.75rem;
+  padding: 0 0.95rem;
+  border-radius: 999px;
+  border: 1px solid rgba($c-accent-secondary, 0.16);
+  background: rgba($c-accent-secondary, 0.08);
+  color: $c-white;
+  font-weight: 800;
+}
+
+.galleryStatus {
+  @include surface(rgba(7, 11, 20, 0.74), 1px solid rgba(255, 255, 255, 0.06), 14px);
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 22px;
+
+  strong {
+    font-size: 1.08rem;
+    letter-spacing: -0.03em;
+  }
+
+  p {
+    color: $c-white-64;
+    font-size: 0.94rem;
+  }
+}
+
+.statusRoutes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.2rem;
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding: 0 0.7rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    color: $c-white-64;
+    font-size: 0.76rem;
+    font-weight: 800;
+  }
+
+  span[data-state='live'] {
+    background: rgba($c-accent, 0.12);
+    color: $c-accent;
+  }
+
+  span[data-state='ready'] {
+    background: rgba($c-accent-green, 0.12);
+    color: $c-accent-green;
+  }
 }
 
 .galleryGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
+  margin-top: 1rem;
 }
 
 .card {
@@ -123,6 +334,7 @@
   min-height: 9rem;
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 
   img {
     width: 100%;
@@ -135,8 +347,8 @@
     inset: auto 0 0 0;
     display: grid;
     gap: 0.15rem;
-    padding: 0.8rem;
-    background: linear-gradient(180deg, transparent, rgba(5, 9, 19, 0.84));
+    padding: 0.85rem;
+    background: linear-gradient(180deg, transparent, rgba(5, 9, 19, 0.88));
 
     strong {
       font-size: 0.88rem;
@@ -151,17 +363,87 @@
 
 .featured {
   grid-column: span 2;
-  min-height: 16rem;
+  min-height: 17rem;
   box-shadow: $shadow-glow;
+}
 
-  figcaption strong {
-    color: $c-accent;
-  }
+.cardSignal {
+  position: absolute;
+  top: 0.85rem;
+  left: 0.85rem;
+  z-index: 1;
+  padding: 0.45rem 0.72rem;
+  border-radius: 999px;
+  background: rgba(5, 9, 19, 0.72);
+  border: 1px solid rgba($c-accent, 0.18);
+  color: $c-accent;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 @media (min-width: 1100px) {
   .grid {
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-    gap: 2.1rem;
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+    gap: 2.2rem;
+  }
+}
+
+@media (max-width: 719px) {
+  .grid {
+    gap: 1.15rem;
+  }
+
+  .storyColumn {
+    gap: 0.8rem;
+  }
+
+  .flowRail,
+  .galleryColumn,
+  .galleryStatus {
+    padding: 0.9rem;
+  }
+
+  .flowList {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(16.5rem, 84vw);
+    overflow-x: auto;
+    padding-bottom: 0.2rem;
+    scroll-snap-type: x mandatory;
+  }
+
+  .flowStep {
+    min-height: 100%;
+    scroll-snap-align: start;
+  }
+
+  .signalBoard {
+    gap: 0.85rem;
+    margin-top: 0.85rem;
+    padding: 0.9rem;
+  }
+
+  .galleryHeader {
+    gap: 0.55rem;
+  }
+
+  .storyButton {
+    min-height: 2.55rem;
+    padding: 0 0.82rem;
+    font-size: 0.84rem;
+  }
+
+  .galleryGrid {
+    gap: 0.6rem;
+    margin-top: 0.85rem;
+  }
+
+  .featured {
+    min-height: 14rem;
+  }
+
+  .signalStats {
+    grid-template-columns: 1fr;
   }
 }

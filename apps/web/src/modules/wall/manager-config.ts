@@ -10,14 +10,14 @@ export const fallbackOptions: ApiWallOptionsResponse = {
     { value: 'auto', label: 'Automatico' },
     { value: 'fullscreen', label: 'Tela cheia' },
     { value: 'polaroid', label: 'Polaroid' },
-    { value: 'split', label: 'Split' },
+    { value: 'split', label: 'Tela dividida' },
     { value: 'cinematic', label: 'Cinematografico' },
   ],
   transitions: [
-    { value: 'fade', label: 'Fade' },
-    { value: 'slide', label: 'Slide' },
-    { value: 'zoom', label: 'Zoom' },
-    { value: 'flip', label: 'Flip' },
+    { value: 'fade', label: 'Suave' },
+    { value: 'slide', label: 'Deslizar' },
+    { value: 'zoom', label: 'Aproximar' },
+    { value: 'flip', label: 'Virar' },
     { value: 'none', label: 'Nenhuma' },
   ],
   statuses: [],
@@ -30,7 +30,7 @@ export const fallbackOptions: ApiWallOptionsResponse = {
     {
       value: 'flow',
       label: 'Fluxo',
-      description: 'Equilibrio padrao entre novidade, replay e fairness.',
+      description: 'Equilibrio padrao entre novidade, repeticao controlada e boa distribuicao.',
     },
     {
       value: 'party',
@@ -123,7 +123,7 @@ export const fallbackOptions: ApiWallOptionsResponse = {
     {
       value: 'custom',
       label: 'Personalizado',
-      description: 'Usa combinacao manual de fairness, cooldown e backlog por remetente.',
+      description: 'Usa ajustes manuais para controlar repeticao e distribuicao entre convidados.',
       selection_policy: {
         max_eligible_items_per_sender: 4,
         max_replays_per_item: 2,
@@ -161,22 +161,22 @@ export const HELP_TEXTS = {
   selectionMode: {
     title: 'Modo do telao',
     description: 'Define o comportamento principal da fila antes dos ajustes finos.',
-    why: 'Com presets o operador escolhe uma abordagem segura sem precisar entender o algoritmo inteiro.',
+    why: 'Com esses modos, o operador escolhe uma base segura sem precisar entender a regra tecnica completa.',
   },
   eventPhase: {
     title: 'Fase do evento',
     description: 'Aplica um contexto operacional por cima do modo escolhido sem destruir seus ajustes manuais.',
-    why: 'A fase ajuda o wall a se comportar diferente na recepcao, no pico da festa e no encerramento sem exigir reconfiguracao completa.',
+    why: 'A fase ajuda o telao a se comportar de um jeito diferente na recepcao, no pico da festa e no encerramento sem exigir nova configuracao.',
   },
   fairnessSection: {
     title: 'Fila e justica',
     description: 'Regras que impedem uma unica pessoa de dominar a exibicao.',
-    why: 'Esse bloco controla cooldown, backlog por remetente e a chance de alternar convidados na tela.',
+    why: 'Esse bloco controla o tempo de espera, o volume por pessoa e a alternancia entre convidados na tela.',
   },
   senderCooldown: {
     title: 'Tempo minimo entre aparicoes',
     description: 'E o tempo que o mesmo remetente precisa esperar para voltar a aparecer quando ha alternativas.',
-    why: 'Isso deixa o wall mais coletivo e reduz a sensacao de spam durante picos de envio.',
+    why: 'Isso deixa o telao mais coletivo e reduz a sensacao de repeticao excessiva nos picos de envio.',
   },
   senderWindowLimit: {
     title: 'Limite por janela',
@@ -191,42 +191,42 @@ export const HELP_TEXTS = {
   maxEligibleItems: {
     title: 'Backlog elegivel por remetente',
     description: 'Quantidade maxima de midias do mesmo remetente disputando a tela ao mesmo tempo.',
-    why: 'O restante continua no backlog, mas entra de forma gradual para nao sequestrar a fila.',
+    why: 'O restante continua aguardando, mas entra aos poucos para nao tomar conta da fila.',
   },
   maxReplaysPerItem: {
     title: 'Maximo de repeticoes por foto',
-    description: 'Controla quantas vezes a mesma foto ou video pode voltar para a fila antes do fallback de continuidade.',
-    why: 'Esse guardrail reduz a sensacao de loop infinito quando a festa esta com pouco conteudo novo, sem apagar o item da fila.',
+    description: 'Controla quantas vezes a mesma foto ou video pode voltar para a fila antes de o sistema liberar novas reprises.',
+    why: 'Isso reduz a sensacao de loop infinito quando a festa esta com pouco conteudo novo, sem apagar a foto da fila.',
   },
   replayAdaptiveSection: {
-    title: 'Replay adaptativo por volume',
-    description: 'Ajusta o tempo minimo de repeticao conforme o tamanho atual da fila do telao.',
-    why: 'Com pouco conteudo, o replay pode ser mais rapido. Com muita fila, o replay fica mais longo para priorizar novidade.',
+    title: 'Repeticao por volume da fila',
+    description: 'Ajusta o tempo minimo para repetir uma foto conforme o tamanho atual da fila do telao.',
+    why: 'Com pouco conteudo, a repeticao pode ser mais rapida. Com muita fila, ela fica mais espaçada para priorizar novidade.',
   },
   lowVolumeThreshold: {
     title: 'Faixa de fila baixa',
-    description: 'Quantidade maxima de itens para o wall ainda ser tratado como fila baixa.',
-    why: 'Quando o evento esta vazio, o wall precisa girar mais rapido sem parecer travado.',
+    description: 'Quantidade maxima de itens para o telao ainda ser tratado como fila baixa.',
+    why: 'Quando o evento esta vazio, o telao precisa girar mais rapido sem parecer travado.',
   },
   mediumVolumeThreshold: {
     title: 'Faixa de fila media',
     description: 'Quantidade maxima de itens para a fila media antes de virar fila alta.',
-    why: 'Isso define quando o selector endurece o replay para proteger recencia e variedade.',
+    why: 'Isso define quando o sistema precisa espaçar mais as repeticoes para proteger novidade e variedade.',
   },
   replayIntervalLow: {
-    title: 'Replay na fila baixa',
+    title: 'Repeticao com fila curta',
     description: 'Tempo minimo para uma foto voltar quando a fila esta curta.',
-    why: 'Use menos tempo em festa com pouco envio; use mais tempo se o loop estiver cansando.',
+    why: 'Use menos tempo quando entram poucas fotos; use mais tempo se a repeticao estiver cansando.',
   },
   replayIntervalMedium: {
-    title: 'Replay na fila media',
+    title: 'Repeticao com fila media',
     description: 'Tempo minimo para repetir quando o evento esta em volume intermediario.',
     why: 'Esse e o comportamento mais comum da noite e precisa equilibrar novidade e continuidade.',
   },
   replayIntervalHigh: {
-    title: 'Replay na fila alta',
+    title: 'Repeticao com fila cheia',
     description: 'Tempo minimo para repetir quando ha muito conteudo novo no wall.',
-    why: 'Em pico de festa, o replay precisa ser mais raro para dar espaco ao que acabou de chegar.',
+    why: 'Em pico de festa, a repeticao precisa ser mais rara para dar espaco ao que acabou de chegar.',
   },
   antiDuplicateSequence: {
     title: 'Anti-sequencia parecida',
