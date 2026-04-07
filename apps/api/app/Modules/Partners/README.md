@@ -35,5 +35,5 @@ Camada administrativa B2B para parceiros profissionais. O modulo trata `partner`
 
 ## Pendencias
 
-- criar telas/forms web para detalhe, create/edit/suspend, staff e grants
 - avaliar job assincrono para rebuild de `partner_stats` quando o volume exigir
+- evoluir paginacao/filtros finos dos subrecursos no detalhe web se o volume exigir

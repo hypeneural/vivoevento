@@ -17,16 +17,16 @@ Observacao de produto:
 
 ## Gap atual
 
-- Frontend: `apps/web/src/modules/partners/PartnersPage.tsx` agora consome `GET /api/v1/partners`; o mock ficou apenas como dado legado em `shared/mock/data.ts`.
+- Frontend: `apps/web/src/modules/partners/PartnersPage.tsx` agora consome a API real de parceiros; o mock ficou apenas como dado legado em `shared/mock/data.ts`.
 - Backend: o modulo `Partners` agora entrega API real para CRUD administrativo e subrecursos de parceiros.
 - Existe CRUD generico em `/api/v1/organizations`, mas ele nao e suficiente para a tela de parceiros porque:
   - nao retorna agregados comerciais da tela;
-  - o frontend `/partners` ainda nao tem telas dedicadas para detalhe/subrecursos do parceiro;
   - nao separa o contrato administrativo de parceiros do contrato de `organizations/current`;
   - o frontend espera campos como plano, receita, eventos ativos e equipe.
 - A migracao final para permissoes com escopo foi aplicada:
   - visibilidade global usa `partners.view.any`;
   - gestao global usa `partners.manage.any`.
+- Compatibilidade operacional: `super-admin` e `platform-admin` continuam autorizados pela role global mesmo quando o banco local ainda nao foi resemeado com as novas permissoes `.any`. Isso corrige o caso real de `GET /api/v1/partners` retornando `403` para super admin em ambientes ja existentes.
 
 ## Validacao adicional da stack atual
 
@@ -55,7 +55,7 @@ Observacao de produto:
 
 - `/partners` consulta API real via `partnersService.list` e `queryKeys.partners.list(filters)`.
 - `/partners` esta protegido por guard real de modulo/permissao.
-- `/partners` cobre listagem e filtros administrativos na V1; telas dedicadas para detalhe, create/edit/suspend/staff/grants no web ficam como proxima camada de UI.
+- `/partners` cobre listagem, filtros administrativos, detalhe, create/edit, suspensao, remocao de parceiro vazio, staff, grants e activity via API real.
 - `/clients` ja e real:
   - usa `/clients`;
   - so mostra filtro de organizacao para `isPlatformAdmin`;
@@ -95,6 +95,13 @@ Observacao de produto:
 - Staff e grants foram implementados como actions proprias do modulo `Partners`, sem reutilizar diretamente `/organizations/current/team`.
 - Os filtros adicionais entraram na V1: `subscription_status`, `has_clients` e `commercial_mode` em `/partners/{partner}/events`.
 - O frontend `/partners` passou a usar API real para listagem, filtros, KPIs da pagina atual, estados de loading/erro/empty e permissao `partners.view.any`/`partners.manage.any`.
+- A UI administrativa completa da V1 foi criada no web:
+  - detalhe em painel lateral;
+  - create/edit em dialog;
+  - suspend em dialog proprio;
+  - delete apenas como "remover vazio";
+  - staff e grants como dialogs de operacao administrativa;
+  - eventos, clientes, staff, grants e activity no detalhe.
 - A troca da equipe mockada em `/settings` continua fora desta fase; o backlog ficou concentrado no CRUD administrativo global de parceiros.
 
 ## Objetivo
@@ -132,6 +139,8 @@ O CRUD deve:
 - [x] Implementar subrecursos `events`, `clients`, `staff`, `grants` e `activity`.
 - [x] Integrar `apps/web/src/modules/partners` com API real e remover `mockPartners` da pagina.
 - [x] Implementar filtros adicionais da V1: `subscription_status`, `has_clients` e `commercial_mode` em eventos do parceiro.
+- [x] Criar UI administrativa completa de create/edit/suspend/remove-empty/staff/grants/detail/activity em `apps/web`.
+- [x] Corrigir compatibilidade de autorizacao para super admin legado que ainda nao recebeu `partners.view.any`/`partners.manage.any` por reseed.
 - [x] Registrar que a troca da equipe mockada em `settings` fica fora do escopo desta fase.
 
 ## Status atual do backend
@@ -158,13 +167,22 @@ Implementado nesta execucao em `apps/api/app/Modules/Partners`:
 
 Contratos automatizados validados nesta fase:
 
-- `PartnerAdminCrudContractTest`: 23 testes verdes cobrindo listagem, filtros, `partner_profiles`, `partner_stats`, CRUD, policy, grants, staff e activity.
+- `PartnerAdminCrudContractTest`: 24 testes verdes cobrindo listagem, filtros, `partner_profiles`, `partner_stats`, CRUD, policy, compatibilidade de super admin legado, grants, staff e activity.
 - regressao de escopo/admin: `OrganizationAdminScopeCharacterizationTest`, `AccessMatrixTest`, `ClientCrudTest`, `ListEventsTest`, `AuditTest`.
 - regressao comercial: `EventCommercialStatusTest` e `EntitlementResolverServiceTest`.
 
+Status do frontend nesta fase:
+
+- UI de listagem/filtros/KPIs usando API real;
+- painel lateral de detalhe com resumo, eventos, clientes, staff, grants e activity;
+- dialogs para criar, editar, suspender, convidar staff e criar grant;
+- acao de remover parceiro vazio protegida por confirmacao;
+- testes de tela cobrindo listagem real, filtros, detalhe, create, edit, suspend e staff.
+
 Pendencias explicitas apos esta fase:
 
-- criar telas/forms no web para create/edit/suspend/staff/grants, se a operacao administrativa precisar sair da API e entrar na UI agora;
+- avaliar job assincrono para rebuild de `partner_stats` quando o volume exigir;
+- evoluir a tela de detalhe para paginacao completa por aba se os subrecursos crescerem muito;
 - trocar a equipe mockada de `/settings`, caso essa tela passe a entrar no mesmo escopo administrativo.
 
 ## Decisoes apos revisar a stack atual
@@ -562,12 +580,17 @@ Campos recomendados em `properties`:
 
 ## Frontend
 
-Implementado na V1 da listagem:
+Implementado na V1 administrativa:
 
 - `apps/web/src/modules/partners/api.ts`
 - `apps/web/src/modules/partners/types.ts`
 - `apps/web/src/modules/partners/PartnersPage.tsx`
 - `apps/web/src/modules/partners/PartnersPage.test.tsx`
+- `apps/web/src/modules/partners/components/PartnerDetailSheet.tsx`
+- `apps/web/src/modules/partners/components/PartnerFormDialog.tsx`
+- `apps/web/src/modules/partners/components/PartnerSuspendDialog.tsx`
+- `apps/web/src/modules/partners/components/PartnerStaffDialog.tsx`
+- `apps/web/src/modules/partners/components/PartnerGrantDialog.tsx`
 
 Usar:
 
@@ -575,13 +598,15 @@ Usar:
 - filtros por busca, status, plano, eventos ativos, clientes e ordenacao;
 - estados de loading, empty, erro e forbidden;
 - permissao `partners.view.any` ou `partners.manage.any` para visualizar.
+- `useMutation` para criar, editar, suspender, remover parceiro vazio, convidar staff e criar grants;
+- acoes de escrita condicionadas por `partners.manage.any`;
+- detalhe administrativo em painel lateral com resumo, eventos, clientes, staff, grants e logs.
 
-Pendente para UI administrativa completa:
+Pendente para refinamento de UI:
 
-- `PartnerFormDialog.tsx`;
-- mutations para criar/editar/suspender/remover;
-- telas ou paineis dedicados para staff, grants, clientes, eventos e activity do detalhe;
-- acao de escrita condicionada por `partners.manage.any`.
+- paginacao completa por aba no detalhe, se o volume dos subrecursos exigir;
+- filtros internos nos subrecursos do detalhe, se a operacao precisar filtrar eventos/clientes/grants dentro do painel;
+- remover mocks de equipe em `/settings`, fora do escopo do CRUD administrativo global de parceiros.
 
 ## Plano de implementacao
 
@@ -600,9 +625,9 @@ Pendente para UI administrativa completa:
 10. Criar facade actions `InvitePartnerStaffAction` e `CreatePartnerGrantAction`, delegando para os modulos donos.
 11. Criar `PartnerController` e rotas REST/subrecursos.
 12. Integrar frontend `/partners` com API real.
-13. Criar UI de detalhe e forms administrativos, se a proxima fase exigir CRUD completo via painel.
+13. Criar UI de detalhe e forms administrativos para CRUD completo via painel.
 14. Decidir e executar o ajuste da tela de `settings` para remover mocks de equipe, ou documentar explicitamente que isso fica fora desta entrega.
-15. Atualizar `apps/web/README.md` quando a tela deixar de ser mockada. Concluido para a listagem de `/partners`.
+15. Atualizar `apps/web/README.md` quando a tela deixar de ser mockada. Concluido para CRUD administrativo de `/partners`.
 
 ## Fora da V1
 
@@ -644,6 +669,11 @@ Comandos rodados:
 - `php artisan test tests/Feature/Events/ListEventsTest.php tests/Feature/Billing/AdminQuickEventTest.php`
 - `npx vitest run src/modules/partners/PartnersPage.test.tsx src/app/layouts/AppSidebar.test.tsx src/app/guards/ModuleGuard.test.tsx`
 - `npm run type-check`
+- `php artisan test tests/Feature/Partners/PartnerAdminCrudContractTest.php --filter="legacy global admin|allows a super admin to list"`
+- `npx vitest run src/modules/partners/PartnersPage.test.tsx --testNamePattern="updates and suspends|adds staff"`
+- `npx vitest run src/modules/partners/PartnersPage.test.tsx src/app/layouts/AppSidebar.test.tsx src/app/guards/ModuleGuard.test.tsx`
+- `npm run type-check`
+- `php artisan test tests/Feature/Partners/PartnerAdminCrudContractTest.php tests/Feature/Auth/AccessMatrixTest.php`
 
 Resumo:
 
@@ -660,9 +690,13 @@ Resumo:
 - sidebar `partners.view.any`: 1 teste passou.
 - regressao final de auth/access matrix: 18 testes passaram.
 - regressao final dos guards do web: 4 testes passaram.
-- regressao final de auth + partners: 28 testes passaram.
+- regressao final de auth + partners: 29 testes passaram.
 - regressao final de events + admin quick event: 10 testes passaram.
 - regressao final web partners/sidebar/guard: 8 testes passaram.
+- regressao focada do 403 de super admin legado: 2 testes passaram.
+- regressao focada de edit/suspend/staff no web: 2 testes passaram.
+- regressao final web partners/sidebar/guard apos UI CRUD: 12 testes passaram.
+- regressao final auth + partners apos compatibilidade de super admin legado: 29 testes passaram.
 - type-check web: ok.
 
 Cobertura esperada:
