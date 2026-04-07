@@ -39,6 +39,21 @@ Optional but recommended fields:
 - `notes`
 - `tags`
 
+## Local Consented Manifests
+
+When a dataset is explicitly authorized for local-only validation but must stay outside the repository, add a manifest under `tests/Fixtures/AI/local/`.
+
+Current local manifest:
+
+- `tests/Fixtures/AI/local/vipsocial.manifest.json`
+
+Rules for local manifests:
+
+- keep the assets outside the repository;
+- resolve the asset root from an environment variable first;
+- record actual file sizes;
+- flag any source larger than the CompreFace 5 MB request limit as requiring a derivative before smoke execution.
+
 ## Privacy Rules
 
 - Do not commit raw customer uploads.

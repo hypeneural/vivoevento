@@ -17,6 +17,7 @@ use App\Modules\Organizations\Models\OrganizationMember;
 use App\Modules\Plans\Models\Plan;
 use App\Modules\Users\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\PermissionRegistrar;
 
 it('allows a super admin to list only partner organizations with aggregate metrics', function () {
@@ -95,6 +96,61 @@ it('allows legacy global admin roles to access partners even before scoped permi
             'email' => 'owner-global@partner.test',
         ],
     ])->assertCreated();
+});
+
+it('lists partners even when partner projection tables are not available yet', function () {
+    $this->actingAsSuperAdmin();
+
+    $plan = createPartnerContractPlan('pro-parceiro', 'Pro Parceiro');
+    $partner = createPartnerContractOrganization([
+        'trade_name' => 'Parceiro Sem Projecao',
+        'email' => 'fallback@partner.test',
+    ]);
+
+    createPartnerContractSubscription($partner, $plan);
+
+    Schema::dropIfExists('partner_stats');
+    Schema::dropIfExists('partner_profiles');
+
+    $response = $this->apiGet('/partners?per_page=10');
+
+    $this->assertApiSuccess($response);
+    $this->assertApiPaginated($response);
+
+    $partnerPayload = collect($response->json('data'))->firstWhere('id', $partner->id);
+
+    expect($partnerPayload)->not->toBeNull();
+    expect($partnerPayload['name'])->toBe('Parceiro Sem Projecao');
+    expect($partnerPayload['segment'])->toBeNull();
+    expect($partnerPayload['clients_count'])->toBe(0);
+    expect($partnerPayload['events_count'])->toBe(0);
+    expect($partnerPayload['revenue']['total_cents'])->toBe(0);
+    expect($partnerPayload['current_subscription']['plan_key'])->toBe('pro-parceiro');
+});
+
+it('shows partner detail even when partner projection tables are not available yet', function () {
+    $this->actingAsSuperAdmin();
+
+    $partner = createPartnerContractOrganization([
+        'trade_name' => 'Detalhe Sem Projecao',
+    ]);
+
+    Client::factory()->create(['organization_id' => $partner->id]);
+    Event::factory()->active()->create(['organization_id' => $partner->id]);
+
+    Schema::dropIfExists('partner_stats');
+    Schema::dropIfExists('partner_profiles');
+
+    $response = $this->apiGet("/partners/{$partner->id}");
+
+    $this->assertApiSuccess($response);
+    $response
+        ->assertJsonPath('data.id', $partner->id)
+        ->assertJsonPath('data.name', 'Detalhe Sem Projecao')
+        ->assertJsonPath('data.segment', null)
+        ->assertJsonPath('data.events_summary.total', 1)
+        ->assertJsonPath('data.events_summary.active', 1)
+        ->assertJsonPath('data.clients_summary.total', 1);
 });
 
 it('supports searching partners by commercial segment stored in partner profiles', function () {

@@ -83,6 +83,7 @@ class EventController extends BaseController
                 'provider_key' => $event->faceSearchSettings->provider_key,
                 'embedding_model_key' => $event->faceSearchSettings->embedding_model_key,
                 'vector_store_key' => $event->faceSearchSettings->vector_store_key,
+                'search_strategy' => $event->faceSearchSettings->search_strategy,
                 'enabled' => (bool) $event->faceSearchSettings->enabled,
                 'min_face_size_px' => $event->faceSearchSettings->min_face_size_px,
                 'min_quality_score' => $event->faceSearchSettings->min_quality_score,

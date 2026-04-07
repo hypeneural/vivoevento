@@ -3,6 +3,12 @@
 namespace App\Modules\MediaIntelligence\Providers;
 
 use App\Modules\MediaIntelligence\Services\NullVisualReasoningProvider;
+use App\Modules\MediaIntelligence\Services\OpenAiCompatibleMultimodalPayloadNormalizer;
+use App\Modules\MediaIntelligence\Services\OpenAiCompatibleVisualReasoningPayloadFactory;
+use App\Modules\MediaIntelligence\Services\OpenRouterModelCatalog;
+use App\Modules\MediaIntelligence\Services\OpenRouterModelPolicy;
+use App\Modules\MediaIntelligence\Services\OpenRouterVisualReasoningProvider;
+use App\Modules\MediaIntelligence\Console\RunOpenRouterSmokeCommand;
 use App\Modules\MediaIntelligence\Services\VisualReasoningProviderInterface;
 use App\Modules\MediaIntelligence\Services\VisualReasoningProviderManager;
 use App\Modules\MediaIntelligence\Services\VllmVisualReasoningProvider;
@@ -14,12 +20,18 @@ class MediaIntelligenceServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->singleton(OpenAiCompatibleMultimodalPayloadNormalizer::class);
+        $this->app->singleton(OpenAiCompatibleVisualReasoningPayloadFactory::class);
+        $this->app->singleton(OpenRouterModelCatalog::class);
+        $this->app->singleton(OpenRouterModelPolicy::class);
         $this->app->singleton(NullVisualReasoningProvider::class);
         $this->app->singleton(VllmVisualReasoningProvider::class);
+        $this->app->singleton(OpenRouterVisualReasoningProvider::class);
         $this->app->singleton(VisualReasoningProviderInterface::class, function ($app) {
             return new VisualReasoningProviderManager([
                 'noop' => $app->make(NullVisualReasoningProvider::class),
                 'vllm' => $app->make(VllmVisualReasoningProvider::class),
+                'openrouter' => $app->make(OpenRouterVisualReasoningProvider::class),
             ], $app->make(ProviderCircuitBreaker::class));
         });
     }
@@ -32,6 +44,12 @@ class MediaIntelligenceServiceProvider extends ServiceProvider
             Route::prefix(config('modules.api_prefix') . '/' . config('modules.api_version'))
                 ->middleware(['api'])
                 ->group($routeFile);
+        }
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                RunOpenRouterSmokeCommand::class,
+            ]);
         }
     }
 }

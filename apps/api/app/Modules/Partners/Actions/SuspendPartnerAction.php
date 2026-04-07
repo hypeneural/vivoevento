@@ -3,6 +3,7 @@
 namespace App\Modules\Partners\Actions;
 
 use App\Modules\Organizations\Models\Organization;
+use App\Modules\Partners\Support\PartnerProjectionTables;
 use App\Modules\Users\Models\User;
 use Illuminate\Support\Facades\DB;
 
@@ -31,12 +32,7 @@ class SuspendPartnerAction
                 ])
                 ->log('Parceiro suspenso');
 
-            return $partner->fresh([
-                'partnerProfile',
-                'partnerStats',
-                'subscription.plan',
-                'members.user',
-            ]);
+            return $partner->fresh(PartnerProjectionTables::loadableOrganizationRelations());
         });
     }
 }

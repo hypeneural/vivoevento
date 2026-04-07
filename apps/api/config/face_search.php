@@ -4,13 +4,24 @@ return [
     'default_detection_provider' => env('FACE_SEARCH_DETECTION_PROVIDER', 'noop'),
     'default_embedding_provider' => env('FACE_SEARCH_EMBEDDING_PROVIDER', 'noop'),
     'default_vector_store' => env('FACE_SEARCH_VECTOR_STORE', 'pgvector'),
+    'default_search_strategy' => env('FACE_SEARCH_SEARCH_STRATEGY', 'exact'),
     'default_embedding_model' => env('FACE_SEARCH_EMBEDDING_MODEL', 'face-embedding-foundation-v1'),
     'embedding_dimension' => (int) env('FACE_SEARCH_EMBEDDING_DIMENSION', 512),
     'crop_disk' => env('FACE_SEARCH_CROP_DISK', 'ai-private'),
     'min_face_size_px' => (int) env('FACE_SEARCH_MIN_FACE_SIZE_PX', 96),
     'min_quality_score' => (float) env('FACE_SEARCH_MIN_QUALITY_SCORE', 0.60),
-    'search_threshold' => (float) env('FACE_SEARCH_SEARCH_THRESHOLD', 0.35),
+    'search_threshold' => (float) env('FACE_SEARCH_SEARCH_THRESHOLD', 0.50),
     'top_k' => (int) env('FACE_SEARCH_TOP_K', 50),
+
+    'ann' => [
+        'hnsw_ef_search' => (int) env('FACE_SEARCH_HNSW_EF_SEARCH', 100),
+        'hnsw_iterative_scan' => env('FACE_SEARCH_HNSW_ITERATIVE_SCAN', 'strict_order'),
+    ],
+
+    'quality' => [
+        'search_priority_face_size_multiplier' => 1.35,
+        'search_priority_quality_delta' => 0.10,
+    ],
 
     'providers' => [
         'noop' => [
@@ -21,6 +32,8 @@ return [
         'compreface' => [
             'base_url' => env('FACE_SEARCH_COMPRE_FACE_BASE_URL', 'http://localhost:8000'),
             'api_key' => env('FACE_SEARCH_COMPRE_FACE_API_KEY', ''),
+            'detection_api_key' => env('FACE_SEARCH_COMPRE_FACE_DETECTION_API_KEY', env('FACE_SEARCH_COMPRE_FACE_API_KEY', '')),
+            'verification_api_key' => env('FACE_SEARCH_COMPRE_FACE_VERIFICATION_API_KEY', env('FACE_SEARCH_COMPRE_FACE_API_KEY', '')),
             'face_plugins' => env('FACE_SEARCH_COMPRE_FACE_FACE_PLUGINS', 'calculator,landmarks'),
             'det_prob_threshold' => env('FACE_SEARCH_COMPRE_FACE_DET_PROB_THRESHOLD'),
             'status' => (bool) env('FACE_SEARCH_COMPRE_FACE_STATUS', true),

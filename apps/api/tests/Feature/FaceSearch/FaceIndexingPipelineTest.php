@@ -264,6 +264,99 @@ it('marks indexed faces as not searchable when the media is rejected', function 
         ->toBeFalse();
 });
 
+it('classifies indexed faces into quality tiers and skips rejected faces before embedding', function () {
+    Storage::fake('public');
+    Storage::fake('ai-private');
+
+    $event = \App\Modules\Events\Models\Event::factory()->active()->create();
+    \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'min_face_size_px' => 100,
+        'min_quality_score' => 0.70,
+    ]);
+
+    $embedTracker = new class
+    {
+        public int $calls = 0;
+    };
+
+    app()->instance(FaceDetectionProviderInterface::class, new class implements FaceDetectionProviderInterface
+    {
+        public function detect(EventMedia $media, \App\Modules\FaceSearch\Models\EventFaceSearchSetting $settings, string $binary): array
+        {
+            return [
+                new DetectedFaceData(
+                    boundingBox: new FaceBoundingBoxData(10, 10, 90, 90),
+                    qualityScore: 0.95,
+                ),
+                new DetectedFaceData(
+                    boundingBox: new FaceBoundingBoxData(140, 40, 110, 110),
+                    qualityScore: 0.74,
+                ),
+                new DetectedFaceData(
+                    boundingBox: new FaceBoundingBoxData(320, 80, 180, 180),
+                    qualityScore: 0.90,
+                    isPrimaryCandidate: true,
+                ),
+            ];
+        }
+    });
+
+    app()->instance(FaceEmbeddingProviderInterface::class, new class($embedTracker) implements FaceEmbeddingProviderInterface
+    {
+        public function __construct(private readonly object $tracker) {}
+
+        public function embed(EventMedia $media, \App\Modules\FaceSearch\Models\EventFaceSearchSetting $settings, string $cropBinary, DetectedFaceData $face): FaceEmbeddingData
+        {
+            $this->tracker->calls++;
+
+            return new FaceEmbeddingData(
+                vector: [0.11, 0.22, 0.33],
+                providerKey: 'noop',
+                providerVersion: 'foundation-v1',
+                modelKey: 'face-embedding-foundation-v1',
+                modelSnapshot: 'face-embedding-foundation-v1',
+                embeddingVersion: 'foundation-v1',
+            );
+        }
+    });
+
+    $path = UploadedFile::fake()
+        ->image('gallery.jpg', 1200, 900)
+        ->store("events/{$event->id}/variants/203", 'public');
+
+    $media = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'moderation_status' => ModerationStatus::Approved->value,
+        'face_index_status' => 'queued',
+    ]);
+
+    EventMediaVariant::query()->create([
+        'event_media_id' => $media->id,
+        'variant_key' => 'gallery',
+        'disk' => 'public',
+        'path' => $path,
+        'width' => 1200,
+        'height' => 900,
+        'size_bytes' => Storage::disk('public')->size($path),
+        'mime_type' => 'image/jpeg',
+    ]);
+
+    app(IndexMediaFacesJob::class, ['eventMediaId' => $media->id])->handle();
+
+    $faces = \App\Modules\FaceSearch\Models\EventMediaFace::query()
+        ->where('event_media_id', $media->id)
+        ->orderBy('face_index')
+        ->get();
+
+    expect($faces)->toHaveCount(2)
+        ->and($embedTracker->calls)->toBe(2)
+        ->and($faces[0]->quality_tier)->toBe('index_only')
+        ->and($faces[0]->quality_rejection_reason)->toBe('borderline_face_size')
+        ->and($faces[1]->quality_tier)->toBe('search_priority')
+        ->and($faces[1]->quality_rejection_reason)->toBeNull();
+});
+
 it('re-enables searchable faces when the media is approved by override', function () {
     $media = EventMedia::factory()->create([
         'moderation_status' => ModerationStatus::Rejected->value,

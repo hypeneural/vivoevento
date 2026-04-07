@@ -9,10 +9,11 @@ const settings = {
   provider_key: 'noop',
   embedding_model_key: 'face-embedding-foundation-v1',
   vector_store_key: 'pgvector',
+  search_strategy: 'exact',
   enabled: true,
   min_face_size_px: 96,
   min_quality_score: 0.6,
-  search_threshold: 0.35,
+  search_threshold: 0.5,
   top_k: 50,
   allow_public_selfie_search: false,
   selfie_retention_hours: 24,
@@ -40,9 +41,10 @@ describe('EventFaceSearchSettingsForm', () => {
         provider_key: 'noop',
         embedding_model_key: 'face-embedding-foundation-v1',
         vector_store_key: 'pgvector',
+        search_strategy: 'exact',
         min_face_size_px: 96,
         min_quality_score: 0.6,
-        search_threshold: 0.35,
+        search_threshold: 0.5,
         top_k: 50,
         allow_public_selfie_search: false,
         selfie_retention_hours: 24,
@@ -85,6 +87,29 @@ describe('EventFaceSearchSettingsForm', () => {
       expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
         provider_key: 'compreface',
         embedding_model_key: 'compreface-face-v1',
+      }));
+    });
+  });
+
+  it('preserves ann search strategy when it comes from the API', async () => {
+    const onSubmit = vi.fn();
+
+    render(
+      <EventFaceSearchSettingsForm
+        settings={{
+          ...settings,
+          search_strategy: 'ann',
+        }}
+        eventModerationMode="ai"
+        onSubmit={onSubmit}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /salvar facesearch/i }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+        search_strategy: 'ann',
       }));
     });
   });

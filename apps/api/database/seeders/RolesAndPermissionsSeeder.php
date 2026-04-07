@@ -47,6 +47,9 @@ class RolesAndPermissionsSeeder extends Seeder
             'partners.manage.any',
             // Settings
             'settings.manage',
+            'branding.manage',
+            'team.manage',
+            'integrations.manage',
             // White Label
             'white_label.manage',
             // Audit
@@ -88,6 +91,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'billing.view', 'billing.manage', 'billing.purchase', 'billing.manage_subscription',
             'analytics.view',
             'settings.manage',
+            'branding.manage',
+            'team.manage',
             'white_label.manage',
             'notifications.view', 'notifications.manage',
         ]);
@@ -107,6 +112,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'play.view', 'play.manage',
             'hub.view', 'hub.manage',
             'analytics.view',
+            'settings.manage',
+            'team.manage',
             'notifications.view',
         ]);
 

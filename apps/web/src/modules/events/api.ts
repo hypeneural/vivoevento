@@ -64,7 +64,7 @@ export interface UpdateEventContentModerationSettingsPayload {
 
 export interface UpdateEventMediaIntelligenceSettingsPayload {
   enabled: boolean;
-  provider_key: 'vllm' | 'noop';
+  provider_key: 'vllm' | 'openrouter' | 'noop';
   model_key: string;
   mode: 'enrich_only' | 'gate';
   prompt_version?: string | null;
@@ -81,6 +81,7 @@ export interface UpdateEventFaceSearchSettingsPayload {
   provider_key: 'noop' | 'compreface';
   embedding_model_key: string;
   vector_store_key: 'pgvector';
+  search_strategy: 'exact' | 'ann';
   min_face_size_px: number;
   min_quality_score: number;
   search_threshold: number;

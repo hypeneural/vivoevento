@@ -38,3 +38,24 @@ it('upserts media intelligence settings for an event', function () {
         'require_json_output' => true,
     ]);
 });
+
+it('supports openrouter as an optional provider in the settings action', function () {
+    $event = Event::factory()->create();
+
+    $settings = app(UpsertEventMediaIntelligenceSettingsAction::class)->execute($event, [
+        'enabled' => true,
+        'provider_key' => 'openrouter',
+        'model_key' => 'openai/gpt-4.1-mini',
+        'mode' => 'enrich_only',
+        'prompt_version' => 'foundation-v1',
+        'approval_prompt' => 'Avalie e retorne JSON.',
+        'caption_style_prompt' => 'Legenda curta.',
+        'response_schema_version' => 'foundation-v1',
+        'timeout_ms' => 12000,
+        'fallback_mode' => 'review',
+        'require_json_output' => true,
+    ]);
+
+    expect($settings->provider_key)->toBe('openrouter')
+        ->and($settings->model_key)->toBe('openai/gpt-4.1-mini');
+});

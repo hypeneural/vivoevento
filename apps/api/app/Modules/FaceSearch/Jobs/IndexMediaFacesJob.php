@@ -67,6 +67,7 @@ class IndexMediaFacesJob implements ShouldBeUnique, ShouldQueue
         $settings = $media->event->faceSearchSettings;
         $runService = app(MediaProcessingRunService::class);
         $degradationPolicy = app(MediaPipelineDegradationPolicy::class);
+        $queueName = $this->resolvedQueueName();
 
         $media->forceFill([
             'face_index_status' => 'processing',
@@ -79,7 +80,7 @@ class IndexMediaFacesJob implements ShouldBeUnique, ShouldQueue
             'model_key' => $settings?->embedding_model_key ?? (string) config('face_search.default_embedding_model', 'face-embedding-foundation-v1'),
             'input_ref' => $media->variants->firstWhere('variant_key', 'gallery')?->path ?: $media->originalStoragePath(),
             'idempotency_key' => "face_index:{$media->id}",
-            'queue_name' => 'face-index',
+            'queue_name' => $queueName,
         ]);
 
         try {
@@ -111,7 +112,7 @@ class IndexMediaFacesJob implements ShouldBeUnique, ShouldQueue
                     ->warning('media_pipeline.degraded', [
                         'stage' => 'face_index',
                         'event_media_id' => $media->id,
-                        'queue' => 'face-index',
+                        'queue' => $queueName,
                         'reason' => 'ops_degradation_pause',
                     ]);
 
@@ -160,8 +161,10 @@ class IndexMediaFacesJob implements ShouldBeUnique, ShouldQueue
 
     public function tags(): array
     {
+        $queueName = $this->resolvedQueueName();
+
         return [
-            'queue:face-index',
+            "queue:{$queueName}",
             'pipeline:face_index',
             "event_media:{$this->eventMediaId}",
         ];
@@ -172,11 +175,18 @@ class IndexMediaFacesJob implements ShouldBeUnique, ShouldQueue
         Log::channel((string) config('observability.queue_log_channel', config('logging.default')))
             ->error('media_pipeline.job_failed', [
                 'job' => static::class,
-                'queue' => 'face-index',
+                'queue' => $this->resolvedQueueName(),
                 'stage' => 'face_index',
                 'event_media_id' => $this->eventMediaId,
                 'exception_class' => $exception::class,
                 'message' => $exception->getMessage(),
             ]);
+    }
+
+    private function resolvedQueueName(): string
+    {
+        return is_string($this->queue) && $this->queue !== ''
+            ? $this->queue
+            : 'face-index';
     }
 }

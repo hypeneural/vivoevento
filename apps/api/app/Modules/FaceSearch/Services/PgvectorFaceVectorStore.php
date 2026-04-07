@@ -42,14 +42,98 @@ class PgvectorFaceVectorStore implements FaceVectorStoreInterface
         int $topK,
         ?float $threshold = null,
         bool $searchableOnly = true,
+        ?string $searchStrategy = null,
     ): array {
         $driver = DB::connection()->getDriverName();
         $topK = max(1, $topK);
+        $searchStrategy = $this->normalizeSearchStrategy($searchStrategy);
 
         if ($driver === 'pgsql') {
             $vector = $this->serializeVector($queryEmbedding);
+
+            return $searchStrategy === 'exact'
+                ? $this->searchPgsqlExact($eventId, $vector, $topK, $threshold, $searchableOnly)
+                : $this->searchPgsqlAnn($eventId, $vector, $topK, $threshold, $searchableOnly);
+        }
+
+        return EventMediaFace::query()
+            ->where('event_id', $eventId)
+            ->whereNotNull('embedding')
+            ->when($searchableOnly, fn ($builder) => $builder->where('searchable', true))
+            ->get(['id', 'event_media_id', 'quality_score', 'quality_tier', 'face_area_ratio', 'embedding'])
+            ->map(function (EventMediaFace $face) use ($queryEmbedding) {
+                $distance = $this->cosineDistance($queryEmbedding, $this->parseVector((string) $face->embedding));
+
+                return new FaceSearchMatchData(
+                    faceId: $face->id,
+                    eventMediaId: $face->event_media_id,
+                    distance: $distance,
+                    qualityScore: $face->quality_score !== null ? (float) $face->quality_score : null,
+                    faceAreaRatio: $face->face_area_ratio !== null ? (float) $face->face_area_ratio : null,
+                    qualityTier: $face->quality_tier,
+                );
+            })
+            ->when($threshold !== null, fn (Collection $matches) => $matches->filter(fn (FaceSearchMatchData $match) => $match->distance <= $threshold))
+            ->sortBy(fn (FaceSearchMatchData $match) => $match->distance)
+            ->take($topK)
+            ->values()
+            ->all();
+    }
+
+    private function searchPgsqlExact(
+        int $eventId,
+        string $vector,
+        int $topK,
+        ?float $threshold,
+        bool $searchableOnly,
+    ): array {
+        $cteFilters = [
+            'event_id = ?',
+            'embedding IS NOT NULL',
+        ];
+        $bindings = [$eventId];
+
+        if ($searchableOnly) {
+            $cteFilters[] = 'searchable = true';
+        }
+
+        $sql = sprintf(
+            'WITH filtered_faces AS MATERIALIZED (
+                SELECT id, event_media_id, quality_score, quality_tier, face_area_ratio, embedding
+                FROM event_media_faces
+                WHERE %s
+            )
+            SELECT id, event_media_id, quality_score, quality_tier, face_area_ratio, embedding <=> ?::vector AS distance
+            FROM filtered_faces',
+            implode(' AND ', $cteFilters),
+        );
+        $bindings[] = $vector;
+
+        if ($threshold !== null) {
+            $sql .= ' WHERE embedding <=> ?::vector <= ?';
+            $bindings[] = $vector;
+            $bindings[] = $threshold;
+        }
+
+        $sql .= ' ORDER BY embedding <=> ?::vector ASC LIMIT ?';
+        $bindings[] = $vector;
+        $bindings[] = $topK;
+
+        return $this->mapPgsqlRows(DB::select($sql, $bindings));
+    }
+
+    private function searchPgsqlAnn(
+        int $eventId,
+        string $vector,
+        int $topK,
+        ?float $threshold,
+        bool $searchableOnly,
+    ): array {
+        return DB::transaction(function () use ($eventId, $vector, $topK, $threshold, $searchableOnly) {
+            $this->applyPgvectorAnnSettings();
+
             $query = EventMediaFace::query()
-                ->select(['id', 'event_media_id', 'quality_score', 'face_area_ratio'])
+                ->select(['id', 'event_media_id', 'quality_score', 'quality_tier', 'face_area_ratio'])
                 ->selectRaw('embedding <=> ?::vector as distance', [$vector])
                 ->where('event_id', $eventId)
                 ->whereNotNull('embedding')
@@ -65,32 +149,53 @@ class PgvectorFaceVectorStore implements FaceVectorStoreInterface
                     distance: (float) ($face->distance ?? 1.0),
                     qualityScore: $face->quality_score !== null ? (float) $face->quality_score : null,
                     faceAreaRatio: $face->face_area_ratio !== null ? (float) $face->face_area_ratio : null,
+                    qualityTier: $face->quality_tier,
                 ))
                 ->values()
                 ->all();
-        }
+        });
+    }
 
-        return EventMediaFace::query()
-            ->where('event_id', $eventId)
-            ->whereNotNull('embedding')
-            ->when($searchableOnly, fn ($builder) => $builder->where('searchable', true))
-            ->get(['id', 'event_media_id', 'quality_score', 'face_area_ratio', 'embedding'])
-            ->map(function (EventMediaFace $face) use ($queryEmbedding) {
-                $distance = $this->cosineDistance($queryEmbedding, $this->parseVector((string) $face->embedding));
-
-                return new FaceSearchMatchData(
-                    faceId: $face->id,
-                    eventMediaId: $face->event_media_id,
-                    distance: $distance,
-                    qualityScore: $face->quality_score !== null ? (float) $face->quality_score : null,
-                    faceAreaRatio: $face->face_area_ratio !== null ? (float) $face->face_area_ratio : null,
-                );
-            })
-            ->when($threshold !== null, fn (Collection $matches) => $matches->filter(fn (FaceSearchMatchData $match) => $match->distance <= $threshold))
-            ->sortBy(fn (FaceSearchMatchData $match) => $match->distance)
-            ->take($topK)
+    /**
+     * @param array<int, object> $rows
+     * @return array<int, FaceSearchMatchData>
+     */
+    private function mapPgsqlRows(array $rows): array
+    {
+        return collect($rows)
+            ->map(fn (object $row) => new FaceSearchMatchData(
+                faceId: (int) $row->id,
+                eventMediaId: (int) $row->event_media_id,
+                distance: (float) ($row->distance ?? 1.0),
+                qualityScore: $row->quality_score !== null ? (float) $row->quality_score : null,
+                faceAreaRatio: $row->face_area_ratio !== null ? (float) $row->face_area_ratio : null,
+                qualityTier: $row->quality_tier ?? null,
+            ))
             ->values()
             ->all();
+    }
+
+    private function normalizeSearchStrategy(?string $searchStrategy): string
+    {
+        if (in_array($searchStrategy, ['exact', 'ann'], true)) {
+            return $searchStrategy;
+        }
+
+        $default = (string) config('face_search.default_search_strategy', 'exact');
+
+        return in_array($default, ['exact', 'ann'], true) ? $default : 'exact';
+    }
+
+    private function applyPgvectorAnnSettings(): void
+    {
+        $efSearch = max(1, (int) config('face_search.ann.hnsw_ef_search', 100));
+        DB::statement("SET LOCAL hnsw.ef_search = {$efSearch}");
+
+        $iterativeScan = (string) config('face_search.ann.hnsw_iterative_scan', 'strict_order');
+
+        if (in_array($iterativeScan, ['off', 'strict_order', 'relaxed_order'], true)) {
+            DB::statement("SET LOCAL hnsw.iterative_scan = {$iterativeScan}");
+        }
     }
 
     /**

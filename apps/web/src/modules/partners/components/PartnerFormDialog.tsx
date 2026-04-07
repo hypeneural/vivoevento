@@ -97,12 +97,12 @@ export function PartnerFormDialog({
     }
 
     if (mode === 'create' && !values.owner_name.trim()) {
-      form.setError('owner_name', { type: 'manual', message: 'Informe o nome do owner.' });
+      form.setError('owner_name', { type: 'manual', message: 'Informe o nome do responsavel principal.' });
       return;
     }
 
     if (mode === 'create' && !values.owner_email.trim()) {
-      form.setError('owner_email', { type: 'manual', message: 'Informe o e-mail do owner.' });
+      form.setError('owner_email', { type: 'manual', message: 'Informe o e-mail do responsavel principal.' });
       return;
     }
 
@@ -133,7 +133,7 @@ export function PartnerFormDialog({
           <DialogTitle>{mode === 'create' ? 'Novo parceiro' : 'Editar parceiro'}</DialogTitle>
           <DialogDescription>
             {mode === 'create'
-              ? 'Cadastre a organizacao parceira e o owner operacional.'
+              ? 'Cadastre a organizacao parceira e o responsavel principal.'
               : 'Atualize dados cadastrais e perfil comercial do parceiro.'}
           </DialogDescription>
         </DialogHeader>
@@ -244,7 +244,7 @@ export function PartnerFormDialog({
                 name="timezone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Timezone</FormLabel>
+                    <FormLabel>Fuso horario</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="America/Sao_Paulo" />
                     </FormControl>
@@ -293,9 +293,9 @@ export function PartnerFormDialog({
 
             {mode === 'create' ? (
               <div className="rounded-2xl border border-border/60 p-4">
-                <p className="text-sm font-semibold">Owner do parceiro</p>
+                <p className="text-sm font-semibold">Responsavel principal</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Este usuario sera vinculado como `partner-owner` da organizacao.
+                  Este usuario sera vinculado como proprietario da organizacao parceira.
                 </p>
 
                 <div className="mt-4 grid gap-4 sm:grid-cols-3">
@@ -306,7 +306,7 @@ export function PartnerFormDialog({
                       <FormItem>
                         <FormLabel>Nome</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Nome do owner" />
+                          <Input {...field} placeholder="Nome do responsavel principal" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -320,7 +320,7 @@ export function PartnerFormDialog({
                       <FormItem>
                         <FormLabel>E-mail</FormLabel>
                         <FormControl>
-                          <Input {...field} type="email" placeholder="owner@parceiro.com" />
+                          <Input {...field} type="email" placeholder="responsavel@parceiro.com" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

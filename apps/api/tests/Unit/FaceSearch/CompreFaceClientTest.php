@@ -78,6 +78,64 @@ it('supports multipart detection requests as a technical fallback', function () 
     });
 });
 
+it('calls compreface embedding verification with the dedicated verification api key', function () {
+    config()->set('face_search.providers.compreface', [
+        'base_url' => 'http://compreface.test',
+        'api_key' => 'generic-api-key',
+        'verification_api_key' => 'verification-api-key',
+        'timeout' => 9,
+        'connect_timeout' => 3,
+    ]);
+
+    Http::fake([
+        'http://compreface.test/api/v1/verification/embeddings/verify' => Http::response([
+            'result' => [
+                [
+                    'embedding' => [0.1, 0.2, 0.3],
+                    'similarity' => 0.97858,
+                ],
+            ],
+        ]),
+    ]);
+
+    $payload = app(CompreFaceClient::class)->verifyEmbeddings(
+        sourceEmbedding: [0.1, 0.2, 0.3],
+        targetEmbeddings: [[0.1, 0.2, 0.3]],
+    );
+
+    expect($payload['result'][0]['similarity'])->toBe(0.97858);
+
+    Http::assertSent(function (Request $request) {
+        return $request->method() === 'POST'
+            && $request->url() === 'http://compreface.test/api/v1/verification/embeddings/verify'
+            && $request->hasHeader('x-api-key', 'verification-api-key')
+            && $request['source'] === [0.1, 0.2, 0.3]
+            && $request['targets'] === [[0.1, 0.2, 0.3]];
+    });
+});
+
+it('falls back to the generic api key for embedding verification when a dedicated key is absent', function () {
+    config()->set('face_search.providers.compreface', [
+        'base_url' => 'http://compreface.test',
+        'api_key' => 'generic-api-key',
+        'timeout' => 9,
+        'connect_timeout' => 3,
+    ]);
+
+    Http::fake([
+        'http://compreface.test/api/v1/verification/embeddings/verify' => Http::response([
+            'result' => [],
+        ]),
+    ]);
+
+    app(CompreFaceClient::class)->verifyEmbeddings(
+        sourceEmbedding: [0.1, 0.2, 0.3],
+        targetEmbeddings: [[0.1, 0.2, 0.3]],
+    );
+
+    Http::assertSent(fn (Request $request) => $request->hasHeader('x-api-key', 'generic-api-key'));
+});
+
 it('throws a useful exception when compreface returns an error', function () {
     config()->set('face_search.providers.compreface', [
         'base_url' => 'http://compreface.test',
@@ -104,4 +162,23 @@ it('fails fast when compreface credentials are missing', function () {
     ]);
 
     app(CompreFaceClient::class)->detectBase64('YmFzZTY0LWltYWdl');
-})->throws(ProviderMisconfiguredException::class, 'FACE_SEARCH_COMPRE_FACE_API_KEY is not configured');
+})->throws(
+    ProviderMisconfiguredException::class,
+    'FACE_SEARCH_COMPRE_FACE_DETECTION_API_KEY or FACE_SEARCH_COMPRE_FACE_API_KEY is not configured',
+);
+
+it('fails fast when compreface verification credentials are missing', function () {
+    config()->set('face_search.providers.compreface', [
+        'base_url' => 'http://compreface.test',
+        'api_key' => '',
+        'verification_api_key' => '',
+    ]);
+
+    app(CompreFaceClient::class)->verifyEmbeddings(
+        sourceEmbedding: [0.1, 0.2, 0.3],
+        targetEmbeddings: [[0.1, 0.2, 0.3]],
+    );
+})->throws(
+    ProviderMisconfiguredException::class,
+    'FACE_SEARCH_COMPRE_FACE_VERIFICATION_API_KEY or FACE_SEARCH_COMPRE_FACE_API_KEY is not configured',
+);

@@ -10,15 +10,20 @@ use App\Modules\Events\Enums\EventStatus;
 use App\Modules\Organizations\Enums\OrganizationType;
 use App\Modules\Organizations\Models\Organization;
 use App\Modules\Partners\Models\PartnerStat;
+use App\Modules\Partners\Support\PartnerProjectionTables;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class RebuildPartnerStatsAction
 {
-    public function execute(Organization $partner): PartnerStat
+    public function execute(Organization $partner): ?PartnerStat
     {
         if (($partner->type?->value ?? $partner->type) !== OrganizationType::Partner->value) {
             throw new InvalidArgumentException('Partner stats only support organizations.type = partner.');
+        }
+
+        if (! PartnerProjectionTables::hasStatsTable()) {
+            return null;
         }
 
         $partner->loadMissing(['subscriptions.plan']);

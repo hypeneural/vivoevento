@@ -3,11 +3,12 @@
 use App\Modules\FaceSearch\DTOs\DetectedFaceData;
 use App\Modules\FaceSearch\DTOs\FaceBoundingBoxData;
 use App\Modules\FaceSearch\DTOs\FaceEmbeddingData;
+use App\Modules\FaceSearch\Enums\FaceQualityTier;
 use App\Modules\FaceSearch\Models\EventMediaFace;
 use App\Modules\FaceSearch\Services\FaceQualityGateService;
 use App\Modules\FaceSearch\Services\PgvectorFaceVectorStore;
 
-it('filters faces by minimum size and quality score', function () {
+it('assesses quality tiers and reasons for detected faces', function () {
     $settings = \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
         'min_face_size_px' => 100,
         'min_quality_score' => 0.70,
@@ -30,9 +31,28 @@ it('filters faces by minimum size and quality score', function () {
         qualityScore: 0.55,
     );
 
-    expect($service->passes($goodFace, $settings))->toBeTrue()
+    $borderlineFace = new DetectedFaceData(
+        boundingBox: new FaceBoundingBoxData(10, 10, 110, 110),
+        qualityScore: 0.74,
+    );
+
+    $goodAssessment = $service->assess($goodFace, $settings);
+    $smallAssessment = $service->assess($tooSmallFace, $settings);
+    $qualityAssessment = $service->assess($lowQualityFace, $settings);
+    $borderlineAssessment = $service->assess($borderlineFace, $settings);
+
+    expect($goodAssessment->tier)->toBe(FaceQualityTier::SearchPriority)
+        ->and($goodAssessment->reason)->toBeNull()
+        ->and($smallAssessment->tier)->toBe(FaceQualityTier::Reject)
+        ->and($smallAssessment->reason)->toBe('face_too_small')
+        ->and($qualityAssessment->tier)->toBe(FaceQualityTier::Reject)
+        ->and($qualityAssessment->reason)->toBe('low_quality')
+        ->and($borderlineAssessment->tier)->toBe(FaceQualityTier::IndexOnly)
+        ->and($borderlineAssessment->reason)->toBe('borderline_face_size')
+        ->and($service->passes($goodFace, $settings))->toBeTrue()
         ->and($service->passes($tooSmallFace, $settings))->toBeFalse()
-        ->and($service->passes($lowQualityFace, $settings))->toBeFalse();
+        ->and($service->passes($lowQualityFace, $settings))->toBeFalse()
+        ->and($service->passes($borderlineFace, $settings))->toBeTrue();
 });
 
 it('stores embeddings and searches by event using sqlite fallback', function () {

@@ -1,0 +1,192 @@
+{
+  "version": 1,
+  "created_at": "2026-04-07",
+  "status": "local_consented_assets_ready",
+  "asset_root_env": "VIPSOCIAL_DATASET_ROOT",
+  "fallback_asset_root": "%USERPROFILE%/Desktop/vipsocial",
+  "provider_constraints": {
+    "compreface_max_file_size_bytes": 5242880,
+    "allowed_extensions": [
+      "jpg",
+      "jpeg",
+      "png",
+      "webp"
+    ]
+  },
+  "privacy": {
+    "requires_explicit_consent": true,
+    "raw_assets_versioned_in_repo": false,
+    "secrets_allowed": false
+  },
+  "entries": [
+    {
+      "id": "vipsocial-person-a-01",
+      "relative_path": "55159264527_7f683b08f6_o.jpg",
+      "event_id": "local-vipsocial-01",
+      "person_id": "person-a",
+      "expected_positive_set": [
+        "vipsocial-person-a-01",
+        "vipsocial-person-a-02",
+        "vipsocial-person-a-03",
+        "vipsocial-person-a-04"
+      ],
+      "scene_type": "single_prominent",
+      "quality_label": "good",
+      "is_public_search_eligible": true,
+      "expected_moderation_bucket": "safe",
+      "consent_basis": "explicit_local_validation",
+      "size_bytes": 3017671,
+      "requires_derivative_for_compreface": false,
+      "target_face_selection": {
+        "strategy": "largest",
+        "value": 1
+      },
+      "notes": "Same consented person, single prominent face."
+    },
+    {
+      "id": "vipsocial-person-a-02",
+      "relative_path": "55160539780_ffeb73e159_o.jpg",
+      "event_id": "local-vipsocial-01",
+      "person_id": "person-a",
+      "expected_positive_set": [
+        "vipsocial-person-a-01",
+        "vipsocial-person-a-02",
+        "vipsocial-person-a-03",
+        "vipsocial-person-a-04"
+      ],
+      "scene_type": "single_prominent",
+      "quality_label": "good",
+      "is_public_search_eligible": true,
+      "expected_moderation_bucket": "safe",
+      "consent_basis": "explicit_local_validation",
+      "size_bytes": 3051621,
+      "requires_derivative_for_compreface": false,
+      "target_face_selection": {
+        "strategy": "largest",
+        "value": 1
+      },
+      "notes": "Same consented person, single prominent face."
+    },
+    {
+      "id": "vipsocial-person-a-03",
+      "relative_path": "55160408924_b566098f08_o.jpg",
+      "event_id": "local-vipsocial-01",
+      "person_id": "person-a",
+      "expected_positive_set": [
+        "vipsocial-person-a-01",
+        "vipsocial-person-a-02",
+        "vipsocial-person-a-03",
+        "vipsocial-person-a-04"
+      ],
+      "scene_type": "group_four",
+      "quality_label": "mixed",
+      "is_public_search_eligible": true,
+      "expected_moderation_bucket": "safe",
+      "consent_basis": "explicit_local_validation",
+      "size_bytes": 7600685,
+      "requires_derivative_for_compreface": true,
+      "smoke_relative_path": "derivatives/55160408924_b566098f08_o-smoke.jpg",
+      "smoke_size_bytes": 3064613,
+      "target_face_selection": {
+        "strategy": "left_to_right_index",
+        "value": 1
+      },
+      "notes": "Same consented person; in a four-person image, target is the first person in frame."
+    },
+    {
+      "id": "vipsocial-person-a-04",
+      "relative_path": "55160539765_1e28e9e04d_o.jpg",
+      "event_id": "local-vipsocial-01",
+      "person_id": "person-a",
+      "expected_positive_set": [
+        "vipsocial-person-a-01",
+        "vipsocial-person-a-02",
+        "vipsocial-person-a-03",
+        "vipsocial-person-a-04"
+      ],
+      "scene_type": "single_profile",
+      "quality_label": "profile_extreme",
+      "is_public_search_eligible": true,
+      "expected_moderation_bucket": "safe",
+      "consent_basis": "explicit_local_validation",
+      "size_bytes": 3413176,
+      "requires_derivative_for_compreface": false,
+      "target_face_selection": {
+        "strategy": "largest",
+        "value": 1
+      },
+      "notes": "Same consented person with face turned away; useful for quality-gate pressure."
+    },
+    {
+      "id": "vipsocial-person-b-01",
+      "relative_path": "55160538970_ce79eb2997_o.jpg",
+      "event_id": "local-vipsocial-01",
+      "person_id": "person-b",
+      "expected_positive_set": [
+        "vipsocial-person-b-01",
+        "vipsocial-person-b-02",
+        "vipsocial-person-b-03"
+      ],
+      "scene_type": "single_prominent",
+      "quality_label": "good",
+      "is_public_search_eligible": true,
+      "expected_moderation_bucket": "safe",
+      "consent_basis": "explicit_local_validation",
+      "size_bytes": 3376073,
+      "requires_derivative_for_compreface": false,
+      "target_face_selection": {
+        "strategy": "largest",
+        "value": 1
+      },
+      "notes": "Same consented person, single prominent face."
+    },
+    {
+      "id": "vipsocial-person-b-02",
+      "relative_path": "55160539330_600b6f30cc_o.jpg",
+      "event_id": "local-vipsocial-01",
+      "person_id": "person-b",
+      "expected_positive_set": [
+        "vipsocial-person-b-01",
+        "vipsocial-person-b-02",
+        "vipsocial-person-b-03"
+      ],
+      "scene_type": "group_two",
+      "quality_label": "mixed",
+      "is_public_search_eligible": true,
+      "expected_moderation_bucket": "safe",
+      "consent_basis": "explicit_local_validation",
+      "size_bytes": 9440832,
+      "requires_derivative_for_compreface": true,
+      "smoke_relative_path": "derivatives/55160539330_600b6f30cc_o-smoke.jpg",
+      "smoke_size_bytes": 2772316,
+      "target_face_selection": {
+        "strategy": "left_to_right_index",
+        "value": 2
+      },
+      "notes": "Same consented person; one of two people in frame."
+    },
+    {
+      "id": "vipsocial-person-b-03",
+      "relative_path": "55160322273_dc03572778_o.jpg",
+      "event_id": "local-vipsocial-01",
+      "person_id": "person-b",
+      "expected_positive_set": [
+        "vipsocial-person-b-01",
+        "vipsocial-person-b-02",
+        "vipsocial-person-b-03"
+      ],
+      "scene_type": "conversation_group",
+      "quality_label": "profile_extreme",
+      "is_public_search_eligible": true,
+      "expected_moderation_bucket": "safe",
+      "consent_basis": "explicit_local_validation",
+      "size_bytes": 4335648,
+      "requires_derivative_for_compreface": false,
+      "target_face_selection": {
+        "strategy": "left_to_right_index",
+        "value": 1
+      },
+      "notes": "Same consented person in a conversation scene, partially side-on."
+    }
+  ]
+}

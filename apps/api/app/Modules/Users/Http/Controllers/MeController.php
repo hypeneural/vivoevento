@@ -60,7 +60,17 @@ class MeController extends BaseController
             'preferences' => ['nullable', 'array'],
             'preferences.theme' => ['nullable', 'string', 'in:light,dark'],
             'preferences.locale' => ['nullable', 'string', 'in:pt-BR,en,es'],
+            'preferences.email_notifications' => ['nullable', 'boolean'],
+            'preferences.push_notifications' => ['nullable', 'boolean'],
+            'preferences.compact_mode' => ['nullable', 'boolean'],
         ]);
+
+        if (array_key_exists('preferences', $validated)) {
+            $validated['preferences'] = array_replace(
+                $request->user()->preferences ?? [],
+                $validated['preferences'] ?? [],
+            );
+        }
 
         $request->user()->update($validated);
 

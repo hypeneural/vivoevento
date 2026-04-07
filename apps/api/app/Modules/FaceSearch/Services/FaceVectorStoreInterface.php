@@ -22,5 +22,6 @@ interface FaceVectorStoreInterface
         int $topK,
         ?float $threshold = null,
         bool $searchableOnly = true,
+        ?string $searchStrategy = null,
     ): array;
 }

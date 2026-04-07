@@ -146,6 +146,9 @@ function buildMockMeResponse(userId: string): MeResponse | null {
         theme: 'light',
         timezone: 'America/Sao_Paulo',
         locale: 'pt-BR',
+        email_notifications: true,
+        push_notifications: false,
+        compact_mode: false,
       },
       last_login_at: new Date().toISOString(),
     },
@@ -314,6 +317,9 @@ function buildMockSignupSession(
         theme: 'light',
         timezone: 'America/Sao_Paulo',
         locale: 'pt-BR',
+        email_notifications: true,
+        push_notifications: false,
+        compact_mode: false,
       },
       last_login_at: new Date().toISOString(),
     },
@@ -723,7 +729,13 @@ export const authService = {
   async updateProfile(data: {
     name?: string;
     phone?: string;
-    preferences?: { theme?: 'light' | 'dark'; locale?: string };
+    preferences?: {
+      theme?: 'light' | 'dark';
+      locale?: string;
+      email_notifications?: boolean;
+      push_notifications?: boolean;
+      compact_mode?: boolean;
+    };
   }): Promise<MeResponse> {
     if (USE_MOCK) {
       await delay(400);

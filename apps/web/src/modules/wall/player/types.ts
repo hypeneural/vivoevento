@@ -1,4 +1,5 @@
 import type {
+  WallAcceptedOrientation,
   WallBootData,
   WallEventSummary,
   WallExpiredPayload,
@@ -20,6 +21,7 @@ import type {
 } from '@eventovivo/shared-types/wall';
 
 export type {
+  WallAcceptedOrientation,
   WallBootData,
   WallEventSummary,
   WallExpiredPayload,

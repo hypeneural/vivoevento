@@ -16,7 +16,9 @@ it('returns default face search settings for an event when none were persisted y
     $response->assertJsonPath('data.enabled', false)
         ->assertJsonPath('data.provider_key', 'noop')
         ->assertJsonPath('data.vector_store_key', 'pgvector')
+        ->assertJsonPath('data.search_strategy', 'exact')
         ->assertJsonPath('data.min_face_size_px', 96)
+        ->assertJsonPath('data.search_threshold', 0.5)
         ->assertJsonPath('data.top_k', 50);
 });
 
@@ -32,6 +34,7 @@ it('updates face search settings for an event', function () {
         'provider_key' => 'noop',
         'embedding_model_key' => 'face-embedding-foundation-v2',
         'vector_store_key' => 'pgvector',
+        'search_strategy' => 'ann',
         'min_face_size_px' => 112,
         'min_quality_score' => 0.72,
         'search_threshold' => 0.28,
@@ -43,6 +46,7 @@ it('updates face search settings for an event', function () {
     $this->assertApiSuccess($response);
     $response->assertJsonPath('data.enabled', true)
         ->assertJsonPath('data.embedding_model_key', 'face-embedding-foundation-v2')
+        ->assertJsonPath('data.search_strategy', 'ann')
         ->assertJsonPath('data.min_quality_score', 0.72)
         ->assertJsonPath('data.search_threshold', 0.28)
         ->assertJsonPath('data.allow_public_selfie_search', true);
@@ -53,6 +57,7 @@ it('updates face search settings for an event', function () {
         'provider_key' => 'noop',
         'embedding_model_key' => 'face-embedding-foundation-v2',
         'vector_store_key' => 'pgvector',
+        'search_strategy' => 'ann',
         'min_face_size_px' => 112,
         'top_k' => 80,
         'allow_public_selfie_search' => true,
@@ -72,6 +77,7 @@ it('accepts compreface as the face search provider', function () {
         'provider_key' => 'compreface',
         'embedding_model_key' => 'compreface-face-v1',
         'vector_store_key' => 'pgvector',
+        'search_strategy' => 'exact',
         'min_face_size_px' => 112,
         'min_quality_score' => 0.72,
         'search_threshold' => 0.28,
@@ -104,6 +110,7 @@ it('validates that public selfie search requires face search enabled', function 
         'provider_key' => 'noop',
         'embedding_model_key' => 'face-embedding-foundation-v1',
         'vector_store_key' => 'pgvector',
+        'search_strategy' => 'exact',
         'min_face_size_px' => 96,
         'min_quality_score' => 0.60,
         'search_threshold' => 0.35,
@@ -127,6 +134,7 @@ it('forbids updating face search settings without permission in the event organi
         'provider_key' => 'noop',
         'embedding_model_key' => 'face-embedding-foundation-v1',
         'vector_store_key' => 'pgvector',
+        'search_strategy' => 'exact',
         'min_face_size_px' => 96,
         'min_quality_score' => 0.60,
         'search_threshold' => 0.35,

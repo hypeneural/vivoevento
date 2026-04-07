@@ -210,6 +210,71 @@ it('persists a vlm evaluation and completes the stage when the provider succeeds
     Queue::assertNotPushed(RunModerationJob::class);
 });
 
+it('does not overwrite a human caption when vlm returns a short caption', function () {
+    Queue::fake();
+
+    app()->bind(VisualReasoningProviderInterface::class, fn () => new class implements VisualReasoningProviderInterface
+    {
+        public function evaluate(EventMedia $media, EventMediaIntelligenceSetting $settings): VisualReasoningEvaluationResult
+        {
+            return VisualReasoningEvaluationResult::approve(
+                reason: 'Imagem compativel com o evento.',
+                shortCaption: 'Legenda sugerida pela IA.',
+                tags: ['festa'],
+                rawResponse: ['provider' => 'fake-vlm'],
+                providerKey: 'fake-vlm',
+                providerVersion: 'test-v1',
+                modelKey: 'fake-vlm-model',
+                modelSnapshot: 'fake-vlm-model@1',
+                promptVersion: $settings->prompt_version,
+                responseSchemaVersion: $settings->response_schema_version,
+                modeApplied: $settings->mode,
+                tokensInput: 87,
+                tokensOutput: 19,
+            );
+        }
+    });
+
+    $event = Event::factory()->active()->create([
+        'moderation_mode' => 'manual',
+    ]);
+
+    EventMediaIntelligenceSetting::factory()->create([
+        'event_id' => $event->id,
+        'enabled' => true,
+        'mode' => 'enrich_only',
+    ]);
+
+    $media = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'caption' => 'Legenda humana preservada.',
+        'vlm_status' => 'queued',
+    ]);
+
+    EventMediaVariant::query()->create([
+        'event_media_id' => $media->id,
+        'variant_key' => 'fast_preview',
+        'disk' => 'public',
+        'path' => "events/{$event->id}/variants/{$media->id}/fast_preview.webp",
+        'mime_type' => 'image/webp',
+        'width' => 512,
+        'height' => 512,
+        'size_bytes' => 2048,
+    ]);
+
+    app(EvaluateMediaPromptJob::class, ['eventMediaId' => $media->id])->handle();
+
+    $media->refresh();
+    $evaluation = EventMediaVlmEvaluation::query()
+        ->where('event_media_id', $media->id)
+        ->latest('id')
+        ->first();
+
+    expect($media->caption)->toBe('Legenda humana preservada.')
+        ->and($evaluation)->not->toBeNull()
+        ->and($evaluation?->short_caption)->toBe('Legenda sugerida pela IA.');
+});
+
 it('keeps media approved when enrich_only vlm fails after moderation is already resolved', function () {
     Queue::fake();
 

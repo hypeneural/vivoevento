@@ -10,5 +10,6 @@ final class FaceSearchMatchData
         public readonly float $distance,
         public readonly ?float $qualityScore = null,
         public readonly ?float $faceAreaRatio = null,
+        public readonly ?string $qualityTier = null,
     ) {}
 }

@@ -92,6 +92,40 @@ it('filters whatsapp instances by provider within the current organization', fun
     expect($response->json('data.0.provider.label'))->toBe('Evolution API');
 });
 
+it('ignores organization_id from partner users and keeps whatsapp listing scoped to the current organization', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $visibleInstance = WhatsAppInstance::factory()->create([
+        'organization_id' => $organization->id,
+        'name' => 'Instancia Visivel',
+    ]);
+
+    $otherOrganization = $this->createOrganization();
+    WhatsAppInstance::factory()->create([
+        'organization_id' => $otherOrganization->id,
+        'name' => 'Instancia Externa',
+    ]);
+
+    $response = $this->apiGet("/whatsapp/instances?organization_id={$otherOrganization->id}");
+
+    $this->assertApiSuccess($response);
+    expect($response->json('data'))->toHaveCount(1);
+    expect($response->json('data.0.id'))->toBe($visibleInstance->id);
+});
+
+it('forbids organization users from viewing whatsapp instances from another organization', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $otherOrganization = $this->createOrganization();
+    $foreignInstance = WhatsAppInstance::factory()->create([
+        'organization_id' => $otherOrganization->id,
+    ]);
+
+    $response = $this->apiGet("/whatsapp/instances/{$foreignInstance->id}");
+
+    $this->assertApiForbidden($response);
+});
+
 it('tests a connection and persists the unified health state', function () {
     [$user, $organization] = $this->actingAsOwner();
 

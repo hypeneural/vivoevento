@@ -87,6 +87,25 @@ it('returns partner-owner permissions for owner', function () {
     expect($permissions)->toContain('events.create');
     expect($permissions)->toContain('media.moderate');
     expect($permissions)->toContain('billing.view');
+    expect($permissions)->toContain('settings.manage');
+    expect($permissions)->toContain('branding.manage');
+    expect($permissions)->toContain('team.manage');
+});
+
+it('returns manager settings permissions without elevated branding or partners access', function () {
+    [$user, $organization] = $this->actingAsManager();
+
+    $response = $this->apiGet('/auth/me');
+
+    $this->assertApiSuccess($response);
+
+    $permissions = $response->json('data.user.permissions');
+
+    expect($permissions)->toContain('settings.manage');
+    expect($permissions)->toContain('team.manage');
+    expect($permissions)->not->toContain('branding.manage');
+    expect($permissions)->not->toContain('partners.view.any');
+    expect($permissions)->not->toContain('partners.manage.any');
 });
 
 it('returns the global super-admin role even with organization membership', function () {
@@ -182,6 +201,8 @@ it('returns limited permissions for viewer', function () {
     expect($permissions)->toContain('events.view');
     expect($permissions)->not->toContain('events.create');
     expect($permissions)->not->toContain('billing.manage');
+    expect($permissions)->not->toContain('settings.manage');
+    expect($permissions)->not->toContain('team.manage');
 });
 
 it('rejects /me for unauthenticated user', function () {
@@ -193,11 +214,19 @@ it('rejects /me for unauthenticated user', function () {
 it('allows updating user preferences', function () {
     [$user] = $this->actingAsOwner();
 
+    $user->update([
+        'preferences' => [
+            'theme' => 'light',
+            'locale' => 'pt-BR',
+        ],
+    ]);
+
     $response = $this->apiPatch('/auth/me', [
         'name' => 'Rafael Updated',
         'preferences' => [
-            'theme' => 'dark',
-            'locale' => 'en',
+            'email_notifications' => false,
+            'push_notifications' => true,
+            'compact_mode' => true,
         ],
     ]);
 
@@ -206,7 +235,14 @@ it('allows updating user preferences', function () {
     $user->refresh();
 
     expect($user->name)->toBe('Rafael Updated');
-    expect($user->preferences['theme'])->toBe('dark');
+    expect($user->preferences['theme'])->toBe('light');
+    expect($user->preferences['locale'])->toBe('pt-BR');
+    expect($user->preferences['email_notifications'])->toBeFalse();
+    expect($user->preferences['push_notifications'])->toBeTrue();
+    expect($user->preferences['compact_mode'])->toBeTrue();
+    expect($response->json('data.user.preferences.email_notifications'))->toBeFalse();
+    expect($response->json('data.user.preferences.push_notifications'))->toBeTrue();
+    expect($response->json('data.user.preferences.compact_mode'))->toBeTrue();
 });
 
 it('allows updating the authenticated user password', function () {

@@ -65,4 +65,27 @@ describe('EventMediaIntelligenceSettingsForm', () => {
     expect(screen.getByRole('button', { name: /salvando/i })).toBeDisabled();
     expect(screen.getByText(/o gate so faz efeito quando o evento estiver em modo ai/i)).toBeInTheDocument();
   });
+
+  it('preserves openrouter when it comes from the API', async () => {
+    const onSubmit = vi.fn();
+
+    render(
+      <EventMediaIntelligenceSettingsForm
+        settings={{ ...settings, provider_key: 'openrouter', model_key: 'openai/gpt-4.1-mini' }}
+        eventModerationMode="ai"
+        onSubmit={onSubmit}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /salvar vlm/i }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider_key: 'openrouter',
+          model_key: 'openai/gpt-4.1-mini',
+        }),
+      );
+    });
+  });
 });

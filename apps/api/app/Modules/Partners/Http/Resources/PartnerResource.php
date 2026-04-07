@@ -13,9 +13,9 @@ class PartnerResource extends JsonResource
     {
         /** @var Organization $partner */
         $partner = $this->resource;
-        $stats = $partner->partnerStats;
-        $profile = $partner->partnerProfile;
-        $subscription = $partner->subscription;
+        $stats = $partner->relationLoaded('partnerStats') ? $partner->getRelation('partnerStats') : null;
+        $profile = $partner->relationLoaded('partnerProfile') ? $partner->getRelation('partnerProfile') : null;
+        $subscription = $partner->relationLoaded('subscription') ? $partner->getRelation('subscription') : $partner->subscription;
         $plan = $subscription?->plan;
         $ownerMembership = $this->resolveOwnerMembership($partner);
 

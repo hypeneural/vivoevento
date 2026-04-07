@@ -29,7 +29,7 @@ import type { UpdateEventMediaIntelligenceSettingsPayload } from '../../api';
 
 const mediaIntelligenceSettingsSchema = z.object({
   enabled: z.boolean(),
-  provider_key: z.enum(['vllm', 'noop']),
+  provider_key: z.enum(['vllm', 'openrouter', 'noop']),
   model_key: z.string().trim().min(1, 'Informe o modelo.').max(160, 'Use ate 160 caracteres.'),
   mode: z.enum(['enrich_only', 'gate']),
   prompt_version: z.string().trim().max(100, 'Use ate 100 caracteres.'),
@@ -54,7 +54,11 @@ type MediaIntelligenceSettingsFormValues = z.infer<typeof mediaIntelligenceSetti
 function buildFormValues(settings: ApiEventMediaIntelligenceSettings): MediaIntelligenceSettingsFormValues {
   return {
     enabled: settings.enabled,
-    provider_key: settings.provider_key === 'noop' ? 'noop' : 'vllm',
+    provider_key: settings.provider_key === 'noop'
+      ? 'noop'
+      : settings.provider_key === 'openrouter'
+        ? 'openrouter'
+        : 'vllm',
     model_key: settings.model_key,
     mode: settings.mode === 'gate' ? 'gate' : 'enrich_only',
     prompt_version: settings.prompt_version ?? 'foundation-v1',
@@ -194,6 +198,7 @@ export function EventMediaIntelligenceSettingsForm({
                   </FormControl>
                   <SelectContent>
                     <SelectItem value="vllm">vLLM</SelectItem>
+                    <SelectItem value="openrouter">OpenRouter</SelectItem>
                     <SelectItem value="noop">Noop</SelectItem>
                   </SelectContent>
                 </Select>

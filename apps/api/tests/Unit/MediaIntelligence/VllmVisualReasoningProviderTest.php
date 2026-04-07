@@ -80,7 +80,9 @@ it('maps a structured vllm response into the domain dto', function () {
         return $request->url() === 'http://127.0.0.1:8000/v1/chat/completions'
             && ($body['response_format']['type'] ?? null) === 'json_schema'
             && ($body['messages'][1]['content'][1]['type'] ?? null) === 'image_url'
-            && ($body['messages'][1]['content'][1]['uuid'] ?? null) === sprintf('media-%s', $media->id);
+            && ($body['messages'][1]['content'][1]['image_url']['url'] ?? null) !== null
+            && ! isset($body['messages'][1]['content'][1]['image_url']['detail'])
+            && ! isset($body['messages'][1]['content'][1]['uuid']);
     });
 });
 

@@ -3,6 +3,7 @@
 namespace App\Modules\Wall\Models;
 
 use App\Modules\Events\Models\Event;
+use App\Modules\Wall\Enums\WallAcceptedOrientation;
 use App\Modules\Wall\Enums\WallEventPhase;
 use App\Modules\Wall\Enums\WallLayout;
 use App\Modules\Wall\Enums\WallSelectionMode;
@@ -37,6 +38,7 @@ class EventWallSetting extends Model
         'selection_mode',
         'event_phase',
         'selection_policy',
+        'accepted_orientation',
         'show_qr',
         'show_branding',
         'show_neon',
@@ -46,6 +48,7 @@ class EventWallSetting extends Model
         'background_image_path',
         'partner_logo_path',
         'instructions_text',
+        'show_side_thumbnails',
         'expires_at',
     ];
 
@@ -59,10 +62,12 @@ class EventWallSetting extends Model
         'selection_mode' => WallSelectionMode::class,
         'event_phase' => WallEventPhase::class,
         'selection_policy' => 'array',
+        'accepted_orientation' => WallAcceptedOrientation::class,
         'show_qr' => 'boolean',
         'show_branding' => 'boolean',
         'show_neon' => 'boolean',
         'show_sender_credit' => 'boolean',
+        'show_side_thumbnails' => 'boolean',
         'expires_at' => 'datetime',
     ];
 

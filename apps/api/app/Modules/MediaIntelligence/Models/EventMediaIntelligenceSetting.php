@@ -19,9 +19,11 @@ class EventMediaIntelligenceSetting extends Model
      */
     public static function defaultAttributes(): array
     {
+        $providerKey = (string) config('media_intelligence.default_provider', 'vllm');
+
         return [
-            'provider_key' => (string) config('media_intelligence.default_provider', 'vllm'),
-            'model_key' => (string) config('media_intelligence.providers.vllm.model', 'Qwen/Qwen2.5-VL-3B-Instruct'),
+            'provider_key' => $providerKey,
+            'model_key' => (string) config("media_intelligence.providers.{$providerKey}.model", 'Qwen/Qwen2.5-VL-3B-Instruct'),
             'enabled' => false,
             'mode' => 'enrich_only',
             'prompt_version' => self::DEFAULT_PROMPT_VERSION,

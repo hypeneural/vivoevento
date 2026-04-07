@@ -1101,6 +1101,36 @@ export default function EventWallManagerPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <HelpLabel helpKey="orientation" className="text-sm">Orientação aceita</HelpLabel>
+                <Select value={wallSettings.accepted_orientation ?? 'all'} onValueChange={(value) => updateDraft('accepted_orientation', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a orientação" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as orientações</SelectItem>
+                    <SelectItem value="landscape">Apenas paisagem (horizontal)</SelectItem>
+                    <SelectItem value="portrait">Apenas retrato (vertical)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Filtra quais mídias aparecem no telão por orientação. Mídias quadradas passam em qualquer filtro.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <HelpLabel helpKey="sideThumbnails">Miniaturas laterais</HelpLabel>
+                  <p className="text-[11px] text-muted-foreground">
+                    Exibe uma faixa com as próximas mídias na lateral do telão, mantendo o público engajado.
+                  </p>
+                </div>
+                <Switch
+                  checked={wallSettings.show_side_thumbnails ?? true}
+                  onCheckedChange={(checked) => updateDraft('show_side_thumbnails', checked)}
+                />
+              </div>
             </div>
           </WallManagerSection>
 

@@ -20,10 +20,14 @@ import { WALL_CAPTION_PANEL, WALL_TEXT_PRIMARY } from '../design/tokens';
 import BrandingOverlay from './BrandingOverlay';
 import ConnectionOverlay from './ConnectionOverlay';
 import ExpiredScreen from './ExpiredScreen';
+import FeaturedBadge from './FeaturedBadge';
 import IdleScreen from './IdleScreen';
 import LayoutRenderer from './LayoutRenderer';
+import { NewPhotoToast, useNewPhotoToast } from './NewPhotoToast';
 import PlayerShell from './PlayerShell';
+import SideThumbnails from './SideThumbnails';
 import type { WallConnectionStatus } from '../types';
+import { useSideThumbnails } from '../hooks/useSideThumbnails';
 
 function FloatingCaption({ layout, text }: { layout: string; text?: string | null }) {
   if (!shouldRenderFloatingCaption(layout as any) || !text) return null;
@@ -53,10 +57,25 @@ export function WallPlayerRoot({ code }: { code: string }) {
   } = useWallPlayer(code);
 
   const { reducedEffects, modeLabel } = usePerformanceMode();
+  const { visible: toastVisible, message: toastMessage } = useNewPhotoToast();
 
   const activeLayout = currentItem && state.settings
     ? resolveRenderableLayout(state.settings.layout, currentItem)
     : null;
+
+  // Multi-item layouts don't show side thumbnails
+  const isMultiItemLayout = activeLayout === 'carousel' || activeLayout === 'mosaic' || activeLayout === 'grid';
+
+  const sideThumbs = useSideThumbnails(
+    state.items,
+    state.currentItemId,
+    {
+      enabled:
+        state.status === 'playing'
+        && (state.settings?.show_side_thumbnails ?? false)
+        && !isMultiItemLayout,
+    },
+  );
 
   return (
     <PlayerShell backgroundUrl={state.settings?.background_url}>
@@ -77,6 +96,7 @@ export function WallPlayerRoot({ code }: { code: string }) {
         showSenderCredit={state.settings?.show_sender_credit ?? false}
         senderCredit={currentItem?.sender_name}
         syncLabel={resolveSyncLabel(isSyncing, connectionStatus, modeLabel)}
+        reducedMotion={reducedEffects}
       />
 
       {/* Connection status */}
@@ -120,11 +140,19 @@ export function WallPlayerRoot({ code }: { code: string }) {
         />
       ) : currentItem && state.settings ? (
         <>
-          <LayoutRenderer media={currentItem} settings={state.settings} />
+          <LayoutRenderer media={currentItem} settings={state.settings} reducedMotion={reducedEffects} />
           <FloatingCaption
             layout={activeLayout ?? 'fullscreen'}
             text={currentItem.caption}
           />
+          {/* Featured badge */}
+          <FeaturedBadge isFeatured={currentItem.is_featured} reducedMotion={reducedEffects} />
+          {/* Side thumbnails */}
+          {sideThumbs.enabled ? (
+            <SideThumbnails leftItems={sideThumbs.leftItems} rightItems={sideThumbs.rightItems} />
+          ) : null}
+          {/* New photo toast */}
+          <NewPhotoToast visible={toastVisible} message={toastMessage} reducedMotion={reducedEffects} />
           {/* Paused badge */}
           {state.status === 'paused' ? (
             <div className="pointer-events-none absolute inset-x-0 top-[max(16px,2vh)] z-30 flex justify-center px-[max(16px,2vw)]">

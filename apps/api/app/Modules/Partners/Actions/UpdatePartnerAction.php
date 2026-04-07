@@ -4,6 +4,7 @@ namespace App\Modules\Partners\Actions;
 
 use App\Modules\Organizations\Models\Organization;
 use App\Modules\Partners\Models\PartnerProfile;
+use App\Modules\Partners\Support\PartnerProjectionTables;
 use App\Modules\Users\Models\User;
 use Illuminate\Support\Facades\DB;
 
@@ -27,7 +28,13 @@ class UpdatePartnerAction
                 'status' => $data['status'] ?? $partner->status,
             ])->save();
 
-            if (array_key_exists('segment', $data) || array_key_exists('notes', $data) || array_key_exists('business_stage', $data)) {
+            if (PartnerProjectionTables::hasProfilesTable() && (
+                array_key_exists('segment', $data)
+                || array_key_exists('notes', $data)
+                || array_key_exists('business_stage', $data)
+            )) {
+                $partner->loadMissing('partnerProfile');
+
                 PartnerProfile::query()->updateOrCreate(
                     ['organization_id' => $partner->id],
                     [
@@ -52,12 +59,7 @@ class UpdatePartnerAction
                 ])
                 ->log('Parceiro atualizado');
 
-            return $partner->fresh([
-                'partnerProfile',
-                'partnerStats',
-                'subscription.plan',
-                'members.user',
-            ]);
+            return $partner->fresh(PartnerProjectionTables::loadableOrganizationRelations());
         });
     }
 }

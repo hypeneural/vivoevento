@@ -21,6 +21,8 @@ class EventMediaFaceFactory extends Factory
             'bbox_h' => 160,
             'detection_confidence' => 0.95,
             'quality_score' => 0.88,
+            'quality_tier' => 'search_priority',
+            'quality_rejection_reason' => null,
             'sharpness_score' => 0.82,
             'face_area_ratio' => 0.18,
             'pose_yaw' => 0.0,

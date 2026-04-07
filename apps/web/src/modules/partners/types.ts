@@ -283,7 +283,7 @@ export const PARTNER_STATUS_LABELS: Record<PartnerStatus, string> = {
 };
 
 export const PARTNER_SUBSCRIPTION_STATUS_LABELS: Record<PartnerSubscriptionStatus, string> = {
-  trialing: 'Trial',
+  trialing: 'Periodo de teste',
   active: 'Ativa',
   canceled: 'Cancelada',
   suspended: 'Suspensa',

@@ -71,6 +71,8 @@ class WallPayloadFactory
             'neon_text' => $settings->neon_text,
             'neon_color' => $settings->neon_color ?? '#ffffff',
             'show_sender_credit' => (bool) $settings->show_sender_credit,
+            'show_side_thumbnails' => (bool) ($settings->show_side_thumbnails ?? true),
+            'accepted_orientation' => $settings->accepted_orientation?->value ?? 'all',
             'instructions_text' => $settings->instructions_text,
         ];
     }

@@ -12,6 +12,9 @@ export const fallbackOptions: ApiWallOptionsResponse = {
     { value: 'polaroid', label: 'Polaroid' },
     { value: 'split', label: 'Tela dividida' },
     { value: 'cinematic', label: 'Cinematografico' },
+    { value: 'kenburns', label: 'Ken Burns' },
+    { value: 'spotlight', label: 'Holofote' },
+    { value: 'gallery', label: 'Galeria de arte' },
   ],
   transitions: [
     { value: 'fade', label: 'Suave' },
@@ -307,6 +310,16 @@ export const HELP_TEXTS = {
     title: 'Salvar alteracoes',
     description: 'As mudancas feitas nesta tela ficam locais ate voce tocar em salvar.',
     why: 'Isso reduz chamadas em redes lentas e evita varias atualizacoes pequenas enquanto voce ainda esta ajustando o telao.',
+  },
+  orientation: {
+    title: 'Orientacao aceita',
+    description: 'Filtra quais midias aparecem no telao com base na orientacao. Midias quadradas sempre passam em qualquer filtro.',
+    why: 'Quando o telao esta em formato 16:9, fotos verticais ficam com barras laterais grandes e podem prejudicar a experiencia visual.',
+  },
+  sideThumbnails: {
+    title: 'Miniaturas laterais',
+    description: 'Exibe uma faixa com as proximas midias na lateral da tela principal. Mantem o publico curioso sobre o proximo conteudo.',
+    why: 'Mostrar a fila de midias vindouras gera engajamento e transparencia sobre a ordem de exibicao.',
   },
 } as const;
 

@@ -4,6 +4,7 @@ namespace App\Modules\Organizations\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 class OrganizationResource extends JsonResource
 {
@@ -21,6 +22,7 @@ class OrganizationResource extends JsonResource
             'billing_email' => $this->when($request->user()?->can('billing.view'), $this->billing_email),
             'phone' => $this->phone,
             'logo_path' => $this->logo_path,
+            'logo_url' => $this->logo_path ? Storage::disk('public')->url($this->logo_path) : null,
             'primary_color' => $this->primary_color,
             'secondary_color' => $this->secondary_color,
             'subdomain' => $this->subdomain,

@@ -97,9 +97,9 @@ export function PartnerGrantDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Criar grant</DialogTitle>
+          <DialogTitle>Criar concessao</DialogTitle>
           <DialogDescription>
-            {partner ? `Criar bonus/manual override para evento de "${partner.name}".` : 'Criar grant de evento.'}
+            {partner ? `Criar bonus ou liberacao manual para evento de "${partner.name}".` : 'Criar concessao comercial do evento.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -135,7 +135,7 @@ export function PartnerGrantDialog({
               name="source_type"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Tipo</FormLabel>
+                  <FormLabel>Tipo de concessao</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange}>
                     <FormControl>
                       <SelectTrigger>
@@ -144,8 +144,8 @@ export function PartnerGrantDialog({
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="bonus">Bonus</SelectItem>
-                      <SelectItem value="manual_override">Manual override</SelectItem>
-                      <SelectItem value="trial">Trial</SelectItem>
+                      <SelectItem value="manual_override">Liberacao manual</SelectItem>
+                      <SelectItem value="trial">Periodo de teste</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -202,7 +202,7 @@ export function PartnerGrantDialog({
                 Cancelar
               </Button>
               <Button type="submit" className="gradient-primary border-0" disabled={isSubmitting || events.length === 0}>
-                Criar grant
+                Criar concessao
               </Button>
             </DialogFooter>
           </form>

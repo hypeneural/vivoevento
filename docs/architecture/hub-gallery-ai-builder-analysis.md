@@ -828,25 +828,234 @@ Interpretacao:
 
 ### O que precisamos melhorar antes de implementar
 
-1. Criar contrato de draft/publicacao para o `Hub`.
-2. Criar cobertura frontend para `HubRenderer` com blocos ligados/desligados, CTA tracking e preview.
-3. Criar testes de normalizacao para retorno de IA rejeitando blocos desconhecidos e campos arbitrarios.
-4. Criar um renderer/config tipado para a `Gallery` antes de colocar IA nela.
-5. Criar testes publicos da `Gallery` para variacoes de layout, mantendo sempre a grade de fotos.
-6. Criar um servico de referencia visual que aceite imagem e devolva somente tokens/decisoes permitidas.
-7. Ajustar a suite Vitest ou testes lentos para evitar timeouts falsos no CI.
+1. Criar contrato canonico versionado para `Hub` e, depois, para `Gallery`.
+2. Criar contrato de draft/publicacao para o `Hub`.
+3. Criar um resolver central de capacidades por evento.
+4. Criar politica explicita de cache para JSON publico e variantes estaticas.
+5. Transformar a API publica da `Gallery` em contrato de midia responsiva.
+6. Criar cobertura frontend para `HubRenderer` com blocos ligados/desligados, CTA tracking e preview.
+7. Criar testes de normalizacao para retorno de IA rejeitando blocos desconhecidos e campos arbitrarios.
+8. Criar um renderer/config tipado para a `Gallery` antes de colocar IA nela.
+9. Criar testes publicos da `Gallery` para variacoes de layout, mantendo sempre a grade de fotos.
+10. Criar um servico de referencia visual que aceite imagem e devolva somente tokens/decisoes permitidas.
+11. Ajustar a suite Vitest ou testes lentos para evitar timeouts falsos no CI.
+
+### Gaps estruturais validados
+
+#### 1. Contrato canonico versionado
+
+Hoje o contrato do `Hub` existe de forma operacional, mas ainda esta espalhado entre:
+
+- `EventHubSetting.builder_config_json`;
+- `HubBuilderPresetRegistry`;
+- `HubPayloadFactory`;
+- tipos TypeScript em `apps/web/src/lib/api-types.ts`;
+- utilitarios de preset em `apps/web/src/modules/hub/hub-builder.ts`.
+
+Isso funciona para o editor manual, mas e fragil para IA.
+
+O proximo passo deve ser criar contratos canonicos versionados, preferencialmente em `packages/contracts`, por exemplo:
+
+- `packages/contracts/surfaces/hub.schema.json`;
+- `packages/contracts/surfaces/gallery.schema.json`;
+- `packages/contracts/surfaces/hub.schema.ts`;
+- `packages/contracts/surfaces/gallery.schema.ts`.
+
+Regras obrigatorias:
+
+- `schema_version` explicito em todo payload salvo;
+- `additionalProperties: false` em objetos controlados pela IA;
+- enums fechados para `layout_key`, `theme_key`, `block_order`, `block.type`, `card_style` e `image_loading_strategy`;
+- listas com `minItems` e `maxItems`;
+- cores aceitando apenas formato normalizado;
+- URLs permitidas somente em campos que aceitam URL;
+- migradores de versao antes da normalizacao;
+- normalizador backend como ultima barreira antes de persistir.
+
+Classes candidatas:
+
+- `Hub\Support\HubBuilderConfigMigrator`;
+- `Hub\Support\HubBuilderConfigValidator`;
+- `Gallery\Support\GalleryBuilderConfigMigrator`;
+- `Gallery\Support\GalleryBuilderConfigValidator`.
+
+Sem esse contrato, a frase "IA gera config" ainda fica fraca: o modelo pode omitir chave obrigatoria, inventar enum, devolver campo arbitrario ou misturar bloco de outra superficie.
+
+#### 2. Resolver central de capabilities
+
+O modelo de capacidades ainda precisa virar um objeto unico e consumivel por backend, frontend e IA.
+
+Hoje algumas regras estao implicitas em modulos do evento, links publicos, endpoints e renderers. Exemplo: a galeria publica depende do modulo `live`, mas isso nao significa automaticamente a mesma coisa que CTA disponivel, permissao de editor ou capacidade da IA.
+
+Proposta:
+
+```json
+{
+  "surfaces": {
+    "hub_public_enabled": true,
+    "gallery_public_enabled": true,
+    "play_public_enabled": false,
+    "wall_public_enabled": true
+  },
+  "features": {
+    "live_enabled": true,
+    "upload_enabled": true,
+    "find_me_enabled": false,
+    "sponsors_enabled": true
+  },
+  "editor": {
+    "can_edit_hub_design": true,
+    "can_edit_gallery_design": false,
+    "can_publish_design": true
+  },
+  "ai": {
+    "allowed_surfaces": ["hub"],
+    "allowed_blocks": ["hero", "welcome", "cta_list", "social_strip"],
+    "blocked_reasons": {
+      "find_me_cta": "Face search is not enabled for this event."
+    }
+  }
+}
+```
+
+Classe candidata:
+
+- `Events\Support\EventSurfaceCapabilitiesResolver`.
+
+Esse resolver deve ser usado por:
+
+- payload publico;
+- payload admin;
+- editor de presets;
+- acao de IA;
+- validacao de publish;
+- testes de contrato.
+
+#### 3. Politica explicita de cache
+
+Cache precisa virar decisao de produto e infraestrutura, nao comportamento default.
+
+Politica recomendada:
+
+- JSON publico de estado, como `/api/v1/public/events/{slug}/gallery`, deve receber `Cache-Control` deliberado;
+- preview/admin draft deve ser `no-store` ou muito curto;
+- payload publico do `Hub` e da `Gallery` pode ter TTL curto se o produto aceitar atraso controlado;
+- variantes estaticas em `/storage/events/.../variants/...` devem ter cache longo se o path for estavel e versionado por media/variante;
+- se um asset puder ser sobrescrito no mesmo path, nao usar `immutable` sem purge/versionamento;
+- respostas `404` e `410` publicas devem ser tratadas explicitamente para nao grudar em cache intermediario.
+
+Decisao minima para a proxima fase:
+
+- `Cache-Control: no-store` para JSON publico que depende de status dinamico do evento;
+- `Cache-Control: public, max-age=31536000, immutable` apenas para variantes cujo path nunca e sobrescrito;
+- revisar Nginx/Cloudflare para garantir que status transitorios nao sejam cacheados sem intencao.
+
+#### 4. Contrato responsivo de midia para Gallery
+
+O shape atual da API publica e suficiente para MVP:
+
+- `thumbnail_url`;
+- `preview_url`;
+- `original_url`;
+- `width`;
+- `height`;
+- `orientation`.
+
+Para builder de galeria, isso deve evoluir para um contrato de midia responsiva:
+
+```json
+{
+  "id": 10,
+  "media_type": "image",
+  "caption": "Entrada dos noivos",
+  "aspect_ratio": 0.5625,
+  "orientation": "portrait",
+  "placeholder": {
+    "dominant_color": "#1f2937",
+    "blur_data_url": null
+  },
+  "variants": {
+    "thumb": {
+      "url": "https://cdn.example/thumb.webp",
+      "width": 480,
+      "height": 480,
+      "mime_type": "image/webp"
+    },
+    "gallery": {
+      "url": "https://cdn.example/gallery.webp",
+      "width": 900,
+      "height": 1600,
+      "mime_type": "image/webp"
+    }
+  }
+}
+```
+
+Observacao importante do estado atual:
+
+- `thumb` e variante `cover` 480x480, portanto e rapida, mas perde proporcao real;
+- `fast_preview`, `gallery` e `wall` sao variantes `scale`, portanto preservam proporcao;
+- se o grid quiser masonry real, ele nao deve depender apenas de `thumbnail_url` quando ela aponta para `thumb`;
+- se o frontend reservar espaco com `width` e `height`, esses valores precisam corresponder a variante efetivamente usada no `src`.
+
+Assim, a decisao correta nao e simplesmente adicionar `width` e `height` no `<img>` atual. Antes disso precisamos expor dimensoes da variante usada ou trocar o grid para usar uma variante que preserve proporcao.
+
+#### 5. Perfis de React Query por superficie
+
+O repo ja tem defaults globais melhores que os defaults brutos do TanStack Query:
+
+- `staleTime` global de 5 minutos;
+- `gcTime` de 10 minutos;
+- retry customizado com no maximo 1 tentativa;
+- `refetchOnWindowFocus: false`;
+- `refetchOnReconnect: true`.
+
+O gap real nao e "desligar defaults agressivos". O gap e criar perfis por superficie:
+
+- preview admin: stale curto, invalidacao manual apos salvar draft;
+- galeria publica: stale deliberado e previsivel, sem refetch agressivo por foco;
+- painel operacional: dados mais frescos, com invalidacao por evento ou realtime;
+- editor IA: estado de draft controlado, evitando sobrescrever preview local com refetch automatico.
+
+Isso deve virar convencao em hooks de dados, nao ficar espalhado em cada `useQuery`.
+
+#### 6. Testes de contrato
+
+Os testes novos cobrem comportamento util, mas ainda nao sao suficientes para IA e builder.
+
+Proximos testes que realmente importam:
+
+- retorno de IA rejeita `additionalProperties`;
+- retorno de IA rejeita bloco desconhecido;
+- retorno de IA rejeita CTA para modulo desabilitado;
+- `schema_version` antigo migra para atual;
+- draft nao altera payload publico antes de publish;
+- rollback restaura revisao anterior;
+- cache headers de JSON publico sao explicitos;
+- variantes estaticas recebem cache headers coerentes;
+- API publica da galeria retorna estrutura responsiva de variantes;
+- preview admin e publico usam o mesmo renderer/contrato.
 
 ### Recomendacao final apos validacao
 
 O MVP correto nao e "criador de site por IA". O MVP correto e "editor guiado por IA para superficies publicas padronizadas".
 
-Ordem recomendada:
+Ordem de produto recomendada:
 
 1. `Hub` com presets + chat que gera draft JSON.
 2. `Hub` com imagem de referencia convertida em tokens controlados.
 3. `Hub` com revisoes, diff e publish manual.
 4. `Gallery` com contrato de builder proprio.
 5. `Gallery` com presets de grade e IA limitada ao contrato.
+
+Ordem tecnica real:
+
+1. `Hub` com schema canonico, draft/publish e revisoes.
+2. `EventSurfaceCapabilitiesResolver` usado por API, frontend, IA e publish.
+3. Politica explicita de cache para JSON publico e variantes.
+4. Contrato responsivo de midia para a `Gallery`.
+5. Cobertura frontend de renderer/preview e testes de contrato.
+6. `Gallery` builder contract antes de qualquer IA na galeria.
 
 ## Duvidas abertas - stack, galeria mobile e logica
 

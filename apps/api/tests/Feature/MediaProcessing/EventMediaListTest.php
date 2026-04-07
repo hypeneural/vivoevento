@@ -172,6 +172,7 @@ it('shows the latest safety and vlm evaluations in the media detail payload', fu
         'moderation_status' => 'pending',
         'safety_status' => 'pass',
         'vlm_status' => 'completed',
+        'caption' => 'Entrada especial na festa.',
     ]);
 
     EventMediaSafetyEvaluation::factory()->create([
@@ -234,9 +235,39 @@ it('shows the latest safety and vlm evaluations in the media detail payload', fu
         ->assertJsonPath('data.latest_safety_evaluation.provider_category_scores.violence', 0.03)
         ->assertJsonPath('data.latest_safety_evaluation.provider_category_input_types.violence.0', 'image')
         ->assertJsonPath('data.latest_safety_evaluation.normalized_provider.input_path_used', 'image_url')
+        ->assertJsonPath('data.caption_source_hint', 'vlm')
         ->assertJsonPath('data.latest_vlm_evaluation.id', $latestVlm->id)
         ->assertJsonPath('data.latest_vlm_evaluation.decision', 'approve')
         ->assertJsonPath('data.latest_vlm_evaluation.reason', 'Imagem compativel com o evento.')
         ->assertJsonPath('data.latest_vlm_evaluation.short_caption', 'Entrada especial na festa.')
         ->assertJsonPath('data.latest_vlm_evaluation.tags.0', 'festa');
+});
+
+it('marks caption source as human when the stored caption differs from the latest vlm short caption', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    $media = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'caption' => 'Legenda humana preservada.',
+        'vlm_status' => 'completed',
+    ]);
+
+    EventMediaVlmEvaluation::factory()->create([
+        'event_id' => $event->id,
+        'event_media_id' => $media->id,
+        'decision' => 'approve',
+        'reason' => 'Imagem compativel com o evento.',
+        'short_caption' => 'Legenda sugerida pela IA.',
+        'tags_json' => ['festa'],
+        'completed_at' => now(),
+    ]);
+
+    $response = $this->apiGet("/media/{$media->id}");
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.caption_source_hint', 'human');
 });

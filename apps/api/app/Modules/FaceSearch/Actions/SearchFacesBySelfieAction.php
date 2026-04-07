@@ -4,6 +4,7 @@ namespace App\Modules\FaceSearch\Actions;
 
 use App\Modules\Events\Models\Event;
 use App\Modules\FaceSearch\DTOs\DetectedFaceData;
+use App\Modules\FaceSearch\DTOs\FaceQualityAssessmentData;
 use App\Modules\FaceSearch\Models\EventFaceSearchRequest;
 use App\Modules\FaceSearch\Models\EventFaceSearchSetting;
 use App\Modules\FaceSearch\Queries\CollapseFaceSearchMatchesQuery;
@@ -39,6 +40,7 @@ class SearchFacesBySelfieAction
      *     rank:int,
      *     event_media_id:int,
      *     best_distance:float,
+     *     best_quality_tier:string|null,
      *     best_quality_score:float|null,
      *     best_face_area_ratio:float|null,
      *     matched_face_ids:array<int, int>,
@@ -109,7 +111,20 @@ class SearchFacesBySelfieAction
                 'faces_detected' => count($detectedFaces),
             ])->save();
 
-            $face = $this->resolveSearchFace($settings, $detectedFaces);
+            ['face' => $face, 'assessment' => $assessment] = $this->resolveSearchFace($settings, $detectedFaces);
+
+            $request->forceFill([
+                'query_face_quality_score' => $face->qualityScore,
+                'query_face_quality_tier' => $assessment->tier->value,
+                'query_face_rejection_reason' => $assessment->reason,
+            ])->save();
+
+            if ($assessment->isRejected()) {
+                throw ValidationException::withMessages([
+                    'selfie' => ['A selfie precisa estar mais nitida e aproximada para a busca.'],
+                ]);
+            }
+
             $cropBinary = $this->cropFace($binary, $face);
             $embedding = $this->embedder->embed($probeMedia, $settings, $cropBinary, $face);
 
@@ -121,6 +136,7 @@ class SearchFacesBySelfieAction
                     topK: $candidateLimit,
                     threshold: $settings->search_threshold,
                     searchableOnly: true,
+                    searchStrategy: $settings->search_strategy ?: (string) config('face_search.default_search_strategy', 'exact'),
                 ),
             );
 
@@ -135,6 +151,8 @@ class SearchFacesBySelfieAction
             $request->forceFill([
                 'status' => 'completed',
                 'query_face_quality_score' => $face->qualityScore,
+                'query_face_quality_tier' => $assessment->tier->value,
+                'query_face_rejection_reason' => $assessment->reason,
                 'best_distance' => $results[0]['best_distance'] ?? null,
                 'result_photo_ids_json' => array_values(array_map(
                     static fn (array $result) => $result['event_media_id'],
@@ -163,11 +181,12 @@ class SearchFacesBySelfieAction
 
     /**
      * @param array<int, DetectedFaceData> $detectedFaces
+     * @return array{face:DetectedFaceData, assessment:FaceQualityAssessmentData}
      */
     private function resolveSearchFace(
         EventFaceSearchSetting $settings,
         array $detectedFaces,
-    ): DetectedFaceData {
+    ): array {
         if ($detectedFaces === []) {
             throw ValidationException::withMessages([
                 'selfie' => ['Nao encontramos um rosto valido na selfie enviada.'],
@@ -181,20 +200,19 @@ class SearchFacesBySelfieAction
         }
 
         $face = $detectedFaces[0];
+        $assessment = $this->qualityGate->assess($face, $settings);
 
-        if (! $this->qualityGate->passes($face, $settings)) {
-            throw ValidationException::withMessages([
-                'selfie' => ['A selfie precisa estar mais nitida e aproximada para a busca.'],
-            ]);
-        }
-
-        return $face;
+        return [
+            'face' => $face,
+            'assessment' => $assessment,
+        ];
     }
 
     /**
      * @param array<int, array{
      *   event_media_id:int,
      *   best_distance:float,
+     *   best_quality_tier:string|null,
      *   best_quality_score:float|null,
      *   best_face_area_ratio:float|null,
      *   matched_face_ids:array<int, int>
@@ -203,6 +221,7 @@ class SearchFacesBySelfieAction
      *   rank:int,
      *   event_media_id:int,
      *   best_distance:float,
+     *   best_quality_tier:string|null,
      *   best_quality_score:float|null,
      *   best_face_area_ratio:float|null,
      *   matched_face_ids:array<int, int>,
@@ -249,6 +268,13 @@ class SearchFacesBySelfieAction
 
                 if ($published !== 0) {
                     return $published;
+                }
+
+                $tier = \App\Modules\FaceSearch\Enums\FaceQualityTier::rankFor($right['best_quality_tier'] ?? null)
+                    <=> \App\Modules\FaceSearch\Enums\FaceQualityTier::rankFor($left['best_quality_tier'] ?? null);
+
+                if ($tier !== 0) {
+                    return $tier;
                 }
 
                 $quality = ($right['best_quality_score'] ?? -1.0) <=> ($left['best_quality_score'] ?? -1.0);

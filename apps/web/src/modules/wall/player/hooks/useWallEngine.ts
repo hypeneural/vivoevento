@@ -9,6 +9,7 @@ import type {
   WallStatusChangedPayload,
 } from '../types';
 import { primeWallAsset } from '../engine/cache';
+import { resolveNextPreloadItem, preloadNextItem } from '../engine/preload';
 import { createEmptyState, wallReducer } from '../engine/reducer';
 import {
   clearWallRuntimeStorage,
@@ -71,16 +72,40 @@ export function useWallEngine(code: string) {
     writeWallRuntimeStorage(code, state);
   }, [code, state]);
 
+  // Track when the last advance happened (for drift compensation)
+  const lastAdvanceAtRef = useRef<number>(Date.now());
+
   useEffect(() => {
     if (state.status !== 'playing' || !state.settings || state.items.length === 0) {
       return;
     }
 
-    const timeout = window.setTimeout(() => {
-      dispatch({ type: 'advance' });
-    }, state.settings.interval_ms);
+    const intervalMs = state.settings.interval_ms;
 
-    return () => window.clearTimeout(timeout);
+    // Phase 0.3: Compensate for timer throttling in background tabs.
+    // When the tab regains visibility, check if enough time has elapsed
+    // for an immediate advance.
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+
+      const elapsed = Date.now() - lastAdvanceAtRef.current;
+      if (elapsed > intervalMs) {
+        lastAdvanceAtRef.current = Date.now();
+        dispatch({ type: 'advance' });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    const timeout = window.setTimeout(() => {
+      lastAdvanceAtRef.current = Date.now();
+      dispatch({ type: 'advance' });
+    }, intervalMs);
+
+    return () => {
+      window.clearTimeout(timeout);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [state.currentItemId, state.items.length, state.settings, state.status]);
 
   const currentItem = useMemo(() => {
@@ -123,6 +148,25 @@ export function useWallEngine(code: string) {
       });
     });
   }, [itemsToPrime]);
+
+  // Phase 0.1: Aggressively preload the predicted NEXT item (img.decode / video preload=auto)
+  useEffect(() => {
+    if (state.status !== 'playing' || !state.currentItemId || !state.settings) {
+      return;
+    }
+
+    const nextItem = resolveNextPreloadItem(
+      state.items,
+      state.currentItemId,
+      state.settings,
+      state.senderStats,
+    );
+
+    if (nextItem && nextItem.url) {
+      void preloadNextItem(nextItem);
+    }
+  }, [state.currentItemId, state.status, state.settings, state.items, state.senderStats]);
+
 
   const applySnapshot = useCallback((snapshot: WallBootData) => {
     const persistedState = persistedRef.current ?? readWallRuntimeStorage(code);

@@ -24,6 +24,7 @@ interface BrandingOverlayProps {
   showSenderCredit?: boolean;
   senderCredit?: string | null;
   syncLabel?: string;
+  reducedMotion?: boolean;
 }
 
 export function BrandingOverlay({
@@ -37,6 +38,7 @@ export function BrandingOverlay({
   showSenderCredit,
   senderCredit,
   syncLabel,
+  reducedMotion = false,
 }: BrandingOverlayProps) {
   return (
     <>
@@ -46,7 +48,7 @@ export function BrandingOverlay({
           <div className={WALL_NEON_PANEL}>
             <div className="flex items-center gap-2">
               <span
-                className="h-2 w-2 animate-pulse rounded-full"
+                className={`h-2 w-2 rounded-full${reducedMotion ? '' : ' animate-pulse'}`}
                 style={{ backgroundColor: neonColor || '#f97316' }}
               />
               <p className="text-sm uppercase tracking-[0.35em] text-orange-200/80">Ao vivo</p>

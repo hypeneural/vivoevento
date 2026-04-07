@@ -20,6 +20,8 @@ class EventFaceSearchRequestFactory extends Factory
             'selfie_storage_strategy' => 'memory_only',
             'faces_detected' => 1,
             'query_face_quality_score' => 0.85,
+            'query_face_quality_tier' => 'search_priority',
+            'query_face_rejection_reason' => null,
             'top_k' => 25,
             'best_distance' => 0.12,
             'result_photo_ids_json' => [1, 2, 3],

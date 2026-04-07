@@ -15,6 +15,7 @@ class EventFaceSearchSettingResource extends JsonResource
             'provider_key' => $this->provider_key,
             'embedding_model_key' => $this->embedding_model_key,
             'vector_store_key' => $this->vector_store_key,
+            'search_strategy' => $this->search_strategy,
             'enabled' => (bool) $this->enabled,
             'min_face_size_px' => $this->min_face_size_px,
             'min_quality_score' => $this->min_quality_score,

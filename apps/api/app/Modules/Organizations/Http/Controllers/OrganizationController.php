@@ -3,24 +3,30 @@
 namespace App\Modules\Organizations\Http\Controllers;
 
 use App\Modules\Organizations\Actions\CreateOrganizationAction;
+use App\Modules\Organizations\Actions\InviteCurrentOrganizationTeamMemberAction;
+use App\Modules\Organizations\Actions\RemoveCurrentOrganizationTeamMemberAction;
+use App\Modules\Organizations\Actions\UploadCurrentOrganizationLogoAction;
 use App\Modules\Organizations\Actions\UpdateOrganizationAction;
 use App\Modules\Organizations\Enums\OrganizationType;
+use App\Modules\Organizations\Http\Requests\InviteCurrentOrganizationTeamMemberRequest;
 use App\Modules\Organizations\Http\Requests\StoreOrganizationRequest;
+use App\Modules\Organizations\Http\Requests\UploadCurrentOrganizationLogoRequest;
+use App\Modules\Organizations\Http\Requests\UpdateCurrentOrganizationBrandingRequest;
+use App\Modules\Organizations\Http\Requests\UpdateCurrentOrganizationRequest;
 use App\Modules\Organizations\Http\Requests\UpdateOrganizationRequest;
+use App\Modules\Organizations\Http\Resources\OrganizationMemberResource;
 use App\Modules\Organizations\Http\Resources\OrganizationResource;
 use App\Modules\Organizations\Models\Organization;
 use App\Modules\Organizations\Models\OrganizationMember;
+use App\Modules\Organizations\Support\CurrentOrganizationAccess;
 use App\Shared\Http\BaseController;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Validation\Rule;
 
 class OrganizationController extends BaseController
 {
-    // ─── Current Organization ─────────────────────────────
-
     /**
      * GET /api/v1/organizations/current
      */
@@ -28,8 +34,8 @@ class OrganizationController extends BaseController
     {
         $org = $request->user()->currentOrganization();
 
-        if (!$org) {
-            return $this->error('Nenhuma organização encontrada', 404);
+        if (! $org) {
+            return $this->error('Nenhuma organizacao encontrada', 404);
         }
 
         $org->loadCount(['clients', 'events']);
@@ -40,23 +46,21 @@ class OrganizationController extends BaseController
     /**
      * PATCH /api/v1/organizations/current
      */
-    public function updateCurrent(Request $request): JsonResponse
+    public function updateCurrent(UpdateCurrentOrganizationRequest $request): JsonResponse
     {
         $org = $request->user()->currentOrganization();
 
-        if (!$org) {
-            return $this->error('Nenhuma organização encontrada', 404);
+        if (! $org) {
+            return $this->error('Nenhuma organizacao encontrada', 404);
         }
 
-        $validated = $request->validate([
-            'trade_name' => ['sometimes', 'string', 'max:160'],
-            'legal_name' => ['nullable', 'string', 'max:200'],
-            'document_number' => ['nullable', 'string', 'max:30'],
-            'email' => ['nullable', 'email', 'max:160'],
-            'billing_email' => ['nullable', 'email', 'max:160'],
-            'phone' => ['nullable', 'string', 'max:40'],
-            'timezone' => ['nullable', 'string', 'max:64'],
-        ]);
+        $validated = $request->validated();
+
+        if (array_key_exists('name', $validated) && ! array_key_exists('trade_name', $validated)) {
+            $validated['trade_name'] = $validated['name'];
+        }
+
+        unset($validated['name']);
 
         $org->update($validated);
 
@@ -66,87 +70,102 @@ class OrganizationController extends BaseController
     /**
      * PATCH /api/v1/organizations/current/branding
      */
-    public function updateBranding(Request $request): JsonResponse
+    public function updateBranding(UpdateCurrentOrganizationBrandingRequest $request): JsonResponse
     {
         $org = $request->user()->currentOrganization();
 
-        if (!$org) {
-            return $this->error('Nenhuma organização encontrada', 404);
+        if (! $org) {
+            return $this->error('Nenhuma organizacao encontrada', 404);
         }
 
-        $validated = $request->validate([
-            'logo_path' => ['nullable', 'string', 'max:255'],
-            'primary_color' => ['nullable', 'string', 'max:20'],
-            'secondary_color' => ['nullable', 'string', 'max:20'],
-            'subdomain' => ['nullable', 'string', 'max:80', 'unique:organizations,subdomain,' . $org->id],
-        ]);
-
-        $org->update($validated);
+        $org->update($request->validated());
 
         activity()
             ->performedOn($org)
             ->causedBy($request->user())
-            ->log('Branding da organização atualizado');
+            ->log('Branding da organizacao atualizado');
 
         return $this->success(new OrganizationResource($org->fresh()));
     }
 
-    // ─── Team ─────────────────────────────────────────────
+    /**
+     * POST /api/v1/organizations/current/branding/logo
+     */
+    public function uploadBrandingLogo(
+        UploadCurrentOrganizationLogoRequest $request,
+        UploadCurrentOrganizationLogoAction $action,
+    ): JsonResponse {
+        $org = $request->user()->currentOrganization();
+
+        if (! $org) {
+            return $this->error('Nenhuma organizacao encontrada', 404);
+        }
+
+        return $this->success(
+            $action->execute($org, $request->user(), $request->file('logo')),
+        );
+    }
 
     /**
      * GET /api/v1/organizations/current/team
      */
     public function team(Request $request): JsonResponse
     {
+        abort_unless(CurrentOrganizationAccess::canManageTeam($request->user()), 403);
+
         $org = $request->user()->currentOrganization();
 
-        if (!$org) {
-            return $this->error('Nenhuma organização encontrada', 404);
+        if (! $org) {
+            return $this->error('Nenhuma organizacao encontrada', 404);
         }
 
         $members = $org->members()
-            ->with('user:id,name,email,avatar_path')
+            ->with('user:id,name,email,phone,avatar_path')
+            ->orderByDesc('is_owner')
+            ->orderBy('id')
             ->get();
 
-        return $this->success($members);
+        return $this->success(OrganizationMemberResource::collection($members));
     }
 
     /**
      * POST /api/v1/organizations/current/team
      */
-    public function inviteTeamMember(Request $request): JsonResponse
-    {
+    public function inviteTeamMember(
+        InviteCurrentOrganizationTeamMemberRequest $request,
+        InviteCurrentOrganizationTeamMemberAction $action,
+    ): JsonResponse {
         $org = $request->user()->currentOrganization();
 
-        if (!$org) {
-            return $this->error('Nenhuma organização encontrada', 404);
+        if (! $org) {
+            return $this->error('Nenhuma organizacao encontrada', 404);
         }
 
-        $validated = $request->validate([
-            'user_id' => ['required', 'exists:users,id'],
-            'role_key' => ['required', 'string', 'max:60'],
-        ]);
+        $member = $action->execute($org, $request->validated(), $request->user());
 
-        $member = OrganizationMember::firstOrCreate(
-            ['organization_id' => $org->id, 'user_id' => $validated['user_id']],
-            [
-                'role_key' => $validated['role_key'],
-                'invited_by' => $request->user()->id,
-                'status' => 'pending',
-                'invited_at' => now(),
-            ]
-        );
-
-        activity()
-            ->performedOn($org)
-            ->causedBy($request->user())
-            ->withProperties(['invited_user_id' => $validated['user_id']])
-            ->log('Membro convidado para a organização');
-
-        return $this->created($member->load('user:id,name,email'));
+        return $this->created(new OrganizationMemberResource($member));
     }
 
-    // ─── Admin CRUD ───────────────────────────────────────
+    /**
+     * DELETE /api/v1/organizations/current/team/{member}
+     */
+    public function removeTeamMember(
+        Request $request,
+        OrganizationMember $member,
+        RemoveCurrentOrganizationTeamMemberAction $action,
+    ): JsonResponse {
+        abort_unless(CurrentOrganizationAccess::canManageTeam($request->user()), 403);
+
+        $org = $request->user()->currentOrganization();
+
+        if (! $org) {
+            return $this->error('Nenhuma organizacao encontrada', 404);
+        }
+
+        $action->execute($org, $member, $request->user());
+
+        return $this->noContent();
+    }
 
     public function index(Request $request): JsonResponse
     {
@@ -196,8 +215,11 @@ class OrganizationController extends BaseController
         return $this->success(new OrganizationResource($organization));
     }
 
-    public function update(UpdateOrganizationRequest $request, Organization $organization, UpdateOrganizationAction $action): JsonResponse
-    {
+    public function update(
+        UpdateOrganizationRequest $request,
+        Organization $organization,
+        UpdateOrganizationAction $action,
+    ): JsonResponse {
         $this->authorize('update', $organization);
 
         $organization = $action->execute($organization, $request->validated());

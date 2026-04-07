@@ -1,0 +1,145 @@
+/**
+ * Ken Burns CSS animations.
+ *
+ * 4 cyclic animations that pan/zoom over a static image.
+ * animation-duration is set inline via `--kb-duration` CSS variable
+ * (synced to interval_ms from settings).
+ *
+ * Vignette: ::after pseudo-element with radial gradient.
+ * Respects prefers-reduced-motion: .kb-reduced disables all animations.
+ */
+
+/* ─── Container ─────────────────────────────── */
+.kb-container {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+/* ─── Vignette overlay ────────────────────────── */
+.kb-vignette::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 45%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
+}
+
+/* ─── Media surface ───────────────────────────── */
+.kb-media {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  will-change: transform;
+  animation-duration: var(--kb-duration, 8s);
+  animation-timing-function: ease-in-out;
+  animation-fill-mode: forwards;
+  animation-iteration-count: 1;
+}
+
+/* ─── 4 Animations ────────────────────────────── */
+.kb-zoom-in {
+  animation-name: kb-zoom-in;
+}
+
+.kb-zoom-out {
+  animation-name: kb-zoom-out;
+}
+
+.kb-pan-left {
+  animation-name: kb-pan-left;
+}
+
+.kb-pan-right {
+  animation-name: kb-pan-right;
+}
+
+@keyframes kb-zoom-in {
+  from {
+    transform: scale(1) translate(0, 0);
+  }
+  to {
+    transform: scale(1.35) translate(-3%, -2%);
+  }
+}
+
+@keyframes kb-zoom-out {
+  from {
+    transform: scale(1.35) translate(3%, 2%);
+  }
+  to {
+    transform: scale(1) translate(0, 0);
+  }
+}
+
+@keyframes kb-pan-left {
+  from {
+    transform: scale(1.2) translateX(5%);
+  }
+  to {
+    transform: scale(1.2) translateX(-5%);
+  }
+}
+
+@keyframes kb-pan-right {
+  from {
+    transform: scale(1.2) translateX(-5%);
+  }
+  to {
+    transform: scale(1.2) translateX(5%);
+  }
+}
+
+/* ─── Video: gentle zoom only ─────────────────── */
+.kb-video-zoom {
+  animation-name: kb-video-zoom;
+  animation-duration: 20s;
+  animation-timing-function: ease-in-out;
+  animation-fill-mode: forwards;
+  animation-iteration-count: 1;
+}
+
+@keyframes kb-video-zoom {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.08);
+  }
+}
+
+/* ─── Reduced motion ──────────────────────────── */
+.kb-reduced .kb-media,
+.kb-reduced .kb-video-zoom {
+  animation: none !important;
+  transform: scale(1) !important;
+}
+
+/* ─── Caption overlay (bottom) ────────────────── */
+.kb-caption-overlay {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 3;
+  padding: max(24px, 3vh) max(32px, 3vw);
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(9, 9, 11, 0.18) 30%,
+    rgba(9, 9, 11, 0.82) 100%
+  );
+}
+
+.kb-sender-name {
+  font-size: clamp(1.4rem, 3.5vw, 3.5rem);
+  font-weight: 800;
+  line-height: 1.06;
+  color: #fff;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.42);
+}

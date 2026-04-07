@@ -19,6 +19,8 @@ class EventFaceSearchRequestResource extends JsonResource
             'selfie_storage_strategy' => $this->selfie_storage_strategy,
             'faces_detected' => $this->faces_detected,
             'query_face_quality_score' => $this->query_face_quality_score,
+            'query_face_quality_tier' => $this->query_face_quality_tier,
+            'query_face_rejection_reason' => $this->query_face_rejection_reason,
             'top_k' => $this->top_k,
             'best_distance' => $this->best_distance,
             'result_photo_ids' => $this->result_photo_ids_json ?? [],

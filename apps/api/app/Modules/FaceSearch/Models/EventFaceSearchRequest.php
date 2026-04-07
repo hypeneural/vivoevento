@@ -19,6 +19,8 @@ class EventFaceSearchRequest extends Model
         'selfie_storage_strategy',
         'faces_detected',
         'query_face_quality_score',
+        'query_face_quality_tier',
+        'query_face_rejection_reason',
         'top_k',
         'best_distance',
         'result_photo_ids_json',
@@ -28,6 +30,8 @@ class EventFaceSearchRequest extends Model
     protected $casts = [
         'faces_detected' => 'integer',
         'query_face_quality_score' => 'float',
+        'query_face_quality_tier' => 'string',
+        'query_face_rejection_reason' => 'string',
         'top_k' => 'integer',
         'best_distance' => 'float',
         'result_photo_ids_json' => 'array',

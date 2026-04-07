@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const can = useCallback((permission: string) => {
     if (!session) return false;
-    if (session.user.role.key === 'super-admin') return true;
+    if (session.user.role.key === 'super-admin' || session.user.role.key === 'platform-admin') return true;
     return session.user.permissions.includes(permission);
   }, [session]);
 
@@ -121,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const canAccessModule = useCallback((moduleKey: string) => {
     if (!session) return false;
-    if (session.user.role.key === 'super-admin') return true;
+    if (session.user.role.key === 'super-admin' || session.user.role.key === 'platform-admin') return true;
     return session.access.accessible_modules.includes(moduleKey);
   }, [session]);
 

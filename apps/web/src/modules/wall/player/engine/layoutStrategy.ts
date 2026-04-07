@@ -23,14 +23,17 @@ export function resolveRenderableLayout(
 
   switch (media.orientation) {
     case 'vertical':
-      return withCaption ? 'split' : (media.is_featured ? 'polaroid' : 'cinematic');
+      if (media.is_featured) return 'spotlight';
+      return withCaption ? 'split' : 'cinematic';
 
     case 'squareish':
-      return media.is_featured ? 'polaroid' : 'fullscreen';
+      if (media.is_featured) return 'polaroid';
+      return withCaption ? 'gallery' : 'fullscreen';
 
     case 'horizontal':
     default:
-      return media.is_featured && !withCaption ? 'cinematic' : 'fullscreen';
+      if (media.is_featured && !withCaption) return 'kenburns';
+      return withCaption ? 'cinematic' : 'fullscreen';
   }
 }
 

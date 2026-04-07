@@ -79,9 +79,20 @@ class IndexMediaFacesAction
         $primaryFaceId = null;
         $primaryFaceQuality = -1.0;
         $sourceImage = Image::decode($binary);
+        $qualitySummary = [
+            'reject' => 0,
+            'index_only' => 0,
+            'search_priority' => 0,
+        ];
+        $dominantRejectionReason = null;
 
         foreach (array_values($detectedFaces) as $index => $face) {
-            if (! $this->qualityGate->passes($face, $settings)) {
+            $qualityAssessment = $this->qualityGate->assess($face, $settings);
+            $qualitySummary[$qualityAssessment->tier->value]++;
+
+            if ($qualityAssessment->isRejected()) {
+                $dominantRejectionReason ??= $qualityAssessment->reason;
+
                 continue;
             }
 
@@ -103,6 +114,8 @@ class IndexMediaFacesAction
                 'bbox_h' => $face->boundingBox->height,
                 'detection_confidence' => $face->detectionConfidence,
                 'quality_score' => $face->qualityScore,
+                'quality_tier' => $qualityAssessment->tier->value,
+                'quality_rejection_reason' => $qualityAssessment->reason,
                 'sharpness_score' => $face->sharpnessScore,
                 'face_area_ratio' => $face->faceAreaRatio ?? $this->faceAreaRatio($sourceImage->width(), $sourceImage->height(), $face),
                 'pose_yaw' => $face->poseYaw,
@@ -147,6 +160,8 @@ class IndexMediaFacesAction
             'source_ref' => "{$sourceDisk}:{$sourcePath}",
             'faces_detected' => count($detectedFaces),
             'faces_indexed' => $indexedFaces,
+            'quality_summary' => $qualitySummary,
+            'dominant_rejection_reason' => $dominantRejectionReason,
             'skipped_reason' => $indexedFaces > 0 ? null : 'no_faces_after_quality_gate',
         ];
     }

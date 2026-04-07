@@ -9,6 +9,9 @@ enum WallLayout: string
     case Fullscreen = 'fullscreen';
     case Split = 'split';
     case Cinematic = 'cinematic';
+    case KenBurns = 'kenburns';
+    case Spotlight = 'spotlight';
+    case Gallery = 'gallery';
 
     public function label(): string
     {
@@ -18,6 +21,9 @@ enum WallLayout: string
             self::Fullscreen => 'Tela cheia',
             self::Split => 'Dividido',
             self::Cinematic => 'Cinematográfico',
+            self::KenBurns => 'Ken Burns',
+            self::Spotlight => 'Holofote',
+            self::Gallery => 'Galeria de arte',
         };
     }
 }

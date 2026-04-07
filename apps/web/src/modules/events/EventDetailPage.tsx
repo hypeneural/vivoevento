@@ -776,7 +776,7 @@ export default function EventDetailPage() {
                       <span className="font-medium text-foreground">
                         {event.face_search
                           ? `${event.face_search.search_threshold} · ${event.face_search.top_k}`
-                          : '0.35 · 50'}
+                          : '0.5 · 50'}
                       </span>
                     </p>
                   </div>

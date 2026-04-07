@@ -27,6 +27,7 @@ Observacao de produto:
   - visibilidade global usa `partners.view.any`;
   - gestao global usa `partners.manage.any`.
 - Compatibilidade operacional: `super-admin` e `platform-admin` continuam autorizados pela role global mesmo quando o banco local ainda nao foi resemeado com as novas permissoes `.any`. Isso corrige o caso real de `GET /api/v1/partners` retornando `403` para super admin em ambientes ja existentes.
+- Robustez operacional adicional: `GET /api/v1/partners` e `GET /api/v1/partners/{partner}` agora toleram ambientes locais onde `partner_stats` e `partner_profiles` ainda nao foram migradas, evitando `500` durante bootstrap ou bases desatualizadas.
 
 ## Validacao adicional da stack atual
 
@@ -67,10 +68,12 @@ Observacao de produto:
 - `/audit` ja e real:
   - exibe o escopo retornado pela API (`global` ou nome da organizacao);
   - ainda nao oferece seletor visual de organizacao, embora o backend suporte `organization_id`.
-- `/settings` ainda mistura dados reais e mock:
-  - usa `meOrganization` para dados basicos;
-  - equipe vem de `mockUsers`;
-  - salvar configuracoes ainda mostra feedback `(mock)`.
+- `/settings` agora esta funcional no fluxo principal:
+  - usa `meOrganization` para hidratar os formularios;
+  - salva organizacao via `PATCH /organizations/current`;
+  - salva branding via `PATCH /organizations/current/branding`;
+  - lista, convida e remove equipe via `/organizations/current/team`;
+  - exibe `Permissoes` e `Integracoes` apenas para `super-admin`.
 - As rotas sensiveis de gestao agora ficam atras de `ModuleGuard` no `App.tsx`.
 
 ## Gaps confirmados e bloqueantes antes do CRUD de partners
@@ -102,7 +105,16 @@ Observacao de produto:
   - delete apenas como "remover vazio";
   - staff e grants como dialogs de operacao administrativa;
   - eventos, clientes, staff, grants e activity no detalhe.
-- A troca da equipe mockada em `/settings` continua fora desta fase; o backlog ficou concentrado no CRUD administrativo global de parceiros.
+- `/settings` ganhou persistencia real para organizacao e branding.
+- `/settings` ganhou upload real de logo/ativos de branding via `POST /organizations/current/branding/logo`.
+- `/settings` ganhou CRUD funcional de equipe via `organizations/current/team`.
+- `/settings` ganhou persistencia real da aba `Preferencias` via `PATCH /auth/me`.
+- As abas de `/settings` voltaram a alternar visualmente o conteudo ativo no frontend.
+- `Permissoes` e `Integracoes` em `/settings` ficaram restritas a `super-admin`.
+- O escopo de integracoes/instancias foi revalidado por testes de WhatsApp para garantir que usuarios de organizacao nao enxergam dados globais ou a instancia padrao do sistema.
+- O `403` real de `GET /organizations/current/team` para super admin legado foi fechado com fallback de acesso por role global quando a organizacao atual existe.
+- Os filtros de `/partners` agora ficam recolhidos por padrao e so aparecem sob demanda em `Filtros e ordenacao`.
+- A terminologia visivel do CRUD administrativo de parceiros foi alinhada para portugues nas acoes de equipe, concessoes e estados comerciais mais sensiveis.
 
 ## Objetivo
 
@@ -141,7 +153,19 @@ O CRUD deve:
 - [x] Implementar filtros adicionais da V1: `subscription_status`, `has_clients` e `commercial_mode` em eventos do parceiro.
 - [x] Criar UI administrativa completa de create/edit/suspend/remove-empty/staff/grants/detail/activity em `apps/web`.
 - [x] Corrigir compatibilidade de autorizacao para super admin legado que ainda nao recebeu `partners.view.any`/`partners.manage.any` por reseed.
-- [x] Registrar que a troca da equipe mockada em `settings` fica fora do escopo desta fase.
+- [x] Implementar rebuild opcional assincrono de `partner_stats` com job unico e hooks dos agregados.
+- [x] Evoluir o detalhe web de parceiros com filtros e paginacao por aba para eventos, clientes e grants.
+- [x] Trocar a equipe mockada de `settings` por leitura real via `/organizations/current/team`.
+- [x] Implementar persistencia real dos saves de organizacao e branding em `settings`.
+- [x] Implementar upload real de logo/ativos de branding em `settings`.
+- [x] Implementar CRUD funcional de equipe em `settings`, incluindo convite e remocao segura.
+- [x] Implementar persistencia real de `Preferencias` em `settings`.
+- [x] Garantir fallback de `/partners` quando `partner_stats` e `partner_profiles` ainda nao existirem no banco local.
+- [x] Corrigir a alternancia visual das abas em `/settings`.
+- [x] Restringir `Permissoes` e `Integracoes` em `settings` para `super-admin`.
+- [x] Validar o escopo de integracoes/instancias para impedir vazamento da instancia padrao do sistema para usuarios de organizacao.
+- [x] Recolher filtros e ordenacao de `/partners` atras de CTA explicita.
+- [x] Traduzir labels criticos do CRUD administrativo de parceiros para portugues.
 
 ## Status atual do backend
 
@@ -150,6 +174,7 @@ Implementado nesta execucao em `apps/api/app/Modules/Partners`:
 - migrations `partner_profiles` e `partner_stats`;
 - `PartnerPolicy` com escopo administrativo global;
 - `RebuildPartnerStatsAction` e `EnsurePartnerStatsProjectionAction`;
+- `RebuildPartnerStatsJob` com dispatch opcional por config, fila `analytics` e deduplicacao por parceiro;
 - `PartnerController` com:
   - `GET /api/v1/partners`
   - `POST /api/v1/partners`
@@ -167,7 +192,8 @@ Implementado nesta execucao em `apps/api/app/Modules/Partners`:
 
 Contratos automatizados validados nesta fase:
 
-- `PartnerAdminCrudContractTest`: 24 testes verdes cobrindo listagem, filtros, `partner_profiles`, `partner_stats`, CRUD, policy, compatibilidade de super admin legado, grants, staff e activity.
+- `PartnerAdminCrudContractTest`: 26 testes verdes cobrindo listagem, fallback sem tabelas de projecao, filtros, `partner_profiles`, `partner_stats`, CRUD, policy, compatibilidade de super admin legado, grants, staff e activity.
+- `PartnerStatsProjectionQueueTest`: 3 testes verdes cobrindo dispatch assincrono, no-op com feature flag desligada e rebuild efetivo da projecao.
 - regressao de escopo/admin: `OrganizationAdminScopeCharacterizationTest`, `AccessMatrixTest`, `ClientCrudTest`, `ListEventsTest`, `AuditTest`.
 - regressao comercial: `EventCommercialStatusTest` e `EntitlementResolverServiceTest`.
 
@@ -175,15 +201,26 @@ Status do frontend nesta fase:
 
 - UI de listagem/filtros/KPIs usando API real;
 - painel lateral de detalhe com resumo, eventos, clientes, staff, grants e activity;
+- detalhe com filtros e paginacao por aba para eventos, clientes, grants, staff e logs;
+- filtros da listagem recolhidos por padrao, com abertura por CTA dedicada;
 - dialogs para criar, editar, suspender, convidar staff e criar grant;
 - acao de remover parceiro vazio protegida por confirmacao;
-- testes de tela cobrindo listagem real, filtros, detalhe, create, edit, suspend e staff.
+- `/settings` lendo equipe real via `/organizations/current/team`, sem `mockUsers`;
+- `/settings` com persistencia real de organizacao e branding via API;
+- `/settings` com upload real de logo/ativos de branding via API;
+- `/settings` com CRUD funcional de equipe, incluindo convite e remocao de membro nao-owner;
+- `/settings` com troca real de abas visiveis, usando apenas o conteudo ativo;
+- `/settings` com persistencia real de `Preferencias` via `/auth/me`;
+- `/settings` mostrando `Permissoes` e `Integracoes` apenas para `super-admin`;
+- `/settings` aceitando super admin legado em equipe/branding/settings mesmo antes de reseed granular, desde que exista organizacao atual;
+- labels visiveis do fluxo administrativo de parceiros revisadas para portugues;
+- testes de tela cobrindo listagem real, filtros, detalhe, create, edit, suspend, staff, grants, paginacao/filtros por aba, delete de parceiro vazio e CRUD funcional de `settings`.
 
 Pendencias explicitas apos esta fase:
 
-- avaliar job assincrono para rebuild de `partner_stats` quando o volume exigir;
-- evoluir a tela de detalhe para paginacao completa por aba se os subrecursos crescerem muito;
-- trocar a equipe mockada de `/settings`, caso essa tela passe a entrar no mesmo escopo administrativo.
+- habilitar `PARTNER_STATS_ASYNC_UPDATES=true` apenas nos ambientes com worker/monitoramento da fila `analytics`;
+- revisar lazy loading dos subrecursos do detalhe se o custo de consultas paralelas por parceiro crescer;
+- evoluir branding para galeria de ativos adicionais se o produto passar a exigir favicon, watermark ou variantes por canal.
 
 ## Decisoes apos revisar a stack atual
 
@@ -602,11 +639,12 @@ Usar:
 - acoes de escrita condicionadas por `partners.manage.any`;
 - detalhe administrativo em painel lateral com resumo, eventos, clientes, staff, grants e logs.
 
-Pendente para refinamento de UI:
+Refinamentos futuros de UI:
 
-- paginacao completa por aba no detalhe, se o volume dos subrecursos exigir;
-- filtros internos nos subrecursos do detalhe, se a operacao precisar filtrar eventos/clientes/grants dentro do painel;
-- remover mocks de equipe em `/settings`, fora do escopo do CRUD administrativo global de parceiros.
+- revisar lazy loading por aba se o custo de carregar todos os subrecursos em paralelo crescer;
+- ampliar filtros internos do detalhe se surgirem novos recortes operacionais alem dos atuais;
+- evoluir o branding de `/settings` para ativos adicionais alem do logo, caso o produto exija.
+- expandir `Preferencias` se surgirem novas configuracoes persistidas por usuario ou por organizacao.
 
 ## Plano de implementacao
 
@@ -626,7 +664,7 @@ Pendente para refinamento de UI:
 11. Criar `PartnerController` e rotas REST/subrecursos.
 12. Integrar frontend `/partners` com API real.
 13. Criar UI de detalhe e forms administrativos para CRUD completo via painel.
-14. Decidir e executar o ajuste da tela de `settings` para remover mocks de equipe, ou documentar explicitamente que isso fica fora desta entrega.
+14. Fechar `/settings` com leitura e escrita real de `organizations/current`, CRUD de equipe e visibilidade estrita de abas administrativas para `super-admin`.
 15. Atualizar `apps/web/README.md` quando a tela deixar de ser mockada. Concluido para CRUD administrativo de `/partners`.
 
 ## Fora da V1
@@ -671,6 +709,7 @@ Comandos rodados:
 - `npm run type-check`
 - `php artisan test tests/Feature/Partners/PartnerAdminCrudContractTest.php --filter="legacy global admin|allows a super admin to list"`
 - `npx vitest run src/modules/partners/PartnersPage.test.tsx --testNamePattern="updates and suspends|adds staff"`
+- `npx vitest run src/modules/partners/PartnersPage.test.tsx --testNamePattern="creates a grant|confirms removing"`
 - `npx vitest run src/modules/partners/PartnersPage.test.tsx src/app/layouts/AppSidebar.test.tsx src/app/guards/ModuleGuard.test.tsx`
 - `npm run type-check`
 - `php artisan test tests/Feature/Partners/PartnerAdminCrudContractTest.php tests/Feature/Auth/AccessMatrixTest.php`
@@ -695,9 +734,94 @@ Resumo:
 - regressao final web partners/sidebar/guard: 8 testes passaram.
 - regressao focada do 403 de super admin legado: 2 testes passaram.
 - regressao focada de edit/suspend/staff no web: 2 testes passaram.
-- regressao final web partners/sidebar/guard apos UI CRUD: 12 testes passaram.
+- regressao focada de grant/delete no web: 2 testes passaram.
+- regressao final web partners/sidebar/guard apos UI CRUD: 14 testes passaram.
 - regressao final auth + partners apos compatibilidade de super admin legado: 29 testes passaram.
 - type-check web: ok.
+
+Ultima validacao completa desta fase em `2026-04-07 15:11:03 -03:00`:
+
+- `php artisan test tests/Feature/Organizations/OrganizationTest.php tests/Feature/Organizations/OrganizationAdminScopeCharacterizationTest.php tests/Feature/Auth/MeTest.php tests/Feature/Clients/ClientCrudTest.php tests/Feature/Audit/AuditTest.php`
+  - 44 testes passaram, 302 assertions.
+- `php artisan test tests/Feature/Partners/PartnerStatsProjectionQueueTest.php tests/Feature/Partners/PartnerAdminCrudContractTest.php tests/Feature/Auth/AccessMatrixTest.php tests/Feature/Events/ListEventsTest.php tests/Feature/Billing/AdminQuickEventTest.php`
+  - 42 testes passaram, 436 assertions.
+- `npx vitest run src/modules/partners/PartnersPage.test.tsx src/modules/settings/SettingsPage.test.tsx src/app/layouts/AppSidebar.test.tsx src/app/guards/ModuleGuard.test.tsx`
+  - 19 testes passaram.
+- `npm run type-check`
+  - ok.
+
+Validacao complementar de acabamento em `2026-04-07 16:02:42 -03:00`:
+
+- `php artisan test tests/Feature/Partners/PartnerStatsProjectionQueueTest.php tests/Feature/Partners/PartnerAdminCrudContractTest.php tests/Feature/Auth/AccessMatrixTest.php tests/Feature/Organizations/OrganizationAdminScopeCharacterizationTest.php`
+  - 39 testes passaram, 332 assertions.
+- `php artisan test tests/Feature/Clients/ClientCrudTest.php tests/Feature/Audit/AuditTest.php tests/Feature/Events/ListEventsTest.php tests/Feature/Billing/AdminQuickEventTest.php`
+  - 31 testes passaram, 299 assertions.
+- `npx vitest run src/modules/partners/PartnersPage.test.tsx src/modules/settings/SettingsPage.test.tsx src/app/layouts/AppSidebar.test.tsx src/app/guards/ModuleGuard.test.tsx`
+  - 24 testes passaram.
+- `npm run type-check`
+  - ok.
+
+O que essa ultima bateria confirmou:
+
+- `/partners` nao quebra com `500` em bases sem `partner_stats` ou `partner_profiles`;
+- `/settings` alterna corretamente entre `Perfil`, `Organizacao`, `Branding`, `Equipe`, `Permissoes`, `Integracoes` e `Preferencias`;
+- `/settings` persiste organizacao e branding por API real;
+- `/settings` convida e remove equipe por API real, preservando o owner;
+- `Permissoes` e `Integracoes` em `/settings` aparecem apenas para `super-admin`;
+- instancias de WhatsApp continuam escopadas para a organizacao atual e nao aceitam vazamento por `organization_id`;
+- o painel de parceiros manteve guardas de permissao e escopo administrativos;
+- os filtros da listagem de parceiros ficaram recolhidos por padrao;
+- labels como equipe, membro, concessao e periodo de teste ficaram padronizadas em portugues.
+
+Validacao final desta etapa em `2026-04-07 17:01:11 -03:00`:
+
+- `php artisan test tests/Feature/Auth/MeTest.php tests/Feature/Auth/AccessMatrixTest.php tests/Feature/Organizations/OrganizationTest.php tests/Feature/Organizations/OrganizationAdminScopeCharacterizationTest.php tests/Feature/WhatsApp/WhatsAppInstanceManagementTest.php tests/Feature/Partners/PartnerAdminCrudContractTest.php tests/Feature/Partners/PartnerStatsProjectionQueueTest.php`
+  - 68 testes passaram, 563 assertions.
+- `php artisan test tests/Feature/Clients/ClientCrudTest.php tests/Feature/Audit/AuditTest.php tests/Feature/Events/ListEventsTest.php tests/Feature/Billing/AdminQuickEventTest.php`
+  - 31 testes passaram, 299 assertions.
+- `npx vitest run src/modules/settings/SettingsPage.test.tsx src/modules/partners/PartnersPage.test.tsx src/app/layouts/AppSidebar.test.tsx src/app/guards/ModuleGuard.test.tsx`
+  - 28 testes passaram.
+- `npm run type-check`
+  - ok.
+
+Validacao pontual apos endurecimento final de RBAC e `/settings` em `2026-04-07 17:03:45 -03:00`:
+
+- `php artisan test tests/Feature/Auth/MeTest.php tests/Feature/Organizations/OrganizationTest.php tests/Feature/WhatsApp/WhatsAppInstanceManagementTest.php`
+  - 30 testes passaram, 245 assertions.
+- `npx vitest run src/modules/settings/SettingsPage.test.tsx`
+  - 9 testes passaram.
+- `npm run type-check`
+  - ok.
+
+Validacao complementar de persistencia real em `/settings` em `2026-04-07 18:01:31 -03:00`:
+
+- `php artisan test tests/Feature/Auth/MeTest.php tests/Feature/Organizations/OrganizationTest.php tests/Feature/WhatsApp/WhatsAppInstanceManagementTest.php tests/Feature/Partners/PartnerAdminCrudContractTest.php tests/Feature/Partners/PartnerStatsProjectionQueueTest.php`
+  - 61 testes passaram, 542 assertions.
+- `npx vitest run src/modules/settings/SettingsPage.test.tsx src/modules/partners/PartnersPage.test.tsx src/app/layouts/AppSidebar.test.tsx src/app/guards/ModuleGuard.test.tsx`
+  - 30 testes passaram.
+- `npm run type-check`
+  - ok.
+
+O que essa bateria adicional confirmou:
+
+- `/settings` faz upload real do logo da organizacao por API e atualiza a sessao com o ativo salvo;
+- `/settings` persiste `Preferencias` do usuario autenticado em `/auth/me` sem sobrescrever outras preferencias existentes;
+- `GET /organizations/current/team` nao retorna mais `403` para super admin legado com organizacao atual;
+- o endurecimento de escopo de integracoes/instancias de WhatsApp segue preservado;
+- o CRUD administrativo de parceiros permaneceu verde apos os ajustes em `settings`.
+
+Validacao ampliada de regressao em `2026-04-07 18:04:53 -03:00`:
+
+- `php artisan test tests/Feature/Clients/ClientCrudTest.php tests/Feature/Audit/AuditTest.php tests/Feature/Events/ListEventsTest.php tests/Feature/Billing/AdminQuickEventTest.php tests/Feature/Auth/AccessMatrixTest.php tests/Feature/Organizations/OrganizationAdminScopeCharacterizationTest.php`
+  - 41 testes passaram, 361 assertions.
+- `php artisan route:list --path=organizations/current`
+  - 7 rotas validadas para `current`, `branding`, `branding/logo` e `team`.
+
+O que essa regressao ampliada confirmou:
+
+- clientes, auditoria, listagem de eventos, billing administrativo rapido e matriz de acesso permaneceram estaveis;
+- o endurecimento do CRUD global de `organizations` continuou preservado;
+- a superficie real de `/organizations/current` esta completa para leitura, escrita, branding/logo e equipe.
 
 Cobertura esperada:
 

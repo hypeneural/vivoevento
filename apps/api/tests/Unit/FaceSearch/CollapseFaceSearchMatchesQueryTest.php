@@ -20,3 +20,31 @@ it('collapses multiple face matches by media and keeps best ranking signals', fu
         ->and($results[0]['matched_face_ids'])->toBe([10, 11])
         ->and($results[1]['event_media_id'])->toBe(200);
 });
+
+it('prefers search priority matches over index only matches when distance ties', function () {
+    $query = app(CollapseFaceSearchMatchesQuery::class);
+
+    $results = $query->execute([
+        new FaceSearchMatchData(
+            faceId: 21,
+            eventMediaId: 100,
+            distance: 0.12,
+            qualityScore: 0.95,
+            faceAreaRatio: 0.18,
+            qualityTier: 'index_only',
+        ),
+        new FaceSearchMatchData(
+            faceId: 22,
+            eventMediaId: 200,
+            distance: 0.12,
+            qualityScore: 0.72,
+            faceAreaRatio: 0.09,
+            qualityTier: 'search_priority',
+        ),
+    ]);
+
+    expect($results[0]['event_media_id'])->toBe(200)
+        ->and($results[0]['best_quality_tier'])->toBe('search_priority')
+        ->and($results[1]['event_media_id'])->toBe(100)
+        ->and($results[1]['best_quality_tier'])->toBe('index_only');
+});

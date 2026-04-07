@@ -53,6 +53,7 @@ class UpdateEventRequest extends FormRequest
 
             'face_search' => ['nullable', 'array'],
             'face_search.enabled' => ['nullable', 'boolean'],
+            'face_search.search_strategy' => ['nullable', 'string', 'in:exact,ann'],
             'face_search.allow_public_selfie_search' => ['nullable', 'boolean'],
             'face_search.selfie_retention_hours' => ['nullable', 'integer', 'min:1', 'max:720'],
 

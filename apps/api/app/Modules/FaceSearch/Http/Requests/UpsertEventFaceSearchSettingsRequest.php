@@ -19,6 +19,7 @@ class UpsertEventFaceSearchSettingsRequest extends FormRequest
             'provider_key' => ['required', 'string', 'in:noop,compreface'],
             'embedding_model_key' => ['required', 'string', 'max:120'],
             'vector_store_key' => ['required', 'string', 'in:pgvector'],
+            'search_strategy' => ['required', 'string', 'in:exact,ann'],
             'min_face_size_px' => ['required', 'integer', 'min:32', 'max:1024'],
             'min_quality_score' => ['required', 'numeric', 'min:0', 'max:1'],
             'search_threshold' => ['required', 'numeric', 'min:0', 'max:1'],

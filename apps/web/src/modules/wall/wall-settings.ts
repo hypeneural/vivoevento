@@ -150,6 +150,8 @@ export function areWallSettingsEqual(
     && blankToNull(left.neon_text) === blankToNull(right.neon_text)
     && blankToNull(left.neon_color) === blankToNull(right.neon_color)
     && left.show_sender_credit === right.show_sender_credit
+    && (left.show_side_thumbnails ?? true) === (right.show_side_thumbnails ?? true)
+    && (left.accepted_orientation ?? 'all') === (right.accepted_orientation ?? 'all')
     && blankToNull(left.instructions_text) === blankToNull(right.instructions_text);
 }
 

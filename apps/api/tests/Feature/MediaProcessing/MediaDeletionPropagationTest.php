@@ -97,7 +97,7 @@ it('deletes media artifacts projections and derived evaluations when media is re
             $this->tracker->deletedFaceIds[] = $face->id;
         }
 
-        public function search(int $eventId, array $queryEmbedding, int $topK, ?float $threshold = null, bool $searchableOnly = true): array
+        public function search(int $eventId, array $queryEmbedding, int $topK, ?float $threshold = null, bool $searchableOnly = true, ?string $searchStrategy = null): array
         {
             return [];
         }

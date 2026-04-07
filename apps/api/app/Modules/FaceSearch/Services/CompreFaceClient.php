@@ -11,6 +11,7 @@ use RuntimeException;
 class CompreFaceClient
 {
     private const DETECTION_ENDPOINT = '/api/v1/detection/detect';
+    private const VERIFY_EMBEDDINGS_ENDPOINT = '/api/v1/verification/embeddings/verify';
 
     public function __construct(
         private readonly HttpFactory $http,
@@ -22,7 +23,7 @@ class CompreFaceClient
      */
     public function detectBase64(string $base64Image, array $options = []): array
     {
-        $config = $this->validatedConfig();
+        $config = $this->validatedConfig('detection');
 
         $response = $this->baseRequest($config)
             ->contentType('application/json')
@@ -43,7 +44,7 @@ class CompreFaceClient
         ?string $mimeType = null,
         array $options = [],
     ): array {
-        $config = $this->validatedConfig();
+        $config = $this->validatedConfig('detection');
         $headers = [];
 
         if ($mimeType !== null && $mimeType !== '') {
@@ -59,24 +60,43 @@ class CompreFaceClient
     }
 
     /**
+     * @param array<int, float|int> $sourceEmbedding
+     * @param array<int, array<int, float|int>> $targetEmbeddings
      * @return array<string, mixed>
      */
-    private function validatedConfig(): array
+    public function verifyEmbeddings(array $sourceEmbedding, array $targetEmbeddings): array
+    {
+        $config = $this->validatedConfig('verification');
+
+        $response = $this->baseRequest($config)
+            ->contentType('application/json')
+            ->post(self::VERIFY_EMBEDDINGS_ENDPOINT, [
+                'source' => array_values($sourceEmbedding),
+                'targets' => array_values($targetEmbeddings),
+            ]);
+
+        return $this->decodeDetectionResponse($response);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function validatedConfig(string $purpose): array
     {
         $config = (array) config('face_search.providers.compreface', []);
         $baseUrl = rtrim((string) ($config['base_url'] ?? ''), '/');
-        $apiKey = (string) ($config['api_key'] ?? '');
+        $apiKey = $this->resolvedApiKey($config, $purpose);
 
         if ($baseUrl === '') {
             throw new ProviderMisconfiguredException('FACE_SEARCH_COMPRE_FACE_BASE_URL is not configured for face search.');
         }
 
         if ($apiKey === '') {
-            throw new ProviderMisconfiguredException('FACE_SEARCH_COMPRE_FACE_API_KEY is not configured for face search.');
+            throw new ProviderMisconfiguredException($this->missingApiKeyMessage($purpose));
         }
 
         $config['base_url'] = $baseUrl;
-        $config['api_key'] = $apiKey;
+        $config['resolved_api_key'] = $apiKey;
 
         return $config;
     }
@@ -89,7 +109,7 @@ class CompreFaceClient
         return $this->http
             ->baseUrl((string) $config['base_url'])
             ->withHeaders([
-                'x-api-key' => (string) $config['api_key'],
+                'x-api-key' => (string) $config['resolved_api_key'],
             ])
             ->acceptJson()
             ->timeout((int) ($config['timeout'] ?? 15))
@@ -162,5 +182,30 @@ class CompreFaceClient
         $body = trim($response->body());
 
         return $body !== '' ? $body : 'empty provider response';
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    private function resolvedApiKey(array $config, string $purpose): string
+    {
+        $dedicatedKey = match ($purpose) {
+            'verification' => (string) ($config['verification_api_key'] ?? ''),
+            default => (string) ($config['detection_api_key'] ?? ''),
+        };
+
+        if ($dedicatedKey !== '') {
+            return $dedicatedKey;
+        }
+
+        return (string) ($config['api_key'] ?? '');
+    }
+
+    private function missingApiKeyMessage(string $purpose): string
+    {
+        return match ($purpose) {
+            'verification' => 'FACE_SEARCH_COMPRE_FACE_VERIFICATION_API_KEY or FACE_SEARCH_COMPRE_FACE_API_KEY is not configured for face search verification.',
+            default => 'FACE_SEARCH_COMPRE_FACE_DETECTION_API_KEY or FACE_SEARCH_COMPRE_FACE_API_KEY is not configured for face search detection.',
+        };
     }
 }

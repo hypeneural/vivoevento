@@ -11,6 +11,7 @@ class CollapseFaceSearchMatchesQuery
      * @return array<int, array{
      *   event_media_id:int,
      *   best_distance:float,
+     *   best_quality_tier:string|null,
      *   best_quality_score:float|null,
      *   best_face_area_ratio:float|null,
      *   matched_face_ids:array<int, int>
@@ -24,12 +25,17 @@ class CollapseFaceSearchMatchesQuery
             $current = $collapsed[$match->eventMediaId] ?? [
                 'event_media_id' => $match->eventMediaId,
                 'best_distance' => $match->distance,
+                'best_quality_tier' => $match->qualityTier,
                 'best_quality_score' => $match->qualityScore,
                 'best_face_area_ratio' => $match->faceAreaRatio,
                 'matched_face_ids' => [],
             ];
 
             $current['best_distance'] = min($current['best_distance'], $match->distance);
+            $current['best_quality_tier'] = $this->bestQualityTier(
+                $current['best_quality_tier'],
+                $match->qualityTier,
+            );
             $current['best_quality_score'] = $this->maxNullable(
                 $current['best_quality_score'],
                 $match->qualityScore,
@@ -50,6 +56,13 @@ class CollapseFaceSearchMatchesQuery
 
             if ($distance !== 0) {
                 return $distance;
+            }
+
+            $tier = \App\Modules\FaceSearch\Enums\FaceQualityTier::rankFor($right['best_quality_tier'] ?? null)
+                <=> \App\Modules\FaceSearch\Enums\FaceQualityTier::rankFor($left['best_quality_tier'] ?? null);
+
+            if ($tier !== 0) {
+                return $tier;
             }
 
             $quality = ($right['best_quality_score'] ?? -1.0) <=> ($left['best_quality_score'] ?? -1.0);
@@ -75,5 +88,13 @@ class CollapseFaceSearchMatchesQuery
         }
 
         return max($left, $right);
+    }
+
+    private function bestQualityTier(?string $left, ?string $right): ?string
+    {
+        return \App\Modules\FaceSearch\Enums\FaceQualityTier::rankFor($right)
+            > \App\Modules\FaceSearch\Enums\FaceQualityTier::rankFor($left)
+            ? $right
+            : $left;
     }
 }

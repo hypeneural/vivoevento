@@ -2,6 +2,7 @@
 
 namespace App\Modules\Wall\Http\Requests;
 
+use App\Modules\Wall\Enums\WallAcceptedOrientation;
 use App\Modules\Wall\Enums\WallLayout;
 use App\Modules\Wall\Enums\WallEventPhase;
 use App\Modules\Wall\Enums\WallSelectionMode;
@@ -44,6 +45,8 @@ class UpdateWallSettingsRequest extends FormRequest
             'neon_text' => ['sometimes', 'nullable', 'string', 'max:180'],
             'neon_color' => ['sometimes', 'nullable', 'string', 'max:30'],
             'show_sender_credit' => ['sometimes', 'boolean'],
+            'show_side_thumbnails' => ['sometimes', 'boolean'],
+            'accepted_orientation' => ['sometimes', Rule::enum(WallAcceptedOrientation::class)],
             'instructions_text' => ['sometimes', 'nullable', 'string', 'max:500'],
             'expires_at' => ['sometimes', 'nullable', 'date'],
         ];

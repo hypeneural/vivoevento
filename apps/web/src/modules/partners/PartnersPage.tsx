@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -99,6 +100,7 @@ export default function PartnersPage() {
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [planFilter, setPlanFilter] = useState('');
   const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState<string>('all');
@@ -246,13 +248,13 @@ export default function PartnersPage() {
       await invalidatePartners();
       setPartnerForStaff(null);
       toast({
-        title: 'Staff adicionado',
+        title: 'Membro adicionado',
         description: 'Membro vinculado ao parceiro.',
       });
     },
     onError: (error: Error) => {
       toast({
-        title: 'Falha ao adicionar staff',
+        title: 'Falha ao adicionar membro',
         description: error.message,
         variant: 'destructive',
       });
@@ -267,13 +269,13 @@ export default function PartnersPage() {
       await invalidatePartners();
       setPartnerForGrant(null);
       toast({
-        title: 'Grant criado',
-        description: 'Grant comercial criado para o evento do parceiro.',
+        title: 'Concessao criada',
+        description: 'Concessao comercial criada para o evento do parceiro.',
       });
     },
     onError: (error: Error) => {
       toast({
-        title: 'Falha ao criar grant',
+        title: 'Falha ao criar concessao',
         description: error.message,
         variant: 'destructive',
       });
@@ -390,106 +392,119 @@ export default function PartnersPage() {
       </div>
 
       <section className="glass rounded-3xl border border-border/60 p-4 sm:p-5">
-        <div className="flex items-center gap-2 text-sm font-semibold">
-          <SlidersHorizontal className="h-4 w-4 text-primary" />
-          Filtros e ordenacao
-        </div>
+        <Collapsible open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <SlidersHorizontal className="h-4 w-4 text-primary" />
+              Lista administrativa
+            </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-12">
-          <div className="relative xl:col-span-4">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome, segmento, email ou documento"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              className="pl-9"
-            />
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" size="sm">
+                <SlidersHorizontal className="h-4 w-4" />
+                Filtros e ordenacao
+              </Button>
+            </CollapsibleTrigger>
           </div>
 
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="xl:col-span-2" aria-label="Status do parceiro">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os status</SelectItem>
-              <SelectItem value="active">Ativos</SelectItem>
-              <SelectItem value="inactive">Inativos</SelectItem>
-              <SelectItem value="suspended">Suspensos</SelectItem>
-            </SelectContent>
-          </Select>
+          <CollapsibleContent className="mt-4">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
+              <div className="relative xl:col-span-4">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nome, segmento, email ou documento"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  className="pl-9"
+                />
+              </div>
 
-          <Select value={subscriptionStatusFilter} onValueChange={setSubscriptionStatusFilter}>
-            <SelectTrigger className="xl:col-span-2" aria-label="Status da assinatura">
-              <SelectValue placeholder="Assinatura" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as assinaturas</SelectItem>
-              <SelectItem value="active">Assinatura ativa</SelectItem>
-              <SelectItem value="trialing">Trial</SelectItem>
-              <SelectItem value="canceled">Cancelada</SelectItem>
-              <SelectItem value="suspended">Suspensa</SelectItem>
-            </SelectContent>
-          </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="xl:col-span-2" aria-label="Status do parceiro">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os status</SelectItem>
+                  <SelectItem value="active">Ativos</SelectItem>
+                  <SelectItem value="inactive">Inativos</SelectItem>
+                  <SelectItem value="suspended">Suspensos</SelectItem>
+                </SelectContent>
+              </Select>
 
-          <Input
-            aria-label="Codigo do plano"
-            placeholder="Plano (codigo)"
-            value={planFilter}
-            onChange={(event) => setPlanFilter(event.target.value)}
-            className="xl:col-span-2"
-          />
+              <Select value={subscriptionStatusFilter} onValueChange={setSubscriptionStatusFilter}>
+                <SelectTrigger className="xl:col-span-2" aria-label="Status da assinatura">
+                  <SelectValue placeholder="Assinatura" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as assinaturas</SelectItem>
+                  <SelectItem value="active">Assinatura ativa</SelectItem>
+                  <SelectItem value="trialing">Periodo de teste</SelectItem>
+                  <SelectItem value="canceled">Cancelada</SelectItem>
+                  <SelectItem value="suspended">Suspensa</SelectItem>
+                </SelectContent>
+              </Select>
 
-          <Select value={hasActiveEventsFilter} onValueChange={setHasActiveEventsFilter}>
-            <SelectTrigger className="xl:col-span-2" aria-label="Eventos ativos">
-              <SelectValue placeholder="Eventos" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os eventos</SelectItem>
-              <SelectItem value="with_active_events">Com eventos ativos</SelectItem>
-              <SelectItem value="without_active_events">Sem eventos ativos</SelectItem>
-            </SelectContent>
-          </Select>
+              <Input
+                aria-label="Codigo do plano"
+                placeholder="Plano (codigo)"
+                value={planFilter}
+                onChange={(event) => setPlanFilter(event.target.value)}
+                className="xl:col-span-2"
+              />
 
-          <Select value={hasClientsFilter} onValueChange={setHasClientsFilter}>
-            <SelectTrigger className="xl:col-span-2" aria-label="Clientes">
-              <SelectValue placeholder="Clientes" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os clientes</SelectItem>
-              <SelectItem value="with_clients">Com clientes</SelectItem>
-              <SelectItem value="without_clients">Sem clientes</SelectItem>
-            </SelectContent>
-          </Select>
+              <Select value={hasActiveEventsFilter} onValueChange={setHasActiveEventsFilter}>
+                <SelectTrigger className="xl:col-span-2" aria-label="Eventos ativos">
+                  <SelectValue placeholder="Eventos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os eventos</SelectItem>
+                  <SelectItem value="with_active_events">Com eventos ativos</SelectItem>
+                  <SelectItem value="without_active_events">Sem eventos ativos</SelectItem>
+                </SelectContent>
+              </Select>
 
-          <Select value={sortBy} onValueChange={(value) => setSortBy(value as PartnerSortBy)}>
-            <SelectTrigger className="xl:col-span-2" aria-label="Ordenar parceiros por">
-              <SelectValue placeholder="Ordenar por" />
-            </SelectTrigger>
-            <SelectContent>
-              {PARTNER_SORT_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              <Select value={hasClientsFilter} onValueChange={setHasClientsFilter}>
+                <SelectTrigger className="xl:col-span-2" aria-label="Clientes">
+                  <SelectValue placeholder="Clientes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os clientes</SelectItem>
+                  <SelectItem value="with_clients">Com clientes</SelectItem>
+                  <SelectItem value="without_clients">Sem clientes</SelectItem>
+                </SelectContent>
+              </Select>
 
-          <Select value={sortDirection} onValueChange={(value) => setSortDirection(value as SortDirection)}>
-            <SelectTrigger className="xl:col-span-2" aria-label="Direcao da ordenacao">
-              <SelectValue placeholder="Direcao" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="desc">Decrescente</SelectItem>
-              <SelectItem value="asc">Crescente</SelectItem>
-            </SelectContent>
-          </Select>
+              <Select value={sortBy} onValueChange={(value) => setSortBy(value as PartnerSortBy)}>
+                <SelectTrigger className="xl:col-span-2" aria-label="Ordenar parceiros por">
+                  <SelectValue placeholder="Ordenar por" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PARTNER_SORT_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-          <div className="xl:col-span-2">
-            <Button variant="outline" className="w-full" onClick={resetFilters}>
-              Limpar filtros
-            </Button>
-          </div>
-        </div>
+              <Select value={sortDirection} onValueChange={(value) => setSortDirection(value as SortDirection)}>
+                <SelectTrigger className="xl:col-span-2" aria-label="Direcao da ordenacao">
+                  <SelectValue placeholder="Direcao" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="desc">Decrescente</SelectItem>
+                  <SelectItem value="asc">Crescente</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <div className="xl:col-span-2">
+                <Button variant="outline" className="w-full" onClick={resetFilters}>
+                  Limpar filtros
+                </Button>
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </section>
 
       {partnersQuery.isLoading && partners.length === 0 ? (

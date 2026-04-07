@@ -31,6 +31,7 @@ const faceSearchSettingsSchema = z.object({
   provider_key: z.enum(['noop', 'compreface']),
   embedding_model_key: z.string().trim().min(1, 'Informe o modelo de embedding.').max(120, 'Use ate 120 caracteres.'),
   vector_store_key: z.enum(['pgvector']),
+  search_strategy: z.enum(['exact', 'ann']),
   min_face_size_px: z.string().regex(/^\d+$/, 'Informe um numero inteiro valido.'),
   min_quality_score: z.string().regex(/^(0(\.\d+)?|1(\.0+)?)$/, 'Use um valor entre 0 e 1.'),
   search_threshold: z.string().regex(/^(0(\.\d+)?|1(\.0+)?)$/, 'Use um valor entre 0 e 1.'),
@@ -59,6 +60,7 @@ function buildFormValues(settings: ApiEventFaceSearchSettings): FaceSearchSettin
     provider_key: settings.provider_key === 'compreface' ? 'compreface' : 'noop',
     embedding_model_key: settings.embedding_model_key,
     vector_store_key: 'pgvector',
+    search_strategy: settings.search_strategy === 'ann' ? 'ann' : 'exact',
     min_face_size_px: String(settings.min_face_size_px),
     min_quality_score: toFormValue(settings.min_quality_score),
     search_threshold: toFormValue(settings.search_threshold),
@@ -74,6 +76,7 @@ function toPayload(values: FaceSearchSettingsFormValues): UpdateEventFaceSearchS
     provider_key: values.provider_key,
     embedding_model_key: values.embedding_model_key,
     vector_store_key: values.vector_store_key,
+    search_strategy: values.search_strategy,
     min_face_size_px: Number(values.min_face_size_px),
     min_quality_score: Number(values.min_quality_score),
     search_threshold: Number(values.search_threshold),
@@ -179,7 +182,7 @@ export function EventFaceSearchSettingsForm({
           />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <FormField
             control={form.control}
             name="provider_key"
@@ -221,6 +224,31 @@ export function EventFaceSearchSettingsForm({
                     <SelectItem value="pgvector">pgvector</SelectItem>
                   </SelectContent>
                 </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="search_strategy"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Estrategia</FormLabel>
+                <Select value={field.value} onValueChange={field.onChange} disabled={disabled || isPending}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a estrategia" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="exact">Exact</SelectItem>
+                    <SelectItem value="ann">ANN</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormDescription>
+                  Use ANN apenas apos benchmark por evento.
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}

@@ -16,6 +16,7 @@ export interface EventFaceSearchSettings {
   provider_key: 'noop' | 'compreface' | string;
   embedding_model_key: string;
   vector_store_key: 'pgvector' | string;
+  search_strategy: 'exact' | 'ann' | string;
   enabled: boolean;
   min_face_size_px: number;
   min_quality_score: number;
@@ -53,7 +54,7 @@ export interface EventMediaIntelligenceSettings {
   id: number | null;
   event_id: number;
   enabled: boolean;
-  provider_key: 'vllm' | 'noop' | string;
+  provider_key: 'vllm' | 'openrouter' | 'noop' | string;
   model_key: string;
   mode: 'enrich_only' | 'gate' | string;
   prompt_version: string | null;

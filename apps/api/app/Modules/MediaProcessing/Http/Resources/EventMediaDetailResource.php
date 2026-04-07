@@ -25,6 +25,7 @@ class EventMediaDetailResource extends JsonResource
                 'mime_type' => $this->mime_type,
                 'size_bytes' => $this->size_bytes,
                 'duration_seconds' => $this->duration_seconds,
+                'caption_source_hint' => $this->resolveCaptionSourceHint(),
                 'preview_url' => $assets->preview($this->resource),
                 'original_url' => $assets->original($this->resource),
                 'variants' => $this->whenLoaded('variants', function () use ($assets) {
@@ -115,5 +116,22 @@ class EventMediaDetailResource extends JsonResource
                 'indexed_faces_count' => $this->whenCounted('faces'),
             ],
         );
+    }
+
+    private function resolveCaptionSourceHint(): ?string
+    {
+        $caption = trim((string) ($this->caption ?? ''));
+
+        if ($caption === '' || ! $this->relationLoaded('latestVlmEvaluation')) {
+            return null;
+        }
+
+        $shortCaption = trim((string) ($this->latestVlmEvaluation?->short_caption ?? ''));
+
+        if ($shortCaption !== '' && $shortCaption === $caption) {
+            return 'vlm';
+        }
+
+        return 'human';
     }
 }

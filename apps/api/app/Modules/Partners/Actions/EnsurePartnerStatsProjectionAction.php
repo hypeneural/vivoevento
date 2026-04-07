@@ -4,6 +4,7 @@ namespace App\Modules\Partners\Actions;
 
 use App\Modules\Organizations\Enums\OrganizationType;
 use App\Modules\Organizations\Models\Organization;
+use App\Modules\Partners\Support\PartnerProjectionTables;
 
 class EnsurePartnerStatsProjectionAction
 {
@@ -13,6 +14,10 @@ class EnsurePartnerStatsProjectionAction
 
     public function execute(): void
     {
+        if (! PartnerProjectionTables::hasStatsTable()) {
+            return;
+        }
+
         Organization::query()
             ->where('type', OrganizationType::Partner->value)
             ->whereDoesntHave('partnerStats')

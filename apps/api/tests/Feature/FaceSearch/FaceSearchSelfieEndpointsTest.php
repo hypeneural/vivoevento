@@ -129,6 +129,62 @@ it('uses compreface calculator embedding to find a selfie match', function () {
     Http::assertSentCount(0);
 });
 
+it('passes the event search strategy to the vector store', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'search_strategy' => 'ann',
+        'top_k' => 10,
+        'search_threshold' => 0.4,
+    ]);
+
+    bindSingleFaceSearchProviders([0.10, 0.20, 0.30]);
+
+    $store = new class implements FaceVectorStoreInterface
+    {
+        public ?string $searchStrategy = null;
+
+        public function upsert(EventMediaFace $face, FaceEmbeddingData $embedding): EventMediaFace
+        {
+            return $face;
+        }
+
+        public function delete(EventMediaFace $face): void {}
+
+        public function search(
+            int $eventId,
+            array $queryEmbedding,
+            int $topK,
+            ?float $threshold = null,
+            bool $searchableOnly = true,
+            ?string $searchStrategy = null,
+        ): array {
+            $this->searchStrategy = $searchStrategy;
+
+            return [];
+        }
+    };
+
+    app()->instance(FaceVectorStoreInterface::class, $store);
+
+    $response = $this->withHeaders(['Accept' => 'application/json'])->post(
+        "/api/v1/events/{$event->id}/face-search/search",
+        [
+            'selfie' => UploadedFile::fake()->image('selfie.jpg'),
+            'include_pending' => true,
+        ],
+    );
+
+    $this->assertApiSuccess($response);
+
+    expect($store->searchStrategy)->toBe('ann');
+});
+
 it('returns a clear validation error when the selfie has no valid face', function () {
     [$user, $organization] = $this->actingAsOwner();
 
@@ -161,6 +217,130 @@ it('returns a clear validation error when the selfie has no valid face', functio
 
     expect($request?->status)->toBe('failed')
         ->and($request?->faces_detected)->toBe(0);
+});
+
+it('stores reject tier and reason when the selfie fails the quality gate', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'min_face_size_px' => 100,
+        'min_quality_score' => 0.70,
+    ]);
+
+    app()->instance(FaceDetectionProviderInterface::class, new class implements FaceDetectionProviderInterface
+    {
+        public function detect(\App\Modules\MediaProcessing\Models\EventMedia $media, \App\Modules\FaceSearch\Models\EventFaceSearchSetting $settings, string $binary): array
+        {
+            return [
+                new DetectedFaceData(
+                    boundingBox: new FaceBoundingBoxData(10, 10, 90, 90),
+                    qualityScore: 0.96,
+                ),
+            ];
+        }
+    });
+
+    $response = $this->withHeaders(['Accept' => 'application/json'])->post(
+        "/api/v1/events/{$event->id}/face-search/search",
+        [
+            'selfie' => UploadedFile::fake()->image('selfie-ruim.jpg'),
+        ],
+    );
+
+    $this->assertApiValidationError($response, ['selfie']);
+
+    $request = EventFaceSearchRequest::query()->where('event_id', $event->id)->latest('id')->first();
+
+    expect($request?->status)->toBe('failed')
+        ->and($request?->query_face_quality_tier)->toBe('reject')
+        ->and($request?->query_face_rejection_reason)->toBe('face_too_small');
+});
+
+it('prefers search priority media over index only media when distances tie', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'top_k' => 10,
+        'search_threshold' => 0.4,
+    ]);
+
+    bindSingleFaceSearchProviders([0.10, 0.20, 0.30]);
+
+    $priorityMedia = EventMedia::factory()->approved()->published()->create([
+        'event_id' => $event->id,
+    ]);
+    $indexOnlyMedia = EventMedia::factory()->approved()->published()->create([
+        'event_id' => $event->id,
+    ]);
+
+    $store = new class($priorityMedia->id, $indexOnlyMedia->id) implements FaceVectorStoreInterface
+    {
+        public function __construct(
+            private readonly int $priorityMediaId,
+            private readonly int $indexOnlyMediaId,
+        ) {}
+
+        public function upsert(EventMediaFace $face, FaceEmbeddingData $embedding): EventMediaFace
+        {
+            return $face;
+        }
+
+        public function delete(EventMediaFace $face): void {}
+
+        public function search(
+            int $eventId,
+            array $queryEmbedding,
+            int $topK,
+            ?float $threshold = null,
+            bool $searchableOnly = true,
+            ?string $searchStrategy = null,
+        ): array {
+            return [
+                new \App\Modules\FaceSearch\DTOs\FaceSearchMatchData(
+                    faceId: 9001,
+                    eventMediaId: $this->indexOnlyMediaId,
+                    distance: 0.10,
+                    qualityScore: 0.95,
+                    faceAreaRatio: 0.18,
+                    qualityTier: 'index_only',
+                ),
+                new \App\Modules\FaceSearch\DTOs\FaceSearchMatchData(
+                    faceId: 9002,
+                    eventMediaId: $this->priorityMediaId,
+                    distance: 0.10,
+                    qualityScore: 0.72,
+                    faceAreaRatio: 0.09,
+                    qualityTier: 'search_priority',
+                ),
+            ];
+        }
+    };
+
+    app()->instance(FaceVectorStoreInterface::class, $store);
+
+    $response = $this->withHeaders(['Accept' => 'application/json'])->post(
+        "/api/v1/events/{$event->id}/face-search/search",
+        [
+            'selfie' => UploadedFile::fake()->image('selfie.jpg'),
+            'include_pending' => true,
+        ],
+    );
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.results.0.event_media_id', $priorityMedia->id);
+    $response->assertJsonPath('data.results.0.best_quality_tier', 'search_priority');
+    $response->assertJsonPath('data.results.1.event_media_id', $indexOnlyMedia->id);
+    $response->assertJsonPath('data.results.1.best_quality_tier', 'index_only');
 });
 
 it('blocks public selfie search when the event does not allow it', function () {

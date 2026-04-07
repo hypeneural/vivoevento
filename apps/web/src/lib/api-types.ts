@@ -657,6 +657,9 @@ export interface MePreferences {
   theme: 'light' | 'dark';
   timezone: string;
   locale: string;
+  email_notifications: boolean;
+  push_notifications: boolean;
+  compact_mode: boolean;
 }
 
 export interface MeOrganization {
@@ -873,6 +876,7 @@ export interface ApiEventFaceSearchSettings {
   provider_key: 'noop' | 'compreface' | string;
   embedding_model_key: string;
   vector_store_key: 'pgvector' | string;
+  search_strategy: 'exact' | 'ann' | string;
   enabled: boolean;
   min_face_size_px: number;
   min_quality_score: number;
@@ -910,7 +914,7 @@ export interface ApiEventMediaIntelligenceSettings {
   id: number | null;
   event_id: number;
   enabled: boolean;
-  provider_key: 'vllm' | 'noop' | string;
+  provider_key: 'vllm' | 'openrouter' | 'noop' | string;
   model_key: string;
   mode: 'enrich_only' | 'gate' | string;
   prompt_version: string | null;
@@ -1378,6 +1382,8 @@ export interface ApiWallSettings {
   neon_text: string | null;
   neon_color: string | null;
   show_sender_credit: boolean;
+  show_side_thumbnails: boolean;
+  accepted_orientation: 'all' | 'landscape' | 'portrait';
   instructions_text: string | null;
 }
 

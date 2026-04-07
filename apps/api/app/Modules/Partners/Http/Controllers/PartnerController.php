@@ -38,6 +38,7 @@ use App\Modules\Partners\Http\Resources\PartnerResource;
 use App\Modules\Partners\Http\Resources\PartnerStaffMemberResource;
 use App\Modules\Partners\Queries\ListPartnerActivitiesQuery;
 use App\Modules\Partners\Queries\ListPartnersQuery;
+use App\Modules\Partners\Support\PartnerProjectionTables;
 use App\Shared\Http\BaseController;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -96,14 +97,11 @@ class PartnerController extends BaseController
     {
         Gate::authorize('viewPartner', $partner);
 
-        $this->rebuildPartnerStats->execute($partner->fresh(['subscriptions.plan']));
+        if (PartnerProjectionTables::hasStatsTable()) {
+            $this->rebuildPartnerStats->execute($partner->fresh(['subscriptions.plan']));
+        }
 
-        $partner = $partner->fresh([
-            'partnerProfile',
-            'partnerStats',
-            'subscription.plan',
-            'members.user',
-        ]);
+        $partner = $partner->fresh(PartnerProjectionTables::loadableOrganizationRelations());
 
         $activity = (new ListPartnerActivitiesQuery($partner))
             ->query()

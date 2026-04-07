@@ -10,12 +10,13 @@ export const WALL_EVENT_NAMES = {
 } as const;
 
 export type WallMediaType = 'image' | 'video';
-export type WallLayout = 'auto' | 'polaroid' | 'fullscreen' | 'split' | 'cinematic';
+export type WallLayout = 'auto' | 'polaroid' | 'fullscreen' | 'split' | 'cinematic' | 'kenburns' | 'spotlight' | 'gallery' | 'carousel' | 'mosaic' | 'grid';
 export type WallTransition = 'fade' | 'slide' | 'zoom' | 'flip' | 'none';
 export type WallLifecycleStatus = 'draft' | 'live' | 'paused' | 'stopped' | 'expired';
 export type WallPublicStatus = WallLifecycleStatus | 'disabled';
 export type WallSelectionMode = 'balanced' | 'live' | 'inclusive' | 'editorial' | 'custom';
 export type WallEventPhase = 'reception' | 'flow' | 'party' | 'closing';
+export type WallAcceptedOrientation = 'all' | 'landscape' | 'portrait';
 export type WallPersistentStorage =
   | 'none'
   | 'localstorage'
@@ -68,6 +69,8 @@ export interface WallSettings {
   neon_text?: string | null;
   neon_color?: string | null;
   show_sender_credit: boolean;
+  show_side_thumbnails: boolean;
+  accepted_orientation: WallAcceptedOrientation;
   instructions_text?: string | null;
 }
 

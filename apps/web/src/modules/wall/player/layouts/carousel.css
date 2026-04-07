@@ -1,0 +1,99 @@
+/* Carousel Layout — 3D perspective carousel */
+
+.carousel-container {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #050505;
+  perspective: 1200px;
+  overflow: hidden;
+}
+
+.carousel-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+/* ─── Slides ─────────────────────────────── */
+.carousel-slide {
+  position: absolute;
+  overflow: hidden;
+  border-radius: 16px;
+  transition:
+    transform 0.5s ease,
+    opacity 0.5s ease,
+    filter 0.5s ease;
+}
+
+.carousel-center {
+  width: min(55vw, 900px);
+  height: min(70vh, 750px);
+  z-index: 10;
+  transform: scale(1) translateX(0);
+  filter: brightness(1);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.6),
+    0 0 40px rgba(0, 0, 0, 0.3);
+}
+
+.carousel-left {
+  width: min(40vw, 650px);
+  height: min(55vh, 580px);
+  z-index: 5;
+  transform: scale(0.85) translateX(-85%) rotateY(8deg);
+  filter: brightness(0.5);
+  opacity: 0.7;
+}
+
+.carousel-right {
+  width: min(40vw, 650px);
+  height: min(55vh, 580px);
+  z-index: 5;
+  transform: scale(0.85) translateX(85%) rotateY(-8deg);
+  filter: brightness(0.5);
+  opacity: 0.7;
+}
+
+/* ─── Empty cell ─────────────────────────── */
+.carousel-empty {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+/* ─── Caption ────────────────────────────── */
+.carousel-caption {
+  position: absolute;
+  bottom: max(24px, 3vh);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  border-radius: 16px;
+  background: rgba(10, 10, 10, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.carousel-sender {
+  font-size: clamp(0.9rem, 1.6vw, 1.4rem);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.carousel-text {
+  font-size: clamp(0.7rem, 1.2vw, 1rem);
+  color: rgba(255, 255, 255, 0.6);
+  max-width: 40vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -6,6 +6,7 @@ use App\Modules\Organizations\Enums\OrganizationType;
 use App\Modules\Organizations\Models\Organization;
 use App\Modules\Organizations\Models\OrganizationMember;
 use App\Modules\Partners\Models\PartnerProfile;
+use App\Modules\Partners\Support\PartnerProjectionTables;
 use App\Modules\Users\Models\User;
 use App\Shared\Support\Helpers;
 use Illuminate\Support\Facades\DB;
@@ -67,14 +68,16 @@ class CreatePartnerAction
                 ],
             );
 
-            PartnerProfile::query()->updateOrCreate(
-                ['organization_id' => $partner->id],
-                [
-                    'segment' => $data['segment'] ?? null,
-                    'notes' => $data['notes'] ?? null,
-                    'account_owner_user_id' => $ownerUser->id,
-                ],
-            );
+            if (PartnerProjectionTables::hasProfilesTable()) {
+                PartnerProfile::query()->updateOrCreate(
+                    ['organization_id' => $partner->id],
+                    [
+                        'segment' => $data['segment'] ?? null,
+                        'notes' => $data['notes'] ?? null,
+                        'account_owner_user_id' => $ownerUser->id,
+                    ],
+                );
+            }
 
             $this->rebuildPartnerStats->execute($partner->fresh(['subscriptions.plan']));
 
@@ -90,12 +93,7 @@ class CreatePartnerAction
                 ])
                 ->log('Parceiro criado');
 
-            return $partner->fresh([
-                'partnerProfile',
-                'partnerStats',
-                'subscription.plan',
-                'members.user',
-            ]);
+            return $partner->fresh(PartnerProjectionTables::loadableOrganizationRelations());
         });
     }
 }

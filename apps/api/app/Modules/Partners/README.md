@@ -32,8 +32,8 @@ Camada administrativa B2B para parceiros profissionais. O modulo trata `partner`
 - escrita via actions dedicadas do modulo
 - policy global em `PartnerPolicy`
 - activity log para create/update/suspend/delete/staff/grants
+- job opcional `RebuildPartnerStatsJob` para atualizar a projecao de forma assincrona quando `PARTNER_STATS_ASYNC_UPDATES=true`
 
 ## Pendencias
 
-- avaliar job assincrono para rebuild de `partner_stats` quando o volume exigir
 - evoluir paginacao/filtros finos dos subrecursos no detalhe web se o volume exigir

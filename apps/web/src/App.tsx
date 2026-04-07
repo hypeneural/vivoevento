@@ -171,8 +171,22 @@ function ProtectedRoutes() {
               </ModuleGuard>
             )}
           />
-          <Route path="settings/whatsapp" element={<WhatsAppInstancesPage />} />
-          <Route path="settings/whatsapp/:id" element={<WhatsAppInstanceDetailPage />} />
+          <Route
+            path="settings/whatsapp"
+            element={(
+              <ModuleGuard moduleKey="whatsapp" requiredPermissions={['channels.manage', 'channels.view']}>
+                <WhatsAppInstancesPage />
+              </ModuleGuard>
+            )}
+          />
+          <Route
+            path="settings/whatsapp/:id"
+            element={(
+              <ModuleGuard moduleKey="whatsapp" requiredPermissions={['channels.manage', 'channels.view']}>
+                <WhatsAppInstanceDetailPage />
+              </ModuleGuard>
+            )}
+          />
 
           {/* 404 */}
           <Route path="*" element={<NotFound />} />

@@ -60,6 +60,80 @@ it('updates media intelligence settings for an event', function () {
     ]);
 });
 
+it('accepts openrouter as the media intelligence provider', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    $response = $this->apiPatch("/events/{$event->id}/media-intelligence/settings", [
+        'enabled' => true,
+        'provider_key' => 'openrouter',
+        'model_key' => 'openai/gpt-4.1-mini',
+        'mode' => 'enrich_only',
+        'prompt_version' => 'foundation-v1',
+        'approval_prompt' => 'Avalie a foto e retorne JSON.',
+        'caption_style_prompt' => 'Legenda curta e positiva.',
+        'response_schema_version' => 'foundation-v1',
+        'timeout_ms' => 9000,
+        'fallback_mode' => 'review',
+        'require_json_output' => true,
+    ]);
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.provider_key', 'openrouter')
+        ->assertJsonPath('data.model_key', 'openai/gpt-4.1-mini');
+});
+
+it('rejects non-pinned OpenRouter router aliases in saved settings', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    $response = $this->apiPatch("/events/{$event->id}/media-intelligence/settings", [
+        'enabled' => true,
+        'provider_key' => 'openrouter',
+        'model_key' => 'openrouter/auto',
+        'mode' => 'enrich_only',
+        'prompt_version' => 'foundation-v1',
+        'approval_prompt' => 'Teste',
+        'caption_style_prompt' => 'Teste',
+        'response_schema_version' => 'foundation-v1',
+        'timeout_ms' => 9000,
+        'fallback_mode' => 'review',
+        'require_json_output' => true,
+    ]);
+
+    $this->assertApiValidationError($response, ['model_key']);
+});
+
+it('rejects non-homologated fixed OpenRouter models in saved settings', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    $response = $this->apiPatch("/events/{$event->id}/media-intelligence/settings", [
+        'enabled' => true,
+        'provider_key' => 'openrouter',
+        'model_key' => 'openai/gpt-4.1-nano',
+        'mode' => 'enrich_only',
+        'prompt_version' => 'foundation-v1',
+        'approval_prompt' => 'Teste',
+        'caption_style_prompt' => 'Teste',
+        'response_schema_version' => 'foundation-v1',
+        'timeout_ms' => 9000,
+        'fallback_mode' => 'review',
+        'require_json_output' => true,
+    ]);
+
+    $this->assertApiValidationError($response, ['model_key']);
+});
+
 it('validates that gate mode cannot use skip fallback', function () {
     [$user, $organization] = $this->actingAsOwner();
 

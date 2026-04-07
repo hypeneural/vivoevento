@@ -15,11 +15,12 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { formatRoleLabel } from '@/shared/auth/labels';
 
 import type { PartnerListItem, PartnerStaffPayload } from '../types';
 
 const staffSchema = z.object({
-  name: z.string().trim().min(2, 'Informe o nome do staff.').max(160, 'Maximo de 160 caracteres.'),
+  name: z.string().trim().min(2, 'Informe o nome do membro.').max(160, 'Maximo de 160 caracteres.'),
   email: z.string().trim().email('E-mail invalido.').max(160, 'Maximo de 160 caracteres.'),
   phone: z.string().trim().max(40, 'Maximo de 40 caracteres.'),
   role_key: z.enum(['partner-owner', 'partner-manager', 'event-operator', 'viewer']),
@@ -83,7 +84,7 @@ export function PartnerStaffDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Adicionar staff</DialogTitle>
+          <DialogTitle>Adicionar membro</DialogTitle>
           <DialogDescription>
             {partner ? `Adicionar membro em "${partner.name}".` : 'Adicionar membro na organizacao parceira.'}
           </DialogDescription>
@@ -139,18 +140,18 @@ export function PartnerStaffDialog({
                 name="role_key"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Role</FormLabel>
+                    <FormLabel>Perfil</FormLabel>
                     <Select value={field.value} onValueChange={field.onChange}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Role" />
+                          <SelectValue placeholder="Selecione o perfil" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="partner-owner">partner-owner</SelectItem>
-                        <SelectItem value="partner-manager">partner-manager</SelectItem>
-                        <SelectItem value="event-operator">event-operator</SelectItem>
-                        <SelectItem value="viewer">viewer</SelectItem>
+                        <SelectItem value="partner-owner">{formatRoleLabel('partner-owner', 'partner-owner')}</SelectItem>
+                        <SelectItem value="partner-manager">{formatRoleLabel('partner-manager', 'partner-manager')}</SelectItem>
+                        <SelectItem value="event-operator">{formatRoleLabel('event-operator', 'event-operator')}</SelectItem>
+                        <SelectItem value="viewer">{formatRoleLabel('viewer', 'viewer')}</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -163,11 +164,11 @@ export function PartnerStaffDialog({
                 name="is_owner"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Owner?</FormLabel>
+                    <FormLabel>Eh proprietario?</FormLabel>
                     <Select value={field.value} onValueChange={field.onChange}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Owner" />
+                          <SelectValue placeholder="Defina a titularidade" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -186,7 +187,7 @@ export function PartnerStaffDialog({
                 Cancelar
               </Button>
               <Button type="submit" className="gradient-primary border-0" disabled={isSubmitting}>
-                Adicionar staff
+                Adicionar membro
               </Button>
             </DialogFooter>
           </form>

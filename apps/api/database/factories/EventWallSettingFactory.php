@@ -31,6 +31,8 @@ class EventWallSettingFactory extends Factory
             'neon_text' => null,
             'neon_color' => '#ffffff',
             'show_sender_credit' => false,
+            'show_side_thumbnails' => true,
+            'accepted_orientation' => 'all',
             'background_image_path' => null,
             'partner_logo_path' => null,
             'instructions_text' => null,
