@@ -41,11 +41,13 @@ export function useWallManagerRealtime(eventId: string) {
     const refresh = () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.wall.byEvent(eventId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.wall.diagnostics(eventId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.wall.insights(eventId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.events.detail(eventId) });
     };
     const refreshDiagnostics = () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.wall.byEvent(eventId) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.wall.diagnostics(eventId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.wall.insights(eventId) });
     };
 
     const handleStateChange = ({ current }: { current: string }) => {

@@ -73,7 +73,11 @@ export const queryKeys = {
   wall: {
     all: () => ['wall'] as const,
     byEvent: (eventId: string) => [...queryKeys.wall.all(), eventId] as const,
+    settings: (eventId: string) => [...queryKeys.wall.byEvent(eventId), 'settings'] as const,
+    options: () => [...queryKeys.wall.all(), 'options'] as const,
+    ads: (eventId: string) => [...queryKeys.wall.byEvent(eventId), 'ads'] as const,
     diagnostics: (eventId: string) => [...queryKeys.wall.byEvent(eventId), 'diagnostics'] as const,
+    insights: (eventId: string) => [...queryKeys.wall.byEvent(eventId), 'insights'] as const,
     simulation: (eventId: string, fingerprint: string) => [...queryKeys.wall.byEvent(eventId), 'simulation', fingerprint] as const,
   },
 

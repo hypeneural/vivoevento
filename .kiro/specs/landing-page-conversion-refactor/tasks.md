@@ -226,7 +226,7 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
     - Apresentar 5 canais: WhatsApp número, WhatsApp grupo, Telegram, Link/QR Code, Upload web
     - Usar cards grandes ou grid visual
     - Mostrar exemplo visual de uso para cada canal
-    - Otimizar para 60-80vh em desktop
+    - Otimizar para 60-80 vh em desktop
     - Implementar acessibilidade: headings, alt text, contraste
     - _Requirements: 5, 22_
 
@@ -287,7 +287,7 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
 
 ## Fase 4 — Conversão
 
-- [~] 13. Refatorar seções de conversão
+- [x] 13. Refatorar seções de conversão
   - [x] 13.1 Refatorar AudienceSection com cards escaneáveis
     - **CLARIFICAÇÃO:** São 3 cards principais: Assessoras/Cerimonialistas, Noivas/Debutantes/Famílias, Promotores/Produtores/Corporativos
     - Cada card responde: promessa principal, módulos prioritários, objeções principais
@@ -296,7 +296,7 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
     - Implementar acessibilidade: headings, contraste, navegação por teclado
     - _Requirements: 9, 19, 22_
   
-  - [~] 13.2 Implementar PersonaSelector interativo
+  - [x] 13.2 Implementar PersonaSelector interativo
     - Criar componente para seleção de persona antes da seção de módulos
     - Oferecer 3 opções com copy claro
     - Persistir escolha durante navegação
@@ -304,8 +304,8 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
     - Implementar acessibilidade: navegação por teclado, aria-labels
     - _Requirements: 35, 31, 22_
 
-- [~] 14. Refatorar prova social contextualizada
-  - [~] 14.1 Refatorar TestimonialsSection com contexto
+- [-] 14. Refatorar prova social contextualizada
+  - [x] 14.1 Refatorar TestimonialsSection com contexto
     - Organizar em 3 blocos: Casamentos e debutantes, Assessoria e cerimonial, Eventos e ativações
     - Incluir em cada depoimento: contexto de evento, volume de fotos, resultado mensurável
     - Adicionar foto real do evento relacionado
@@ -313,14 +313,14 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
     - Implementar acessibilidade: headings, alt text para fotos de eventos
     - _Requirements: 10, 34, 22_
   
-  - [~] 14.2 Implementar adaptação de prova social por persona
+  - [x] 14.2 Implementar adaptação de prova social por persona
     - Priorizar depoimentos de casamento para persona social
     - Priorizar depoimentos de assessoria para persona assessora
     - Priorizar depoimentos corporativos para persona corporativo
     - Integrar com `usePersonaContent` hook
     - _Requirements: 34, 31_
   
-  - [~] 14.3 Criar fallbacks SEGUROS para depoimentos
+  - [x] 14.3 Criar fallbacks SEGUROS para depoimentos
     - **ATENÇÃO:** Depoimentos fallback com cara de real em produção é arriscado
     - Em produção, usar: placeholder visual de layout, case temporariamente oculto, ou bloco "exemplo ilustrativo" bem marcado
     - Implementar FALLBACK_TESTIMONIALS com mínimo 3 depoimentos
@@ -329,8 +329,8 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
     - Fallbacks realistas APENAS em desenvolvimento
     - _Requirements: 29_
 
-- [~] 15. Refatorar seções comerciais finais
-  - [~] 15.1 Refatorar PricingSection com clareza comercial
+- [ ] 15. Refatorar seções comerciais finais
+  - [x] 15.1 Refatorar PricingSection com clareza comercial
     - Separar 3 categorias: evento avulso, parceiros recorrentes, operação enterprise
     - Destacar visualmente plano mais comum
     - Reduzir ruído visual em 40%
@@ -338,7 +338,7 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
     - Implementar acessibilidade: headings, contraste, navegação por teclado
     - _Requirements: 11, 19, 22_
   
-  - [~] 15.2 Refatorar FAQSection enxuta
+  - [x] 15.2 Refatorar FAQSection enxuta
     - Reduzir para 7-10 perguntas comerciais e de objeção
     - Incluir: precisa de app?, aceita vídeo?, funciona com muito volume?, moderação?, busca facial?, serve para casamento/formatura?, branding?
     - Implementar accordion com apenas uma pergunta aberta por vez
@@ -346,7 +346,7 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
     - Implementar acessibilidade: padrão APG WAI para Accordion, navegação por teclado
     - _Requirements: 12, 22_
   
-  - [~] 15.3 Refatorar FinalCTASection
+  - [x] 15.3 Refatorar FinalCTASection
     - Título forte e subtítulo curto
     - Exatamente 2 botões: "Agendar demonstração" e "Falar no WhatsApp"
     - Fundo limpo e contrastante
@@ -354,34 +354,34 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
     - Implementar acessibilidade: contraste, navegação por teclado
     - _Requirements: 13, 20, 22_
 
-- [~] 16. Implementar microconversões
-  - [~] 16.1 Adicionar CTAs de microconversão
+- [x] 16. Implementar microconversões
+  - [x] 16.1 Adicionar CTAs de microconversão
     - Implementar "Ver evento exemplo", "Ver como funciona em 30s", "Abrir demonstração visual"
     - Posicionar próximo ao CTA principal
     - Implementar tracking de microconversão
     - _Requirements: 36_
   
-  - [~] 16.2 Implementar CTA flutuante
+  - [x] 16.2 Implementar CTA flutuante
     - Criar componente CTAFloating que aparece após 80% de scroll
     - Implementar lógica no ScrollUIContext
     - Design discreto e não intrusivo
     - Implementar acessibilidade: não bloquear conteúdo, permitir fechar
     - _Requirements: 20, 36, 22_
 
-- [~] 17. Implementar modelo de conversão adaptado
-  - [~] 17.1 Criar CTAs específicos por persona
+- [x] 17. Implementar modelo de conversão adaptado
+  - [x] 17.1 Criar CTAs específicos por persona
     - Para social: priorizar "Falar no WhatsApp" com mensagem pré-preenchida
     - Para assessora: priorizar "Agendar demonstração" com formulário qualificado
     - Para corporativo: priorizar "Agendar demonstração" com formulário multi-step
     - _Requirements: 37_
   
-  - [~] 17.2 Implementar buildCTAUrl com UTM params
+  - [x] 17.2 Implementar buildCTAUrl com UTM params
     - Criar função em `apps/landing/src/utils/routing.ts`
     - Capturar e propagar parâmetros UTM em todos CTAs
     - Implementar getUTMParams, setPersonaInURL, getPersonaFromURL
     - _Requirements: 26, 37_
 
-- [~] 18. Checkpoint - Validar conversão e CTAs
+- [x] 18. Checkpoint - Validar conversão e CTAs
   - ✅ Build verde
   - ✅ Type-check verde
   - ✅ Todos CTAs funcionais com UTM params
@@ -393,43 +393,43 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
 
 ## Fase 5 — Não Funcionais Integrados
 
-- [~] 19. Implementar copy premium e hierarquia visual
-  - [~] 19.1 Revisar e otimizar copy de todas seções
+- [x] 19. Implementar copy premium e hierarquia visual
+  - [x] 19.1 Revisar e otimizar copy de todas seções
     - Reduzir texto por bloco em 40%
     - Priorizar benefício antes de tecnologia
     - Evitar jargão técnico
     - Frases concisas (≤20 palavras)
     - _Requirements: 15_
   
-  - [~] 19.2 Implementar hierarquia visual clara
+  - [x] 19.2 Implementar hierarquia visual clara
     - Garantir 1 mensagem principal por dobra
     - Melhorar contraste entre título, corpo e elementos auxiliares
     - Aumentar espaço em branco em 50%
     - Alternar padrões visuais entre seções consecutivas
     - _Requirements: 19, 38_
   
-  - [~] 19.3 Implementar alternância visual emocional/funcional/comercial
+  - [x] 19.3 Implementar alternância visual emocional/funcional/comercial
     - Alternar entre fotografia real de evento, UI do produto e layout limpo
     - Evitar mais de 2 seções consecutivas com mesmo padrão
     - Usar fotografia real em ≥3 seções
     - Usar UI do produto em ≥2 seções
     - _Requirements: 38, 1_
 
-- [~] 20. Otimizar performance REAL (não apenas lazy load agressivo)
-  - [~] 20.1 Implementar lazy loading SELETIVO (conforme decisão 0.2)
+- [x] 20. Otimizar performance REAL (não apenas lazy load agressivo)
+  - [x] 20.1 Implementar lazy loading SELETIVO (conforme decisão 0.2)
     - Carregar imediato: Navbar, HeroSection, TrustSignals, HTML principal das seções
     - Lazy load APENAS: demos pesadas (PhaserGameDemo, RiveAnimation), vídeos, carrosséis pesados
     - Configurar Suspense boundaries apropriados
     - _Requirements: 17, 40, 30_
   
-  - [~] 20.2 Otimizar imagens e assets
+  - [x] 20.2 Otimizar imagens e assets
     - Implementar preload para imagens acima da dobra
     - Converter imagens para WebP quando possível
     - Implementar dimensões corretas e srcset responsivo
     - Adicionar loading="lazy" para imagens abaixo da dobra
     - _Requirements: 17, 40_
   
-  - [~] 20.3 Otimizar Core Web Vitals (INP, não FID)
+  - [x] 20.3 Otimizar Core Web Vitals (INP, não FID)
     - **ATUALIZAÇÃO:** Web Vitals substituiu FID por INP
     - Reduzir peso visual acima da dobra em 30%
     - Otimizar para LCP ≤2.5s, INP ≤200ms (não FID), CLS ≤0.1
@@ -437,57 +437,57 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
     - Minimizar JavaScript acima da dobra
     - _Requirements: 40_
   
-  - [~] 20.4 Instrumentar RUM (Real User Monitoring)
+  - [x] 20.4 Instrumentar RUM (Real User Monitoring)
     - **NOVO:** Implementar envio de LCP/INP/CLS reais para analytics
     - Diferenciar métricas de laboratório (Lighthouse) vs campo (RUM)
     - Rastrear Web Vitals em produção para experiência real
     - Configurar alertas para degradação de performance
     - _Requirements: 26, 40_
 
-- [~] 21. Implementar motion e animações
-  - [~] 21.1 Adicionar microinterações premium
+- [x] 21. Implementar motion e animações
+  - [x] 21.1 Adicionar microinterações premium
     - Implementar hover states sutis
     - Adicionar transições em tabs e carrosséis
     - Implementar animações de entrada em viewport
     - Duração entre 200ms-600ms em 90% dos casos
     - _Requirements: 18_
   
-  - [~] 21.2 Implementar suporte a prefers-reduced-motion
+  - [x] 21.2 Implementar suporte a prefers-reduced-motion
     - Detectar preferência do usuário
     - Desabilitar animações decorativas quando ativo
     - Manter transições funcionais essenciais
     - _Requirements: 18, 30_
 
-- [~] 22. Implementar estados de erro e fallbacks
-  - [~] 22.1 Implementar degradação graciosa
+- [x] 22. Implementar estados de erro e fallbacks
+  - [x] 22.1 Implementar degradação graciosa
     - Exibir conteúdo principal com JS desabilitado (conforme decisão 0.2)
     - Implementar fallback para imagens que falharem
     - Implementar fallback para vídeos indisponíveis
     - Manter CTAs funcionais com falha de componentes interativos
     - _Requirements: 30, 29_
   
-  - [~] 22.2 Implementar fallbacks de conteúdo
+  - [x] 22.2 Implementar fallbacks de conteúdo
     - Criar FALLBACK_IMAGES para todas imagens críticas
     - Criar FALLBACK_TESTIMONIALS (mínimo 3, seguros para produção)
     - Implementar estados de loading apropriados
     - _Requirements: 29_
 
-- [~] 23. Implementar privacidade e transparência (conforme decisão 0.5)
-  - [~] 23.1 Adicionar comunicação de privacidade
+- [ ] 23. Implementar privacidade e transparência (conforme decisão 0.5)
+  - [ ] 23.1 Adicionar comunicação de privacidade
     - **ATENÇÃO ANPD:** Indicar que IA e busca facial são configuráveis
     - Explicar níveis de moderação (sem, manual, IA)
     - Adicionar microcopys de transparência perto dos CTAs
     - Revisar copy com perspectiva jurídica/técnica
     - _Requirements: 28, 33_
   
-  - [~] 23.2 Adicionar links de privacidade
+  - [ ] 23.2 Adicionar links de privacidade
     - Incluir link para política de privacidade no footer
     - Incluir link para termos de uso no footer
     - Posicionar link de privacidade perto de CTAs principais
     - _Requirements: 28, 33_
 
-- [~] 24. Remover componentes obsoletos
-  - [~] 24.1 Remover seções antigas
+- [ ] 24. Remover componentes obsoletos
+  - [ ] 24.1 Remover seções antigas
     - Remover DynamicGallerySection.tsx e .module.scss
     - Remover InteractiveGamesSection.tsx e .module.scss
     - Remover DynamicWallSection.tsx e .module.scss
@@ -496,13 +496,13 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
     - Remover ComparisonSection.tsx e .module.scss
     - _Requirements: 14, 1_
   
-  - [~] 24.2 Atualizar App.tsx com nova estrutura
+  - [ ] 24.2 Atualizar App.tsx com nova estrutura
     - Atualizar imports para novos componentes
     - Garantir ordem correta: Hero → HowItWorks → CaptureChannels → ExperienceModules → AISafety → FaceRecognition → Audience → Testimonials → Pricing → FAQ → FinalCTA
     - Validar que total de seções é ≤12
     - _Requirements: 1, 14_
 
-- [~] 25. Checkpoint - Validar implementação completa
+- [ ] 25. Checkpoint - Validar implementação completa
   - ✅ Build verde
   - ✅ Type-check verde
   - ✅ Sem erros de console
@@ -515,14 +515,14 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
 
 ## Fase 6 — Publicação Controlada
 
-- [~] 26. Testes e validação final
-  - [~] 26.1 Validar TypeScript e build
+- [ ] 26. Testes e validação final
+  - [ ] 26.1 Validar TypeScript e build
     - Executar `npm run type-check` sem erros
     - Executar `npm run build` com sucesso
     - Validar que não há erros de console em desenvolvimento
     - _Requirements: 24_
   
-  - [~] 26.2 Testar responsividade e mobile-first
+  - [ ] 26.2 Testar responsividade e mobile-first
     - Testar em mobile (iOS Safari, Chrome Android)
     - Testar em tablet
     - Testar em desktop (Chrome, Firefox, Safari, Edge últimas 2 versões)
@@ -530,14 +530,14 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
     - **MOBILE-FIRST:** Garantir paridade de conteúdo (Google usa mobile-first indexing)
     - _Requirements: 16, 24_
   
-  - [~] 26.3 Executar auditorias Lighthouse (laboratório)
+  - [ ] 26.3 Executar auditorias Lighthouse (laboratório)
     - Executar Lighthouse mobile em ambiente de homologação
     - Validar Performance ≥85
     - Validar Accessibility ≥90
     - Validar FCP ≤1.5s
     - _Requirements: 17, 24, 40_
   
-  - [~] 26.4 Validar SEO e structured data
+  - [ ] 26.4 Validar SEO e structured data
     - Executar Google Rich Results Test
     - Validar preview social (Facebook, Twitter, LinkedIn)
     - Validar canonical tags
@@ -545,7 +545,7 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
     - Testar Open Graph debugger
     - _Requirements: 27_
   
-  - [~] 26.5 Validar navegação e interações
+  - [ ] 26.5 Validar navegação e interações
     - Testar navegação por teclado em todos elementos
     - Testar todos CTAs (primário, secundário, microconversões)
     - Testar PersonaSelector e adaptação de conteúdo
@@ -553,7 +553,7 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
     - Testar tabs/carrossel de módulos (padrão APG WAI)
     - _Requirements: 22, 24_
   
-  - [~] 26.6 Validar tracking e analytics
+  - [ ] 26.6 Validar tracking e analytics
     - Validar captura de UTM params
     - Validar tracking de cliques em CTAs
     - Validar tracking de scroll depth
@@ -561,27 +561,27 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
     - Validar RUM enviando métricas reais
     - _Requirements: 26_
 
-- [~] 27. Preparar rollout controlado
-  - [~] 27.1 Configurar preview deploy
+- [ ] 27. Preparar rollout controlado
+  - [ ] 27.1 Configurar preview deploy
     - Deploy em ambiente de staging
     - Gerar URL de preview para QA
     - Validar todas funcionalidades em staging
     - _Requirements: 24_
   
-  - [~] 27.2 Implementar feature flag para landing nova/antiga
+  - [ ] 27.2 Implementar feature flag para landing nova/antiga
     - Criar flag para alternar entre landing antiga e nova
     - Testar alternância sem quebrar experiência
     - Preparar rollback simples
     - _Requirements: 39_
   
-  - [~] 27.3 Configurar monitoramento pós-publicação
+  - [ ] 27.3 Configurar monitoramento pós-publicação
     - Configurar alertas para erros JavaScript
     - Configurar alertas para degradação de performance (RUM)
     - Configurar alertas para queda de conversão
     - Planejar monitoramento 24-72h pós-lançamento
     - _Requirements: 26, 40_
 
-- [~] 28. Checkpoint final - Preparar para produção
+- [ ] 28. Checkpoint final - Preparar para produção
   - ✅ Build verde em staging
   - ✅ Lighthouse: Performance ≥85, Accessibility ≥90
   - ✅ RUM instrumentado e funcionando

@@ -42,22 +42,24 @@ export default function AudienceSection() {
                 </div>
 
                 <div className={styles.cardContent}>
+                  {/* Promise - Most prominent */}
                   <div className={styles.promiseBlock}>
-                    <span className={styles.label}>Promessa principal</span>
                     <p className={styles.promise}>{profile.promise}</p>
                   </div>
 
+                  {/* Priority Modules - Quick scan */}
                   <div className={styles.modulesBlock}>
-                    <span className={styles.label}>Módulos prioritários</span>
-                    <ul className={styles.modulesList}>
+                    <h4 className={styles.sectionLabel}>Módulos prioritários</h4>
+                    <ul className={styles.modulesList} aria-label="Módulos prioritários">
                       {profile.priorityModules.map((module, idx) => (
                         <li key={idx}>{module}</li>
                       ))}
                     </ul>
                   </div>
 
+                  {/* Objections - Collapsible for scanning */}
                   <div className={styles.objectionsBlock}>
-                    <span className={styles.label}>Objeções principais</span>
+                    <h4 className={styles.sectionLabel}>Dúvidas frequentes</h4>
                     <dl className={styles.objectionsList}>
                       {profile.objections.map((objection, idx) => (
                         <div key={idx} className={styles.objectionItem}>
@@ -75,6 +77,7 @@ export default function AudienceSection() {
                     className={styles.ctaButton}
                     target="_blank"
                     rel="noopener noreferrer"
+                    aria-label={`${profile.cta.text} para ${profile.name}`}
                   >
                     {profile.cta.text}
                   </a>

@@ -81,6 +81,24 @@ class RouteInboundToMediaPipeline implements ShouldQueue
             return;
         }
 
+        if ($event->normalized->messageType === 'sticker') {
+            Log::channel('whatsapp')->info('Inbound sticker ignored for event media intake because stickers are not treated as gallery media', [
+                'message_id' => $event->message->id,
+                'provider_message_id' => $event->normalized->messageId,
+                'chat_id' => $event->normalized->chatId,
+                'sender_external_id' => $event->normalized->senderExternalId(),
+                'sender_phone' => $event->normalized->senderPhone,
+                'is_group' => $event->normalized->isFromGroup(),
+                'mime_type' => $event->normalized->mimeType,
+            ]);
+
+            return;
+        }
+
+        $captureTarget = $event->normalized->messageType === 'audio'
+            ? 'event_audio'
+            : 'event_media';
+
         $context = $contextResolver->resolve(
             $event->message->instance,
             $event->normalized,
@@ -88,6 +106,33 @@ class RouteInboundToMediaPipeline implements ShouldQueue
         );
 
         if (! $context) {
+            if ($event->normalized->isFromGroup()) {
+                Log::channel('whatsapp')->warning('Inbound group media ignored because no eligible event context was resolved', [
+                    'message_id' => $event->message->id,
+                    'provider_message_id' => $event->normalized->messageId,
+                    'chat_id' => $event->normalized->chatId,
+                    'group_id' => $event->normalized->groupId,
+                    'type' => $event->normalized->messageType,
+                ]);
+
+                return;
+            }
+
+            $missingSessionResult = $directSessions->handleMediaWithoutActiveSession(
+                $event->message->instance,
+                $event->normalized,
+            );
+
+            Log::channel('whatsapp')->warning('Inbound direct media ignored because no active intake session was resolved', [
+                'message_id' => $event->message->id,
+                'provider_message_id' => $event->normalized->messageId,
+                'chat_id' => $event->normalized->chatId,
+                'sender_external_id' => $event->normalized->senderExternalId(),
+                'sender_phone' => $event->normalized->senderPhone,
+                'type' => $event->normalized->messageType,
+                'missing_session' => $missingSessionResult,
+            ]);
+
             return;
         }
 
@@ -107,6 +152,8 @@ class RouteInboundToMediaPipeline implements ShouldQueue
         }
 
         $payload = array_merge($event->normalized->rawPayload, [
+            'message_type' => $event->normalized->messageType,
+            'mime_type' => $event->normalized->mimeType,
             '_event_context' => array_merge($context->toArray(), [
                 'provider_message_id' => $event->normalized->messageId,
                 'chat_external_id' => $event->normalized->chatId,
@@ -119,19 +166,28 @@ class RouteInboundToMediaPipeline implements ShouldQueue
                 'from_me' => $event->normalized->fromMe,
                 'caption' => $event->normalized->caption,
                 'media_url' => $event->normalized->mediaUrl,
+                'message_type' => $event->normalized->messageType,
+                'mime_type' => $event->normalized->mimeType,
+                'capture_target' => $captureTarget,
                 'trace_id' => data_get($event->normalized->rawPayload, '_trace_id'),
             ]),
         ]);
 
-        Log::channel('whatsapp')->info('Routing inbound media to gallery pipeline', [
+        Log::channel('whatsapp')->info(
+            $captureTarget === 'event_audio'
+                ? 'Routing inbound audio to the event capture pipeline'
+                : 'Routing inbound media to gallery pipeline',
+            [
             'message_id' => $event->message->id,
             'event_id' => $context->event->id,
             'event_channel_id' => $context->eventChannel->id,
             'intake_source' => $context->intakeSource,
             'media_url' => $event->normalized->mediaUrl,
             'type' => $event->normalized->messageType,
+            'capture_target' => $captureTarget,
             'trace_id' => data_get($event->normalized->rawPayload, '_trace_id'),
-        ]);
+            ],
+        );
 
         $feedback->sendDetectedReaction($context->event, $event->message->instance, [
             'provider_message_id' => $event->normalized->messageId,

@@ -656,9 +656,9 @@ Status desta rodada:
 - [x] `IA-RM-09-T1` ativar evento real de teste com moderacao por IA
 - [x] `IA-RM-09-T2` ativar resposta automatica por IA no evento
 - [x] `IA-RM-09-T3` validar intake por grupo
-- [ ] `IA-RM-09-T4` validar intake por DM
-- [ ] `IA-RM-09-T5` repetir homologacao com resposta fixa
-- [ ] `IA-RM-09-T6` consolidar artefatos e checklist final
+- [x] `IA-RM-09-T4` validar intake por DM
+- [x] `IA-RM-09-T5` repetir homologacao com resposta fixa
+- [x] `IA-RM-09-T6` consolidar artefatos e checklist final
 
 Status desta rodada:
 
@@ -670,7 +670,15 @@ Status desta rodada:
   - DM: `FOTOS-EVIVO-TESTE`
 - o canal de grupo ja esta vinculado localmente com:
   - `group_external_id = 120363425796926861-group`
-- a configuracao real do evento ficou assim:
+- a rodada foi validada em dois estados do evento:
+  - primeiro com `MediaIntelligence.reply_text_mode = ai` para validar DM e grupo com resposta automatica por IA
+  - depois com `MediaIntelligence.reply_text_mode = fixed_random` para validar a resposta fixa no proprio grupo
+- apos a validacao manual, o evento local `31` foi restaurado para:
+  - `MediaIntelligence.reply_text_mode = ai`
+  - objetivo:
+    - manter os proximos testes reais de imagem no estado principal do produto
+    - preservar a evidência de video/fixo nos feedbacks ja gravados
+- a configuracao real do evento, no momento da homologacao por IA, ficou assim:
   - `ContentModeration.enabled = true`
   - `ContentModeration.provider_key = openai`
   - `ContentModeration.mode = enforced`
@@ -680,7 +688,11 @@ Status desta rodada:
   - `MediaIntelligence.mode = enrich_only`
   - `MediaIntelligence.reply_text_mode = ai`
   - `MediaIntelligence.reply_prompt_preset_id = 4`
-- o prompt padrao global tambem foi materializado no banco local com preset padrao
+- depois da validacao por IA, a configuracao global ficou endurecida para a rodada de resposta fixa:
+  - `reply_text_fixed_templates_json = ["Momento de risadas e lembrancas! 📱🎉", "Memorias que fazem o coracao sorrir! 🎉📸", "Paz, amor e um sorriso! ✌️😊"]`
+  - `reply_ai_rate_limit_enabled = true`
+  - `reply_ai_rate_limit_max_messages = 10`
+  - `reply_ai_rate_limit_window_minutes = 10`
 - validacoes operacionais reexecutadas nesta rodada:
   - `content-moderation:smoke-openai` verde
   - `media-intelligence:smoke-openrouter` verde
@@ -705,6 +717,8 @@ Status desta rodada:
   - `event_media` reais publicadas:
     - `11340`
     - `11341`
+    - `11342`
+    - `11343`
   - moderacao real:
     - `safety_status = pass`
     - `moderation_status = approved`
@@ -720,17 +734,113 @@ Status desta rodada:
   - `mode = ai`
   - `source = vlm`
   - `variables.nome_do_evento = Homologacao WhatsApp Z-API Local`
-- comportamento atual importante do produto:
-  - em `whatsapp_group`, a frase automatica nao aparece no grupo
-  - ela e enviada via `send-text` com `privateAnswer = true`
-  - no grupo, o comportamento visivel atual e:
+- evidencias reais de DM nesta rodada:
+  - midias `11344`, `11345` e `11347`
+  - todas com:
+    - `source_type = whatsapp_direct`
+    - `safety_status = pass`
+    - `moderation_status = approved`
+    - `publication_status = published`
+  - feedbacks publicados persistidos:
+    - `56`, `58`, `60` para `reply`
+    - textos enviados:
+      - `Um momento doce e especial para celebrar! 🎉`
+      - `Um momento especial de celebracao e alegria! 🎉`
+      - `Um toque de conforto para o dia a dia.`
+  - dispatches reais `sendText` em DM com `HTTP 200` e `privateAnswer = false`
+- observacao importante de DM:
+  - a midia `11346` expunha um bug real separado do fluxo de imagem
+  - causa raiz validada:
+    - o payload do Z-API trazia `video` corretamente
+    - mas tambem trazia `photo` escalar de avatar do remetente
+    - o normalizador canonico acabava salvando `message_type = photo`
+    - depois o pipeline tentava rodar `variants` de imagem em um arquivo `video/mp4`
+  - endurecimento aplicado:
+    - o roteador de WhatsApp agora injeta `message_type` e `mime_type` explicitos no payload encaminhado
+    - `NormalizeInboundMessageJob` deixou de tratar `photo` escalar como midia valida
+    - `DownloadInboundMediaJob` agora infere `media_type = video` pelo `mime_type`
+    - videos nao passam mais pela trilha de `variants`, `safety` nem `vlm`
+    - video segue para moderacao/publicacao com `safety_status = skipped` e `vlm_status = skipped`
+  - validacao real do legado `11346` apos o fix:
+    - `media_type = video`
+    - `mime_type = video/mp4`
+    - `processing_status = processed`
+    - `moderation_status = approved`
+    - `publication_status = published`
+    - `safety_status = skipped`
+    - `vlm_status = skipped`
+  - feedbacks reais persistidos para `11346`:
+    - `63` reacao `published`
+    - `64` reply `published`
+  - resposta textual validada nesta rodada:
+    - `Momento de risadas e lembrancas! 📱🎉`
+    - origem:
+      - `mode = fixed_random`
+      - `source = global_fixed_template`
+  - dispatches reais `HTTP 200`:
+    - `send-reaction` para `messageId = 2A21968460B09237C28F`
+    - `send-text` para `messageId = 2A21968460B09237C28F`
+  - regra endurecida de produto:
+    - video nao usa resposta por IA
+    - quando o modo do evento for `ai`, video fica sem texto e envia apenas reacao
+    - quando o modo do evento for `fixed_random`, video pode responder com texto fixo
+- comportamento atual validado do produto em `whatsapp_group`:
+  - a frase automatica aparece no proprio grupo
+  - o envio usa `send-text` com `privateAnswer = false`
+  - no grupo, o comportamento visivel fica:
     - reacao `detected`
     - reacao `published`
-  - no privado do remetente, vai a resposta textual da IA encadeada ao `messageId`
-- pendencias manuais restantes:
-  - enviar codigo em DM e depois imagem real
-  - repetir fluxo em `texto fixo aleatorio`
-  - consolidar os artefatos do teste manual
+    - resposta textual encadeada ao `messageId`
+- homologacao real com resposta fixa tambem foi confirmada:
+  - a midia `11343` foi reprocessada em `2026-04-08 06:46`
+  - feedbacks novos persistidos:
+    - `61` reacao `published`
+    - `62` reply `published`
+  - `resolution_json` final:
+    - `mode = fixed_random`
+    - `source = global_fixed_template`
+    - `reply_text = Paz, amor e um sorriso! ✌️😊`
+  - dispatch real no grupo com `HTTP 200`:
+    - `messageId = 2A1F381C0980872C1936`
+    - `privateAnswer = false`
+    - `message = Paz, amor e um sorriso! ✌️😊`
+- local exato para alterar textos fixos:
+  - global:
+    - `IA > Respostas automaticas de midia > Configuracao > Textos fixos padrao`
+  - por evento:
+    - pagina do evento > `IA da midia` > `Resposta automatica = Texto fixo aleatorio`
+    - campo `Textos fixos`
+- endurecimento adicional de intake DM aplicado apos a homologacao:
+  - dois videos reais recebidos em `2026-04-08 13:43` chegaram ao webhook Z-API e foram persistidos como mensagens `619` e `621`
+  - eles nao geraram `reaction detected`, `reaction published` nem `reply` porque a sessao DM do remetente ja estava expirada
+  - causa raiz validada:
+    - os webhooks entraram normalmente
+    - nao houve `Routing inbound media to gallery pipeline`
+    - o contexto do evento nao foi resolvido porque a janela da sessao direta ja tinha acabado
+  - endurecimento aplicado:
+    - `RouteInboundToMediaPipeline` agora registra `warning` explicito quando a midia direta chega sem sessao ativa
+    - `WhatsAppDirectIntakeSessionService` agora responde com instrucao de reativacao do codigo do evento
+    - o aviso de reativacao tem cooldown de `5` minutos para nao spammar o participante em burst
+  - runbook operacional validado:
+    - apos aplicar o fix, o worker local foi reiniciado para carregar o codigo novo
+    - o worker atual ficou ativo em background apos o `queue:restart`
+- endurecimento adicional aplicado nesta rodada:
+  - o limitador de resposta automatica por IA ficou ativo globalmente em:
+    - `10` respostas
+    - janela de `10` minutos
+  - configuracao exposta em:
+    - `IA > Respostas automaticas de midia > Configuracao > Limite de respostas por IA por participante`
+  - nova validacao operacional do telefone final `483594`:
+    - imagem real em DM continuou entrando ponta a ponta
+    - o sticker real recebido na mesma rodada mostrou um gap de produto:
+      - ele ainda estava indo para o pipeline de galeria antes do fix
+    - endurecimento aplicado e testado:
+      - `RouteInboundToMediaPipeline` agora ignora `messageType = sticker` para intake de galeria
+      - sticker deixa de gerar midia de evento, reacoes de publicacao e resposta automatica de galeria
+  - endurecimento de sessao ativa:
+    - se o mesmo codigo do evento for reenviado com a sessao ainda ativa
+    - o sistema agora responde informando que o remetente ja esta vinculado ao evento
+    - a sessao e renovada sem fechar contexto nem criar ambiguidade operacional
 
 ---
 
@@ -760,35 +870,51 @@ Status desta rodada:
 - [x] labels 100% em portugues
 - [x] teste do prompt com ate `3` imagens
 - [x] historico de testes
+- [x] historico de eventos reais com filtros operacionais
 - [x] remocao da configuracao de `Settings`
 - [x] aba `Catalogo` com CRUD de categorias e presets
 - [x] selecao de preset preenchendo o `texto de instrucao`
+- [x] filtros do catalogo por categoria e nome/texto da instrucao
 
 ### Manual
 
 - [x] validar grupo `#ATIVAR#GRUPO-EVIVO-TESTE`
 - [x] validar imagem em grupo com moderacao + resposta automatica
-- [ ] validar imagem em DM com moderacao + resposta automatica
-- [ ] validar resposta fixa
+- [x] validar imagem em DM com moderacao + resposta automatica
+- [x] validar resposta fixa
+- [x] validar video em DM sem passar pela IA
+- [x] validar DM expirado com instrucao de reativacao e cooldown
+- [x] validar codigo reenviado em sessao ativa com mensagem explicita de vinculo
+- [x] endurecer sticker para nao entrar no pipeline de galeria/telao
+- [x] endurecer audio para nao entrar em galeria/telao e manter captura vinculada ao evento
 
 ---
 
 ## Proxima Sequencia Recomendada
 
-1. executar o teste manual real no grupo com `#ATIVAR#GRUPO-EVIVO-TESTE`
-2. repetir em DM com `FOTOS-EVIVO-TESTE` e validar:
-   - moderacao por IA
-   - publicacao
-   - resposta automatica por IA via `reply-message`
-3. trocar o evento para `texto fixo aleatorio` e repetir a homologacao
-4. consolidar artefatos finais de `IA-RM-09`
+1. separar workers por prioridade para reduzir latencia de `reaction detected` e `send-text`
+2. manter o limite de respostas por IA sob observacao em rodada real com burst maior de imagens
+3. decidir se o limitador fica ativo por padrao em homologacao/producao
+4. decidir se o comportamento padrao de video em producao sera:
+   - sem texto
+   - ou texto fixo
+5. consolidar eventual runbook de rollback do modo `fixed_random` para `ai`
 
 Atualizacao apos a rodada atual:
 
-1. `IA-RM-01` ate `IA-RM-08` estao fechadas
-2. `IA-RM-09` ficou parcialmente fechada:
-   - `T1`, `T2` e `T3` concluidos
-   - `T4` a `T6` ainda dependem do teste manual no WhatsApp real
+1. `IA-RM-01` ate `IA-RM-09` estao fechadas
+2. a homologacao real local ficou comprovada em:
+   - grupo com resposta por IA
+   - DM com resposta por IA
+   - grupo reprocessado com `texto fixo aleatorio`
+   - DM de video com resposta nao-IA
+3. o limitador de resposta por IA ficou implementado, testado e ativado em `10/10`
+4. o painel agora tambem cobre:
+   - filtros do catalogo
+   - historico de eventos reais
+5. sticker deixou de contaminar o intake de galeria/telao
+6. reenvio do mesmo codigo em sessao ativa agora devolve mensagem explicita de vinculo ja existente
+7. audio passou a ser persistido fora de `EventMedia`, mantendo vinculo ao evento para futura trilha de gravacoes
 
 Resumo de validacao desta rodada:
 
@@ -796,17 +922,31 @@ Resumo de validacao desta rodada:
   - `48` testes e `421` assertions na regressao focada de observabilidade e IA
   - `11` testes e `73` assertions na trilha focada de schema/payload/smoke `OpenRouter`
 - frontend:
-  - `24` testes verdes cobrindo:
+  - `31` testes verdes cobrindo:
     - pagina dedicada de IA
     - formulario do evento
     - remocao de `Settings`
     - navegacao lateral
     - catalogo de categorias/presets
+    - filtros do catalogo
+    - historico de eventos reais
+    - detalhe de execucao real
 - `npm run type-check` verde
 - `content-moderation:smoke-openai` verde com `omni-moderation-latest`
 - `media-intelligence:smoke-openrouter` verde com `openai/gpt-4.1-mini`
-- worker local persistente de homologacao ativo em `PID 25384`
-- backlog de `whatsapp-inbound` drenado e intake por grupo comprovado em producao local
+- worker local persistente de homologacao ativo e consumindo:
+  - `whatsapp-inbound`
+  - `webhooks`
+  - `media-download`
+  - `media-fast`
+  - `media-safety`
+  - `media-vlm`
+  - `media-publish`
+  - `whatsapp-send`
+- backlog de `whatsapp-inbound` drenado e intake por grupo/DM comprovado em producao local
+- worker reiniciado nesta rodada para carregar:
+  - mensagem de sessao ativa ja vinculada
+  - endurecimento de sticker fora do intake de galeria
 
 ## Runbook Operacional Do Tunnel
 

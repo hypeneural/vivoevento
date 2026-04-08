@@ -6,6 +6,15 @@ Este documento foca apenas em dataset e calibracao do `FaceSearch`.
 
 Nao cobre `ContentModeration`, `MediaIntelligence` nem outras frentes da fase.
 
+Leitura complementar importante:
+
+- para a avaliacao consolidada da stack, da validacao em galeria real e da estrategia de provider pago + fallback, ver:
+  - `docs/architecture/face-search-stack-assessment-and-provider-strategy-2026-04-08.md`
+- para o plano detalhado de integracao `AWS Rekognition` como opcao inicial, ver:
+  - `docs/architecture/face-search-aws-rekognition-integration-plan-2026-04-08.md`
+- para o backlog executavel da trilha AWS com fases e bateria de testes, ver:
+  - `docs/architecture/face-search-aws-rekognition-execution-plan-2026-04-08.md`
+
 ## Stack Atual Relevante
 
 - `CompreFace` faz `detection` e fornece embedding via `calculator`.
@@ -1804,6 +1813,51 @@ So faz sentido reavaliar `ann` quando:
 
 - o volume de embeddings por evento crescer materialmente;
 - ou o `p95` do `exact` sair da meta.
+
+## Validacao Pratica Em Galeria Real
+
+Para sair do regime de dataset curado e medir comportamento em evento real, foi executado o organizador local de galeria por embedding em:
+
+- origem:
+  - `C:\Users\Usuario\Desktop\ddddd\FINAL`
+- saida:
+  - `C:\Users\Usuario\Desktop\ddddd\AGRUPADO_POR_PESSOA\20260408-full-002`
+
+Comando usado:
+
+- `php artisan face-search:organize-local-gallery --input-dir="C:\Users\Usuario\Desktop\ddddd\FINAL" --output-dir="C:\Users\Usuario\Desktop\ddddd\AGRUPADO_POR_PESSOA\20260408-full-002" --cluster-threshold=0.35 --min-face-size=24 --min-quality-score=0.6`
+
+Leitura do run real:
+
+- `images_total=963`
+- `images_clustered=852`
+- `images_without_faces=111`
+- `images_failed_or_invalid=0`
+- `faces_accepted_total=2402`
+- `clusters_total=161`
+- `multi_person_images=638`
+- `max_person_folders_per_image=16`
+
+Leitura:
+
+- o pipeline aguentou um evento real grande sem falha operacional;
+- o ajuste para tratar `No face is found` como `no_face` estava correto;
+- a estrategia de materializacao por `hard link` no mesmo volume foi necessaria para nao explodir uso de disco;
+- o provider esta funcional para organizar material real por pessoa, inclusive em fotos de grupo.
+
+Sinais positivos:
+
+- `0` falhas tecnicas na rodada completa;
+- cobertura alta de fotos com pessoa (`852/963`);
+- fotos de grupo realmente entram em mais de uma pasta por pessoa;
+- o app consegue produzir uma estrutura validavel manualmente sem mexer em `search_threshold`.
+
+Sinais de atencao:
+
+- `161` clusters para `2402` faces aceitas ainda indicam fragmentacao relevante nas caudas;
+- `67` clusters ficaram com apenas `1` imagem;
+- os maiores clusters ficaram muito grandes (`571`, `218`, `165`, `147` imagens) e exigem revisao visual para confirmar se houve fusao de pessoas parecidas;
+- isso reforca que o proximo gargalo pratico e robustez de deteccao/embedding em qualidade variavel, nao ajuste do motor vetorial.
 
 ## Proxima Sequencia Recomendada
 

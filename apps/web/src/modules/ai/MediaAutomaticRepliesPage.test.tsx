@@ -19,6 +19,9 @@ const deletePresetMock = vi.fn();
 const runPromptTestMock = vi.fn();
 const listPromptTestsMock = vi.fn();
 const getPromptTestMock = vi.fn();
+const listEventOptionsMock = vi.fn();
+const listEventHistoryMock = vi.fn();
+const getEventHistoryItemMock = vi.fn();
 
 vi.mock('@/app/providers/AuthProvider', () => ({
   useAuth: () => useAuthMock(),
@@ -45,6 +48,9 @@ vi.mock('./api', () => ({
     runPromptTest: (...args: unknown[]) => runPromptTestMock(...args),
     listPromptTests: (...args: unknown[]) => listPromptTestsMock(...args),
     getPromptTest: (...args: unknown[]) => getPromptTestMock(...args),
+    listEventOptions: (...args: unknown[]) => listEventOptionsMock(...args),
+    listEventHistory: (...args: unknown[]) => listEventHistoryMock(...args),
+    getEventHistoryItem: (...args: unknown[]) => getEventHistoryItemMock(...args),
   },
 }));
 
@@ -94,6 +100,9 @@ describe('MediaAutomaticRepliesPage', () => {
         'Memorias que fazem o coracao sorrir! 🎉📸',
       ],
       reply_prompt_preset_id: 10,
+      reply_ai_rate_limit_enabled: true,
+      reply_ai_rate_limit_max_messages: 10,
+      reply_ai_rate_limit_window_minutes: 15,
       created_at: null,
       updated_at: null,
     });
@@ -309,6 +318,105 @@ describe('MediaAutomaticRepliesPage', () => {
       created_at: null,
       updated_at: null,
     });
+    listEventOptionsMock.mockResolvedValue([
+      {
+        id: 42,
+        title: 'Formatura 2026',
+      },
+      {
+        id: 77,
+        title: 'Casamento Ana e Pedro',
+      },
+    ]);
+    listEventHistoryMock.mockResolvedValue({
+      data: [
+        {
+          id: 200,
+          event_id: 77,
+          event_title: 'Casamento Ana e Pedro',
+          event_media_id: 200,
+          inbound_message_id: 88,
+          provider_message_id: 'wamid.200',
+          trace_id: 'trace-event-200',
+          source_type: 'whatsapp',
+          source_label: 'WhatsApp',
+          sender_name: 'Anderson Marques',
+          sender_phone: '5548998483594',
+          sender_external_id: '5548998483594',
+          message_type: 'image',
+          media_type: 'image',
+          mime_type: 'image/jpeg',
+          preview_url: null,
+          provider_key: 'openrouter',
+          model_key: 'openai/gpt-4.1-mini',
+          status: 'completed',
+          decision: 'approve',
+          prompt_template: 'Use {nome_do_evento}.',
+          prompt_resolved: 'Use Casamento Ana e Pedro.',
+          prompt_variables: { nome_do_evento: 'Casamento Ana e Pedro' },
+          preset_name: 'Casamento romantico',
+          preset_id: 10,
+          prompt_instruction_source: 'event',
+          prompt_preset_source: 'event',
+          reply_text: 'Memorias que fazem o coracao sorrir!',
+          short_caption: 'Noivos em destaque.',
+          tags: ['casamento'],
+          request_payload: { model: 'openai/gpt-4.1-mini' },
+          response_payload: { reply_text: 'Memorias que fazem o coracao sorrir!' },
+          error_message: null,
+          run_status: 'completed',
+          run_started_at: null,
+          run_finished_at: null,
+          completed_at: null,
+          published_at: null,
+          created_at: null,
+          updated_at: null,
+        },
+      ],
+      meta: { page: 1, per_page: 15, total: 1, last_page: 1 },
+    });
+    getEventHistoryItemMock.mockResolvedValue({
+      id: 200,
+      event_id: 77,
+      event_title: 'Casamento Ana e Pedro',
+      event_media_id: 200,
+      inbound_message_id: 88,
+      provider_message_id: 'wamid.200',
+      trace_id: 'trace-event-200',
+      source_type: 'whatsapp',
+      source_label: 'WhatsApp',
+      sender_name: 'Anderson Marques',
+      sender_phone: '5548998483594',
+      sender_external_id: '5548998483594',
+      message_type: 'image',
+      media_type: 'image',
+      mime_type: 'image/jpeg',
+      preview_url: null,
+      provider_key: 'openrouter',
+      model_key: 'openai/gpt-4.1-mini',
+      status: 'completed',
+      decision: 'approve',
+      prompt_template: 'Use {nome_do_evento}.',
+      prompt_resolved: 'Use Casamento Ana e Pedro.',
+      prompt_variables: { nome_do_evento: 'Casamento Ana e Pedro' },
+      preset_name: 'Casamento romantico',
+      preset_id: 10,
+      prompt_instruction_source: 'event',
+      prompt_preset_source: 'event',
+      reply_text: 'Memorias que fazem o coracao sorrir!',
+      short_caption: 'Noivos em destaque.',
+      tags: ['casamento'],
+      request_payload: { model: 'openai/gpt-4.1-mini' },
+      response_payload: { reply_text: 'Memorias que fazem o coracao sorrir!' },
+      error_message: null,
+      run_status: 'completed',
+      run_started_at: null,
+      run_finished_at: null,
+      completed_at: null,
+      published_at: null,
+      created_at: null,
+      updated_at: null,
+    });
   });
 
   it('renders the dedicated IA tabs and loads the standard configuration', async () => {
@@ -323,6 +431,9 @@ describe('MediaAutomaticRepliesPage', () => {
       'Use {nome_do_evento} de forma natural quando combinar com a imagem.',
     );
     expect(screen.getByLabelText(/textos fixos padrao/i)).toHaveValue('Memorias que fazem o coracao sorrir! 🎉📸');
+    expect(screen.getByLabelText(/limite de respostas por ia por participante/i)).toBeChecked();
+    expect(screen.getByLabelText(/quantidade maxima/i)).toHaveValue(10);
+    expect(screen.getByLabelText(/janela em minutos/i)).toHaveValue(15);
     expect(screen.getAllByText(/\{nome_do_evento\}/i).length).toBeGreaterThan(0);
   });
 
@@ -335,6 +446,12 @@ describe('MediaAutomaticRepliesPage', () => {
     fireEvent.change(screen.getByLabelText(/textos fixos padrao/i), {
       target: { value: 'Memorias que fazem o coracao sorrir! 🎉📸\nMomento de risadas e lembrancas! 📱🎉' },
     });
+    fireEvent.change(screen.getByLabelText(/quantidade maxima/i), {
+      target: { value: '8' },
+    });
+    fireEvent.change(screen.getByLabelText(/janela em minutos/i), {
+      target: { value: '12' },
+    });
     fireEvent.click(screen.getByRole('button', { name: /salvar configuracao/i }));
 
     await waitFor(() => {
@@ -345,6 +462,9 @@ describe('MediaAutomaticRepliesPage', () => {
           'Momento de risadas e lembrancas! 📱🎉',
         ],
         reply_prompt_preset_id: 10,
+        reply_ai_rate_limit_enabled: true,
+        reply_ai_rate_limit_max_messages: 8,
+        reply_ai_rate_limit_window_minutes: 12,
       });
     });
   });
@@ -418,8 +538,54 @@ describe('MediaAutomaticRepliesPage', () => {
 
     activateTab(/historico/i);
 
-    expect(await screen.findByText(/memorias que fazem o coracao sorrir/i)).toBeInTheDocument();
+    expect((await screen.findAllByText(/memorias que fazem o coracao sorrir/i)).length).toBeGreaterThan(0);
     expect(await screen.findByText(/detalhe do teste/i)).toBeInTheDocument();
     expect(await screen.findByText(/trace-100/i)).toBeInTheDocument();
+  });
+
+  it('filters the preset catalog by category and instruction text', async () => {
+    renderPage();
+
+    activateTab(/catalogo/i);
+
+    fireEvent.click(await screen.findByLabelText(/filtro de categoria do catalogo/i));
+    fireEvent.click(await screen.findByRole('option', { name: /^casamento$/i }));
+
+    expect(await screen.findByRole('button', { name: /casamentos/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /corporativos/i })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/buscar por nome ou texto da instrucao/i), {
+      target: { value: 'profissional' },
+    });
+
+    expect(screen.queryByRole('button', { name: /casamentos/i })).not.toBeInTheDocument();
+    expect(await screen.findByText(/nenhum preset encontrado com os filtros atuais/i)).toBeInTheDocument();
+  });
+
+  it('lists real event history and loads the selected production detail', async () => {
+    renderPage();
+
+    activateTab(/historico/i);
+
+    expect(await screen.findByText(/historico de eventos reais/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText(/filtro de evento do historico real/i));
+    fireEvent.click(await screen.findByRole('option', { name: /casamento ana e pedro/i }));
+
+    await waitFor(() => {
+      expect(listEventHistoryMock).toHaveBeenCalledWith(expect.objectContaining({
+        event_id: 77,
+      }));
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: /casamento ana e pedro/i }));
+
+    await waitFor(() => {
+      expect(getEventHistoryItemMock).toHaveBeenCalledWith(200);
+    });
+
+    expect(await screen.findByText(/detalhe do evento real/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/anderson marques/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/memorias que fazem o coracao sorrir/i).length).toBeGreaterThan(0);
   });
 });

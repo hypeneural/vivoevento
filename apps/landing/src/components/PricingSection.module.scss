@@ -1,130 +1,196 @@
 @use '../styles/variables' as *;
 @use '../styles/mixins' as *;
 
+.section {
+  position: relative;
+}
+
 .header {
-  margin-bottom: 1.5rem;
+  margin-bottom: 3rem;
+  text-align: center;
 
   :global(.section-title) {
-    margin-top: 1rem;
-    max-width: 16ch;
+    margin-top: 0.75rem;
+    margin-bottom: 0.75rem;
   }
+}
+
+.subtitle {
+  color: $c-white-64;
+  font-size: 1.1rem;
+  margin-top: 0.5rem;
 }
 
 .grid {
   display: grid;
-  gap: 1rem;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
 }
 
 .card {
   @include surface(rgba(10, 16, 29, 0.82), $border-subtle, 18px);
-  display: grid;
-  gap: 1rem;
-  border-radius: $radius-lg;
-  padding: 1rem;
-}
-
-.featured {
-  border-color: rgba($c-accent, 0.22);
-  box-shadow: $shadow-soft, $shadow-glow;
-}
-
-.cardHeader {
-  display: grid;
-  gap: 0.8rem;
-}
-
-.badge {
-  justify-self: start;
-  padding: 0.35rem 0.6rem;
-  border-radius: 999px;
-  background: rgba($c-accent-warm, 0.12);
-  color: $c-accent-warm;
-  font-size: 0.76rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.signalRow {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
+  flex-direction: column;
+  border-radius: $radius-lg;
+  padding: 2rem 1.5rem;
+  @include transition((transform, box-shadow, border-color), 0.3s);
 
-  span {
-    display: inline-flex;
-    align-items: center;
-    min-height: 2rem;
-    padding: 0 0.7rem;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.04);
-    color: $c-white-64;
-    font-size: 0.76rem;
-    font-weight: 800;
+  &:hover {
+    @media (prefers-reduced-motion: no-preference) {
+      transform: translateY(-4px);
+    }
+  }
+
+  &:focus-within {
+    outline: 2px solid $c-accent;
+    outline-offset: 2px;
   }
 }
 
-.identity {
-  display: grid;
-  gap: 0.45rem;
+.featured {
+  border-color: rgba($c-accent, 0.4);
+  box-shadow: $shadow-soft, $shadow-glow, 0 0 40px rgba($c-accent, 0.15);
+  
+  @media (prefers-reduced-motion: no-preference) {
+    transform: scale(1.02);
+  }
+
+  &:hover {
+    @media (prefers-reduced-motion: no-preference) {
+      transform: scale(1.02) translateY(-4px);
+    }
+  }
 }
 
-.identity h3 {
-  font-size: 1.3rem;
+.featuredBadge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, $c-accent-warm, $c-accent);
+  color: $c-white;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  box-shadow: 0 4px 12px rgba($c-accent, 0.3);
+}
+
+.cardContent {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  flex: 1;
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.planName {
+  font-size: 1.5rem;
+  font-weight: 700;
   letter-spacing: -0.03em;
+  color: $c-white;
 }
 
 .audience {
   color: $c-white-64;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  min-height: 2.85rem;
 }
 
 .price {
   font-family: $font-display;
-  font-size: 1.6rem;
+  font-size: 1.75rem;
+  font-weight: 700;
   letter-spacing: -0.04em;
-}
-
-.storyPanel {
-  @include surface(rgba(8, 13, 24, 0.72), 1px solid rgba(255, 255, 255, 0.06), 14px);
-  display: grid;
-  gap: 0.3rem;
-  padding: 0.95rem;
-  border-radius: 22px;
-
-  span {
-    color: $c-white-48;
-    font-size: 0.72rem;
-    font-weight: 800;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-  }
-
-  strong {
-    font-size: 1rem;
-    letter-spacing: -0.03em;
-  }
+  color: $c-accent-warm;
+  margin-top: 0.5rem;
 }
 
 .features {
-  display: grid;
-  gap: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
 
   li {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 0.6rem;
-    padding: 0.8rem 0.9rem;
-    border-radius: 18px;
-    background: rgba(255, 255, 255, 0.04);
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
     color: $c-white-80;
+    font-size: 0.95rem;
+    line-height: 1.5;
   }
 
   svg {
+    flex-shrink: 0;
+    margin-top: 0.15rem;
     color: $c-accent-green;
+  }
+
+  span {
+    flex: 1;
   }
 }
 
-@media (min-width: 980px) {
+.note {
+  text-align: center;
+  color: $c-white-48;
+  font-size: 0.9rem;
+  margin-top: 2rem;
+}
+
+@media (min-width: 768px) {
   .grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2rem;
+  }
+
+  .card {
+    padding: 2.5rem 2rem;
+  }
+
+  .featured {
+    @media (prefers-reduced-motion: no-preference) {
+      transform: scale(1.05);
+    }
+
+    &:hover {
+      @media (prefers-reduced-motion: no-preference) {
+        transform: scale(1.05) translateY(-4px);
+      }
+    }
+  }
+}
+
+@media (max-width: 767px) {
+  .header {
+    margin-bottom: 2rem;
+  }
+
+  .subtitle {
+    font-size: 1rem;
+  }
+
+  .planName {
+    font-size: 1.35rem;
+  }
+
+  .price {
+    font-size: 1.5rem;
+  }
+
+  .features {
+    font-size: 0.9rem;
   }
 }

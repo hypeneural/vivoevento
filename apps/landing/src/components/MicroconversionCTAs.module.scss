@@ -1,0 +1,156 @@
+// ============================================
+// MICROCONVERSION CTAs
+// ============================================
+// Requisito 36: Microconversões e Redução de Fricção
+//
+// CTAs de baixo risco posicionados próximos aos CTAs principais
+// para oferecer caminho alternativo com menor fricção.
+// ============================================
+
+.microconversionCTAs {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  
+  // Inline variant (horizontal layout)
+  &.inline {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    
+    @media (max-width: 640px) {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+  
+  // Stacked variant (vertical layout)
+  &.stacked {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.microCTA {
+  // Reset button styles
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  cursor: pointer;
+  
+  // Microconversion CTA styling
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  
+  // Typography
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: left;
+  color: var(--color-text-secondary);
+  
+  // Visual style
+  background-color: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  
+  // Transitions
+  transition: all 0.2s ease-out;
+  
+  // Icon styling
+  svg {
+    flex-shrink: 0;
+    opacity: 0.7;
+    transition: opacity 0.2s ease-out;
+  }
+  
+  // Hover state
+  &:hover {
+    color: var(--color-text-primary);
+    background-color: var(--color-surface-hover);
+    border-color: var(--color-border-hover);
+    transform: translateY(-1px);
+    
+    svg {
+      opacity: 1;
+    }
+  }
+  
+  // Focus state (accessibility)
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    color: var(--color-text-primary);
+    
+    svg {
+      opacity: 1;
+    }
+  }
+  
+  // Active state
+  &:active {
+    transform: translateY(0);
+  }
+  
+  // Disabled state
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    
+    &:hover {
+      transform: none;
+      background-color: transparent;
+      border-color: var(--color-border);
+    }
+  }
+  
+  // Stacked variant adjustments
+  .stacked & {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+// Reduced motion support
+@media (prefers-reduced-motion: reduce) {
+  .microCTA {
+    transition: none;
+    
+    &:hover {
+      transform: none;
+    }
+    
+    &:active {
+      transform: none;
+    }
+  }
+}
+
+// Mobile optimizations
+@media (max-width: 640px) {
+  .microconversionCTAs.inline {
+    gap: 0.5rem;
+  }
+  
+  .microCTA {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    
+    // Larger touch target for mobile
+    min-height: 44px;
+  }
+}
+
+// Dark mode support (if implemented)
+@media (prefers-color-scheme: dark) {
+  .microCTA {
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+  }
+}

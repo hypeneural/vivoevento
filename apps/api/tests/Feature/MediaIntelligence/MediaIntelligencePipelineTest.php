@@ -280,15 +280,18 @@ it('does not overwrite a human caption when vlm returns a short caption', functi
 it('skips vlm generation when the ai reply burst guard blocks the sender in enrich_only mode', function () {
     Queue::fake();
 
-    $calls = 0;
-
-    app()->bind(VisualReasoningProviderInterface::class, fn () => new class(&$calls) implements VisualReasoningProviderInterface
+    $counter = new class
     {
-        public function __construct(private int &$calls) {}
+        public int $calls = 0;
+    };
+
+    app()->bind(VisualReasoningProviderInterface::class, fn () => new class($counter) implements VisualReasoningProviderInterface
+    {
+        public function __construct(private object $counter) {}
 
         public function evaluate(EventMedia $media, EventMediaIntelligenceSetting $settings): VisualReasoningEvaluationResult
         {
-            $this->calls++;
+            $this->counter->calls++;
 
             return VisualReasoningEvaluationResult::approve(
                 reason: 'Imagem compativel com o evento.',
@@ -399,7 +402,7 @@ it('skips vlm generation when the ai reply burst guard blocks the sender in enri
     $firstMedia->refresh();
     $secondMedia->refresh();
 
-    expect($calls)->toBe(1)
+    expect($counter->calls)->toBe(1)
         ->and($firstMedia->vlm_status)->toBe('completed')
         ->and($secondMedia->vlm_status)->toBe('skipped');
 

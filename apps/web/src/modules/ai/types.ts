@@ -99,3 +99,51 @@ export interface MediaReplyPromptTestRun {
   created_at: string | null;
   updated_at: string | null;
 }
+
+export interface MediaReplyEventOption {
+  id: number;
+  title: string;
+}
+
+export interface MediaReplyEventHistoryItem {
+  id: number;
+  event_id: number | null;
+  event_title: string | null;
+  event_media_id: number;
+  inbound_message_id: number | null;
+  provider_message_id: string | null;
+  trace_id: string | null;
+  source_type: string | null;
+  source_label: string | null;
+  sender_name: string | null;
+  sender_phone: string | null;
+  sender_external_id: string | null;
+  message_type: string | null;
+  media_type: string | null;
+  mime_type: string | null;
+  preview_url: string | null;
+  provider_key: string | null;
+  model_key: string | null;
+  status: string | null;
+  decision: string | null;
+  prompt_template: string | null;
+  prompt_resolved: string | null;
+  prompt_variables: Record<string, string>;
+  preset_name: string | null;
+  preset_id: number | null;
+  prompt_instruction_source: string | null;
+  prompt_preset_source: string | null;
+  reply_text: string | null;
+  short_caption: string | null;
+  tags: string[];
+  request_payload: Record<string, unknown>;
+  response_payload: Record<string, unknown>;
+  error_message: string | null;
+  run_status: string | null;
+  run_started_at: string | null;
+  run_finished_at: string | null;
+  completed_at: string | null;
+  published_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}

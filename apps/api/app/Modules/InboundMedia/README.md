@@ -11,6 +11,7 @@ Recepcao, normalizacao e rastreamento da midia recebida por canais que ja chegar
 1. Webhook ou transporte provider-aware chega -> `ProcessInboundWebhookJob` (fila: webhooks)
 2. Log salvo -> `NormalizeInboundMessageJob` (fila: webhooks)
 3. Mensagem normalizada -> dispatch para MediaProcessing
+4. `audio` fica vinculado ao evento pelo `InboundMessage`, com artefato persistido em storage proprio, sem gerar `EventMedia`
 
 ## Rotas
 | Metodo | Rota | Descricao |
@@ -24,6 +25,8 @@ Recepcao, normalizacao e rastreamento da midia recebida por canais que ja chegar
 - o webhook do Telegram foi movido para o modulo `Telegram`;
 - rota atual de WhatsApp inbound: `/api/v1/webhooks/whatsapp/{provider}/{instanceKey}/inbound`;
 - rota atual de Telegram inbound privado: `/api/v1/webhooks/telegram`.
+- `sticker` nao entra em galeria/telao;
+- `audio` nao entra em galeria/telao, mas continua rastreado e persistido para futuras features de gravacoes do evento.
 
 ## Dependencias
 - Channels (resolver evento pelo canal)

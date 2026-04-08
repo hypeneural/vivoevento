@@ -274,4 +274,58 @@ describe('useWallEngine', () => {
 
     expect(result.current.currentItem?.sender_name).toBe('Maria');
   });
+
+  it('intercepts the slideshow advance with an ad and only advances the photo after ad-finished', () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() => useWallEngine('ABCD1234'));
+
+    act(() => {
+      result.current.applySnapshot({
+        ...makeSnapshot('live', [
+          makeMedia({ id: 'media_a', sender_name: 'Ana', sender_key: 'sender-ana', type: 'image', created_at: '2026-04-01T10:01:00Z' }),
+          makeMedia({ id: 'media_b', sender_name: 'Bruno', sender_key: 'sender-bruno', type: 'image', created_at: '2026-04-01T10:02:00Z' }),
+        ]),
+        ads: [
+          {
+            id: 11,
+            url: 'https://cdn.example.com/ad-11.jpg',
+            media_type: 'image',
+            duration_seconds: 10,
+            position: 0,
+          },
+        ],
+        settings: {
+          ...makeSnapshot('live').settings,
+          ad_mode: 'by_photos',
+          ad_frequency: 1,
+          ad_interval_minutes: 3,
+        },
+      });
+    });
+
+    expect(result.current.currentItem?.id).toBe('media_b');
+
+    act(() => {
+      vi.advanceTimersByTime(8_000);
+    });
+
+    expect((result.current.state as any).currentAd).toEqual(expect.objectContaining({
+      id: 11,
+    }));
+    expect(result.current.currentItem?.id).toBe('media_b');
+
+    act(() => {
+      vi.advanceTimersByTime(16_000);
+    });
+
+    expect(result.current.currentItem?.id).toBe('media_b');
+
+    act(() => {
+      (result.current as any).handleAdFinished();
+    });
+
+    expect((result.current.state as any).currentAd).toBeNull();
+    expect(result.current.currentItem?.id).toBe('media_a');
+  });
 });

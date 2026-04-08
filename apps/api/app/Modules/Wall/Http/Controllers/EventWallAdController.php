@@ -9,8 +9,10 @@ use App\Modules\Wall\Services\WallBroadcasterService;
 use App\Shared\Http\BaseController;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class EventWallAdController extends BaseController
 {
@@ -25,7 +27,7 @@ class EventWallAdController extends BaseController
         $wallSetting = $event->wallSettings;
 
         if (! $wallSetting) {
-            return $this->error('Wall não configurado.', 404);
+            return $this->error('Wall nao configurado.', 404);
         }
 
         $ads = $wallSetting->ads()
@@ -47,27 +49,12 @@ class EventWallAdController extends BaseController
         $wallSetting = $event->wallSettings;
 
         if (! $wallSetting) {
-            return $this->error('Wall não configurado.', 404);
+            return $this->error('Wall nao configurado.', 404);
         }
 
         $file = $request->file('file');
+        [$mediaType, $extension] = $this->resolveUploadedAdMetadata($file);
 
-        // Validate MIME via finfo (don't trust Content-Type header)
-        $realMime = finfo_file(finfo_open(FILEINFO_MIME_TYPE), $file->getPathname());
-        $allowedMimes = [
-            'image/jpeg', 'image/png', 'image/webp', 'image/gif',
-            'video/mp4',
-        ];
-
-        if (! in_array($realMime, $allowedMimes, true)) {
-            return $this->error('Tipo de arquivo não permitido.', 422);
-        }
-
-        // Detect media type from real MIME
-        $mediaType = str_starts_with($realMime, 'video/') ? 'video' : 'image';
-
-        // Store file with UUID name
-        $extension = $file->getClientOriginalExtension() ?: 'bin';
         $filename = Str::uuid() . '.' . $extension;
         $path = $file->storeAs(
             "wall/events/{$event->id}/ads",
@@ -75,7 +62,6 @@ class EventWallAdController extends BaseController
             'public',
         );
 
-        // Get max position for ordering
         $maxPosition = $wallSetting->ads()->max('position') ?? -1;
 
         $ad = $wallSetting->ads()->create([
@@ -102,10 +88,9 @@ class EventWallAdController extends BaseController
         $wallSetting = $event->wallSettings;
 
         if (! $wallSetting || $ad->event_wall_setting_id !== $wallSetting->id) {
-            return $this->error('Anúncio não encontrado.', 404);
+            return $this->error('Anuncio nao encontrado.', 404);
         }
 
-        // Delete file from storage
         if ($ad->file_path && Storage::disk('public')->exists($ad->file_path)) {
             Storage::disk('public')->delete($ad->file_path);
         }
@@ -128,15 +113,25 @@ class EventWallAdController extends BaseController
         $wallSetting = $event->wallSettings;
 
         if (! $wallSetting) {
-            return $this->error('Wall não configurado.', 404);
+            return $this->error('Wall nao configurado.', 404);
         }
 
         $request->validate([
-            'order' => 'required|array',
-            'order.*' => 'integer|exists:event_wall_ads,id',
+            'order' => 'required|array|min:1',
+            'order.*' => 'integer|distinct',
         ]);
 
-        $order = $request->input('order');
+        $order = array_values($request->input('order'));
+        $ownedIds = $wallSetting->ads()
+            ->whereIn('id', $order)
+            ->pluck('id')
+            ->all();
+
+        if (count($ownedIds) !== count($order)) {
+            throw ValidationException::withMessages([
+                'order' => 'A ordem informada contem anuncios que nao pertencem a este telao.',
+            ]);
+        }
 
         foreach ($order as $position => $adId) {
             EventWallAd::where('id', $adId)
@@ -165,5 +160,34 @@ class EventWallAdController extends BaseController
             'is_active' => $ad->is_active,
             'created_at' => $ad->created_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * Detect the ad media type from the real MIME and map it to a safe extension.
+     */
+    private function resolveUploadedAdMetadata(UploadedFile $file): array
+    {
+        $mimeMap = [
+            'image/jpeg' => ['image', 'jpg'],
+            'image/png' => ['image', 'png'],
+            'image/webp' => ['image', 'webp'],
+            'image/gif' => ['image', 'gif'],
+            'video/mp4' => ['video', 'mp4'],
+        ];
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $realMime = $finfo ? finfo_file($finfo, $file->getPathname()) : false;
+
+        if ($finfo) {
+            finfo_close($finfo);
+        }
+
+        if (! is_string($realMime) || ! array_key_exists($realMime, $mimeMap)) {
+            throw ValidationException::withMessages([
+                'file' => 'Tipo de arquivo nao permitido.',
+            ]);
+        }
+
+        return $mimeMap[$realMime];
     }
 }

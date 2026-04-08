@@ -15,15 +15,18 @@ class InboundMessage extends Model
         'event_id', 'event_channel_id', 'trace_id', 'provider', 'message_id', 'message_type',
         'chat_external_id', 'sender_external_id', 'sender_phone', 'sender_lid',
         'sender_name', 'sender_avatar_url', 'body_text', 'media_url',
+        'capture_target', 'stored_disk', 'stored_path', 'client_filename', 'mime_type', 'size_bytes',
         'reference_message_id', 'from_me', 'normalized_payload_json', 'status',
-        'received_at', 'processed_at',
+        'received_at', 'processed_at', 'captured_at',
     ];
 
     protected $casts = [
         'from_me' => 'boolean',
+        'size_bytes' => 'integer',
         'normalized_payload_json' => 'array',
         'received_at' => 'datetime',
         'processed_at' => 'datetime',
+        'captured_at' => 'datetime',
     ];
 
     public function event(): BelongsTo

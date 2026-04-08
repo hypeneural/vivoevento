@@ -29,6 +29,22 @@ export type CTAConfig = {
   };
 };
 
+// ============================================
+// PERSONA-SPECIFIC CTA CONFIGURATION
+// ============================================
+
+export type PersonaCTAConfig = {
+  assessora: CTAConfig;
+  social: CTAConfig;
+  corporativo: CTAConfig;
+};
+
+export type WhatsAppMessageTemplate = {
+  assessora: string;
+  social: string;
+  corporativo: string;
+};
+
 export type EventImage = {
   src: string;
   alt: string;
@@ -401,12 +417,12 @@ export const heroMetrics = [
 
 export const heroVariations: HeroVariations = {
   assessora: {
-    eyebrow: "Plataforma premium de experiências ao vivo",
+    eyebrow: "Experiências ao vivo",
     headline: {
       lead: "Controle total.",
       accent: ["Moderação inteligente,", "operação segura."],
     },
-    subheadline: "Receba por QR Code, aprove com IA e transforme o mesmo envio em galeria dinâmica, jogos interativos, telão ao vivo e busca facial em segundos.",
+    subheadline: "Receba por QR, aprove com IA e publique em galeria, jogos, telão e busca facial.",
     flowSteps: [
       {
         number: 1,
@@ -416,12 +432,12 @@ export const heroVariations: HeroVariations = {
       {
         number: 2,
         title: "IA decide",
-        detail: "aprova, bloqueia e indexa",
+        detail: "aprova e indexa",
       },
       {
         number: 3,
         title: "Publica experiência",
-        detail: "galeria, jogos, telão e match",
+        detail: "galeria, jogos, telão",
       },
     ],
     ctas: {
@@ -466,12 +482,12 @@ export const heroVariations: HeroVariations = {
     ],
   },
   social: {
-    eyebrow: "Plataforma premium de experiências ao vivo",
+    eyebrow: "Experiências ao vivo",
     headline: {
-      lead: "Os convidados já estão tirando fotos.",
-      accent: ["Agora elas viram experiência", "ao vivo no seu evento."],
+      lead: "Fotos dos convidados.",
+      accent: ["Viram experiência", "ao vivo no evento."],
     },
-    subheadline: "Transforme fotos e vídeos dos convidados em galeria ao vivo, jogos interativos, telão dinâmico e memórias encontráveis por selfie.",
+    subheadline: "Transforme fotos em galeria ao vivo, jogos, telão e busca por selfie.",
     flowSteps: [
       {
         number: 1,
@@ -481,12 +497,12 @@ export const heroVariations: HeroVariations = {
       {
         number: 2,
         title: "IA organiza",
-        detail: "modera e indexa automaticamente",
+        detail: "modera e indexa",
       },
       {
         number: 3,
         title: "Vira experiência",
-        detail: "galeria, jogos, telão e busca facial",
+        detail: "galeria, jogos, telão",
       },
     ],
     ctas: {
@@ -531,27 +547,27 @@ export const heroVariations: HeroVariations = {
     ],
   },
   corporativo: {
-    eyebrow: "Plataforma premium de experiências ao vivo",
+    eyebrow: "Experiências ao vivo",
     headline: {
       lead: "Engajamento em escala.",
       accent: ["Galeria, jogos e telão", "em tempo real."],
     },
-    subheadline: "Arquitetura preparada para alto volume: receba por múltiplos canais, modere com IA e publique em galeria, jogos, telão e busca facial simultaneamente.",
+    subheadline: "Alto volume: múltiplos canais, moderação IA e publicação simultânea.",
     flowSteps: [
       {
         number: 1,
         title: "Múltiplos canais",
-        detail: "QR, WhatsApp, Telegram, link",
+        detail: "QR, WhatsApp, Telegram",
       },
       {
         number: 2,
         title: "IA em escala",
-        detail: "moderação e indexação automática",
+        detail: "moderação automática",
       },
       {
         number: 3,
         title: "Publicação realtime",
-        detail: "galeria, jogos, telão e busca",
+        detail: "galeria, jogos, telão",
       },
     ],
     ctas: {
@@ -596,45 +612,129 @@ export const heroVariations: HeroVariations = {
   },
 };
 
+// ============================================
+// PERSONA-SPECIFIC CTA CONFIGURATIONS
+// ============================================
+
+/**
+ * WhatsApp phone number for CTAs
+ * Format: country code + area code + number (no spaces or special chars)
+ */
+export const WHATSAPP_PHONE = '5511999999999';
+
+/**
+ * Pre-filled WhatsApp messages by persona
+ * Requirement 37: Persona-specific conversion model
+ */
+export const whatsAppMessages: WhatsAppMessageTemplate = {
+  assessora: 'Olá! Sou assessora/cerimonialista e quero conhecer a plataforma Evento Vivo. Gostaria de agendar uma demonstração para entender como funciona a moderação por IA e a operação segura.',
+  social: 'Olá! Quero usar a plataforma Evento Vivo no meu evento. Gostaria de saber mais sobre a galeria ao vivo, jogos interativos e busca facial.',
+  corporativo: 'Olá! Sou produtor/promotor e quero conhecer a plataforma Evento Vivo. Gostaria de agendar uma demonstração para entender a arquitetura para alto volume e as possibilidades de branding.',
+};
+
+/**
+ * Persona-specific CTA configurations
+ * Requirement 37: Adaptive conversion model
+ * 
+ * - Assessora: Prioriza "Agendar demonstração" (formulário qualificado)
+ * - Social: Prioriza "Falar no WhatsApp" (baixa fricção)
+ * - Corporativo: Prioriza "Agendar demonstração" (formulário multi-step)
+ */
+export const personaCTAs: PersonaCTAConfig = {
+  assessora: {
+    primary: {
+      text: 'Agendar demonstração',
+      url: 'https://eventovivo.com/agendar?tipo=assessora',
+      icon: 'Calendar',
+    },
+    secondary: {
+      text: 'Falar no WhatsApp',
+      url: `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(whatsAppMessages.assessora)}`,
+      icon: 'MessageCircle',
+    },
+  },
+  social: {
+    primary: {
+      text: 'Falar no WhatsApp',
+      url: `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(whatsAppMessages.social)}`,
+      icon: 'MessageCircle',
+    },
+    secondary: {
+      text: 'Agendar demonstração',
+      url: 'https://eventovivo.com/agendar?tipo=social',
+      icon: 'Calendar',
+    },
+  },
+  corporativo: {
+    primary: {
+      text: 'Agendar demonstração',
+      url: 'https://eventovivo.com/agendar?tipo=corporativo',
+      icon: 'Calendar',
+    },
+    secondary: {
+      text: 'Falar no WhatsApp',
+      url: `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(whatsAppMessages.corporativo)}`,
+      icon: 'MessageCircle',
+    },
+  },
+};
+
+/**
+ * Default CTA configuration (when no persona is selected)
+ * Balanced approach for generic visitors
+ */
+export const defaultCTAs: CTAConfig = {
+  primary: {
+    text: 'Agendar demonstração',
+    url: 'https://eventovivo.com/agendar',
+    icon: 'Calendar',
+  },
+  secondary: {
+    text: 'Falar no WhatsApp',
+    url: `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent('Olá! Quero conhecer a plataforma Evento Vivo.')}`,
+    icon: 'MessageCircle',
+  },
+};
+
 export const ecosystemModules: VisualModule[] = [
   {
     id: "gallery",
     title: "Galeria Dinâmica",
     eyebrow: "Mosaico vivo",
-    benefit: "As fotos entram, ganham destaque e reorganizam a experiência automaticamente.",
-    detail: "Mosaico responsivo, destaque inteligente e sensação de evento vivo em vez de grade estática.",
+    benefit: "Fotos entram e reorganizam automaticamente.",
+    detail: "Destaque inteligente para conteúdo novo.",
     accent: "cyan",
   },
   {
     id: "games",
     title: "Jogos Interativos",
     eyebrow: "Engajamento real",
-    benefit: "Transforme cada nova foto em puzzle, memória e ranking mobile-first.",
-    detail: "Jogos feitos para festa: rápidos, acessíveis no celular e pensados para thumb zone.",
+    benefit: "Puzzle e memória com fotos do evento.",
+    detail: "Rápidos, mobile-first e divertidos.",
     accent: "warm",
   },
   {
     id: "wall",
     title: "Telão Dinâmico",
     eyebrow: "Palco premium",
-    benefit: "Layouts fullscreen, split, polaroid e cinematic que performam ao vivo.",
-    detail: "O telão vira um módulo da plataforma, não o único produto vendável.",
+    benefit: "Layouts profissionais ao vivo.",
+    detail: "Fullscreen, split, polaroid e cinematic.",
     accent: "blue",
   },
   {
     id: "moderation",
     title: "Moderação Inteligente",
     eyebrow: "Segurança operacional",
-    benefit: "Nossa IA filtra conteúdo impróprio antes de publicar, reduzindo risco sem travar o fluxo.",
-    detail: "Escolha entre sem moderação, manual ou IA assistida conforme o tipo de evento.",
+    benefit: "IA filtra conteúdo antes de publicar.",
+    detail: "Sem moderação, manual ou IA assistida.",
     accent: "coral",
   },
   {
     id: "face",
-    title: "Busca Facial com IA",
+    title: "Busca Facial",
     eyebrow: "Memórias acionáveis",
-    benefit: "Uma selfie encontra as melhores fotos do convidado em segundos.",
-    detail: "Entrega premium no pós-evento, sem rolagem infinita e sem dor para o convidado.",
+    benefit: "Selfie encontra suas fotos em segundos.",
+    detail: "Sem rolagem infinita no pós-evento.",
     accent: "green",
   },
 ];
@@ -650,67 +750,353 @@ export const galleryImages: EventImage[] = [
   eventImages.heroMobile,
 ];
 
-export const testimonials = [
+// ============================================
+// TESTIMONIALS CONTENT - Organized by context
+// ============================================
+
+export const testimonialsContent: TestimonialsContent = {
+  eyebrow: "Prova social",
+  title: "Não é um telão bonito. É outra categoria.",
+  subtitle: "Casos reais por tipo de evento",
+  testimonials: [
+    {
+      id: "testimonial-1",
+      context: "casamento",
+      quote: "A IA segurou o que precisava sem parar a operação. Menos risco, mais tranquilidade.",
+      author: {
+        name: "Mariana Costa",
+        role: "Cerimonialista",
+      },
+      event: {
+        type: "Casamento",
+        volume: "1.800 fotos",
+        photo: eventImages.gallerySecondary.src,
+      },
+      highlight: "Moderação inteligente",
+      result: "Operação segura e noivos encantados.",
+    },
+    {
+      id: "testimonial-2",
+      context: "casamento",
+      quote: "Convidados adoraram ver fotos ao vivo. Busca facial foi o diferencial inesperado.",
+      author: {
+        name: "Ana Paula Ferreira",
+        role: "Noiva",
+      },
+      event: {
+        type: "Casamento premium",
+        volume: "2.100 fotos",
+        photo: eventImages.wallHero.src,
+      },
+      highlight: "Galeria e busca facial",
+      result: "Experiência memorável.",
+    },
+    {
+      id: "testimonial-3",
+      context: "assessoria",
+      quote: "Controle total no telão. Moderação IA deu segurança sem surpresas.",
+      author: {
+        name: "Juliana Mendes",
+        role: "Assessora",
+      },
+      event: {
+        type: "Debutante",
+        volume: "1.500 fotos",
+        photo: eventImages.galleryFeatured.src,
+      },
+      highlight: "Moderação configurável",
+      result: "Cliente encantado, operação segura.",
+    },
+    {
+      id: "testimonial-4",
+      context: "corporativo",
+      quote: "Substituiu o telão por experiência real. Puzzle virou assunto da festa.",
+      author: {
+        name: "Rodrigo Almeida",
+        role: "Produtor",
+      },
+      event: {
+        type: "Formatura",
+        volume: "4.200 fotos",
+        photo: eventImages.galleryThird.src,
+      },
+      highlight: "Jogos com fotos do evento",
+      result: "Mais permanência e percepção premium.",
+    },
+    {
+      id: "testimonial-5",
+      context: "corporativo",
+      quote: "Busca facial virou diferencial inesperado. Selfie encontrou memórias em segundos.",
+      author: {
+        name: "Thiago Pontes",
+        role: "Coordenador",
+      },
+      event: {
+        type: "Evento corporativo",
+        volume: "2.600 fotos",
+        photo: eventImages.galleryFourth.src,
+      },
+      highlight: "Busca facial",
+      result: "Maior engajamento e percepção premium.",
+    },
+  ],
+  contextGroups: {
+    casamento: [],
+    assessoria: [],
+    corporativo: [],
+  },
+};
+
+// Organize testimonials into context groups
+testimonialsContent.contextGroups.casamento = testimonialsContent.testimonials.filter(t => t.context === 'casamento');
+testimonialsContent.contextGroups.assessoria = testimonialsContent.testimonials.filter(t => t.context === 'assessoria');
+testimonialsContent.contextGroups.corporativo = testimonialsContent.testimonials.filter(t => t.context === 'corporativo');
+
+// Legacy export for backward compatibility
+export const testimonials = testimonialsContent.testimonials.map(t => ({
+  quote: t.quote,
+  author: t.author.name,
+  role: t.author.role,
+  eventType: t.event.type,
+  volume: t.event.volume,
+  highlight: t.highlight,
+  result: t.result,
+}));
+
+// ============================================
+// FALLBACK IMAGES FOR MISSING EVENT PHOTOS
+// ============================================
+
+/**
+ * Fallback images para fotos de eventos ausentes
+ * Usadas quando event.photo não está disponível
+ */
+export const FALLBACK_EVENT_IMAGES = {
+  casamento: "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=900&q=80",
+  assessoria: "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=900&q=80",
+  corporativo: "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=900&q=80",
+  generic: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=900&q=80",
+};
+
+/**
+ * Fallback images para todas imagens críticas da landing page
+ * Requirement 29: Ter fallback visual para imagens ausentes
+ * 
+ * Usadas quando imagens principais falharem ao carregar
+ */
+export const FALLBACK_IMAGES = {
+  // Hero section
+  hero: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=1400&q=80",
+  heroMobile: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=720&q=80",
+  
+  // Gallery module
+  gallery: "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=1200&q=80",
+  galleryFeatured: "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=900&q=80",
+  
+  // Wall module
+  wall: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=1400&q=80",
+  wallHero: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=1400&q=80",
+  
+  // Face recognition module
+  faceSelfie: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=720&q=80",
+  faceMatch: "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=720&q=80",
+  
+  // Games module
+  games: "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80",
+  
+  // AI Safety module
+  aiModeration: "https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=1200&q=80",
+  
+  // Capture channels
+  channels: "https://images.unsplash.com/photo-1611162617474-5b21e879e113?auto=format&fit=crop&w=1200&q=80",
+  
+  // Generic fallback for any missing image
+  generic: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=900&q=80",
+};
+
+// ============================================
+// FALLBACK TESTIMONIALS - SAFE FOR PRODUCTION
+// ============================================
+
+/**
+ * ATENÇÃO: Depoimentos fallback com cara de real em produção é arriscado.
+ * 
+ * Em PRODUÇÃO: Usar placeholder visual de layout, caso temporariamente oculto,
+ * ou bloco "exemplo ilustrativo" bem marcado.
+ * 
+ * Em DESENVOLVIMENTO: Fallbacks realistas APENAS para testes visuais.
+ * 
+ * Estratégia:
+ * - Produção: Depoimentos claramente marcados como exemplos ilustrativos
+ * - Desenvolvimento: Depoimentos realistas para testar layout e fluxo
+ */
+
+const isDevelopment = import.meta.env.MODE === 'development';
+
+/**
+ * Fallback testimonials para desenvolvimento (realistas)
+ */
+const DEVELOPMENT_FALLBACK_TESTIMONIALS: Testimonial[] = [
   {
-    quote:
-      "Substituiu o velho telão de fotos por uma experiência que realmente ocupou a pista. O puzzle com fotos recém-enviadas virou assunto da festa inteira.",
-    author: "Rodrigo Almeida",
-    role: "Produtor de formatura",
-    eventType: "Formatura premium",
-    volume: "4.200 fotos em uma noite",
-    highlight: "Jogos com fotos do próprio evento",
-    result: "Mais permanência dos convidados e percepção clara de tecnologia premium.",
+    id: 'fallback-dev-1',
+    context: 'casamento',
+    quote: 'A plataforma transformou a experiência do nosso casamento. Os convidados adoraram ver as fotos ao vivo no telão.',
+    author: {
+      name: 'Cliente Satisfeito',
+      role: 'Casamento Premium',
+    },
+    event: {
+      type: 'Casamento',
+      volume: '1.500+ fotos',
+      photo: FALLBACK_EVENT_IMAGES.casamento,
+    },
+    highlight: 'Galeria ao vivo',
+    result: 'Experiência memorável para todos os convidados',
   },
   {
-    quote:
-      "A IA segurou o que precisava segurar sem eu parar a operação. Para casamento, isso muda tudo: menos risco e mais tranquilidade para a equipe.",
-    author: "Mariana Costa",
-    role: "Cerimonialista",
-    eventType: "Casamento",
-    volume: "1.800 fotos e selfies",
-    highlight: "Moderação inteligente antes do telão",
-    result: "Operação segura, noivos encantados e pós-evento mais organizado.",
+    id: 'fallback-dev-2',
+    context: 'assessoria',
+    quote: 'Como assessora, preciso de controle total. A moderação por IA me deu segurança para oferecer a experiência sem preocupações.',
+    author: {
+      name: 'Profissional de Eventos',
+      role: 'Assessora',
+    },
+    event: {
+      type: 'Debutante',
+      volume: '1.200 fotos',
+      photo: FALLBACK_EVENT_IMAGES.assessoria,
+    },
+    highlight: 'Moderação configurável',
+    result: 'Cliente encantado e operação sem riscos',
   },
   {
-    quote:
-      "No corporativo, a busca facial virou o diferencial que ninguém esperava. O time tirou selfie e recebeu as melhores memórias do evento em segundos.",
-    author: "Thiago Pontes",
-    role: "Coordenador de endomarketing",
-    eventType: "Evento corporativo",
-    volume: "2.600 fotos em ativação interna",
-    highlight: "Busca facial e galeria baixável",
-    result: "Maior engajamento interno e percepção de plataforma proprietária.",
+    id: 'fallback-dev-3',
+    context: 'corporativo',
+    quote: 'No evento corporativo, a busca facial virou o diferencial. O time tirou selfie e recebeu as melhores memórias em segundos.',
+    author: {
+      name: 'Gestor de Eventos',
+      role: 'Coordenador',
+    },
+    event: {
+      type: 'Evento Corporativo',
+      volume: '2.000+ fotos',
+      photo: FALLBACK_EVENT_IMAGES.corporativo,
+    },
+    highlight: 'Busca facial',
+    result: 'Maior engajamento e percepção de tecnologia premium',
   },
 ];
+
+/**
+ * Fallback testimonials para produção (claramente marcados como exemplos)
+ */
+const PRODUCTION_FALLBACK_TESTIMONIALS: Testimonial[] = [
+  {
+    id: 'fallback-prod-1',
+    context: 'casamento',
+    quote: '[Exemplo ilustrativo] Depoimento de cliente sobre experiência em casamento com galeria ao vivo e telão dinâmico.',
+    author: {
+      name: '[Exemplo]',
+      role: 'Cliente de Casamento',
+    },
+    event: {
+      type: '[Exemplo] Casamento',
+      volume: 'Volume ilustrativo',
+      photo: FALLBACK_EVENT_IMAGES.casamento,
+    },
+    highlight: '[Exemplo] Funcionalidade destacada',
+    result: '[Exemplo] Resultado percebido pelo cliente',
+  },
+  {
+    id: 'fallback-prod-2',
+    context: 'assessoria',
+    quote: '[Exemplo ilustrativo] Depoimento de assessora sobre controle e moderação inteligente.',
+    author: {
+      name: '[Exemplo]',
+      role: 'Assessora de Eventos',
+    },
+    event: {
+      type: '[Exemplo] Debutante',
+      volume: 'Volume ilustrativo',
+      photo: FALLBACK_EVENT_IMAGES.assessoria,
+    },
+    highlight: '[Exemplo] Funcionalidade destacada',
+    result: '[Exemplo] Resultado percebido pelo cliente',
+  },
+  {
+    id: 'fallback-prod-3',
+    context: 'corporativo',
+    quote: '[Exemplo ilustrativo] Depoimento de produtor sobre engajamento em escala e busca facial.',
+    author: {
+      name: '[Exemplo]',
+      role: 'Produtor de Eventos',
+    },
+    event: {
+      type: '[Exemplo] Evento Corporativo',
+      volume: 'Volume ilustrativo',
+      photo: FALLBACK_EVENT_IMAGES.corporativo,
+    },
+    highlight: '[Exemplo] Funcionalidade destacada',
+    result: '[Exemplo] Resultado percebido pelo cliente',
+  },
+];
+
+/**
+ * Fallback testimonials exportados (mínimo 3 depoimentos)
+ * Usa versão de desenvolvimento ou produção conforme ambiente
+ */
+export const FALLBACK_TESTIMONIALS: Testimonial[] = isDevelopment
+  ? DEVELOPMENT_FALLBACK_TESTIMONIALS
+  : PRODUCTION_FALLBACK_TESTIMONIALS;
+
+/**
+ * Fallback testimonials content completo
+ * Usado quando testimonialsContent principal não está disponível
+ */
+export const FALLBACK_TESTIMONIALS_CONTENT: TestimonialsContent = {
+  eyebrow: isDevelopment ? "Prova social" : "[Exemplos ilustrativos]",
+  title: isDevelopment 
+    ? "Casos de sucesso da plataforma" 
+    : "[Exemplos] Depoimentos de clientes",
+  subtitle: isDevelopment
+    ? "Casos reais organizados por tipo de evento"
+    : "Exemplos ilustrativos - aguardando depoimentos reais aprovados",
+  testimonials: FALLBACK_TESTIMONIALS,
+  contextGroups: {
+    casamento: FALLBACK_TESTIMONIALS.filter(t => t.context === 'casamento'),
+    assessoria: FALLBACK_TESTIMONIALS.filter(t => t.context === 'assessoria'),
+    corporativo: FALLBACK_TESTIMONIALS.filter(t => t.context === 'corporativo'),
+  },
+};
 
 // Audience Section - 3 main profiles with scannable cards
 export const audienceContent = {
   eyebrow: "Para quem é",
-  title: "Cada perfil enxerga valor em módulos diferentes",
-  subtitle: "Identifique rapidamente se a plataforma serve para você",
+  title: "Cada perfil enxerga valor diferente",
+  subtitle: "Identifique se serve para você",
   profiles: [
     {
       id: "assessora" as const,
       name: "Assessoras e Cerimonialistas",
       icon: "shield-check",
-      promise: "Controle total e segurança operacional para encantar clientes sem riscos",
+      promise: "Controle total e segurança para encantar sem riscos",
       priorityModules: [
-        "Moderação por IA configurável",
-        "Galeria organizada e profissional",
-        "Busca facial para encontrar fotos de convidados",
+        "Moderação IA configurável",
+        "Galeria profissional",
+        "Busca facial",
       ],
       objections: [
         {
           question: "E se aparecer conteúdo impróprio?",
-          answer: "Moderação por IA filtra automaticamente antes de publicar",
+          answer: "IA filtra automaticamente antes de publicar",
         },
         {
-          question: "Consigo personalizar com a identidade do evento?",
-          answer: "Sim, layouts e branding totalmente personalizáveis",
+          question: "Consigo personalizar?",
+          answer: "Sim, layouts e branding personalizáveis",
         },
         {
-          question: "Funciona para casamentos e debutantes?",
-          answer: "Perfeitamente. É o uso mais comum da plataforma",
+          question: "Funciona para casamentos?",
+          answer: "Perfeitamente. É o uso mais comum",
         },
       ],
       cta: {
@@ -722,24 +1108,24 @@ export const audienceContent = {
       id: "social" as const,
       name: "Noivas, Debutantes e Famílias",
       icon: "heart",
-      promise: "Transforme fotos dos convidados em experiência inesquecível no seu evento",
+      promise: "Transforme fotos em experiência inesquecível",
       priorityModules: [
-        "Galeria ao vivo com fotos e vídeos",
-        "Jogos interativos com ranking",
-        "Busca facial: encontre suas fotos por selfie",
+        "Galeria ao vivo",
+        "Jogos com ranking",
+        "Busca por selfie",
       ],
       objections: [
         {
           question: "Precisa instalar app?",
-          answer: "Não! Convidados enviam por WhatsApp, Telegram ou link",
+          answer: "Não! WhatsApp, Telegram ou link",
         },
         {
-          question: "Funciona com muitas pessoas enviando ao mesmo tempo?",
-          answer: "Sim, suporta centenas de convidados simultaneamente",
+          question: "Funciona com muitas pessoas?",
+          answer: "Sim, centenas simultaneamente",
         },
         {
-          question: "Consigo baixar todas as fotos depois?",
-          answer: "Sim, galeria completa organizada e disponível para download",
+          question: "Consigo baixar depois?",
+          answer: "Sim, galeria completa para download",
         },
       ],
       cta: {
@@ -749,26 +1135,26 @@ export const audienceContent = {
     },
     {
       id: "corporativo" as const,
-      name: "Promotores, Produtores e Corporativos",
+      name: "Promotores e Corporativos",
       icon: "building-2",
-      promise: "Engajamento em escala com segurança de marca e operação robusta",
+      promise: "Engajamento em escala com segurança de marca",
       priorityModules: [
-        "Telão dinâmico com layouts profissionais",
-        "Moderação e controle de marca",
-        "Arquitetura preparada para alto volume",
+        "Telão profissional",
+        "Moderação e controle",
+        "Alto volume",
       ],
       objections: [
         {
-          question: "Aguenta pico de uso em ativações grandes?",
-          answer: "Sim, arquitetura preparada para milhares de envios simultâneos",
+          question: "Aguenta pico de uso?",
+          answer: "Sim, milhares de envios simultâneos",
         },
         {
-          question: "Consigo garantir que só apareça conteúdo adequado?",
-          answer: "Moderação por IA + aprovação manual quando necessário",
+          question: "Controle de conteúdo?",
+          answer: "IA + aprovação manual quando necessário",
         },
         {
-          question: "Posso usar com branding do cliente?",
-          answer: "Sim, layouts totalmente personalizáveis com identidade visual",
+          question: "Posso usar meu branding?",
+          answer: "Sim, layouts personalizáveis",
         },
       ],
       cta: {
@@ -782,60 +1168,60 @@ export const audienceContent = {
 export const pricingPlans = [
   {
     name: "Evento Signature",
-    audience: "Casamentos, aniversários, formaturas e eventos pontuais",
-    price: "Sob medida por evento",
+    audience: "Casamentos, aniversários e formaturas",
+    price: "Sob medida",
     badge: "Mais contratado",
     features: [
-      "Galeria dinâmica, telão premium e QR Code de entrada",
-      "Jogos com fotos do evento e ranking em tempo real",
-      "Moderação manual ou com IA conforme o perfil do evento",
-      "Entrega de memórias organizadas e baixáveis",
+      "Galeria, telão e QR Code",
+      "Jogos com ranking realtime",
+      "Moderação manual ou IA",
+      "Memórias organizadas",
     ],
   },
   {
     name: "Operação Recorrente",
-    audience: "Cerimonialistas, buffets, espaços e produtoras",
-    price: "Assinatura consultiva",
+    audience: "Cerimonialistas e produtoras",
+    price: "Assinatura",
     badge: "Escala mensal",
     features: [
-      "Uso em múltiplos eventos com operação padronizada",
-      "Suporte premium e configuração orientada ao parceiro",
-      "Layouts personalizáveis e experiência de marca mais forte",
-      "Base pronta para crescimento de volume e novas ativações",
+      "Múltiplos eventos",
+      "Suporte premium",
+      "Layouts personalizáveis",
+      "Base para crescimento",
     ],
   },
   {
-    name: "Enterprise Experience",
-    audience: "Eventos corporativos, ativações e operações de alto volume",
+    name: "Enterprise",
+    audience: "Corporativos e alto volume",
     price: "Projeto dedicado",
     badge: "Alta complexidade",
     features: [
-      "Arquitetura preparada para alto volume e janelas críticas",
-      "Fluxos de aprovação, indexação e publicação desacoplados",
-      "Integrações, branding e operação com SLA comercial",
-      "Estratégia de rollout para múltiplos pontos de captura",
+      "Alto volume e SLA",
+      "Fluxos desacoplados",
+      "Integrações e branding",
+      "Múltiplos pontos",
     ],
   },
 ];
 
 export const howItWorksContent: HowItWorksContent = {
-  eyebrow: "Fluxo simples e poderoso",
-  title: "Como funciona na prática",
-  subtitle: "Do envio do convidado até a experiência ao vivo, tudo acontece em segundos",
+  eyebrow: "Fluxo simples",
+  title: "Como funciona",
+  subtitle: "Do envio até a experiência ao vivo em segundos",
   steps: [
     {
       id: "step-1",
       number: 1,
       title: "Convidados enviam",
-      description: "Por QR Code, WhatsApp, Telegram ou link direto. Sem app, sem cadastro, sem fricção.",
+      description: "QR Code, WhatsApp ou link. Sem app, sem cadastro.",
       icon: "Upload",
       visual: "/images/how-it-works/step-1-upload.svg",
     },
     {
       id: "step-2",
       number: 2,
-      title: "Plataforma recebe e organiza",
-      description: "Cada foto e vídeo é processado, indexado e preparado para publicação em tempo real.",
+      title: "Plataforma organiza",
+      description: "Processa, indexa e prepara em tempo real.",
       icon: "Server",
       visual: "/images/how-it-works/step-2-process.svg",
     },
@@ -843,15 +1229,15 @@ export const howItWorksContent: HowItWorksContent = {
       id: "step-3",
       number: 3,
       title: "IA modera (opcional)",
-      description: "Moderação inteligente filtra conteúdo impróprio antes de publicar, mantendo o evento seguro.",
+      description: "Filtra conteúdo impróprio antes de publicar.",
       icon: "ShieldCheck",
       visual: "/images/how-it-works/step-3-moderate.svg",
     },
     {
       id: "step-4",
       number: 4,
-      title: "Aparece em galeria, telão e jogos",
-      description: "Conteúdo aprovado vira experiência ao vivo: galeria dinâmica, telão premium, jogos interativos e busca facial.",
+      title: "Aparece ao vivo",
+      description: "Galeria, telão, jogos e busca facial.",
       icon: "Sparkles",
       visual: "/images/how-it-works/step-4-publish.svg",
     },
@@ -859,97 +1245,87 @@ export const howItWorksContent: HowItWorksContent = {
 };
 
 export const captureChannelsContent: CaptureChannelsContent = {
-  eyebrow: "Múltiplos canais de entrada",
-  title: "Escolha como seus convidados vão participar",
-  subtitle: "Cada evento tem seu perfil. Ofereça o canal ideal para o seu público.",
+  eyebrow: "Múltiplos canais",
+  title: "Escolha como convidados participam",
+  subtitle: "Cada evento tem seu perfil. Ofereça o canal ideal.",
   channels: [
     {
       id: "whatsapp-number",
       name: "WhatsApp Número",
-      description: "Convidados enviam fotos e vídeos direto para um número dedicado do evento",
+      description: "Envio direto para número dedicado do evento",
       icon: "MessageCircle",
       visual: "/images/channels/whatsapp-number.png",
       features: [
-        "Número exclusivo do evento",
-        "Recebe fotos e vídeos",
-        "Resposta automática por IA",
-        "Ideal para eventos sociais",
+        "Número exclusivo",
+        "Fotos e vídeos",
+        "Resposta automática IA",
       ],
       useCases: [
-        "Casamentos e aniversários",
+        "Casamentos",
         "Formaturas",
-        "Eventos familiares",
       ],
     },
     {
       id: "whatsapp-group",
       name: "Grupo WhatsApp",
-      description: "Crie um grupo onde todos compartilham e veem as fotos em tempo real",
+      description: "Grupo onde todos compartilham em tempo real",
       icon: "Users",
       visual: "/images/channels/whatsapp-group.png",
       features: [
-        "Grupo dedicado do evento",
+        "Grupo dedicado",
         "Compartilhamento coletivo",
         "Moderação antes de publicar",
-        "Engajamento social",
       ],
       useCases: [
         "Eventos corporativos",
         "Confraternizações",
-        "Reuniões de equipe",
       ],
     },
     {
       id: "telegram",
       name: "Telegram",
-      description: "Canal ou bot do Telegram para receber mídia de alta qualidade sem compressão",
+      description: "Canal ou bot sem compressão de mídia",
       icon: "Send",
       visual: "/images/channels/telegram.png",
       features: [
-        "Sem compressão de mídia",
-        "Vídeos em alta qualidade",
+        "Sem compressão",
+        "Vídeos alta qualidade",
         "Bot interativo",
-        "Ideal para conteúdo premium",
       ],
       useCases: [
-        "Eventos corporativos",
-        "Produções audiovisuais",
+        "Corporativos",
         "Ativações de marca",
       ],
     },
     {
       id: "qr-link",
       name: "QR Code / Link",
-      description: "Convidados escaneiam QR Code ou acessam link para enviar fotos pela web",
+      description: "Escaneie QR ou acesse link para enviar pela web",
       icon: "QrCode",
       visual: "/images/channels/qr-code.png",
       features: [
-        "Sem app necessário",
+        "Sem app",
         "Acesso instantâneo",
-        "Upload web otimizado",
-        "Funciona em qualquer dispositivo",
+        "Qualquer dispositivo",
       ],
       useCases: [
-        "Todos os tipos de evento",
-        "Entrada principal recomendada",
-        "Máxima acessibilidade",
+        "Todos os eventos",
+        "Entrada principal",
       ],
     },
     {
       id: "web-upload",
       name: "Upload Web",
-      description: "Interface web completa para upload de múltiplas fotos e vídeos de uma vez",
+      description: "Interface web para upload em lote",
       icon: "Globe",
       visual: "/images/channels/web-upload.png",
       features: [
         "Upload em lote",
         "Drag and drop",
         "Preview antes de enviar",
-        "Ideal para fotógrafos",
       ],
       useCases: [
-        "Fotógrafos profissionais",
-        "Equipe de produção",
+        "Fotógrafos",
         "Upload pós-evento",
       ],
     },
@@ -962,19 +1338,19 @@ export const captureChannelsContent: CaptureChannelsContent = {
 
 export const experienceModulesContent: ExperienceModulesContent = {
   eyebrow: "Ecossistema completo",
-  title: "Uma foto. Quatro experiências ao vivo.",
-  subtitle: "Cada envio alimenta galeria, telão, jogos e busca facial simultaneamente. Sem retrabalho, sem fricção.",
+  title: "Uma foto. Quatro experiências.",
+  subtitle: "Cada envio alimenta galeria, telão, jogos e busca simultaneamente.",
   modules: [
     {
       id: "gallery",
       name: "Galeria ao vivo",
       eyebrow: "Mosaico dinâmico",
-      title: "As fotos entram e reorganizam a experiência automaticamente",
-      benefit: "Mosaico responsivo com destaque inteligente para fotos recém-chegadas",
+      title: "Fotos entram e reorganizam automaticamente",
+      benefit: "Destaque inteligente para conteúdo novo",
       features: [
-        "Destaque automático para fotos novas",
-        "Reorganização em tempo real",
-        "Sensação de evento vivo, não grade estática",
+        "Destaque automático",
+        "Reorganização realtime",
+        "Sensação de evento vivo",
       ],
       visual: {
         type: "image",
@@ -990,12 +1366,12 @@ export const experienceModulesContent: ExperienceModulesContent = {
       id: "wall",
       name: "Telão dinâmico",
       eyebrow: "Palco premium",
-      title: "Layouts fullscreen, split, polaroid e cinematic que performam ao vivo",
-      benefit: "O telão vira um módulo da plataforma, não o único produto vendável",
+      title: "Layouts profissionais ao vivo",
+      benefit: "Fullscreen, split, polaroid e cinematic",
       features: [
-        "4 layouts premium (fullscreen, split, polaroid, cinematic)",
-        "Transições suaves e leitura imediata",
-        "Atualização em tempo real sincronizada",
+        "4 layouts premium",
+        "Transições suaves",
+        "Atualização sincronizada",
       ],
       visual: {
         type: "image",
@@ -1011,12 +1387,12 @@ export const experienceModulesContent: ExperienceModulesContent = {
       id: "games",
       name: "Jogos interativos",
       eyebrow: "Engajamento real",
-      title: "Transforme cada nova foto em puzzle, memória e ranking mobile-first",
-      benefit: "Jogos feitos para festa: rápidos, acessíveis no celular e pensados para thumb zone",
+      title: "Puzzle e memória com fotos do evento",
+      benefit: "Rápidos, mobile-first e divertidos",
       features: [
-        "Puzzle e jogo da memória com fotos reais",
-        "Ranking em tempo real",
-        "Mobile-first e sem fricção",
+        "Puzzle e memória",
+        "Ranking realtime",
+        "Mobile-first",
       ],
       visual: {
         type: "demo",
@@ -1032,12 +1408,12 @@ export const experienceModulesContent: ExperienceModulesContent = {
       id: "face",
       name: "Busca facial",
       eyebrow: "Memórias acionáveis",
-      title: "Uma selfie encontra as melhores fotos do convidado em segundos",
-      benefit: "Entrega premium no pós-evento, sem rolagem infinita e sem dor para o convidado",
+      title: "Selfie encontra suas fotos em segundos",
+      benefit: "Sem rolagem infinita no pós-evento",
       features: [
-        "Busca por selfie em segundos",
-        "Resultados organizados por relevância",
-        "Download e compartilhamento facilitados",
+        "Busca por selfie",
+        "Resultados por relevância",
+        "Download facilitado",
       ],
       visual: {
         type: "image",
@@ -1060,26 +1436,54 @@ export const experienceModulesContent: ExperienceModulesContent = {
   },
 };
 
-export const faqs = [
+export const faqs: FAQItem[] = [
   {
-    question: "O convidado precisa baixar aplicativo para participar?",
-    answer:
-      "Não. A entrada acontece por QR Code e experiência web. O convidado aponta a câmera, envia a foto e participa sem instalar nada.",
+    id: "faq-app",
+    question: "Precisa de app?",
+    answer: "Não. QR Code, WhatsApp ou link web.",
+    category: "comercial",
   },
   {
-    question: "A plataforma aguenta evento com muito volume de fotos?",
-    answer:
-      "Sim. O fluxo foi pensado para picos reais: captura, moderação, indexação e publicação são tratados de forma desacoplada para a operação não travar.",
+    id: "faq-video",
+    question: "Aceita vídeos?",
+    answer: "Sim. Fotos e vídeos no mesmo fluxo.",
+    category: "comercial",
   },
   {
-    question: "Como a moderação funciona na prática?",
-    answer:
-      "Você escolhe o modo mais adequado ao evento: sem moderação, moderação manual ou moderação por IA. No modo inteligente, a análise acontece antes da exibição.",
+    id: "faq-volume",
+    question: "Funciona com muito volume?",
+    answer: "Sim. Centenas de envios simultâneos.",
+    category: "tecnico",
   },
   {
-    question: "A busca facial é só uma promessa ou vira experiência real?",
-    answer:
-      "Ela vira experiência real. O convidado envia uma selfie e recebe os matches do evento em segundos, com uma interface pensada para download e compartilhamento.",
+    id: "faq-moderation",
+    question: "Como funciona a moderação?",
+    answer: "Você escolhe: sem, manual ou IA.",
+    category: "operacional",
+  },
+  {
+    id: "faq-face-search",
+    question: "Busca facial é configurável?",
+    answer: "Sim. Você decide se ativa por evento.",
+    category: "operacional",
+  },
+  {
+    id: "faq-event-types",
+    question: "Serve para casamento e corporativo?",
+    answer: "Sim. Casamentos, formaturas e eventos corporativos.",
+    category: "comercial",
+  },
+  {
+    id: "faq-branding",
+    question: "Posso usar meu branding?",
+    answer: "Sim. Layouts e cores personalizáveis.",
+    category: "comercial",
+  },
+  {
+    id: "faq-download",
+    question: "Convidados baixam as fotos?",
+    answer: "Sim. Galeria completa para download.",
+    category: "operacional",
   },
 ];
 

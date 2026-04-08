@@ -292,6 +292,34 @@ Uso pratico:
 - medir se o lane consentido/local do produto realmente pressiona `min_face_size_px`
 - confirmar se thresholds como `16` e `24` sao neutros ou nao para o smoke real
 
+Comando local para organizar uma galeria real por pessoa detectada:
+
+- `php artisan face-search:organize-local-gallery --input-dir=<diretorio-com-fotos>`
+
+Uso pratico:
+
+- detecta faces no diretório local usando o provider real do app
+- aplica o `quality gate` do modulo com overrides locais de `min_face_size_px` e `min_quality_score`
+- gera clusters por embedding e cria pastas `pessoa-001`, `pessoa-002`, ...
+- quando uma foto tem mais de uma pessoa aceita, ela entra em mais de uma pasta
+- quando o provider responde `No face is found`, a imagem conta como `no_face`, nao como falha operacional
+
+Opcoes principais:
+
+- `--output-dir=<diretorio-de-saida>`
+- `--no-face-dir=<diretorio-de-referencia-para-sem-pessoa>`
+- `--cluster-threshold=0.35`
+- `--min-face-size=24`
+- `--min-quality-score=0.6`
+- `--max-dimension=2560`
+- `--max-working-bytes=5242880`
+
+Detalhe operacional importante:
+
+- quando origem e destino estao no mesmo volume, o comando materializa as fotos por `hard link`
+- isso evita explodir uso de disco em eventos grandes com fotos repetidas em varias pastas
+- o relatorio final fica em `<output-dir>/report.json`
+
 Importante:
 
 - a doc oficial do `CompreFace` fala em `similarity threshold`;

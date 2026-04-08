@@ -65,3 +65,20 @@ export {
 } from './webVitals';
 
 export type { WebVitalMetric } from './webVitals';
+
+// Motion utilities
+export {
+  DURATION,
+  EASING,
+  prefersReducedMotion,
+  getMotionDuration,
+  getMotionDistance,
+  viewportVariants,
+  staggerContainerVariants,
+  staggerItemVariants,
+  tabContentVariants,
+  hoverVariants,
+  getTransition,
+  getGSAPConfig,
+  VIEWPORT_OBSERVER_OPTIONS,
+} from './motion';

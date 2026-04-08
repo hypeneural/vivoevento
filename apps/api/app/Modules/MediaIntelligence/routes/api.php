@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\MediaIntelligence\Http\Controllers\EventMediaIntelligenceSettingsController;
+use App\Modules\MediaIntelligence\Http\Controllers\MediaReplyEventHistoryController;
 use App\Modules\MediaIntelligence\Http\Controllers\MediaReplyPromptCategoryController;
 use App\Modules\MediaIntelligence\Http\Controllers\MediaReplyPromptPresetController;
 use App\Modules\MediaIntelligence\Http\Controllers\MediaReplyPromptTestController;
@@ -59,6 +60,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get(
         'ia/respostas-de-midia/testes/{teste}',
         [MediaReplyPromptTestController::class, 'show'],
+    );
+    Route::get(
+        'ia/respostas-de-midia/eventos',
+        [MediaReplyEventHistoryController::class, 'events'],
+    );
+    Route::get(
+        'ia/respostas-de-midia/historico-eventos',
+        [MediaReplyEventHistoryController::class, 'index'],
+    );
+    Route::get(
+        'ia/respostas-de-midia/historico-eventos/{historicoEvento}',
+        [MediaReplyEventHistoryController::class, 'show'],
     );
     Route::get(
         'media-intelligence/global-settings',

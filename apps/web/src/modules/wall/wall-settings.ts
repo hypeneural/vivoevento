@@ -101,6 +101,9 @@ export function cloneWallSettings(settings: ApiWallSettings): ApiWallSettings {
   return {
     ...settings,
     event_phase: settings.event_phase ?? 'flow',
+    ad_mode: settings.ad_mode ?? 'disabled',
+    ad_frequency: clampInteger(settings.ad_frequency, 5, 1, 100),
+    ad_interval_minutes: clampInteger(settings.ad_interval_minutes, 3, 1, 60),
     selection_policy: normalizeWallSelectionPolicy(settings.selection_policy),
   };
 }
@@ -109,6 +112,9 @@ export function prepareWallSettingsPayload(settings: ApiWallSettings): ApiWallSe
   return {
     ...settings,
     event_phase: settings.event_phase ?? 'flow',
+    ad_mode: settings.ad_mode ?? 'disabled',
+    ad_frequency: clampInteger(settings.ad_frequency, 5, 1, 100),
+    ad_interval_minutes: clampInteger(settings.ad_interval_minutes, 3, 1, 60),
     selection_policy: normalizeWallSelectionPolicy(settings.selection_policy),
     neon_text: blankToNull(settings.neon_text),
     instructions_text: blankToNull(settings.instructions_text),
@@ -152,6 +158,9 @@ export function areWallSettingsEqual(
     && left.show_sender_credit === right.show_sender_credit
     && (left.show_side_thumbnails ?? true) === (right.show_side_thumbnails ?? true)
     && (left.accepted_orientation ?? 'all') === (right.accepted_orientation ?? 'all')
+    && (left.ad_mode ?? 'disabled') === (right.ad_mode ?? 'disabled')
+    && clampInteger(left.ad_frequency, 5, 1, 100) === clampInteger(right.ad_frequency, 5, 1, 100)
+    && clampInteger(left.ad_interval_minutes, 3, 1, 60) === clampInteger(right.ad_interval_minutes, 3, 1, 60)
     && blankToNull(left.instructions_text) === blankToNull(right.instructions_text);
 }
 

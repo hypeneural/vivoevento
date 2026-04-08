@@ -1,0 +1,297 @@
+// ============================================
+// FLOATING CTA
+// ============================================
+// Requisitos 20, 36, 22:
+// - Aparece após 80% de scroll (Req 20)
+// - Microconversão para reduzir fricção (Req 36)
+// - Acessibilidade: não bloqueia conteúdo, permite fechar (Req 22)
+//
+// Design discreto e não intrusivo, posicionado no canto inferior direito.
+// ============================================
+
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.floatingCTA {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 50;
+  
+  // Initial state (hidden)
+  opacity: 0;
+  transform: translateY(20px) scale(0.95);
+  pointer-events: none;
+  
+  // Smooth transition
+  transition: opacity 300ms ease-out, transform 300ms ease-out;
+  
+  // Visible state
+  &.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+  
+  // Mobile positioning
+  @media (max-width: 768px) {
+    bottom: 1rem;
+    right: 1rem;
+    left: 1rem;
+  }
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  
+  // Sizing
+  min-width: 320px;
+  max-width: 380px;
+  padding: 1.25rem;
+  
+  // Visual style - matching Navbar design
+  border-radius: 20px;
+  border: 1px solid rgba(115, 236, 255, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 26%),
+    rgba(5, 9, 19, 0.92);
+  box-shadow:
+    0 22px 66px rgba(0, 0, 0, 0.38),
+    0 0 64px rgba(115, 236, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  
+  // Subtle glow effect
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 20px;
+    background:
+      radial-gradient(circle at 20% 20%, rgba($c-accent, 0.12), transparent 40%),
+      radial-gradient(circle at 80% 80%, rgba($c-accent-warm, 0.10), transparent 40%);
+    pointer-events: none;
+  }
+  
+  // Mobile full width
+  @media (max-width: 768px) {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+  }
+}
+
+.closeButton {
+  // Reset button styles
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  
+  // Positioning
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 1;
+  
+  // Sizing
+  @include flex-center;
+  width: 2rem;
+  height: 2rem;
+  
+  // Visual style
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: $c-white-64;
+  
+  // Transitions
+  transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+  
+  // Hover state
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: $c-white;
+    transform: scale(1.05);
+  }
+  
+  // Focus state (accessibility)
+  &:focus-visible {
+    outline: 2px solid $c-accent;
+    outline-offset: 2px;
+    color: $c-white;
+  }
+  
+  // Active state
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-right: 2rem; // Space for close button
+}
+
+.title {
+  font-family: $font-display;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: $c-white;
+  line-height: 1.3;
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: $c-white-64;
+  line-height: 1.4;
+}
+
+.actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.primaryCTA,
+.secondaryCTA {
+  // Reset link styles
+  text-decoration: none;
+  
+  // Layout
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  
+  // Sizing
+  min-height: 2.75rem;
+  padding: 0 1.25rem;
+  
+  // Typography
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  
+  // Visual style
+  border-radius: 14px;
+  
+  // Transitions
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  
+  // Icon styling
+  svg {
+    flex-shrink: 0;
+  }
+  
+  // Hover state
+  &:hover {
+    transform: translateY(-2px);
+  }
+  
+  // Focus state (accessibility)
+  &:focus-visible {
+    outline: 2px solid $c-accent;
+    outline-offset: 2px;
+  }
+  
+  // Active state
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.primaryCTA {
+  border: 1px solid rgba($c-accent-warm, 0.28);
+  background: linear-gradient(135deg, rgba($c-accent-warm, 0.20), rgba($c-accent-secondary, 0.14));
+  color: $c-white;
+  box-shadow: 
+    0 4px 16px rgba($c-accent-warm, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  
+  &:hover {
+    border-color: rgba($c-accent-warm, 0.36);
+    background: linear-gradient(135deg, rgba($c-accent-warm, 0.26), rgba($c-accent-secondary, 0.18));
+    box-shadow: 
+      0 6px 20px rgba($c-accent-warm, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  }
+}
+
+.secondaryCTA {
+  border: 1px solid rgba($c-accent, 0.18);
+  background: rgba($c-accent, 0.08);
+  color: $c-white;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  
+  &:hover {
+    border-color: rgba($c-accent, 0.24);
+    background: rgba($c-accent, 0.12);
+    box-shadow: 
+      0 4px 16px rgba($c-accent, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+}
+
+// Reduced motion support (accessibility)
+@media (prefers-reduced-motion: reduce) {
+  .floatingCTA {
+    transition: opacity 200ms ease;
+    
+    &.visible {
+      transform: none;
+    }
+  }
+  
+  .closeButton,
+  .primaryCTA,
+  .secondaryCTA {
+    transition: none;
+    
+    &:hover,
+    &:active {
+      transform: none;
+    }
+  }
+}
+
+// Mobile optimizations
+@media (max-width: 768px) {
+  .card {
+    padding: 1rem;
+  }
+  
+  .title {
+    font-size: 1rem;
+  }
+  
+  .subtitle {
+    font-size: 0.8125rem;
+  }
+  
+  .primaryCTA,
+  .secondaryCTA {
+    min-height: 2.75rem;
+    font-size: 0.875rem;
+    
+    // Larger touch target for mobile
+    min-height: 48px;
+  }
+}
+
+// Ensure it doesn't block content (accessibility requirement)
+// The card is positioned in the corner and can be dismissed
+// Content behind remains accessible via scroll

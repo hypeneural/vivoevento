@@ -60,6 +60,34 @@ it('returns the latest ai reply when the mode is ai', function () {
         ]);
 });
 
+it('returns null for ai reply mode when the media is a video', function () {
+    $event = Event::factory()->create([
+        'title' => 'Evento Teste',
+    ]);
+
+    EventMediaIntelligenceSetting::factory()->create([
+        'event_id' => $event->id,
+        'reply_text_mode' => 'ai',
+        'reply_text_enabled' => true,
+    ]);
+
+    $media = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'media_type' => 'video',
+    ]);
+
+    EventMediaVlmEvaluation::factory()->create([
+        'event_id' => $event->id,
+        'event_media_id' => $media->id,
+        'reply_text' => 'Isto nao deve ser enviado para video.',
+    ]);
+
+    $resolver = app(PublishedMediaReplyTextResolver::class);
+
+    expect($resolver->resolve($media))->toBeNull()
+        ->and($resolver->resolveContext($media))->toBeNull();
+});
+
 it('returns a deterministic fixed template from event settings when the mode is fixed_random', function () {
     $event = Event::factory()->create([
         'title' => 'Casamento da Ana',

@@ -12,9 +12,12 @@ use App\Modules\WhatsApp\Models\WhatsAppInboxSession;
 use App\Modules\WhatsApp\Models\WhatsAppInstance;
 use App\Modules\WhatsApp\Models\WhatsAppMessage;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 class WhatsAppDirectIntakeSessionService
 {
+    private const MISSING_SESSION_NOTICE_COOLDOWN_MINUTES = 5;
+
     public function __construct(
         private readonly WhatsAppMessagingService $messagingService,
         private readonly EventMediaSenderBlacklistService $blacklists,
@@ -54,6 +57,30 @@ class WhatsAppDirectIntakeSessionService
 
         if ($candidateCode === null) {
             return false;
+        }
+
+        if ($activeSession !== null) {
+            $activeSession->loadMissing(['event', 'channel']);
+
+            $activeCode = trim((string) ($activeSession->channel?->external_id ?? ''));
+
+            if ($activeCode !== '' && strcasecmp($activeCode, $candidateCode) === 0) {
+                $ttlMinutes = max(1, (int) data_get($activeSession->channel?->config_json, 'session_ttl_minutes', 180));
+
+                $activeSession->update([
+                    'last_inbound_provider_message_id' => $normalized->messageId,
+                    'last_interaction_at' => now(),
+                    'expires_at' => now()->addMinutes($ttlMinutes),
+                ]);
+
+                $this->sendReply(
+                    $instance,
+                    $normalized,
+                    $this->buildSessionAlreadyActiveMessage($activeSession->event?->title),
+                );
+
+                return true;
+            }
         }
 
         $channel = $this->findDirectChannelByCode($instance, $candidateCode);
@@ -172,6 +199,101 @@ class WhatsAppDirectIntakeSessionService
         ]);
     }
 
+    /**
+     * @return array{
+     *     matched: bool,
+     *     notice_sent: bool,
+     *     reason: string,
+     *     session_id?: int,
+     *     event_id?: int,
+     *     event_channel_id?: int,
+     *     session_status?: string,
+     *     expires_at?: string|null,
+     *     activation_code?: string|null
+     * }
+     */
+    public function handleMediaWithoutActiveSession(
+        WhatsAppInstance $instance,
+        NormalizedInboundMessageData $normalized,
+    ): array {
+        if ($normalized->isFromGroup() || ! $normalized->hasMedia() || ($normalized->fromMe ?? false)) {
+            return [
+                'matched' => false,
+                'notice_sent' => false,
+                'reason' => 'not_applicable',
+            ];
+        }
+
+        $session = $this->findLatestSession($instance, $normalized);
+
+        if (! $session) {
+            return [
+                'matched' => false,
+                'notice_sent' => false,
+                'reason' => 'no_known_session',
+            ];
+        }
+
+        $session->loadMissing(['event', 'channel']);
+
+        if ($this->isSessionActive($session)) {
+            return [
+                'matched' => false,
+                'notice_sent' => false,
+                'reason' => 'active_session',
+            ];
+        }
+
+        $reason = $session->status === 'closed'
+            ? 'closed_session'
+            : 'expired_session';
+
+        $noticeSent = false;
+
+        if (! Cache::has($this->missingSessionNoticeCooldownKey($instance, $normalized))) {
+            $this->sendReply(
+                $instance,
+                $normalized,
+                $this->buildSessionReactivationMessage(
+                    $session->event?->title,
+                    $session->channel?->external_id,
+                ),
+            );
+
+            Cache::put(
+                $this->missingSessionNoticeCooldownKey($instance, $normalized),
+                true,
+                now()->addMinutes(self::MISSING_SESSION_NOTICE_COOLDOWN_MINUTES),
+            );
+
+            $noticeSent = true;
+        }
+
+        return [
+            'matched' => true,
+            'notice_sent' => $noticeSent,
+            'reason' => $reason,
+            'session_id' => $session->id,
+            'event_id' => $session->event_id,
+            'event_channel_id' => $session->event_channel_id,
+            'session_status' => (string) $session->status,
+            'expires_at' => $session->expires_at?->toIso8601String(),
+            'activation_code' => $session->channel?->external_id,
+        ];
+    }
+
+    public function findLatestSession(
+        WhatsAppInstance $instance,
+        NormalizedInboundMessageData $normalized,
+    ): ?WhatsAppInboxSession {
+        return WhatsAppInboxSession::query()
+            ->with(['event', 'channel'])
+            ->where('instance_id', $instance->id)
+            ->where('sender_external_id', $normalized->senderExternalId())
+            ->latest('id')
+            ->first();
+    }
+
     private function findDirectChannelByCode(WhatsAppInstance $instance, string $candidateCode): ?EventChannel
     {
         return EventChannel::query()
@@ -248,6 +370,62 @@ class WhatsAppDirectIntakeSessionService
             $titleLine,
             '',
             'Se quiser voltar a enviar midias, mande o codigo novamente.',
+        ]);
+    }
+
+    private function buildSessionAlreadyActiveMessage(?string $eventTitle): string
+    {
+        $titleLine = $eventTitle !== null && $eventTitle !== ''
+            ? "Voce ja esta vinculado ao evento {$eventTitle}."
+            : 'Voce ja esta com uma sessao ativa para envio de midias.';
+
+        return implode("\n", [
+            '*EventoVivo*',
+            '',
+            $titleLine,
+            '',
+            'Pode continuar enviando fotos e videos normalmente.',
+        ]);
+    }
+
+    private function buildSessionReactivationMessage(?string $eventTitle, ?string $code): string
+    {
+        $titleLine = $eventTitle !== null && $eventTitle !== ''
+            ? "Seu acesso para {$eventTitle} nao esta mais ativo."
+            : 'Seu acesso para envio de midias nao esta mais ativo.';
+
+        $instructionLine = $code !== null && $code !== ''
+            ? "Envie {$code} novamente para continuar enviando fotos e videos."
+            : 'Envie o codigo novamente para continuar enviando fotos e videos.';
+
+        return implode("\n", [
+            '*EventoVivo*',
+            '',
+            $titleLine,
+            '',
+            $instructionLine,
+        ]);
+    }
+
+    private function isSessionActive(WhatsAppInboxSession $session): bool
+    {
+        if ($session->status !== 'active' || $session->closed_at !== null) {
+            return false;
+        }
+
+        return $session->expires_at === null || $session->expires_at->isFuture();
+    }
+
+    private function missingSessionNoticeCooldownKey(
+        WhatsAppInstance $instance,
+        NormalizedInboundMessageData $normalized,
+    ): string {
+        return implode(':', [
+            'whatsapp',
+            'direct-intake',
+            'missing-session-notice',
+            $instance->id,
+            $normalized->senderExternalId(),
         ]);
     }
 

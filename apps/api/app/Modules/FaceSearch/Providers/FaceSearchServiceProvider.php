@@ -13,6 +13,7 @@ use App\Modules\FaceSearch\Console\RunFaceIndexLaneThroughputCommand;
 use App\Modules\FaceSearch\Console\RunManifestFaceSizeThresholdSweepCommand;
 use App\Modules\FaceSearch\Console\RunFaceSizeThresholdSweepCommand;
 use App\Modules\FaceSearch\Console\RunLfwLocalLoaderCommand;
+use App\Modules\FaceSearch\Console\RunOrganizeLocalGalleryByFaceCommand;
 use App\Modules\FaceSearch\Console\RunSearchThresholdSweepCommand;
 use App\Modules\FaceSearch\Console\RunSmokeMinFaceSizeAnalysisCommand;
 use App\Modules\FaceSearch\Console\RunWiderFaceLocalLoaderCommand;
@@ -35,6 +36,7 @@ use App\Modules\FaceSearch\Services\FaceSearchBenchmarkService;
 use App\Modules\FaceSearch\Services\FaceSearchThresholdSweepService;
 use App\Modules\FaceSearch\Services\LfwLocalLoaderService;
 use App\Modules\FaceSearch\Services\ManifestFaceSizeThresholdSweepService;
+use App\Modules\FaceSearch\Services\OrganizeLocalGalleryByFaceService;
 use App\Modules\FaceSearch\Services\SmokeMinFaceSizeAnalysisService;
 use App\Modules\FaceSearch\Services\CompreFaceClient;
 use App\Modules\FaceSearch\Services\CompreFaceDetectionProvider;
@@ -69,6 +71,7 @@ class FaceSearchServiceProvider extends ServiceProvider
         $this->app->singleton(ManifestFaceSizeThresholdSweepService::class);
         $this->app->singleton(NullFaceDetectionProvider::class);
         $this->app->singleton(NullFaceEmbeddingProvider::class);
+        $this->app->singleton(OrganizeLocalGalleryByFaceService::class);
         $this->app->singleton(PgvectorFaceVectorStore::class);
         $this->app->singleton(SmokeMinFaceSizeAnalysisService::class);
         $this->app->singleton(WiderFaceLocalLoaderService::class);
@@ -104,6 +107,7 @@ class FaceSearchServiceProvider extends ServiceProvider
                 RunFaceSizeThresholdSweepCommand::class,
                 RunLfwLocalLoaderCommand::class,
                 RunManifestFaceSizeThresholdSweepCommand::class,
+                RunOrganizeLocalGalleryByFaceCommand::class,
                 RunSearchThresholdSweepCommand::class,
                 RunSmokeMinFaceSizeAnalysisCommand::class,
                 RunWiderFaceLocalLoaderCommand::class,

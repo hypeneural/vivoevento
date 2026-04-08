@@ -30,12 +30,169 @@
   color: inherit;
 }
 
+// Section padding with 50% increase
 @mixin section-padding {
-  padding: clamp(5rem, 7vw, 7.5rem) 0;
+  padding: $space-xl 0; // clamp(6rem, 9vw, 7.5rem) - 50% increase from 5rem/7vw/7.5rem
 }
 
+// Display title with improved hierarchy
 @mixin display-title {
   font-family: $font-display;
-  line-height: 0.96;
+  font-size: $font-size-display;
+  line-height: $line-height-tight;
   letter-spacing: -0.05em;
+}
+
+// Heading styles with clear hierarchy
+@mixin heading-1 {
+  font-family: $font-display;
+  font-size: $font-size-h1;
+  line-height: $line-height-snug;
+  letter-spacing: -0.03em;
+}
+
+@mixin heading-2 {
+  font-family: $font-display;
+  font-size: $font-size-h2;
+  line-height: $line-height-snug;
+  letter-spacing: -0.02em;
+}
+
+@mixin heading-3 {
+  font-family: $font-display;
+  font-size: $font-size-h3;
+  line-height: $line-height-normal;
+  letter-spacing: -0.01em;
+}
+
+// Body text styles
+@mixin body-large {
+  font-family: $font-body;
+  font-size: $font-size-body-lg;
+  line-height: $line-height-relaxed;
+}
+
+@mixin body-text {
+  font-family: $font-body;
+  font-size: $font-size-body;
+  line-height: $line-height-normal;
+}
+
+@mixin body-small {
+  font-family: $font-body;
+  font-size: $font-size-sm;
+  line-height: $line-height-normal;
+}
+
+// Visual pattern alternation helpers
+@mixin pattern-emotional {
+  // Real event photography pattern
+  background: $c-bg-dark;
+  position: relative;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 30% 50%, rgba(255, 191, 114, 0.08), transparent 60%);
+    pointer-events: none;
+  }
+}
+
+@mixin pattern-functional {
+  // Product UI pattern
+  background: $c-bg-soft;
+  position: relative;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 70% 50%, rgba(115, 236, 255, 0.06), transparent 60%);
+    pointer-events: none;
+  }
+}
+
+@mixin pattern-commercial {
+  // Clean layout pattern
+  background: $c-bg-dark;
+  position: relative;
+}
+
+// Motion and Animation Mixins
+// **Validates: Requirements 18** - Subtle premium motion with prefers-reduced-motion support
+
+// Transition mixin with automatic reduced motion support
+@mixin transition($properties: all, $duration: 0.3s, $easing: cubic-bezier(0.16, 1, 0.3, 1)) {
+  @media (prefers-reduced-motion: no-preference) {
+    transition: $properties $duration $easing;
+  }
+  
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+// Subtle hover lift effect for cards and interactive elements
+@mixin hover-lift($scale: 1.02, $duration: 0.2s) {
+  @media (prefers-reduced-motion: no-preference) {
+    transition: transform $duration cubic-bezier(0.16, 1, 0.3, 1);
+    
+    &:hover {
+      transform: scale($scale);
+    }
+  }
+}
+
+// Subtle hover glow effect
+@mixin hover-glow($color: $c-accent, $intensity: 0.15, $duration: 0.3s) {
+  @media (prefers-reduced-motion: no-preference) {
+    transition: box-shadow $duration cubic-bezier(0.16, 1, 0.3, 1);
+    
+    &:hover {
+      box-shadow: 0 0 24px rgba($color, $intensity);
+    }
+  }
+}
+
+// Viewport entrance animation
+@mixin animate-in($delay: 0s, $distance: 24px, $duration: 0.5s) {
+  @media (prefers-reduced-motion: no-preference) {
+    opacity: 0;
+    transform: translateY($distance);
+    animation: slide-in-up $duration cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: $delay;
+  }
+}
+
+// Keyframes for entrance animations
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }

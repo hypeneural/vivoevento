@@ -36,6 +36,10 @@ class PublishedMediaReplyTextResolver
             return null;
         }
 
+        if ($media->media_type !== 'image' && ! $settings->usesFixedAutomaticReply()) {
+            return null;
+        }
+
         if ($settings->usesFixedAutomaticReply()) {
             return $this->resolveFixedReplyText($media);
         }

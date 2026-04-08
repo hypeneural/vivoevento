@@ -78,7 +78,7 @@
   background: $c-bg-panel;
   border-radius: $radius-lg;
   border: $border-subtle;
-  transition: all 0.3s ease;
+  @include transition((transform, border-color, box-shadow), 0.3s);
 
   @media (min-width: 960px) {
     grid-template-columns: auto auto 1fr;
@@ -90,7 +90,10 @@
   &:hover {
     border-color: rgba($c-accent, 0.3);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-    transform: translateY(-2px);
+    
+    @media (prefers-reduced-motion: no-preference) {
+      transform: translateY(-2px);
+    }
   }
 
   &:focus-within {
@@ -201,8 +204,6 @@
 // Accessibility improvements
 @media (prefers-reduced-motion: reduce) {
   .step {
-    transition: none;
-    
     &:hover {
       transform: none;
     }

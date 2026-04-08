@@ -1,7 +1,9 @@
 import api from '@/lib/api';
 import type {
+  ApiWallAdItem,
   ApiWallActionResponse,
   ApiWallDiagnosticsResponse,
+  ApiWallInsightsResponse,
   ApiWallOptionsResponse,
   ApiWallPlayerCommand,
   ApiWallPlayerCommandResponse,
@@ -20,6 +22,14 @@ export function getEventWallSettings(eventId: string | number) {
 
 export function getEventWallDiagnostics(eventId: string | number) {
   return api.get<ApiWallDiagnosticsResponse>(`/events/${eventId}/wall/diagnostics`);
+}
+
+export function getEventWallInsights(eventId: string | number) {
+  return api.get<ApiWallInsightsResponse>(`/events/${eventId}/wall/insights`);
+}
+
+export function getEventWallAds(eventId: string | number) {
+  return api.get<ApiWallAdItem[]>(`/events/${eventId}/wall/ads`);
 }
 
 export function updateEventWallSettings(
@@ -61,5 +71,32 @@ export function runEventWallPlayerCommand(
       command,
       reason: reason ?? null,
     },
+  });
+}
+
+export function createEventWallAd(
+  eventId: string | number,
+  payload: {
+    file: File;
+    durationSeconds?: number | null;
+  },
+) {
+  const formData = new FormData();
+  formData.append('file', payload.file);
+
+  if (payload.durationSeconds != null) {
+    formData.append('duration_seconds', String(payload.durationSeconds));
+  }
+
+  return api.upload<ApiWallAdItem>(`/events/${eventId}/wall/ads`, formData);
+}
+
+export function deleteEventWallAd(eventId: string | number, adId: number) {
+  return api.delete<void>(`/events/${eventId}/wall/ads/${adId}`);
+}
+
+export function reorderEventWallAds(eventId: string | number, order: number[]) {
+  return api.patch<{ reordered: boolean }>(`/events/${eventId}/wall/ads/reorder`, {
+    body: { order },
   });
 }

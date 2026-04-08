@@ -21,6 +21,8 @@ import { siteConfig } from "@/config/site";
 import { useSmoothScroll } from "@/hooks/useSmoothScroll";
 import { usePersonaContent } from "@/hooks/usePersonaContent";
 import TrustSignals from "./TrustSignals";
+import MicroconversionCTAs from "./MicroconversionCTAs";
+import { trackCTAClick, trackMicroconversion } from "@/utils/tracking";
 
 gsap.registerPlugin(useGSAP);
 
@@ -310,6 +312,7 @@ export default function HeroExperience() {
                 target="_blank" 
                 rel="noreferrer"
                 aria-label="Agendar demonstração da plataforma"
+                onClick={() => trackCTAClick("primary", "hero", "Agendar demonstração")}
               >
                 <CalendarDays size={18} aria-hidden="true" />
                 {heroContent.ctas.primary.text}
@@ -324,6 +327,13 @@ export default function HeroExperience() {
                 Ver como funciona
                 <ArrowRight size={17} aria-hidden="true" />
               </button>
+            </div>
+
+            <div data-hero-reveal>
+              <MicroconversionCTAs 
+                variant="inline"
+                onMicroconversion={(action) => trackMicroconversion(action, "hero")}
+              />
             </div>
 
             <div data-hero-reveal>

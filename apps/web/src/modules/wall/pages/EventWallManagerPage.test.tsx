@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,9 +11,15 @@ import EventWallManagerPage from './EventWallManagerPage';
 const getEventDetailMock = vi.fn();
 const getEventWallSettingsMock = vi.fn();
 const getEventWallDiagnosticsMock = vi.fn();
+const getEventWallInsightsMock = vi.fn();
+const getEventWallAdsMock = vi.fn();
 const getWallOptionsMock = vi.fn();
 const simulateEventWallMock = vi.fn();
 const runEventWallPlayerCommandMock = vi.fn();
+const createEventWallAdMock = vi.fn();
+const deleteEventWallAdMock = vi.fn();
+const reorderEventWallAdsMock = vi.fn();
+const updateEventWallSettingsMock = vi.fn();
 
 vi.mock('@/modules/events/api', () => ({
   getEventDetail: (...args: unknown[]) => getEventDetailMock(...args),
@@ -22,10 +28,15 @@ vi.mock('@/modules/events/api', () => ({
 vi.mock('../api', () => ({
   getEventWallSettings: (...args: unknown[]) => getEventWallSettingsMock(...args),
   getEventWallDiagnostics: (...args: unknown[]) => getEventWallDiagnosticsMock(...args),
+  getEventWallInsights: (...args: unknown[]) => getEventWallInsightsMock(...args),
+  getEventWallAds: (...args: unknown[]) => getEventWallAdsMock(...args),
   getWallOptions: (...args: unknown[]) => getWallOptionsMock(...args),
   simulateEventWall: (...args: unknown[]) => simulateEventWallMock(...args),
   runEventWallPlayerCommand: (...args: unknown[]) => runEventWallPlayerCommandMock(...args),
-  updateEventWallSettings: vi.fn(),
+  createEventWallAd: (...args: unknown[]) => createEventWallAdMock(...args),
+  deleteEventWallAd: (...args: unknown[]) => deleteEventWallAdMock(...args),
+  reorderEventWallAds: (...args: unknown[]) => reorderEventWallAdsMock(...args),
+  updateEventWallSettings: (...args: unknown[]) => updateEventWallSettingsMock(...args),
   runEventWallAction: vi.fn(),
 }));
 
@@ -66,18 +77,7 @@ describe('EventWallManagerPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    getEventDetailMock.mockResolvedValue({
-      id: 1,
-      title: 'Evento Vivo',
-      status: 'active',
-      starts_at: '2026-04-02T18:00:00Z',
-      location_name: 'Salao Principal',
-      module_flags: {
-        wall: true,
-      },
-    });
-
-    getEventWallSettingsMock.mockResolvedValue({
+    const wallSettingsResponse = {
       id: 10,
       event_id: 1,
       wall_code: 'ABCD1234',
@@ -103,10 +103,13 @@ describe('EventWallManagerPage', () => {
         show_sender_credit: false,
         show_side_thumbnails: true,
         accepted_orientation: 'all',
+        ad_mode: 'by_photos' as const,
+        ad_frequency: 5,
+        ad_interval_minutes: 3,
         instructions_text: 'Envie sua foto',
       },
       diagnostics_summary: {
-        health_status: 'healthy',
+        health_status: 'healthy' as const,
         total_players: 1,
         online_players: 1,
         offline_players: 0,
@@ -127,9 +130,88 @@ describe('EventWallManagerPage', () => {
       expires_at: null,
       created_at: '2026-04-02T20:00:00Z',
       updated_at: '2026-04-02T21:00:00Z',
+    };
+
+    getEventDetailMock.mockResolvedValue({
+      id: 1,
+      title: 'Evento Vivo',
+      status: 'active',
+      starts_at: '2026-04-02T18:00:00Z',
+      location_name: 'Salao Principal',
+      module_flags: {
+        wall: true,
+      },
     });
 
+    getEventWallSettingsMock.mockResolvedValue(wallSettingsResponse);
+
     getWallOptionsMock.mockResolvedValue(fallbackOptions);
+    getEventWallInsightsMock.mockResolvedValue({
+      topContributor: {
+        senderKey: 'whatsapp:5511999990001',
+        displayName: 'Carla',
+        maskedContact: '5511...01',
+        source: 'whatsapp',
+        mediaCount: 4,
+        lastSentAt: '2026-04-02T20:58:00Z',
+        avatarUrl: null,
+      },
+      totals: {
+        received: 24,
+        approved: 20,
+        queued: 14,
+        displayed: null,
+      },
+      recentItems: [
+        {
+          id: 'recent-carla',
+          previewUrl: 'https://cdn.example.com/recent-carla.jpg',
+          senderName: 'Carla',
+          senderKey: 'whatsapp:5511999990001',
+          source: 'whatsapp',
+          createdAt: '2026-04-02T20:58:00Z',
+          approvedAt: '2026-04-02T20:58:20Z',
+          displayedAt: null,
+          status: 'queued',
+          isFeatured: false,
+          isReplay: false,
+        },
+        {
+          id: 'recent-diego',
+          previewUrl: 'https://cdn.example.com/recent-diego.jpg',
+          senderName: 'Diego',
+          senderKey: 'upload:diego',
+          source: 'upload',
+          createdAt: '2026-04-02T20:59:00Z',
+          approvedAt: null,
+          displayedAt: null,
+          status: 'received',
+          isFeatured: true,
+          isReplay: false,
+        },
+      ],
+      sourceMix: [
+        { source: 'whatsapp', count: 18 },
+        { source: 'upload', count: 6 },
+      ],
+      lastCaptureAt: '2026-04-02T20:59:00Z',
+    });
+    getEventWallAdsMock.mockResolvedValue([
+      {
+        id: 1,
+        url: 'https://cdn.example.com/ad-1.jpg',
+        media_type: 'image',
+        duration_seconds: 10,
+        position: 0,
+      },
+      {
+        id: 2,
+        url: 'https://cdn.example.com/ad-2.mp4',
+        media_type: 'video',
+        duration_seconds: 0,
+        position: 1,
+      },
+    ]);
 
     getEventWallDiagnosticsMock.mockResolvedValue({
       summary: {
@@ -228,15 +310,36 @@ describe('EventWallManagerPage', () => {
       command: 'clear-cache',
       issued_at: '2026-04-02T21:00:00Z',
     });
+    createEventWallAdMock.mockResolvedValue({
+      id: 3,
+      url: 'https://cdn.example.com/ad-3.jpg',
+      media_type: 'image',
+      duration_seconds: 15,
+      position: 2,
+    });
+    deleteEventWallAdMock.mockResolvedValue(undefined);
+    reorderEventWallAdsMock.mockResolvedValue({ reordered: true });
+    updateEventWallSettingsMock.mockImplementation(async (_eventId: string, payload: unknown) => ({
+      ...wallSettingsResponse,
+      settings: payload,
+      updated_at: '2026-04-02T21:05:00Z',
+    }));
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.useRealTimers();
   });
 
   it('renders the simulation and diagnostics blocks with realtime wall data', async () => {
     renderPage();
 
+    await waitFor(() => {
+      expect(screen.getAllByText(/Quem mais enviou/i).length).toBeGreaterThan(0);
+    });
+    expect(screen.getByText(/Total de midias/i)).toBeInTheDocument();
+    expect(screen.getByText(/Ultimas chegadas/i)).toBeInTheDocument();
     expect(await screen.findByText(/Diagnostico operacional/i)).toBeInTheDocument();
     expect(screen.getByText(/Previsao da fila/i)).toBeInTheDocument();
     expect(screen.getByText(/Tela player-alpha/i)).toBeInTheDocument();
@@ -250,7 +353,22 @@ describe('EventWallManagerPage', () => {
     await waitFor(() => {
       expect(screen.getAllByText(/Saudavel/i).length).toBeGreaterThan(0);
     });
-  });
+  }, 15000);
+
+  it('liga o trilho de ultimas chegadas ao palco atual quando uma midia e selecionada', async () => {
+    renderPage();
+
+    const recentButton = await screen.findByRole('button', {
+      name: /Selecionar midia recente de Carla/i,
+    });
+
+    fireEvent.click(recentButton);
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Midia selecionada do topo/i).length).toBeGreaterThan(0);
+    });
+    expect(screen.getAllByText(/Carla/i).length).toBeGreaterThan(0);
+  }, 15000);
 
   it('sends a player command from the diagnostics panel', async () => {
     renderPage();
@@ -261,5 +379,83 @@ describe('EventWallManagerPage', () => {
     await waitFor(() => {
       expect(runEventWallPlayerCommandMock).toHaveBeenCalledWith('1', 'clear-cache', 'manager_clear_cache');
     });
-  });
+  }, 15000);
+
+  it('renders the sponsor ads section and uploads a new creative', async () => {
+    renderPage();
+
+    expect(await screen.findByText(/Patrocinadores no telao/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Patrocinador 1/i)).toBeInTheDocument();
+
+    const file = new File(['banner'], 'banner.jpg', { type: 'image/jpeg' });
+    const fileInput = screen.getByLabelText(/Arquivo do patrocinador/i);
+
+    fireEvent.change(fileInput, {
+      target: {
+        files: [file],
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Enviar anuncio/i }));
+
+    await waitFor(() => {
+      expect(createEventWallAdMock).toHaveBeenCalledWith('1', {
+        file,
+        durationSeconds: 10,
+      });
+    });
+  }, 15000);
+
+  it('reorders sponsor creatives from the wall manager', async () => {
+    renderPage();
+
+    expect(await screen.findByText(/Patrocinador 1/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Descer anuncio 1/i }));
+
+    await waitFor(() => {
+      expect(reorderEventWallAdsMock).toHaveBeenCalledWith('1', [2, 1]);
+    });
+  }, 15000);
+
+  it('persists sponsor scheduling settings from the wall manager', async () => {
+    renderPage();
+
+    expect(await screen.findByText(/Patrocinador 1/i)).toBeInTheDocument();
+
+    const frequencyField = screen.getByText(/Frequencia por fotos/i).parentElement?.querySelector('input');
+
+    expect(frequencyField).not.toBeNull();
+    fireEvent.change(frequencyField as HTMLInputElement, {
+      target: {
+        value: '7',
+      },
+    });
+
+    const saveButton = screen
+      .getAllByRole('button', { name: /Salvar alteracoes/i })
+      .find((button) => button.querySelector('.lucide-save') !== null);
+
+    expect(saveButton).toBeDefined();
+    fireEvent.click(saveButton as HTMLButtonElement);
+
+    await waitFor(() => {
+      expect(updateEventWallSettingsMock).toHaveBeenCalledWith('1', expect.objectContaining({
+        ad_mode: 'by_photos',
+        ad_frequency: 7,
+        ad_interval_minutes: 3,
+      }));
+    });
+  }, 15000);
+
+  it('removes sponsor creatives from the wall manager', async () => {
+    renderPage();
+
+    expect(await screen.findByText(/Patrocinador 1/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Remover anuncio 1/i }));
+
+    await waitFor(() => {
+      expect(deleteEventWallAdMock).toHaveBeenCalledWith('1', 1);
+    });
+  }, 15000);
 });

@@ -70,13 +70,15 @@ class NormalizeInboundMessageJob implements ShouldQueue
         }
 
         try {
+            $messageType = $this->resolvedMessageType($payload);
+
             $inboundMessage = InboundMessage::query()->firstOrCreate(
                 $identity,
                 [
                     'event_id' => data_get($context, 'event_id'),
                     'event_channel_id' => data_get($context, 'event_channel_id'),
                     'trace_id' => $traceId !== '' ? $traceId : null,
-                    'message_type' => data_get($payload, 'message_type') ?? $this->detectType($payload),
+                    'message_type' => $messageType,
                     'chat_external_id' => $chatExternalId,
                     'sender_external_id' => data_get($context, 'sender_external_id') ?? data_get($context, 'sender_lid') ?? data_get($context, 'sender_phone'),
                     'sender_phone' => data_get($context, 'sender_phone'),
@@ -85,6 +87,8 @@ class NormalizeInboundMessageJob implements ShouldQueue
                     'sender_avatar_url' => data_get($context, 'sender_avatar_url') ?? data_get($payload, 'senderPhoto'),
                     'body_text' => data_get($context, 'caption') ?? data_get($payload, 'caption') ?? data_get($payload, 'body_text') ?? data_get($payload, 'text.message'),
                     'media_url' => data_get($context, 'media_url'),
+                    'capture_target' => $this->resolvedCaptureTarget($context, $messageType),
+                    'mime_type' => data_get($context, 'mime_type') ?? data_get($payload, 'mime_type') ?? $this->resolvedMimeType($payload, $messageType),
                     'reference_message_id' => data_get($payload, 'referenceMessageId') ?? data_get($payload, 'provider_message_id'),
                     'from_me' => data_get($context, 'from_me') ?? data_get($payload, 'fromMe'),
                     'normalized_payload_json' => array_merge($payload, [
@@ -135,15 +139,48 @@ class NormalizeInboundMessageJob implements ShouldQueue
         DownloadInboundMediaJob::dispatch($inboundMessage->id);
     }
 
+    private function resolvedMessageType(array $payload): string
+    {
+        $messageType = data_get($payload, 'message_type');
+
+        if (is_string($messageType) && trim($messageType) !== '') {
+            return trim($messageType);
+        }
+
+        return $this->detectType($payload);
+    }
+
     private function detectType(array $payload): string
     {
-        foreach (['photo', 'image', 'video', 'audio', 'document', 'sticker'] as $type) {
-            if (isset($payload[$type])) {
+        foreach (['image', 'video', 'audio', 'document', 'sticker', 'photo'] as $type) {
+            if ($this->hasMediaPayload($payload, $type)) {
                 return $type;
             }
         }
 
-        return isset($payload['text']) ? 'text' : 'unknown';
+        return $this->hasTextPayload($payload) ? 'text' : 'unknown';
+    }
+
+    private function hasMediaPayload(array $payload, string $type): bool
+    {
+        $value = $payload[$type] ?? null;
+
+        return is_array($value) && $value !== [];
+    }
+
+    private function hasTextPayload(array $payload): bool
+    {
+        if (! array_key_exists('text', $payload)) {
+            return false;
+        }
+
+        $text = $payload['text'];
+
+        if (is_array($text)) {
+            return $text !== [];
+        }
+
+        return is_string($text) && trim($text) !== '';
     }
 
     private function hasDownloadableMedia(InboundMessage $inboundMessage): bool
@@ -182,5 +219,38 @@ class NormalizeInboundMessageJob implements ShouldQueue
         $sqlState = $exception->errorInfo[0] ?? null;
 
         return in_array($sqlState, ['23000', '23505'], true);
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function resolvedCaptureTarget(array $context, string $messageType): string
+    {
+        $fromContext = data_get($context, 'capture_target');
+
+        if (is_string($fromContext) && trim($fromContext) !== '') {
+            return trim($fromContext);
+        }
+
+        return $messageType === 'audio' ? 'event_audio' : 'event_media';
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function resolvedMimeType(array $payload, string $messageType): ?string
+    {
+        $mimeType = data_get($payload, "{$messageType}.mimeType")
+            ?? data_get($payload, 'image.mimeType')
+            ?? data_get($payload, 'video.mimeType')
+            ?? data_get($payload, 'audio.mimeType')
+            ?? data_get($payload, 'sticker.mimeType')
+            ?? data_get($payload, 'document.mimeType');
+
+        if (! is_string($mimeType) || trim($mimeType) === '') {
+            return null;
+        }
+
+        return trim($mimeType);
     }
 }

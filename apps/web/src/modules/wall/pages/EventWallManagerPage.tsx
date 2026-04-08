@@ -1,9 +1,11 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   AlertTriangle,
+  ArrowDown,
   ArrowLeft,
+  ArrowUp,
   Check,
   Copy,
   ExternalLink,
@@ -29,6 +31,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import type {
+  ApiWallAdItem,
   ApiWallDiagnosticsPlayer,
   ApiWallDiagnosticsSummary,
   ApiWallPlayerCommand,
@@ -44,6 +47,7 @@ import { EVENT_STATUS_LABELS } from '@/modules/events/types';
 
 import { HelpLabel, HelpTooltip } from '../components/WallManagerHelp';
 import { WallManagerSection } from '../components/WallManagerSection';
+import { WallTopInsightsRail } from '../components/manager/top/WallTopInsightsRail';
 import {
   fallbackOptions,
   WALL_COOLDOWN_OPTIONS,
@@ -56,9 +60,13 @@ import {
   WALL_WINDOW_MINUTE_OPTIONS,
 } from '../manager-config';
 import {
+  createEventWallAd,
+  deleteEventWallAd,
   getEventWallDiagnostics,
+  getEventWallAds,
   getEventWallSettings,
   getWallOptions,
+  reorderEventWallAds,
   runEventWallAction,
   runEventWallPlayerCommand,
   simulateEventWall,
@@ -66,6 +74,9 @@ import {
   type EventWallAction,
 } from '../api';
 import { realtimeLabel, useWallManagerRealtime } from '../hooks/useWallManagerRealtime';
+import { useWallSelectedMedia } from '../hooks/useWallSelectedMedia';
+import { useWallTopInsights } from '../hooks/useWallTopInsights';
+import { WALL_INSIGHTS_COPY, formatWallRecentStatusLabel } from '../wall-copy';
 import {
   applyWallSelectionPreset,
   areWallSettingsEqual,
@@ -75,6 +86,8 @@ import {
   prepareWallSettingsPayload,
   resolveWallSelectionModeOption,
 } from '../wall-settings';
+import { getWallSourceMeta } from '../wall-source-meta';
+import { formatWallRelativeTime } from '../wall-view-models';
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-neutral-500/20 text-neutral-300 border-neutral-500/30',
@@ -102,6 +115,63 @@ function formatEventSchedule(startsAt?: string | null, locationName?: string | n
   ].filter(Boolean).join(' - ') || 'Sem agenda definida';
 }
 
+function sortWallAds(ads: ApiWallAdItem[]): ApiWallAdItem[] {
+  return [...ads].sort((left, right) => left.position - right.position);
+}
+
+function moveWallAd(ads: ApiWallAdItem[], adId: number, direction: -1 | 1): ApiWallAdItem[] | null {
+  const orderedAds = sortWallAds(ads);
+  const currentIndex = orderedAds.findIndex((item) => item.id === adId);
+
+  if (currentIndex < 0) {
+    return null;
+  }
+
+  const nextIndex = currentIndex + direction;
+  if (nextIndex < 0 || nextIndex >= orderedAds.length) {
+    return null;
+  }
+
+  const nextAds = [...orderedAds];
+  const [moved] = nextAds.splice(currentIndex, 1);
+  nextAds.splice(nextIndex, 0, moved);
+
+  return nextAds.map((item, index) => ({
+    ...item,
+    position: index,
+  }));
+}
+
+function isVideoAdFile(file: File): boolean {
+  if (file.type.startsWith('video/')) {
+    return true;
+  }
+
+  return /\.mp4$/i.test(file.name);
+}
+
+function clampIntegerInput(value: string | number | undefined, fallback: number, min: number, max: number) {
+  const parsed = typeof value === 'number' ? value : Number(value);
+
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.max(min, Math.min(max, Math.trunc(parsed)));
+}
+
+function formatFileSize(sizeBytes: number): string {
+  if (sizeBytes < 1024) {
+    return `${sizeBytes} B`;
+  }
+
+  if (sizeBytes < 1024 * 1024) {
+    return `${Math.round(sizeBytes / 102.4) / 10} KB`;
+  }
+
+  return `${Math.round(sizeBytes / 104857.6) / 10} MB`;
+}
+
 export default function EventWallManagerPage() {
   const { id } = useParams<{ id: string }>();
   const eventId = id ?? '';
@@ -112,6 +182,9 @@ export default function EventWallManagerPage() {
   const [copied, setCopied] = useState(false);
   const [simulationDraft, setSimulationDraft] = useState<ApiWallSettings | null>(null);
   const [simulationFingerprint, setSimulationFingerprint] = useState('');
+  const [selectedAdFile, setSelectedAdFile] = useState<File | null>(null);
+  const [selectedAdDuration, setSelectedAdDuration] = useState('10');
+  const adFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const eventQuery = useQuery({
     queryKey: queryKeys.events.detail(eventId),
@@ -120,13 +193,13 @@ export default function EventWallManagerPage() {
   });
 
   const settingsQuery = useQuery({
-    queryKey: queryKeys.wall.byEvent(eventId),
+    queryKey: queryKeys.wall.settings(eventId),
     enabled: eventId !== '',
     queryFn: () => getEventWallSettings(eventId),
   });
 
   const optionsQuery = useQuery({
-    queryKey: [...queryKeys.wall.all(), 'options'],
+    queryKey: queryKeys.wall.options(),
     queryFn: getWallOptions,
   });
 
@@ -135,6 +208,13 @@ export default function EventWallManagerPage() {
     enabled: eventId !== '',
     queryFn: () => getEventWallDiagnostics(eventId),
   });
+
+  const adsQuery = useQuery({
+    queryKey: queryKeys.wall.ads(eventId),
+    enabled: eventId !== '',
+    queryFn: () => getEventWallAds(eventId),
+  });
+  const insightsQuery = useWallTopInsights(eventId);
 
   useEffect(() => {
     if (settingsQuery.data?.settings) {
@@ -156,6 +236,24 @@ export default function EventWallManagerPage() {
     ),
   });
 
+  const uploadAdMutation = useMutation({
+    mutationFn: ({
+      file,
+      durationSeconds,
+    }: {
+      file: File;
+      durationSeconds?: number | null;
+    }) => createEventWallAd(eventId, { file, durationSeconds }),
+  });
+
+  const deleteAdMutation = useMutation({
+    mutationFn: (adId: number) => deleteEventWallAd(eventId, adId),
+  });
+
+  const reorderAdsMutation = useMutation({
+    mutationFn: (order: number[]) => reorderEventWallAds(eventId, order),
+  });
+
   const event = eventQuery.data;
   const settings = settingsQuery.data;
   const persistedSettings = settings?.settings ?? null;
@@ -168,12 +266,26 @@ export default function EventWallManagerPage() {
     ? options.event_phases
     : WALL_EVENT_PHASE_OPTIONS;
   const realtimeState = useWallManagerRealtime(eventId);
+  const adMode = wallSettings?.ad_mode ?? 'disabled';
+  const adFrequency = wallSettings?.ad_frequency ?? 5;
+  const adIntervalMinutes = wallSettings?.ad_interval_minutes ?? 3;
+  const wallAds = useMemo(
+    () => sortWallAds(adsQuery.data ?? []),
+    [adsQuery.data],
+  );
+  const selectedAdIsVideo = selectedAdFile ? isVideoAdFile(selectedAdFile) : false;
 
   const status = settings?.status ?? 'draft';
   const isLive = status === 'live';
   const isPaused = status === 'paused';
   const isTerminal = status === 'expired' || status === 'stopped';
-  const isBusy = saveMutation.isPending || actionMutation.isPending || playerCommandMutation.isPending;
+  const isBusy =
+    saveMutation.isPending
+    || actionMutation.isPending
+    || playerCommandMutation.isPending
+    || uploadAdMutation.isPending
+    || deleteAdMutation.isPending
+    || reorderAdsMutation.isPending;
   const hasUnsavedChanges = useMemo(
     () => !areWallSettingsEqual(draft, persistedSettings),
     [draft, persistedSettings],
@@ -224,6 +336,8 @@ export default function EventWallManagerPage() {
 
   const diagnosticsSummary = diagnosticsQuery.data?.summary ?? settings?.diagnostics_summary ?? null;
   const diagnosticsPlayers = diagnosticsQuery.data?.players ?? [];
+  const insights = insightsQuery.data ?? null;
+  const insightsRecentItems = insights?.recentItems ?? [];
   const simulationSummary = simulationQuery.data?.summary ?? null;
   const simulationPreview = simulationQuery.data?.sequence_preview ?? [];
   const simulationExplanation = simulationQuery.data?.explanation ?? [];
@@ -232,6 +346,12 @@ export default function EventWallManagerPage() {
     && simulationFingerprint
     && liveSimulationFingerprint !== simulationFingerprint,
   );
+  const {
+    selectedMediaId,
+    selectedMedia,
+    selectMedia,
+  } = useWallSelectedMedia(insightsRecentItems);
+  const selectedMediaSourceMeta = selectedMedia ? getWallSourceMeta(selectedMedia.source) : null;
 
   function updateDraft<K extends keyof ApiWallSettings>(key: K, value: ApiWallSettings[K]) {
     setDraft((current) => (current ? { ...current, [key]: value } : current));
@@ -275,7 +395,7 @@ export default function EventWallManagerPage() {
     try {
       const payload = await saveMutation.mutateAsync(prepareWallSettingsPayload(draft));
       setDraft(cloneWallSettings(payload.settings));
-      queryClient.setQueryData(queryKeys.wall.byEvent(eventId), payload);
+      queryClient.setQueryData(queryKeys.wall.settings(eventId), payload);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.events.detail(eventId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.wall.diagnostics(eventId) }),
@@ -290,7 +410,7 @@ export default function EventWallManagerPage() {
 
       return true;
     } catch (error) {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.wall.byEvent(eventId) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.wall.settings(eventId) });
 
       if (!options.quiet) {
         toast({
@@ -320,7 +440,7 @@ export default function EventWallManagerPage() {
     try {
       const payload = await actionMutation.mutateAsync(action);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.wall.byEvent(eventId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.wall.settings(eventId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.wall.diagnostics(eventId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.events.detail(eventId) }),
       ]);
@@ -369,6 +489,111 @@ export default function EventWallManagerPage() {
   function openScreen() {
     if (!settings?.public_url) return;
     window.open(settings.public_url, '_blank', 'noopener,noreferrer');
+  }
+
+  function resetAdUploadForm() {
+    setSelectedAdFile(null);
+    setSelectedAdDuration('10');
+
+    if (adFileInputRef.current) {
+      adFileInputRef.current.value = '';
+    }
+  }
+
+  async function handleAdUpload() {
+    if (!selectedAdFile) {
+      toast({
+        title: 'Selecione um arquivo',
+        description: 'Escolha uma imagem ou video antes de enviar o anuncio.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      const createdAd = await uploadAdMutation.mutateAsync({
+        file: selectedAdFile,
+        durationSeconds: selectedAdIsVideo
+          ? null
+          : clampIntegerInput(selectedAdDuration, 10, 3, 120),
+      });
+
+      queryClient.setQueryData<ApiWallAdItem[]>(
+        queryKeys.wall.ads(eventId),
+        (current) => sortWallAds([...(current ?? []), createdAd]),
+      );
+      void queryClient.invalidateQueries({ queryKey: queryKeys.wall.ads(eventId) });
+
+      resetAdUploadForm();
+
+      toast({
+        title: 'Anuncio enviado',
+        description: 'O patrocinador foi salvo e o player ja pode receber a atualizacao realtime.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Falha ao enviar anuncio',
+        description: error instanceof Error ? error.message : 'Nao foi possivel enviar o anuncio para o telao.',
+        variant: 'destructive',
+      });
+    }
+  }
+
+  async function handleDeleteAd(ad: ApiWallAdItem) {
+    const confirmed = window.confirm('Remover este anuncio do telao?');
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteAdMutation.mutateAsync(ad.id);
+
+      queryClient.setQueryData<ApiWallAdItem[]>(
+        queryKeys.wall.ads(eventId),
+        (current) => sortWallAds((current ?? []).filter((item) => item.id !== ad.id)),
+      );
+      void queryClient.invalidateQueries({ queryKey: queryKeys.wall.ads(eventId) });
+
+      toast({
+        title: 'Anuncio removido',
+        description: 'O patrocinador foi removido e o player sera atualizado.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Falha ao remover anuncio',
+        description: error instanceof Error ? error.message : 'Nao foi possivel remover o anuncio.',
+        variant: 'destructive',
+      });
+    }
+  }
+
+  async function handleMoveAd(adId: number, direction: -1 | 1) {
+    const nextAds = moveWallAd(wallAds, adId, direction);
+
+    if (!nextAds) {
+      return;
+    }
+
+    try {
+      await reorderAdsMutation.mutateAsync(nextAds.map((item) => item.id));
+
+      queryClient.setQueryData<ApiWallAdItem[]>(
+        queryKeys.wall.ads(eventId),
+        nextAds,
+      );
+      void queryClient.invalidateQueries({ queryKey: queryKeys.wall.ads(eventId) });
+
+      toast({
+        title: 'Ordem atualizada',
+        description: 'A sequencia dos anuncios foi salva para o telao.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Falha ao reordenar',
+        description: error instanceof Error ? error.message : 'Nao foi possivel atualizar a ordem dos anuncios.',
+        variant: 'destructive',
+      });
+    }
   }
 
   if (eventQuery.isLoading || settingsQuery.isLoading) {
@@ -453,13 +678,66 @@ export default function EventWallManagerPage() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.12fr)_420px]">
         <div className="space-y-4">
           <WallManagerSection
+            title="Pulso do evento"
+            description="Veja rapido quem mais enviou, o volume do evento e o que acabou de chegar agora."
+          >
+            <WallTopInsightsRail
+              insights={insights}
+              isLoading={insightsQuery.isLoading}
+              selectedMediaId={selectedMediaId}
+              onSelectMedia={selectMedia}
+            />
+          </WallManagerSection>
+
+          <WallManagerSection
             title="Estado do telao"
             description="Veja rapidamente se o telao esta ativo, pausado ou aguardando inicio."
           >
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
               <div className="overflow-hidden rounded-3xl border border-border/60 bg-muted/30">
                 <div className="aspect-[4/3] sm:aspect-video">
-                  {isLive || isPaused ? (
+                  {selectedMedia ? (
+                    <div className="relative h-full overflow-hidden bg-neutral-950">
+                      {selectedMedia.previewUrl ? (
+                        <img
+                          src={selectedMedia.previewUrl}
+                          alt={`Midia recente enviada por ${selectedMedia.senderName || 'Convidado'}`}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-white/70">
+                          Essa midia chegou sem miniatura pronta para o palco.
+                        </div>
+                      )}
+
+                      <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/40 to-transparent" />
+                      <div className="absolute inset-x-0 bottom-0 space-y-3 p-5 text-white">
+                        <div className="space-y-1">
+                          <p className="text-xs uppercase tracking-[0.18em] text-white/60">
+                            {WALL_INSIGHTS_COPY.selectedMedia}
+                          </p>
+                          <h3 className="text-xl font-semibold">
+                            {selectedMedia.senderName || 'Convidado'}
+                          </h3>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          {selectedMediaSourceMeta ? (
+                            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 font-medium ${selectedMediaSourceMeta.chipClassName}`}>
+                              <selectedMediaSourceMeta.Icon className="h-3.5 w-3.5" />
+                              {selectedMediaSourceMeta.label}
+                            </span>
+                          ) : null}
+                          <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-2 py-1 font-medium text-white/80">
+                            {formatWallRecentStatusLabel(selectedMedia.status)}
+                          </span>
+                          <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-2 py-1 font-medium text-white/80">
+                            {formatWallRelativeTime(selectedMedia.createdAt, 'Agora')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : isLive || isPaused ? (
                     <div className="flex h-full items-center justify-center bg-gradient-to-br from-neutral-900 via-neutral-950 to-neutral-900 px-6 text-center">
                       <div className="space-y-3">
                         <Monitor className="mx-auto h-14 w-14 text-orange-400/80" />
@@ -486,6 +764,17 @@ export default function EventWallManagerPage() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                {selectedMedia ? (
+                  <InfoCard
+                    label={WALL_INSIGHTS_COPY.selectedMedia}
+                    value={selectedMedia.senderName || 'Convidado'}
+                    detail={[
+                      selectedMediaSourceMeta?.label,
+                      formatWallRecentStatusLabel(selectedMedia.status),
+                      formatWallRelativeTime(selectedMedia.createdAt, 'Agora'),
+                    ].filter(Boolean).join(' - ')}
+                  />
+                ) : null}
                 <InfoCard label="Evento" value={event.title} detail={formatEventSchedule(event.starts_at, event.location_name)} />
                 <InfoCard
                   label="Codigo do telao"
@@ -1130,6 +1419,224 @@ export default function EventWallManagerPage() {
                   checked={wallSettings.show_side_thumbnails ?? true}
                   onCheckedChange={(checked) => updateDraft('show_side_thumbnails', checked)}
                 />
+              </div>
+            </div>
+          </WallManagerSection>
+
+          <WallManagerSection
+            title={(
+              <span className="flex items-center gap-2">
+                Patrocinadores no telao
+              </span>
+            )}
+            description="Configure quando os anuncios entram no slideshow e gerencie os criativos ativos do evento."
+          >
+            <div className="space-y-5">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <div className="space-y-4 rounded-2xl border border-border/60 bg-background/60 p-4">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Modo de exibicao dos anuncios</p>
+                    <Select value={adMode} onValueChange={(value) => updateDraft('ad_mode', value as ApiWallSettings['ad_mode'])}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o modo de anuncios" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="disabled">Desativado</SelectItem>
+                        <SelectItem value="by_photos">A cada X fotos</SelectItem>
+                        <SelectItem value="by_minutes">A cada X minutos</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] text-muted-foreground">
+                      Videos de patrocinador sao reproduzidos sem som para respeitar autoplay nos navegadores.
+                    </p>
+                  </div>
+
+                  {adMode === 'by_photos' ? (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Frequencia por fotos</p>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={String(adFrequency)}
+                        onChange={(event) => updateDraft('ad_frequency', clampIntegerInput(event.target.value, 5, 1, 100))}
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        O anuncio entra depois de cada bloco de fotos exibidas pelo slideshow.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {adMode === 'by_minutes' ? (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Intervalo por minutos</p>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={60}
+                        value={String(adIntervalMinutes)}
+                        onChange={(event) => updateDraft('ad_interval_minutes', clampIntegerInput(event.target.value, 3, 1, 60))}
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Use esse modo quando quiser ciclos mais previsiveis para patrocinadores em eventos longos.
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="space-y-4 rounded-2xl border border-border/60 bg-background/60 p-4">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Adicionar novo criativo</p>
+                    <Input
+                      ref={adFileInputRef}
+                      aria-label="Arquivo do patrocinador"
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp,.gif,.mp4,image/jpeg,image/png,image/webp,image/gif,video/mp4"
+                      onChange={(event) => setSelectedAdFile(event.target.files?.[0] ?? null)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Duracao da imagem em segundos</p>
+                    <Input
+                      aria-label="Duracao do anuncio"
+                      type="number"
+                      min={3}
+                      max={120}
+                      disabled={selectedAdIsVideo || !selectedAdFile}
+                      value={selectedAdDuration}
+                      onChange={(event) => setSelectedAdDuration(event.target.value)}
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Para video, a duracao vem do proprio arquivo e o player avanca ao terminar.
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                    {selectedAdFile
+                      ? `Selecionado: ${selectedAdFile.name} · ${formatFileSize(selectedAdFile.size)}`
+                      : 'Formatos aceitos: JPG, PNG, WebP, GIF e MP4. Tamanho maximo: 20 MB.'}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => void handleAdUpload()}
+                      disabled={!selectedAdFile || uploadAdMutation.isPending}
+                    >
+                      {uploadAdMutation.isPending ? (
+                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                      ) : null}
+                      Enviar anuncio
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={resetAdUploadForm}
+                      disabled={!selectedAdFile || uploadAdMutation.isPending}
+                    >
+                      Limpar selecao
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Criativos ativos</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      A ordem abaixo define a sequencia usada pelo player em round-robin.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-border/70 bg-background px-3 py-1 text-xs text-muted-foreground">
+                    {wallAds.length} item(ns)
+                  </span>
+                </div>
+
+                {adsQuery.isLoading ? (
+                  <div className="rounded-2xl border border-border/60 bg-background/60 px-4 py-6 text-sm text-muted-foreground">
+                    Carregando anuncios do telao...
+                  </div>
+                ) : wallAds.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-border/60 bg-background/60 px-4 py-8 text-sm text-muted-foreground">
+                    Nenhum anuncio cadastrado ainda. Envie o primeiro criativo para liberar a monetizacao do telao.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {wallAds.map((ad, index) => (
+                      <div key={ad.id} className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+                          <div className="h-24 w-full overflow-hidden rounded-xl border border-border/60 bg-muted/30 lg:w-40">
+                            {ad.media_type === 'image' && ad.url ? (
+                              <img
+                                src={ad.url}
+                                alt={`Criativo ${index + 1}`}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                                Video MP4
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold">Patrocinador {index + 1}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {ad.media_type === 'video' ? 'Video' : 'Imagem'}
+                              {' · '}
+                              {ad.media_type === 'video' ? 'termina no fim do video' : `${ad.duration_seconds}s na tela`}
+                            </p>
+                            {ad.url ? (
+                              <a
+                                href={ad.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-2 inline-flex text-xs font-medium text-primary underline-offset-4 hover:underline"
+                              >
+                                Abrir criativo
+                              </a>
+                            ) : null}
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              aria-label={`Subir anuncio ${index + 1}`}
+                              disabled={index === 0 || reorderAdsMutation.isPending}
+                              onClick={() => void handleMoveAd(ad.id, -1)}
+                            >
+                              <ArrowUp className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              aria-label={`Descer anuncio ${index + 1}`}
+                              disabled={index === wallAds.length - 1 || reorderAdsMutation.isPending}
+                              onClick={() => void handleMoveAd(ad.id, 1)}
+                            >
+                              <ArrowDown className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="icon"
+                              aria-label={`Remover anuncio ${index + 1}`}
+                              disabled={deleteAdMutation.isPending}
+                              onClick={() => void handleDeleteAd(ad)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </WallManagerSection>

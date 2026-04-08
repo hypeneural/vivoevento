@@ -2,76 +2,177 @@
 @use '../styles/mixins' as *;
 
 .section {
-  padding-top: 0;
-}
-
-.panel {
-  @include surface(rgba(10, 17, 30, 0.88), $border-strong, 18px);
+  // Otimizar para 50-70vh em desktop (Req 13.4)
+  min-height: 50vh;
+  
+  @media (min-width: 768px) {
+    min-height: 60vh;
+    max-height: 70vh;
+    display: flex;
+    align-items: center;
+  }
+  
+  // Fundo limpo e contrastante (Req 13.3)
+  background: linear-gradient(
+    135deg,
+    rgba($c-bg-soft, 0.95) 0%,
+    rgba($c-bg-dark, 0.98) 100%
+  );
   position: relative;
   overflow: hidden;
-  border-radius: $radius-lg;
-  padding: clamp(1.6rem, 3vw, 2.8rem);
-
+  
+  // Efeito de profundidade sutil
   &::before {
     content: '';
     position: absolute;
-    inset: -20% auto auto -8%;
-    width: 280px;
-    height: 280px;
-    background: radial-gradient(circle, rgba($c-accent, 0.24), transparent 70%);
+    inset: -30% auto auto -15%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(
+      circle,
+      rgba($c-accent, 0.12),
+      transparent 70%
+    );
     pointer-events: none;
+    filter: blur(60px);
   }
-
+  
   &::after {
     content: '';
     position: absolute;
-    inset: auto -10% -30% auto;
-    width: 320px;
-    height: 320px;
-    background: radial-gradient(circle, rgba($c-accent-warm, 0.2), transparent 70%);
+    inset: auto -15% -30% auto;
+    width: 450px;
+    height: 450px;
+    background: radial-gradient(
+      circle,
+      rgba($c-accent-warm, 0.1),
+      transparent 70%
+    );
     pointer-events: none;
+    filter: blur(60px);
+  }
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2rem;
+  padding: clamp(3rem, 8vh, 5rem) 0;
+  
+  @media (min-width: 768px) {
+    gap: 2.5rem;
   }
 }
 
 .copy {
-  position: relative;
-  z-index: 1;
-  max-width: 54rem;
-
-  :global(.section-title) {
-    margin-top: 1rem;
-  }
-
-  :global(.section-lead) {
-    margin-top: 1rem;
-  }
+  max-width: 42rem;
 }
 
-.actions {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.8rem;
-  margin-top: 1.6rem;
-}
-
-.ribbon {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.8rem;
-  margin-top: 1.75rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  color: $c-white-64;
+// Título forte (Req 13.1)
+.title {
+  font-family: $font-display;
+  font-size: clamp(2rem, 5vw, 3.5rem);
   font-weight: 700;
+  line-height: 1.15;
+  color: $c-white;
+  margin: 0;
+  
+  // Contraste WCAG AA (Req 22.4)
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
 
-  span {
-    padding: 0.45rem 0.7rem;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.04);
+// Subtítulo curto (Req 13.1)
+.subtitle {
+  font-size: clamp(1.125rem, 2vw, 1.375rem);
+  line-height: 1.5;
+  color: $c-white-80;
+  margin: 1rem 0 0;
+  
+  // Contraste WCAG AA (Req 22.4)
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.2);
+}
+
+// Exatamente 2 botões (Req 13.2)
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+  
+  @media (min-width: 640px) {
+    gap: 1.25rem;
+  }
+  
+  // Garantir navegação por teclado (Req 22.3)
+  a {
+    // Foco visível para acessibilidade
+    &:focus-visible {
+      outline: 2px solid $c-accent;
+      outline-offset: 4px;
+      border-radius: 12px;
+    }
+    
+    // Contraste adequado (Req 22.4)
+    &[data-variant="primary"] {
+      background: $c-accent;
+      color: $c-bg-dark;
+      
+      &:hover {
+        background: rgba($c-accent, 0.9);
+      }
+    }
+    
+    &[data-variant="secondary"] {
+      background: rgba($c-white, 0.08);
+      color: $c-white;
+      border: 1px solid rgba($c-white, 0.16);
+      
+      &:hover {
+        background: rgba($c-white, 0.12);
+        border-color: rgba($c-white, 0.24);
+      }
+    }
+  }
+}
+
+// Microconversions CTAs (Req 36)
+// Posicionados próximos aos CTAs principais
+.microconversions {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+// Motion sutil (Req 18)
+@media (prefers-reduced-motion: no-preference) {
+  .content {
+    animation: fadeInUp 0.6s ease-out;
+  }
+  
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+// Desabilitar animações se usuário preferir (Req 18.4)
+@media (prefers-reduced-motion: reduce) {
+  .content {
+    animation: none;
+  }
+  
+  .section::before,
+  .section::after {
+    animation: none;
   }
 }

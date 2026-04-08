@@ -35,6 +35,33 @@
   padding: 3rem 1rem;
 }
 
+.minimalFallback {
+  min-height: 2rem;
+  background: transparent;
+}
+
+.heavyDemoFallback {
+  @include flex-center;
+  flex-direction: column;
+  gap: 1.2rem;
+  min-height: 40vh;
+  padding: 2rem 1rem;
+  
+  p {
+    color: $c-white-64;
+    font-size: 0.9rem;
+  }
+}
+
+.demoSpinner {
+  width: 3rem;
+  height: 3rem;
+  border: 4px solid rgba($c-accent, 0.15);
+  border-top-color: $c-accent;
+  border-radius: 50%;
+  animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
 .spinner {
   width: 2.4rem;
   height: 2.4rem;

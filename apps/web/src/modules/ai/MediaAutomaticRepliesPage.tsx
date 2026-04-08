@@ -24,6 +24,8 @@ import { PageHeader } from '@/shared/components/PageHeader';
 
 import { aiMediaRepliesService } from './api';
 import type {
+  MediaReplyEventHistoryItem,
+  MediaReplyEventOption,
   MediaReplyPromptCategory,
   MediaReplyPromptPreset,
   MediaReplyPromptTestRun,
@@ -80,6 +82,8 @@ export default function MediaAutomaticRepliesPage() {
   const [categoryForm, setCategoryForm] = useState<SaveMediaReplyPromptCategoryPayload>(emptyCategoryForm());
   const [selectedPresetId, setSelectedPresetId] = useState<number | null>(null);
   const [presetForm, setPresetForm] = useState<SaveMediaReplyPromptPresetPayload>(emptyPresetForm());
+  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState<string>('all');
+  const [catalogPresetSearch, setCatalogPresetSearch] = useState('');
 
   const [testEventId, setTestEventId] = useState('');
   const [testProviderKey, setTestProviderKey] = useState<'vllm' | 'openrouter'>('openrouter');
@@ -93,6 +97,15 @@ export default function MediaAutomaticRepliesPage() {
   const [historyProviderKey, setHistoryProviderKey] = useState<string>('all');
   const [historyStatus, setHistoryStatus] = useState<string>('all');
   const [selectedHistoryId, setSelectedHistoryId] = useState<number | null>(null);
+  const [realHistoryEventId, setRealHistoryEventId] = useState<string>('all');
+  const [realHistoryProviderKey, setRealHistoryProviderKey] = useState<string>('all');
+  const [realHistoryStatus, setRealHistoryStatus] = useState<string>('all');
+  const [realHistoryModelKey, setRealHistoryModelKey] = useState('');
+  const [realHistoryPresetName, setRealHistoryPresetName] = useState('');
+  const [realHistorySenderQuery, setRealHistorySenderQuery] = useState('');
+  const [realHistoryDateFrom, setRealHistoryDateFrom] = useState('');
+  const [realHistoryDateTo, setRealHistoryDateTo] = useState('');
+  const [selectedRealHistoryId, setSelectedRealHistoryId] = useState<number | null>(null);
 
   const configurationQuery = useQuery({
     queryKey: ['ia', 'respostas-de-midia', 'configuracao'],
@@ -107,6 +120,10 @@ export default function MediaAutomaticRepliesPage() {
     queryKey: ['ia', 'respostas-de-midia', 'presets'],
     queryFn: () => aiMediaRepliesService.listPresets(),
   });
+  const eventOptionsQuery = useQuery({
+    queryKey: ['ia', 'respostas-de-midia', 'eventos'],
+    queryFn: () => aiMediaRepliesService.listEventOptions(),
+  });
   const historyQuery = useQuery({
     queryKey: ['ia', 'respostas-de-midia', 'testes', historyEventId, historyProviderKey, historyStatus],
     queryFn: () => aiMediaRepliesService.listPromptTests({
@@ -116,10 +133,41 @@ export default function MediaAutomaticRepliesPage() {
       per_page: 15,
     }),
   });
+  const realHistoryQuery = useQuery({
+    queryKey: [
+      'ia',
+      'respostas-de-midia',
+      'historico-eventos',
+      realHistoryEventId,
+      realHistoryProviderKey,
+      realHistoryStatus,
+      realHistoryModelKey,
+      realHistoryPresetName,
+      realHistorySenderQuery,
+      realHistoryDateFrom,
+      realHistoryDateTo,
+    ],
+    queryFn: () => aiMediaRepliesService.listEventHistory({
+      event_id: realHistoryEventId !== 'all' ? Number(realHistoryEventId) : null,
+      provider_key: realHistoryProviderKey !== 'all' ? realHistoryProviderKey : null,
+      model_key: realHistoryModelKey.trim() !== '' ? realHistoryModelKey.trim() : null,
+      status: realHistoryStatus !== 'all' ? realHistoryStatus : null,
+      preset_name: realHistoryPresetName.trim() !== '' ? realHistoryPresetName.trim() : null,
+      sender_query: realHistorySenderQuery.trim() !== '' ? realHistorySenderQuery.trim() : null,
+      date_from: realHistoryDateFrom.trim() !== '' ? realHistoryDateFrom : null,
+      date_to: realHistoryDateTo.trim() !== '' ? realHistoryDateTo : null,
+      per_page: 15,
+    }),
+  });
   const historyDetailQuery = useQuery({
     queryKey: ['ia', 'respostas-de-midia', 'testes', 'detalhe', selectedHistoryId],
     queryFn: () => aiMediaRepliesService.getPromptTest(selectedHistoryId as number),
     enabled: selectedHistoryId !== null,
+  });
+  const realHistoryDetailQuery = useQuery({
+    queryKey: ['ia', 'respostas-de-midia', 'historico-eventos', 'detalhe', selectedRealHistoryId],
+    queryFn: () => aiMediaRepliesService.getEventHistoryItem(selectedRealHistoryId as number),
+    enabled: selectedRealHistoryId !== null,
   });
 
   useEffect(() => {
@@ -214,6 +262,18 @@ export default function MediaAutomaticRepliesPage() {
       return firstId;
     });
   }, [historyQuery.data]);
+
+  useEffect(() => {
+    const firstId = realHistoryQuery.data?.data?.[0]?.id ?? null;
+
+    setSelectedRealHistoryId((current) => {
+      if (current && realHistoryQuery.data?.data.some((item) => item.id === current)) {
+        return current;
+      }
+
+      return firstId;
+    });
+  }, [realHistoryQuery.data]);
 
   const updateConfigurationMutation = useMutation({
     mutationFn: () => aiMediaRepliesService.updateConfiguration({
@@ -380,16 +440,31 @@ export default function MediaAutomaticRepliesPage() {
 
   const categories = categoriesQuery.data ?? [];
   const presets = presetsQuery.data ?? [];
+  const eventOptions = eventOptionsQuery.data ?? [];
   const historyItems = historyQuery.data?.data ?? [];
+  const realHistoryItems = realHistoryQuery.data?.data ?? [];
   const activeHistoryDetail = latestTestRun && latestTestRun.id === selectedHistoryId
     ? latestTestRun
     : historyDetailQuery.data ?? null;
+  const activeRealHistoryDetail = realHistoryDetailQuery.data ?? null;
   const configurationLoading = canManageGlobalAi && configurationQuery.isLoading;
   const historyFiltersSummary = useMemo(() => ({
     event_id: historyEventId.trim() !== '' ? Number(historyEventId) : null,
     provider_key: historyProviderKey,
     status: historyStatus,
   }), [historyEventId, historyProviderKey, historyStatus]);
+  const filteredPresets = useMemo(() => {
+    const normalizedSearch = catalogPresetSearch.trim().toLowerCase();
+
+    return presets.filter((preset) => {
+      const matchesCategory = catalogCategoryFilter === 'all' || preset.category === catalogCategoryFilter;
+      const matchesSearch = normalizedSearch === ''
+        || preset.name.toLowerCase().includes(normalizedSearch)
+        || preset.prompt_template.toLowerCase().includes(normalizedSearch);
+
+      return matchesCategory && matchesSearch;
+    });
+  }, [catalogCategoryFilter, catalogPresetSearch, presets]);
 
   return (
     <motion.div initial={false} animate={{ opacity: 1 }} className="space-y-6">
@@ -899,18 +974,47 @@ export default function MediaAutomaticRepliesPage() {
                 </Button>
               </div>
 
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="catalogo-filtro-categoria">Filtrar por categoria</Label>
+                  <Select value={catalogCategoryFilter} onValueChange={setCatalogCategoryFilter}>
+                    <SelectTrigger id="catalogo-filtro-categoria" aria-label="Filtro de categoria do catalogo">
+                      <SelectValue placeholder="Todas as categorias" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as categorias</SelectItem>
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.slug}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="catalogo-filtro-preset">Buscar por nome ou texto da instrucao</Label>
+                  <Input
+                    id="catalogo-filtro-preset"
+                    value={catalogPresetSearch}
+                    onChange={(event) => setCatalogPresetSearch(event.target.value)}
+                    placeholder="Ex: romantico, corporativo, alegre"
+                  />
+                </div>
+              </div>
+
               <div className="grid gap-3 md:grid-cols-2">
                 {presetsQuery.isLoading ? (
                   <div className="col-span-full flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Carregando presets...
                   </div>
-                ) : presets.length === 0 ? (
+                ) : filteredPresets.length === 0 ? (
                   <div className="col-span-full rounded-lg border border-dashed border-border/60 p-4 text-sm text-muted-foreground">
-                    Nenhum preset cadastrado ainda.
+                    Nenhum preset encontrado com os filtros atuais.
                   </div>
                 ) : (
-                  presets.map((preset) => (
+                  filteredPresets.map((preset) => (
                     <button
                       key={preset.id}
                       type="button"
@@ -1204,6 +1308,250 @@ export default function MediaAutomaticRepliesPage() {
                       <div className="font-medium">Payload recebido</div>
                       <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
                         {JSON.stringify(activeHistoryDetail.response_payload ?? {}, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(360px,460px)_minmax(0,1fr)]">
+            <div className="glass space-y-4 rounded-xl p-6">
+              <div className="space-y-1">
+                <h3 className="font-semibold">Historico de eventos reais</h3>
+                <p className="text-sm text-muted-foreground">
+                  Audite o comportamento da IA em producao real por evento, remetente, preset, modelo e periodo.
+                </p>
+              </div>
+
+              <div className="grid gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="historico-real-evento">Evento</Label>
+                  <Select value={realHistoryEventId} onValueChange={setRealHistoryEventId}>
+                    <SelectTrigger id="historico-real-evento" aria-label="Filtro de evento do historico real">
+                      <SelectValue placeholder="Todos os eventos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os eventos</SelectItem>
+                      {eventOptions.map((eventOption) => (
+                        <SelectItem key={eventOption.id} value={String(eventOption.id)}>
+                          {eventOption.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="historico-real-provedor">Provedor</Label>
+                    <Select value={realHistoryProviderKey} onValueChange={setRealHistoryProviderKey}>
+                      <SelectTrigger id="historico-real-provedor" aria-label="Filtro de provedor do historico real">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="openrouter">OpenRouter</SelectItem>
+                        <SelectItem value="vllm">vLLM</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="historico-real-status">Status</Label>
+                    <Select value={realHistoryStatus} onValueChange={setRealHistoryStatus}>
+                      <SelectTrigger id="historico-real-status" aria-label="Filtro de status do historico real">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="success">Sucesso</SelectItem>
+                        <SelectItem value="failed">Falha</SelectItem>
+                        <SelectItem value="completed">Concluido</SelectItem>
+                        <SelectItem value="review">Revisao</SelectItem>
+                        <SelectItem value="rejected">Rejeitado</SelectItem>
+                        <SelectItem value="skipped">Ignorado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="historico-real-modelo">Modelo</Label>
+                    <Input
+                      id="historico-real-modelo"
+                      value={realHistoryModelKey}
+                      onChange={(event) => setRealHistoryModelKey(event.target.value)}
+                      placeholder="Ex: openai/gpt-4.1-mini"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="historico-real-preset">Nome do preset</Label>
+                    <Input
+                      id="historico-real-preset"
+                      value={realHistoryPresetName}
+                      onChange={(event) => setRealHistoryPresetName(event.target.value)}
+                      placeholder="Ex: Casamento romantico"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="historico-real-remetente">Remetente</Label>
+                  <Input
+                    id="historico-real-remetente"
+                    value={realHistorySenderQuery}
+                    onChange={(event) => setRealHistorySenderQuery(event.target.value)}
+                    placeholder="Telefone, nome ou identificador"
+                  />
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="historico-real-data-inicial">Data inicial</Label>
+                    <Input
+                      id="historico-real-data-inicial"
+                      type="date"
+                      value={realHistoryDateFrom}
+                      onChange={(event) => setRealHistoryDateFrom(event.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="historico-real-data-final">Data final</Label>
+                    <Input
+                      id="historico-real-data-final"
+                      type="date"
+                      value={realHistoryDateTo}
+                      onChange={(event) => setRealHistoryDateTo(event.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {realHistoryQuery.isLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Carregando historico real...
+                  </div>
+                ) : realHistoryItems.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border/60 p-4 text-sm text-muted-foreground">
+                    Nenhuma execucao real encontrada com os filtros atuais.
+                  </div>
+                ) : (
+                  realHistoryItems.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`w-full rounded-lg border p-3 text-left transition ${selectedRealHistoryId === item.id ? 'border-primary bg-primary/5' : 'border-border/60 bg-muted/20'}`}
+                      onClick={() => setSelectedRealHistoryId(item.id)}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-medium">{item.event_title || `Midia ${item.event_media_id}`}</span>
+                        <Badge variant={item.status === 'failed' ? 'destructive' : 'default'}>
+                          {item.status || 'sem status'}
+                        </Badge>
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {(item.sender_name || item.sender_phone || 'Remetente nao identificado')} - {item.provider_key || 'sem provedor'}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {item.reply_text || item.short_caption || 'Sem texto gerado'}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="glass space-y-4 rounded-xl p-6">
+              <div className="space-y-1">
+                <h3 className="font-semibold">Detalhe do evento real</h3>
+                <p className="text-sm text-muted-foreground">
+                  Veja o prompt efetivo, payload tecnico, remetente, preset usado e o retorno completo da execucao produtiva.
+                </p>
+              </div>
+
+              {selectedRealHistoryId === null ? (
+                <div className="rounded-lg border border-dashed border-border/60 p-4 text-sm text-muted-foreground">
+                  Selecione uma execucao real para ver o detalhe completo.
+                </div>
+              ) : realHistoryDetailQuery.isLoading && activeRealHistoryDetail === null ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Carregando detalhe do evento real...
+                </div>
+              ) : activeRealHistoryDetail === null ? (
+                <div className="rounded-lg border border-destructive/30 p-4 text-sm text-destructive">
+                  Nao foi possivel carregar o detalhe desta execucao real.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={activeRealHistoryDetail.status === 'failed' ? 'destructive' : 'default'}>
+                      {activeRealHistoryDetail.status || 'sem status'}
+                    </Badge>
+                    {activeRealHistoryDetail.provider_key ? <Badge variant="outline">{activeRealHistoryDetail.provider_key}</Badge> : null}
+                    {activeRealHistoryDetail.model_key ? <Badge variant="outline">{activeRealHistoryDetail.model_key}</Badge> : null}
+                    {activeRealHistoryDetail.trace_id ? <Badge variant="outline">{activeRealHistoryDetail.trace_id}</Badge> : null}
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                      <div className="font-medium">Evento e remetente</div>
+                      <div className="mt-2 space-y-1 text-muted-foreground">
+                        <div>Evento: {activeRealHistoryDetail.event_title || 'Nao informado'}</div>
+                        <div>Remetente: {activeRealHistoryDetail.sender_name || 'Nao informado'}</div>
+                        <div>Telefone: {activeRealHistoryDetail.sender_phone || 'Nao informado'}</div>
+                        <div>Tipo da mensagem: {activeRealHistoryDetail.message_type || 'Nao informado'}</div>
+                        <div>Midia: {activeRealHistoryDetail.media_type || 'Nao informado'}</div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                      <div className="font-medium">Preset e resposta</div>
+                      <div className="mt-2 space-y-1 text-muted-foreground">
+                        <div>Preset: {activeRealHistoryDetail.preset_name || 'Sem preset'}</div>
+                        <div>Origem do preset: {activeRealHistoryDetail.prompt_preset_source || 'Nao informada'}</div>
+                        <div>Origem da instrucao: {activeRealHistoryDetail.prompt_instruction_source || 'Nao informada'}</div>
+                        <div>Resposta: {activeRealHistoryDetail.reply_text || 'Sem resposta automatica'}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                      <div className="font-medium">Prompt template</div>
+                      <pre className="mt-2 whitespace-pre-wrap break-words text-muted-foreground">{activeRealHistoryDetail.prompt_template || 'Vazio'}</pre>
+                    </div>
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                      <div className="font-medium">Prompt efetivo</div>
+                      <pre className="mt-2 whitespace-pre-wrap break-words text-muted-foreground">{activeRealHistoryDetail.prompt_resolved || 'Vazio'}</pre>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                    <div className="font-medium">Variaveis resolvidas</div>
+                    <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                      {JSON.stringify(activeRealHistoryDetail.prompt_variables ?? {}, null, 2)}
+                    </pre>
+                  </div>
+
+                  <div className="grid gap-4">
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                      <div className="font-medium">Payload enviado</div>
+                      <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                        {JSON.stringify(activeRealHistoryDetail.request_payload ?? {}, null, 2)}
+                      </pre>
+                    </div>
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                      <div className="font-medium">Payload recebido</div>
+                      <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                        {JSON.stringify(activeRealHistoryDetail.response_payload ?? {}, null, 2)}
                       </pre>
                     </div>
                   </div>

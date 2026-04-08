@@ -54,6 +54,8 @@ const engineMock = {
   handleNewMedia: vi.fn(),
   handleMediaUpdated: vi.fn(),
   handleMediaDeleted: vi.fn(),
+  handleAdsUpdated: vi.fn(),
+  handleAdFinished: vi.fn(),
   markExpired: vi.fn(),
   markSyncError: vi.fn(),
   resetAssetStatuses: vi.fn(),
@@ -138,6 +140,15 @@ describe('useWallPlayer', () => {
         show_sender_credit: false,
         instructions_text: null,
       },
+      ads: [
+        {
+          id: 1,
+          url: 'https://cdn.example.com/ad-1.jpg',
+          media_type: 'image',
+          duration_seconds: 10,
+          position: 0,
+        },
+      ],
     });
     sendWallHeartbeatMock.mockResolvedValue(undefined);
     clearWallAssetCachesMock.mockResolvedValue(undefined);
@@ -245,5 +256,59 @@ describe('useWallPlayer', () => {
 
     expect(clearWallAssetCachesMock).toHaveBeenCalled();
     expect(engineMock.resetAssetStatuses).toHaveBeenCalled();
+  });
+
+  it('routes boot and realtime ad payloads into the wall engine', async () => {
+    renderHook(() => useWallPlayer('ABCD1234'));
+
+    await flushAsyncWork();
+
+    expect(engineMock.applySnapshot).toHaveBeenCalledWith(expect.objectContaining({
+      ads: [
+        {
+          id: 1,
+          url: 'https://cdn.example.com/ad-1.jpg',
+          media_type: 'image',
+          duration_seconds: 10,
+          position: 0,
+        },
+      ],
+    }));
+
+    const config = useWallRealtimeMock.mock.calls[0]?.[0] as {
+      onAdsUpdated?: (payload: {
+        ads: Array<{
+          id: number;
+          url: string;
+          media_type: 'image' | 'video';
+          duration_seconds: number;
+          position: number;
+        }>;
+      }) => void;
+    };
+
+    act(() => {
+      config.onAdsUpdated?.({
+        ads: [
+          {
+            id: 2,
+            url: 'https://cdn.example.com/ad-2.mp4',
+            media_type: 'video',
+            duration_seconds: 0,
+            position: 0,
+          },
+        ],
+        });
+    });
+
+    expect(engineMock.handleAdsUpdated).toHaveBeenCalledWith([
+      {
+        id: 2,
+        url: 'https://cdn.example.com/ad-2.mp4',
+        media_type: 'video',
+        duration_seconds: 0,
+        position: 0,
+      },
+    ]);
   });
 });

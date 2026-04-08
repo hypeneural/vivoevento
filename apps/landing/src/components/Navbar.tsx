@@ -12,6 +12,7 @@ import { navItems } from "@/data/landing";
 import { useActiveSection } from "@/hooks/useActiveSection";
 import { useSmoothScroll } from "@/hooks/useSmoothScroll";
 import { siteConfig } from "@/config/site";
+import { trackCTAClick } from "@/utils/tracking";
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -104,12 +105,24 @@ export default function Navbar() {
           </nav>
 
           <div className={styles.actions}>
-            <a className={styles.secondaryAction} href={siteConfig.whatsappUrl} target="_blank" rel="noreferrer">
+            <a 
+              className={styles.secondaryAction} 
+              href={siteConfig.whatsappUrl} 
+              target="_blank" 
+              rel="noreferrer"
+              onClick={() => trackCTAClick("secondary", "navbar", "WhatsApp")}
+            >
               <MessageCircle size={16} />
               WhatsApp
             </a>
 
-            <a className={styles.desktopCta} href={siteConfig.primaryCtaUrl} target="_blank" rel="noreferrer">
+            <a 
+              className={styles.desktopCta} 
+              href={siteConfig.primaryCtaUrl} 
+              target="_blank" 
+              rel="noreferrer"
+              onClick={() => trackCTAClick("primary", "navbar", "Agendar demonstração")}
+            >
               Agendar demonstração
               <ArrowUpRight size={16} />
             </a>
@@ -143,10 +156,24 @@ export default function Navbar() {
           </div>
 
           <div className={styles.mobileButtons}>
-            <a className="button" data-variant="primary" href={siteConfig.primaryCtaUrl} target="_blank" rel="noreferrer">
+            <a 
+              className="button" 
+              data-variant="primary" 
+              href={siteConfig.primaryCtaUrl} 
+              target="_blank" 
+              rel="noreferrer"
+              onClick={() => trackCTAClick("primary", "navbar", "Agendar demonstração (mobile)")}
+            >
               Agendar demonstração
             </a>
-            <a className="button" data-variant="ghost" href={siteConfig.whatsappUrl} target="_blank" rel="noreferrer">
+            <a 
+              className="button" 
+              data-variant="ghost" 
+              href={siteConfig.whatsappUrl} 
+              target="_blank" 
+              rel="noreferrer"
+              onClick={() => trackCTAClick("secondary", "navbar", "Falar no WhatsApp (mobile)")}
+            >
               Falar no WhatsApp
             </a>
           </div>

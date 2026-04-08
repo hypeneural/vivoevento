@@ -3,9 +3,11 @@
 use App\Modules\Events\Models\Event;
 use App\Modules\Events\Models\EventModule;
 use App\Modules\Wall\Enums\WallLayout;
+use App\Modules\Wall\Events\WallAdsUpdated;
 use App\Modules\Wall\Models\EventWallAd;
 use App\Modules\Wall\Models\EventWallSetting;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Event as EventFacade;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
@@ -74,6 +76,26 @@ it('uploads an image ad via POST', function () {
         'event_wall_setting_id' => $this->settings->id,
         'media_type' => 'image',
     ]);
+});
+
+it('stores image ads with a safe extension derived from the real mime', function () {
+    $pngBytes = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3X8AAAAASUVORK5CYII=');
+    $tmpPath = tempnam(sys_get_temp_dir(), 'png_');
+    file_put_contents($tmpPath, $pngBytes);
+
+    $file = new UploadedFile($tmpPath, 'banner.jpg', 'image/png', null, true);
+
+    $response = $this->postJson("/api/v1/events/{$this->event->id}/wall/ads", [
+        'file' => $file,
+        'duration_seconds' => 15,
+    ]);
+
+    $response->assertCreated();
+
+    $ad = EventWallAd::query()->latest('id')->firstOrFail();
+
+    expect($ad->file_path)->toEndWith('.png');
+    expect($ad->file_path)->not->toEndWith('.jpg');
 });
 
 it('uploads a video ad via POST', function () {
@@ -154,6 +176,38 @@ it('reorders ads correctly', function () {
     expect($ad3->fresh()->position)->toBe(0);
     expect($ad1->fresh()->position)->toBe(1);
     expect($ad2->fresh()->position)->toBe(2);
+});
+
+it('rejects reorder requests with ads from another wall', function () {
+    $foreignEvent = Event::factory()->active()->create([
+        'organization_id' => $this->organization->id,
+        'title' => 'Outro wall',
+    ]);
+
+    EventModule::query()->create([
+        'event_id' => $foreignEvent->id,
+        'module_key' => 'wall',
+        'is_enabled' => true,
+    ]);
+
+    $foreignSettings = EventWallSetting::factory()->live()->create([
+        'event_id' => $foreignEvent->id,
+    ]);
+
+    $localAd = EventWallAd::factory()->create([
+        'event_wall_setting_id' => $this->settings->id,
+        'position' => 0,
+    ]);
+    $foreignAd = EventWallAd::factory()->create([
+        'event_wall_setting_id' => $foreignSettings->id,
+        'position' => 0,
+    ]);
+
+    $response = $this->apiPatch("/events/{$this->event->id}/wall/ads/reorder", [
+        'order' => [$localAd->id, $foreignAd->id],
+    ]);
+
+    $response->assertUnprocessable();
 });
 
 // ─── Boot Payload ─────────────────────────────────────────────
@@ -241,6 +295,44 @@ it('forbids ad access for users from another organization', function () {
     $response = $this->apiGet("/events/{$otherEvent->id}/wall/ads");
 
     $this->assertApiForbidden($response);
+});
+
+it('broadcasts WallAdsUpdated after creating an ad', function () {
+    EventFacade::fake([WallAdsUpdated::class]);
+
+    $file = UploadedFile::fake()->image('banner.jpg', 1920, 1080)->size(500);
+
+    $response = $this->postJson("/api/v1/events/{$this->event->id}/wall/ads", [
+        'file' => $file,
+        'duration_seconds' => 15,
+    ]);
+
+    $response->assertCreated();
+
+    EventFacade::assertDispatched(WallAdsUpdated::class, function (WallAdsUpdated $event) {
+        return $event->wallCode === $this->settings->wall_code
+            && count(($event->payload ?? [])['ads'] ?? []) === 1;
+    });
+});
+
+it('broadcasts WallAdsUpdated after deleting an ad', function () {
+    EventFacade::fake([WallAdsUpdated::class]);
+
+    $ad = EventWallAd::factory()->create([
+        'event_wall_setting_id' => $this->settings->id,
+        'file_path' => 'wall/events/' . $this->event->id . '/ads/test.jpg',
+    ]);
+
+    Storage::disk('public')->put($ad->file_path, 'fake-content');
+
+    $response = $this->apiDelete("/events/{$this->event->id}/wall/ads/{$ad->id}");
+
+    $response->assertNoContent();
+
+    EventFacade::assertDispatched(WallAdsUpdated::class, function (WallAdsUpdated $event) {
+        return $event->wallCode === $this->settings->wall_code
+            && (($event->payload ?? [])['ads'] ?? []) === [];
+    });
 });
 
 // ─── Factory ──────────────────────────────────────────────────

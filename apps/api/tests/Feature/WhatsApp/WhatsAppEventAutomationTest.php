@@ -845,6 +845,82 @@ it('sends only the ai published reply after vlm completes for media already publ
         ->and($outbound[1]->text_body)->toBe('Momento de risadas e lembrancas! 📱🎉');
 });
 
+it('sends only the published reaction for video media when automatic reply mode is ai', function () {
+    Bus::fake([SendWhatsAppMessageJob::class]);
+
+    $instance = WhatsAppInstance::factory()->connected()->create([
+        'external_instance_id' => 'INSTANCE-FIXTURE-001',
+    ]);
+
+    $event = Event::factory()->create([
+        'organization_id' => $instance->organization_id,
+        'status' => EventStatus::Active->value,
+        'default_whatsapp_instance_id' => $instance->id,
+        'whatsapp_instance_mode' => 'shared',
+        'moderation_mode' => 'ai',
+        'current_entitlements_json' => makeAutomationEntitlements(),
+    ]);
+
+    enableAutomationEventModule($event);
+
+    EventMediaIntelligenceSetting::factory()->create([
+        'event_id' => $event->id,
+        'enabled' => true,
+        'mode' => 'enrich_only',
+        'reply_text_mode' => 'ai',
+        'reply_text_enabled' => true,
+    ]);
+
+    $channel = EventChannel::query()->create([
+        'event_id' => $event->id,
+        'channel_type' => ChannelType::WhatsAppGroup->value,
+        'provider' => 'zapi',
+        'external_id' => 'GRUPOAUTO',
+        'label' => 'WhatsApp grupos',
+        'status' => 'active',
+        'config_json' => [
+            'group_bind_code' => 'GRUPOAUTO',
+            'groups' => [
+                [
+                    'group_external_id' => '120363499999999999-group',
+                    'group_name' => 'Grupo Fixture Evento',
+                    'is_active' => true,
+                    'auto_feedback_enabled' => true,
+                ],
+            ],
+        ],
+    ]);
+
+    [$inboundMessage, $eventMedia] = createInboundMediaWithEventContext($event, $channel);
+
+    $eventMedia->forceFill([
+        'media_type' => 'video',
+        'mime_type' => 'video/mp4',
+        'original_filename' => 'entrada.mp4',
+        'client_filename' => 'entrada.mp4',
+        'original_path' => "events/{$event->id}/originals/entrada.mp4",
+        'publication_status' => PublicationStatus::Published->value,
+        'moderation_status' => ModerationStatus::Approved->value,
+        'safety_status' => 'skipped',
+        'vlm_status' => 'skipped',
+    ])->save();
+
+    app(SendFeedbackOnMediaPublished::class)->handle(MediaPublished::fromMedia($eventMedia));
+
+    $feedback = WhatsAppMessageFeedback::query()->orderBy('id')->get();
+    $outbound = WhatsAppMessage::query()->where('direction', MessageDirection::Outbound)->orderBy('id')->get();
+
+    expect($feedback)->toHaveCount(1)
+        ->and($feedback[0]->feedback_kind)->toBe('reaction')
+        ->and($feedback[0]->feedback_phase)->toBe('published')
+        ->and($feedback[0]->event_media_id)->toBe($eventMedia->id)
+        ->and($feedback[0]->reply_text)->toBeNull();
+
+    expect($outbound)->toHaveCount(1)
+        ->and($outbound[0]->type->value)->toBe('reaction')
+        ->and($outbound[0]->reply_to_provider_message_id)->toBe($inboundMessage->message_id);
+});
+
 it('sends a single rejected feedback bundle with reaction plus threaded reply when the media is rejected', function () {
     Bus::fake([SendWhatsAppMessageJob::class]);
 

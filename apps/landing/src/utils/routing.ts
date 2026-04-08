@@ -97,7 +97,7 @@ export function buildWhatsAppUrl(
   if (utmParams) {
     const utmString = Object.entries(utmParams)
       .filter(([_, value]) => value)
-      .map(([key, value]) => `${key}=${value}`)
+      .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
       .join('&');
     
     if (utmString) {

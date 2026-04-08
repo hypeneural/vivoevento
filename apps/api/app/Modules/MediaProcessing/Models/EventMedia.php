@@ -98,6 +98,14 @@ class EventMedia extends Model
             ->latestOfMany();
     }
 
+    public function latestVlmRun(): HasOne
+    {
+        return $this->hasOne(MediaProcessingRun::class)
+            ->ofMany(['id' => 'max'], function ($query) {
+                $query->where('stage_key', 'vlm');
+            });
+    }
+
     public function faces(): HasMany
     {
         return $this->hasMany(\App\Modules\FaceSearch\Models\EventMediaFace::class, 'event_media_id');

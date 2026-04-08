@@ -1402,7 +1402,22 @@ export interface ApiWallSettings {
   show_sender_credit: boolean;
   show_side_thumbnails: boolean;
   accepted_orientation: 'all' | 'landscape' | 'portrait';
+  ad_mode?: ApiWallAdMode;
+  ad_frequency?: number;
+  ad_interval_minutes?: number;
   instructions_text: string | null;
+}
+
+export type ApiWallAdMode = 'disabled' | 'by_photos' | 'by_minutes';
+
+export interface ApiWallAdItem {
+  id: number;
+  url: string | null;
+  media_type: 'image' | 'video';
+  duration_seconds: number;
+  position: number;
+  is_active?: boolean;
+  created_at?: string | null;
 }
 
 export type ApiWallSelectionMode =
@@ -1582,6 +1597,64 @@ export interface ApiWallOptionsResponse {
   statuses: ApiWallOption[];
   selection_modes: ApiWallSelectionModeOption[];
   event_phases: ApiWallEventPhaseOption[];
+}
+
+export type ApiWallMediaSource =
+  | 'whatsapp'
+  | 'telegram'
+  | 'upload'
+  | 'manual'
+  | 'gallery';
+
+export interface ApiWallInsightsTopContributor {
+  senderKey: string;
+  displayName: string | null;
+  maskedContact?: string | null;
+  source: ApiWallMediaSource;
+  mediaCount: number;
+  lastSentAt?: string | null;
+  avatarUrl?: string | null;
+}
+
+export interface ApiWallInsightsTotals {
+  received: number;
+  approved: number;
+  queued: number;
+  displayed: number | null;
+}
+
+export type ApiWallRecentItemStatus =
+  | 'received'
+  | 'approved'
+  | 'queued'
+  | 'displayed'
+  | 'error';
+
+export interface ApiWallInsightsRecentItem {
+  id: string;
+  previewUrl: string | null;
+  senderName: string | null;
+  senderKey: string;
+  source: ApiWallMediaSource;
+  createdAt: string | null;
+  approvedAt?: string | null;
+  displayedAt?: string | null;
+  status: ApiWallRecentItemStatus;
+  isFeatured?: boolean;
+  isReplay?: boolean;
+}
+
+export interface ApiWallInsightsSourceMixItem {
+  source: ApiWallMediaSource;
+  count: number;
+}
+
+export interface ApiWallInsightsResponse {
+  topContributor: ApiWallInsightsTopContributor | null;
+  totals: ApiWallInsightsTotals;
+  recentItems: ApiWallInsightsRecentItem[];
+  sourceMix: ApiWallInsightsSourceMixItem[];
+  lastCaptureAt?: string | null;
 }
 
 export interface ApiWallActionResponse {

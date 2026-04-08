@@ -1,225 +1,325 @@
 /**
- * Real User Monitoring (RUM) for Core Web Vitals
- * Tracks LCP, INP, CLS in production for real user experience
+ * Core Web Vitals Optimization Utilities
+ * 
+ * Provides utilities for optimizing Core Web Vitals:
+ * - LCP (Largest Contentful Paint) ≤ 2.5s
+ * - INP (Interaction to Next Paint) ≤ 200ms (replaces FID)
+ * - CLS (Cumulative Layout Shift) ≤ 0.1
+ * 
+ * References:
+ * - https://web.dev/vitals/
+ * - https://web.dev/inp/
  */
 
-import { analytics } from './analytics';
-
-export interface WebVitalMetric {
-  name: 'LCP' | 'INP' | 'CLS' | 'FCP' | 'TTFB';
+export type WebVitalMetric = {
+  name: 'LCP' | 'INP' | 'FID' | 'CLS' | 'FCP' | 'TTFB';
   value: number;
   rating: 'good' | 'needs-improvement' | 'poor';
   delta: number;
   id: string;
-}
+  navigationType: 'navigate' | 'reload' | 'back-forward' | 'prerender';
+};
+
+export type WebVitalThresholds = {
+  good: number;
+  needsImprovement: number;
+};
 
 /**
- * Thresholds for Web Vitals ratings
- * Based on web.dev recommendations
+ * Core Web Vitals thresholds (updated for 2024)
  */
-const THRESHOLDS = {
-  LCP: { good: 2500, poor: 4000 },
-  INP: { good: 200, poor: 500 },
-  CLS: { good: 0.1, poor: 0.25 },
-  FCP: { good: 1800, poor: 3000 },
-  TTFB: { good: 800, poor: 1800 },
+export const WEB_VITAL_THRESHOLDS: Record<string, WebVitalThresholds> = {
+  LCP: { good: 2500, needsImprovement: 4000 },
+  INP: { good: 200, needsImprovement: 500 },  // Replaces FID
+  FID: { good: 100, needsImprovement: 300 },  // Deprecated but kept for compatibility
+  CLS: { good: 0.1, needsImprovement: 0.25 },
+  FCP: { good: 1800, needsImprovement: 3000 },
+  TTFB: { good: 800, needsImprovement: 1800 },
 };
 
 /**
  * Get rating for a metric value
  */
-function getRating(name: WebVitalMetric['name'], value: number): WebVitalMetric['rating'] {
-  const threshold = THRESHOLDS[name];
+export function getRating(name: string, value: number): 'good' | 'needs-improvement' | 'poor' {
+  const thresholds = WEB_VITAL_THRESHOLDS[name];
+  if (!thresholds) return 'good';
   
-  if (value <= threshold.good) {
-    return 'good';
-  }
-  
-  if (value <= threshold.poor) {
-    return 'needs-improvement';
-  }
-  
+  if (value <= thresholds.good) return 'good';
+  if (value <= thresholds.needsImprovement) return 'needs-improvement';
   return 'poor';
 }
 
 /**
- * Send Web Vital metric to analytics
+ * Report Web Vital to analytics
  */
-function sendToAnalytics(metric: WebVitalMetric): void {
-  analytics.trackEvent({
-    category: 'web_vitals',
-    action: metric.name,
-    label: metric.rating,
-    value: Math.round(metric.value),
-    metadata: {
-      metric_id: metric.id,
-      metric_delta: metric.delta,
-    },
+export function reportWebVital(metric: WebVitalMetric): void {
+  // Send to Google Analytics
+  if (typeof window !== 'undefined' && (window as any).gtag) {
+    (window as any).gtag('event', metric.name, {
+      event_category: 'Web Vitals',
+      event_label: metric.id,
+      value: Math.round(metric.name === 'CLS' ? metric.value * 1000 : metric.value),
+      metric_rating: metric.rating,
+      metric_delta: Math.round(metric.delta),
+      non_interaction: true,
+    });
+  }
+  
+  // Send to custom analytics endpoint
+  if (typeof navigator !== 'undefined' && 'sendBeacon' in navigator) {
+    const body = JSON.stringify({
+      name: metric.name,
+      value: metric.value,
+      rating: metric.rating,
+      delta: metric.delta,
+      id: metric.id,
+      navigationType: metric.navigationType,
+      timestamp: Date.now(),
+      url: window.location.href,
+      userAgent: navigator.userAgent,
+    });
+    
+    navigator.sendBeacon('/api/analytics/web-vitals', body);
+  }
+  
+  // Log in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[Web Vitals] ${metric.name}:`, {
+      value: metric.value,
+      rating: metric.rating,
+      delta: metric.delta,
+    });
+  }
+}
+
+/**
+ * Initialize Web Vitals monitoring
+ * Uses web-vitals library for accurate measurements
+ */
+export async function initWebVitals(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const { onLCP, onINP, onCLS, onFCP, onTTFB } = await import('web-vitals');
+    
+    // Monitor LCP (Largest Contentful Paint)
+    onLCP((metric) => {
+      const webVital: WebVitalMetric = {
+        ...metric,
+        rating: getRating('LCP', metric.value),
+      };
+      reportWebVital(webVital);
+    });
+    
+    // Monitor INP (Interaction to Next Paint) - replaces FID
+    onINP((metric) => {
+      const webVital: WebVitalMetric = {
+        ...metric,
+        rating: getRating('INP', metric.value),
+      };
+      reportWebVital(webVital);
+    });
+    
+    // Monitor CLS (Cumulative Layout Shift)
+    onCLS((metric) => {
+      const webVital: WebVitalMetric = {
+        ...metric,
+        rating: getRating('CLS', metric.value),
+      };
+      reportWebVital(webVital);
+    });
+    
+    // Monitor FCP (First Contentful Paint)
+    onFCP((metric) => {
+      const webVital: WebVitalMetric = {
+        ...metric,
+        rating: getRating('FCP', metric.value),
+      };
+      reportWebVital(webVital);
+    });
+    
+    // Monitor TTFB (Time to First Byte)
+    onTTFB((metric) => {
+      const webVital: WebVitalMetric = {
+        ...metric,
+        rating: getRating('TTFB', metric.value),
+      };
+      reportWebVital(webVital);
+    });
+  } catch (error) {
+    console.error('Failed to initialize Web Vitals:', error);
+  }
+}
+
+/**
+ * Optimize for LCP (Largest Contentful Paint)
+ * 
+ * Best practices:
+ * - Preload critical resources
+ * - Optimize server response time
+ * - Eliminate render-blocking resources
+ * - Optimize images
+ */
+export function optimizeLCP(): void {
+  // Preconnect to required origins
+  const origins = [
+    'https://fonts.googleapis.com',
+    'https://fonts.gstatic.com',
+  ];
+  
+  origins.forEach(origin => {
+    const link = document.createElement('link');
+    link.rel = 'preconnect';
+    link.href = origin;
+    link.crossOrigin = 'anonymous';
+    document.head.appendChild(link);
   });
 }
 
 /**
- * Initialize Web Vitals tracking
- * Uses web-vitals library if available
+ * Optimize for INP (Interaction to Next Paint)
+ * 
+ * Best practices:
+ * - Break up long tasks
+ * - Defer non-critical JavaScript
+ * - Use web workers for heavy computation
+ * - Optimize event handlers
  */
-export async function initWebVitals(): Promise<void> {
-  // Only track in production
-  if (import.meta.env.DEV) {
-    return;
-  }
-
-  try {
-    // Dynamic import to avoid bundling in development
-    const { onLCP, onINP, onCLS, onFCP, onTTFB } = await import('web-vitals');
-
-    // Track Largest Contentful Paint
-    onLCP((metric) => {
-      sendToAnalytics({
-        name: 'LCP',
-        value: metric.value,
-        rating: getRating('LCP', metric.value),
-        delta: metric.delta,
-        id: metric.id,
-      });
+export function optimizeINP(): void {
+  // Defer non-critical scripts
+  if (typeof window !== 'undefined') {
+    // Use requestIdleCallback for non-critical work
+    const scheduleWork = (callback: () => void) => {
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(callback, { timeout: 2000 });
+      } else {
+        setTimeout(callback, 1);
+      }
+    };
+    
+    // Example: defer analytics initialization
+    scheduleWork(() => {
+      // Initialize non-critical analytics
     });
-
-    // Track Interaction to Next Paint (replaces FID)
-    onINP((metric) => {
-      sendToAnalytics({
-        name: 'INP',
-        value: metric.value,
-        rating: getRating('INP', metric.value),
-        delta: metric.delta,
-        id: metric.id,
-      });
-    });
-
-    // Track Cumulative Layout Shift
-    onCLS((metric) => {
-      sendToAnalytics({
-        name: 'CLS',
-        value: metric.value,
-        rating: getRating('CLS', metric.value),
-        delta: metric.delta,
-        id: metric.id,
-      });
-    });
-
-    // Track First Contentful Paint
-    onFCP((metric) => {
-      sendToAnalytics({
-        name: 'FCP',
-        value: metric.value,
-        rating: getRating('FCP', metric.value),
-        delta: metric.delta,
-        id: metric.id,
-      });
-    });
-
-    // Track Time to First Byte
-    onTTFB((metric) => {
-      sendToAnalytics({
-        name: 'TTFB',
-        value: metric.value,
-        rating: getRating('TTFB', metric.value),
-        delta: metric.delta,
-        id: metric.id,
-      });
-    });
-  } catch (error) {
-    console.error('Failed to initialize Web Vitals tracking:', error);
   }
 }
 
 /**
- * Manual performance mark for custom metrics
+ * Optimize for CLS (Cumulative Layout Shift)
+ * 
+ * Best practices:
+ * - Set explicit dimensions for images and videos
+ * - Reserve space for dynamic content
+ * - Avoid inserting content above existing content
+ * - Use CSS aspect-ratio
  */
-export function markPerformance(name: string): void {
-  if (typeof performance !== 'undefined' && performance.mark) {
-    performance.mark(name);
-  }
-}
-
-/**
- * Measure performance between two marks
- */
-export function measurePerformance(
-  name: string,
-  startMark: string,
-  endMark: string
-): number | null {
-  if (typeof performance !== 'undefined' && performance.measure) {
-    try {
-      const measure = performance.measure(name, startMark, endMark);
-      return measure.duration;
-    } catch (error) {
-      console.error('Failed to measure performance:', error);
+export function optimizeCLS(): void {
+  // Add aspect-ratio support detection
+  if (typeof CSS !== 'undefined' && CSS.supports) {
+    const supportsAspectRatio = CSS.supports('aspect-ratio', '16 / 9');
+    
+    if (!supportsAspectRatio) {
+      console.warn('aspect-ratio not supported, using fallback');
     }
   }
-  
-  return null;
 }
 
 /**
- * Get navigation timing metrics
+ * Debounce function for optimizing event handlers
+ * Helps reduce INP by limiting event handler frequency
  */
-export function getNavigationTiming(): Record<string, number> | null {
-  if (typeof performance === 'undefined' || !performance.getEntriesByType) {
-    return null;
-  }
-
-  const [navigation] = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+export function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
   
-  if (!navigation) {
-    return null;
-  }
-
-  return {
-    dns: navigation.domainLookupEnd - navigation.domainLookupStart,
-    tcp: navigation.connectEnd - navigation.connectStart,
-    ttfb: navigation.responseStart - navigation.requestStart,
-    download: navigation.responseEnd - navigation.responseStart,
-    domInteractive: navigation.domInteractive - navigation.fetchStart,
-    domComplete: navigation.domComplete - navigation.fetchStart,
-    loadComplete: navigation.loadEventEnd - navigation.fetchStart,
+  return function executedFunction(...args: Parameters<T>) {
+    const later = () => {
+      timeout = null;
+      func(...args);
+    };
+    
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
   };
 }
 
 /**
- * Track resource loading performance
+ * Throttle function for optimizing scroll/resize handlers
+ * Helps reduce INP by limiting event handler frequency
  */
-export function trackResourceTiming(): void {
-  if (typeof performance === 'undefined' || !performance.getEntriesByType) {
-    return;
-  }
-
-  const resources = performance.getEntriesByType('resource') as PerformanceResourceTiming[];
+export function throttle<T extends (...args: any[]) => any>(
+  func: T,
+  limit: number
+): (...args: Parameters<T>) => void {
+  let inThrottle: boolean;
   
-  // Group by resource type
-  const byType: Record<string, { count: number; totalDuration: number }> = {};
-  
-  resources.forEach((resource) => {
-    const type = resource.initiatorType;
-    
-    if (!byType[type]) {
-      byType[type] = { count: 0, totalDuration: 0 };
+  return function executedFunction(...args: Parameters<T>) {
+    if (!inThrottle) {
+      func(...args);
+      inThrottle = true;
+      setTimeout(() => (inThrottle = false), limit);
     }
-    
-    byType[type].count++;
-    byType[type].totalDuration += resource.duration;
-  });
+  };
+}
 
-  // Send to analytics
-  Object.entries(byType).forEach(([type, stats]) => {
-    analytics.trackEvent({
-      category: 'performance',
-      action: 'resource_timing',
-      label: type,
-      value: Math.round(stats.totalDuration / stats.count),
-      metadata: {
-        resource_count: stats.count,
-        total_duration: Math.round(stats.totalDuration),
-      },
-    });
-  });
+/**
+ * Request Idle Callback polyfill
+ */
+export function requestIdleCallback(callback: () => void, options?: { timeout?: number }): number {
+  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+    return (window as any).requestIdleCallback(callback, options);
+  }
+  
+  // Fallback to setTimeout
+  return setTimeout(callback, 1) as unknown as number;
+}
+
+/**
+ * Cancel Idle Callback polyfill
+ */
+export function cancelIdleCallback(id: number): void {
+  if (typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+    (window as any).cancelIdleCallback(id);
+  } else {
+    clearTimeout(id);
+  }
+}
+
+/**
+ * Break up long tasks using scheduler.yield() or setTimeout
+ */
+export async function yieldToMain(): Promise<void> {
+  if (typeof window !== 'undefined' && 'scheduler' in window && 'yield' in (window as any).scheduler) {
+    return (window as any).scheduler.yield();
+  }
+  
+  // Fallback to setTimeout
+  return new Promise(resolve => setTimeout(resolve, 0));
+}
+
+/**
+ * Measure task duration and warn if too long
+ */
+export function measureTask<T>(name: string, task: () => T): T {
+  const start = performance.now();
+  const result = task();
+  const duration = performance.now() - start;
+  
+  if (duration > 50) {
+    console.warn(`[Performance] Long task detected: ${name} took ${duration.toFixed(2)}ms`);
+  }
+  
+  return result;
+}
+
+/**
+ * Initialize all Web Vitals optimizations
+ */
+export function initWebVitalsOptimizations(): void {
+  optimizeLCP();
+  optimizeINP();
+  optimizeCLS();
+  initWebVitals();
 }

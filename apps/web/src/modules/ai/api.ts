@@ -2,6 +2,8 @@ import { api } from '@/lib/api';
 import type { PaginatedResponse } from '@/lib/api-types';
 
 import type {
+  MediaReplyEventHistoryItem,
+  MediaReplyEventOption,
   MediaIntelligenceGlobalSettings,
   MediaReplyPromptCategory,
   MediaReplyPromptPreset,
@@ -106,5 +108,39 @@ export const aiMediaRepliesService = {
 
   getPromptTest(testId: number) {
     return api.get<MediaReplyPromptTestRun>(`/ia/respostas-de-midia/testes/${testId}`);
+  },
+
+  listEventOptions() {
+    return api.get<MediaReplyEventOption[]>('/ia/respostas-de-midia/eventos');
+  },
+
+  listEventHistory(params?: {
+    event_id?: number | null;
+    provider_key?: string | null;
+    model_key?: string | null;
+    status?: string | null;
+    preset_name?: string | null;
+    sender_query?: string | null;
+    date_from?: string | null;
+    date_to?: string | null;
+    per_page?: number;
+  }) {
+    return api.get<PaginatedResponse<MediaReplyEventHistoryItem>>('/ia/respostas-de-midia/historico-eventos', {
+      params: {
+        event_id: params?.event_id ?? undefined,
+        provider_key: params?.provider_key ?? undefined,
+        model_key: params?.model_key ?? undefined,
+        status: params?.status ?? undefined,
+        preset_name: params?.preset_name ?? undefined,
+        sender_query: params?.sender_query ?? undefined,
+        date_from: params?.date_from ?? undefined,
+        date_to: params?.date_to ?? undefined,
+        per_page: params?.per_page ?? 15,
+      },
+    });
+  },
+
+  getEventHistoryItem(itemId: number) {
+    return api.get<MediaReplyEventHistoryItem>(`/ia/respostas-de-midia/historico-eventos/${itemId}`);
   },
 };

@@ -7,6 +7,8 @@ import { ArrowRight, Check } from "lucide-react";
 import styles from "./ExperienceModulesSection.module.scss";
 import { experienceModulesContent, type ExperienceModule } from "@/data/landing";
 import { usePersona } from "@/contexts/PersonaContext";
+import { VideoWithFallback } from "@/utils/videoFallback";
+import { ImageWithFallback } from "@/utils/imageFallback";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
@@ -190,15 +192,16 @@ export default function ExperienceModulesSection() {
               <div className={styles.visualColumn}>
                 <div className={styles.visualFrame} role="img" aria-label={activeModule.visual.alt}>
                   {activeModule.visual.type === "image" ? (
-                    <img
+                    <ImageWithFallback
                       src={activeModule.visual.src}
                       alt={activeModule.visual.alt}
                       loading="lazy"
                       decoding="async"
                       className={styles.moduleImage}
+                      fallbackText="Imagem de demonstração indisponível"
                     />
                   ) : activeModule.visual.type === "video" ? (
-                    <video
+                    <VideoWithFallback
                       src={activeModule.visual.src}
                       poster={activeModule.visual.poster}
                       autoPlay
@@ -207,9 +210,9 @@ export default function ExperienceModulesSection() {
                       playsInline
                       className={styles.moduleVideo}
                       aria-label={activeModule.visual.alt}
-                    >
-                      <track kind="captions" />
-                    </video>
+                      fallbackText="Vídeo de demonstração indisponível"
+                      showPlayButton
+                    />
                   ) : (
                     <div className={styles.moduleDemoPlaceholder} role="presentation">
                       <span>Demo interativa</span>
