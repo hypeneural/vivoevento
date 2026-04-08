@@ -1,4 +1,4 @@
-﻿@use './variables' as *;
+@use './variables' as *;
 @use './mixins' as *;
 
 :root {
@@ -35,7 +35,7 @@ select {
 }
 
 section[id] {
-  scroll-margin-top: calc(#{$header-height} + 2rem);
+  scroll-margin-top: calc(#{$header-height} + 1rem);
 }
 
 a {
@@ -148,7 +148,7 @@ section[id].section-shell > .container::after {
 
 .section-title {
   @include display-title;
-  font-size: clamp(2.1rem, 5vw, 4rem);
+  font-size: clamp(1.9rem, 4.5vw, 3.2rem);
 }
 
 .section-lead {

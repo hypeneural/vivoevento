@@ -1,4 +1,5 @@
 import type {
+  WallAdItem,
   WallBootData,
   WallMediaItem,
   WallPlayerState,
@@ -8,6 +9,14 @@ import type {
   WallSettings,
   WallStatusChangedPayload,
 } from '../types';
+import {
+  createAdSchedulerState,
+  markAdPlayed,
+  markPhotoAdvanced,
+  selectNextAd,
+  shouldPlayAd,
+  updateAdSchedulerMode,
+} from './adScheduler';
 import {
   findWallCurrentIndex,
   isWallItemRenderable,
@@ -42,13 +51,49 @@ export type WallEngineAction =
   | { type: 'new-media'; media: WallMediaItem }
   | { type: 'media-updated'; media: Partial<WallMediaItem> & { id: string } }
   | { type: 'media-deleted'; id: string }
+  | { type: 'ads-updated'; ads: WallAdItem[] }
   | { type: 'media-asset-status'; payload: MediaStatusPayload }
   | { type: 'advance' }
+  | { type: 'ad-finished' }
   | { type: 'mark-expired' }
   | { type: 'sync-error' };
 
 function countQueueCandidates(items: WallRuntimeItem[]): number {
   return items.filter((item) => Boolean(item.url) && item.assetStatus !== 'error').length;
+}
+
+function clampInteger(value: number | undefined, fallback: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.max(min, Math.min(max, Math.trunc(value as number)));
+}
+
+function sortWallAds(ads: WallAdItem[]): WallAdItem[] {
+  return [...ads].sort((left, right) => {
+    if (left.position !== right.position) {
+      return left.position - right.position;
+    }
+
+    return left.id - right.id;
+  });
+}
+
+function resolveAdFrequency(settings?: WallSettings | null): number {
+  if ((settings?.ad_mode ?? 'disabled') === 'by_minutes') {
+    return clampInteger(settings?.ad_interval_minutes, 3, 1, 60);
+  }
+
+  return clampInteger(settings?.ad_frequency, 5, 1, 100);
+}
+
+function syncAdSchedulerWithSettings(state: WallPlayerState, settings?: WallSettings | null) {
+  return updateAdSchedulerMode(
+    state.adScheduler,
+    settings?.ad_mode ?? 'disabled',
+    resolveAdFrequency(settings),
+  );
 }
 
 function mapWallStatusToPlayerStatus(
@@ -149,6 +194,10 @@ export function createEmptyState(code: string): WallPlayerState {
     event: null,
     settings: null,
     items: [],
+    ads: [],
+    currentAd: null,
+    adBaseItemId: null,
+    adScheduler: createAdSchedulerState(),
     senderStats: {},
     currentIndex: 0,
     currentItemId: null,
@@ -212,6 +261,10 @@ export function wallReducer(state: WallPlayerState, action: WallEngineAction): W
       const resolvedStatus = resolvedCurrentItemId
         ? playerStatus
         : (playerStatus === 'playing' ? 'idle' : playerStatus);
+      const ads = sortWallAds(action.snapshot.ads ?? []);
+      const currentAd = state.currentAd
+        ? ads.find((ad) => ad.id === state.currentAd?.id) ?? null
+        : null;
 
       const nextState = resolveStateWithCurrentItem(
         {
@@ -219,6 +272,14 @@ export function wallReducer(state: WallPlayerState, action: WallEngineAction): W
           status: resolvedStatus,
           event: action.snapshot.event,
           settings: action.snapshot.settings,
+          ads,
+          currentAd,
+          adBaseItemId: currentAd ? (state.adBaseItemId ?? state.currentItemId ?? null) : null,
+          adScheduler: updateAdSchedulerMode(
+            state.adScheduler,
+            action.snapshot.settings.ad_mode ?? 'disabled',
+            resolveAdFrequency(action.snapshot.settings),
+          ),
         },
         playbackState.items,
         resolvedCurrentItemId,
@@ -231,12 +292,27 @@ export function wallReducer(state: WallPlayerState, action: WallEngineAction): W
     }
 
     case 'apply-settings':
-      return { ...state, settings: action.settings };
-
-    case 'status-changed': {
       return {
         ...state,
-        status: mapWallStatusToPlayerStatus(action.payload.status, state.status, state.items),
+        settings: action.settings,
+        currentAd: action.settings.ad_mode === 'disabled' ? null : state.currentAd,
+        adBaseItemId: action.settings.ad_mode === 'disabled'
+          ? null
+          : (state.currentAd ? (state.adBaseItemId ?? state.currentItemId ?? null) : state.adBaseItemId ?? null),
+        adScheduler: updateAdSchedulerMode(
+          state.adScheduler,
+          action.settings.ad_mode ?? 'disabled',
+          resolveAdFrequency(action.settings),
+        ),
+      };
+
+    case 'status-changed': {
+      const nextStatus = mapWallStatusToPlayerStatus(action.payload.status, state.status, state.items);
+      return {
+        ...state,
+        status: nextStatus,
+        currentAd: nextStatus === 'playing' ? state.currentAd : null,
+        adBaseItemId: nextStatus === 'playing' ? state.adBaseItemId ?? null : null,
       };
     }
 
@@ -352,6 +428,20 @@ export function wallReducer(state: WallPlayerState, action: WallEngineAction): W
       };
     }
 
+    case 'ads-updated': {
+      const ads = sortWallAds(action.ads);
+      const currentAd = state.currentAd
+        ? ads.find((ad) => ad.id === state.currentAd?.id) ?? null
+        : null;
+
+      return {
+        ...state,
+        ads,
+        currentAd,
+        adBaseItemId: currentAd ? (state.adBaseItemId ?? state.currentItemId ?? null) : null,
+      };
+    }
+
     case 'media-asset-status': {
       const itemIndex = state.items.findIndex((item) => item.id === action.payload.id);
       if (itemIndex < 0) {
@@ -422,8 +512,30 @@ export function wallReducer(state: WallPlayerState, action: WallEngineAction): W
     }
 
     case 'advance': {
+      if (state.currentAd) {
+        return state;
+      }
+
       if (state.items.length === 0) {
         return state;
+      }
+
+      const nextAdScheduler = markPhotoAdvanced(syncAdSchedulerWithSettings(state, state.settings));
+
+      if (shouldPlayAd(nextAdScheduler, state.ads.length)) {
+        const { ad, nextIndex } = selectNextAd(state.ads, nextAdScheduler.lastAdIndex);
+
+        if (ad) {
+          return {
+            ...state,
+            currentAd: ad,
+            adBaseItemId: state.currentItemId ?? null,
+            adScheduler: {
+              ...nextAdScheduler,
+              lastAdIndex: nextIndex,
+            },
+          };
+        }
       }
 
       const nextCurrentItemId = pickNextWallItemId(
@@ -436,11 +548,64 @@ export function wallReducer(state: WallPlayerState, action: WallEngineAction): W
         return {
           ...state,
           status: state.status === 'playing' ? 'idle' : state.status,
+          adScheduler: nextAdScheduler,
         };
       }
 
       const playbackState = markPlayback(state.items, state.senderStats, nextCurrentItemId);
-      const nextState = resolveStateWithCurrentItem(state, playbackState.items, nextCurrentItemId);
+      const nextState = resolveStateWithCurrentItem(
+        {
+          ...state,
+          adScheduler: nextAdScheduler,
+        },
+        playbackState.items,
+        nextCurrentItemId,
+      );
+
+      return {
+        ...nextState,
+        senderStats: playbackState.senderStats,
+      };
+    }
+
+    case 'ad-finished': {
+      if (!state.currentAd) {
+        return state;
+      }
+
+      const nextAdScheduler = markAdPlayed(syncAdSchedulerWithSettings(state, state.settings));
+      const nextCurrentItemId = pickNextWallItemId(
+        state.items,
+        state.adBaseItemId ?? state.currentItemId,
+        resolveWallSelectionPolicy(state.settings),
+        state.senderStats,
+      );
+
+      if (!nextCurrentItemId) {
+        return resolveStateWithCurrentItem(
+          {
+            ...state,
+            status: state.status === 'playing' ? 'idle' : state.status,
+            currentAd: null,
+            adBaseItemId: null,
+            adScheduler: nextAdScheduler,
+          },
+          state.items,
+          null,
+        );
+      }
+
+      const playbackState = markPlayback(state.items, state.senderStats, nextCurrentItemId);
+      const nextState = resolveStateWithCurrentItem(
+        {
+          ...state,
+          currentAd: null,
+          adBaseItemId: null,
+          adScheduler: nextAdScheduler,
+        },
+        playbackState.items,
+        nextCurrentItemId,
+      );
 
       return {
         ...nextState,
@@ -449,7 +614,7 @@ export function wallReducer(state: WallPlayerState, action: WallEngineAction): W
     }
 
     case 'mark-expired':
-      return { ...state, status: 'expired' };
+      return { ...state, status: 'expired', currentAd: null, adBaseItemId: null };
 
     case 'sync-error':
       return countQueueCandidates(state.items) > 0 ? state : { ...state, status: 'error' };

@@ -23,6 +23,14 @@ it('returns only active public event packages and sorts them by sort order', fun
         'is_active' => true,
     ]);
 
+    $partnerOnly = EventPackage::factory()->create([
+        'code' => 'partner-exclusive',
+        'name' => 'Partner Exclusive',
+        'target_audience' => EventPackageAudience::Partner->value,
+        'sort_order' => 5,
+        'is_active' => true,
+    ]);
+
     EventPackage::factory()->create([
         'code' => 'hidden-event',
         'name' => 'Oculto',
@@ -31,7 +39,7 @@ it('returns only active public event packages and sorts them by sort order', fun
         'is_active' => false,
     ]);
 
-    foreach ([$premium, $essential] as $package) {
+    foreach ([$premium, $essential, $partnerOnly] as $package) {
         EventPackagePrice::factory()->create([
             'event_package_id' => $package->id,
             'billing_mode' => EventPackageBillingMode::OneTime->value,

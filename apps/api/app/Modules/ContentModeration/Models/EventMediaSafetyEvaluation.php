@@ -29,6 +29,10 @@ class EventMediaSafetyEvaluation extends Model
         'reason_codes_json',
         'raw_response_json',
         'request_payload_json',
+        'normalized_text_context',
+        'normalized_text_context_mode',
+        'policy_snapshot_json',
+        'policy_sources_json',
         'completed_at',
     ];
 
@@ -43,6 +47,8 @@ class EventMediaSafetyEvaluation extends Model
         'reason_codes_json' => 'array',
         'raw_response_json' => 'array',
         'request_payload_json' => 'array',
+        'policy_snapshot_json' => 'array',
+        'policy_sources_json' => 'array',
         'completed_at' => 'datetime',
     ];
 

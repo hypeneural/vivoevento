@@ -6,8 +6,11 @@ use App\Modules\MediaIntelligence\Services\VllmVisualReasoningProvider;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Models\EventMediaVariant;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 
 it('maps a structured vllm response into the domain dto', function () {
+    Storage::fake('public');
+
     $event = Event::factory()->create([
         'title' => 'Casamento AI',
     ]);
@@ -27,6 +30,11 @@ it('maps a structured vllm response into the domain dto', function () {
         'height' => 512,
         'size_bytes' => 1024,
     ]);
+
+    Storage::disk('public')->put(
+        "events/{$event->id}/fast/{$media->id}.jpg",
+        'fake-image-binary',
+    );
 
     $settings = EventMediaIntelligenceSetting::factory()->make([
         'event_id' => $event->id,
@@ -89,6 +97,8 @@ it('maps a structured vllm response into the domain dto', function () {
 });
 
 it('fails when vllm returns invalid json content', function () {
+    Storage::fake('public');
+
     $event = Event::factory()->create();
     $media = EventMedia::factory()->create([
         'event_id' => $event->id,
@@ -104,6 +114,11 @@ it('fails when vllm returns invalid json content', function () {
         'height' => 512,
         'size_bytes' => 1024,
     ]);
+
+    Storage::disk('public')->put(
+        "events/{$event->id}/fast/{$media->id}.jpg",
+        'fake-image-binary',
+    );
 
     $settings = EventMediaIntelligenceSetting::factory()->make([
         'event_id' => $event->id,

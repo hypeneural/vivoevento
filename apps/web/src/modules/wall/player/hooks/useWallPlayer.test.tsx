@@ -39,6 +39,17 @@ const engineMock = {
         height: 900,
       },
     ],
+    ads: [],
+    currentAd: null,
+    adBaseItemId: null,
+    adScheduler: {
+      mode: 'disabled' as const,
+      frequency: 5,
+      photosSinceLastAd: 0,
+      lastAdPlayedAt: null,
+      lastAdIndex: -1,
+      skipNextAdCheck: false,
+    },
     senderStats: {},
     currentIndex: 0,
     currentItemId: 'media_1',
@@ -99,6 +110,17 @@ describe('useWallPlayer', () => {
         assetStatus: 'ready',
       },
     ];
+    engineMock.state.ads = [];
+    engineMock.state.currentAd = null;
+    engineMock.state.adBaseItemId = null;
+    engineMock.state.adScheduler = {
+      mode: 'disabled',
+      frequency: 5,
+      photosSinceLastAd: 0,
+      lastAdPlayedAt: null,
+      lastAdIndex: -1,
+      skipNextAdCheck: false,
+    };
 
     getWallBootMock.mockResolvedValue({
       event: {

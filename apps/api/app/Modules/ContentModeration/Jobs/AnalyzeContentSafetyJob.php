@@ -6,6 +6,7 @@ use App\Modules\ContentModeration\Actions\EvaluateContentSafetyAction;
 use App\Modules\MediaIntelligence\Jobs\EvaluateMediaPromptJob;
 use App\Modules\MediaProcessing\Jobs\RunModerationJob;
 use App\Modules\MediaProcessing\Models\EventMedia;
+use App\Modules\ContentModeration\Services\ContentModerationSettingsResolver;
 use App\Modules\MediaProcessing\Services\MediaPipelineDegradationPolicy;
 use App\Modules\MediaProcessing\Services\MediaProcessingRunService;
 use App\Modules\MediaProcessing\Services\ModerationBroadcasterService;
@@ -66,7 +67,7 @@ class AnalyzeContentSafetyJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $settings = $media->event->contentModerationSettings;
+        $settings = app(ContentModerationSettingsResolver::class)->resolveForEvent($media->event);
         $inputRef = $media->variants->firstWhere('variant_key', 'fast_preview')?->path
             ?: $media->originalStoragePath();
         $runService = app(MediaProcessingRunService::class);
@@ -129,12 +130,13 @@ class AnalyzeContentSafetyJob implements ShouldBeUnique, ShouldQueue
                     'model_snapshot' => $result->modelSnapshot,
                     'decision_key' => $result->decision->value,
                     'result_json' => $result->toRunResult(),
-                    'metrics_json' => [
-                        'settings_enabled' => (bool) $settings?->enabled,
-                        'review_required' => $result->reviewRequired,
-                        'blocked' => $result->blocked,
-                    ],
-                ]);
+                'metrics_json' => [
+                    'settings_enabled' => (bool) $settings?->enabled,
+                    'review_required' => $result->reviewRequired,
+                    'blocked' => $result->blocked,
+                    'analysis_scope' => $settings?->analysis_scope,
+                ],
+            ]);
             } catch (Throwable $exception) {
                 $fallbackMode = $settings?->fallback_mode === 'block' ? 'block' : 'review';
 

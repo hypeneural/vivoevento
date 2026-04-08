@@ -24,6 +24,8 @@ final class ContentSafetyEvaluationResult
         public readonly array $reasonCodes = [],
         public readonly array $rawResponse = [],
         public readonly array $requestPayload = [],
+        public readonly ?string $normalizedTextContext = null,
+        public readonly ?string $normalizedTextContextMode = null,
         public readonly ?string $providerKey = null,
         public readonly ?string $providerVersion = null,
         public readonly ?string $modelKey = null,
@@ -46,6 +48,8 @@ final class ContentSafetyEvaluationResult
         array $reasonCodes = [],
         array $rawResponse = [],
         array $requestPayload = [],
+        ?string $normalizedTextContext = null,
+        ?string $normalizedTextContextMode = null,
         ?string $providerKey = null,
         ?string $providerVersion = null,
         ?string $modelKey = null,
@@ -64,6 +68,8 @@ final class ContentSafetyEvaluationResult
             reasonCodes: $reasonCodes,
             rawResponse: $rawResponse,
             requestPayload: $requestPayload,
+            normalizedTextContext: $normalizedTextContext,
+            normalizedTextContextMode: $normalizedTextContextMode,
             providerKey: $providerKey,
             providerVersion: $providerVersion,
             modelKey: $modelKey,
@@ -87,6 +93,8 @@ final class ContentSafetyEvaluationResult
         array $reasonCodes = [],
         array $rawResponse = [],
         array $requestPayload = [],
+        ?string $normalizedTextContext = null,
+        ?string $normalizedTextContextMode = null,
         ?string $providerKey = null,
         ?string $providerVersion = null,
         ?string $modelKey = null,
@@ -105,6 +113,8 @@ final class ContentSafetyEvaluationResult
             reasonCodes: $reasonCodes,
             rawResponse: $rawResponse,
             requestPayload: $requestPayload,
+            normalizedTextContext: $normalizedTextContext,
+            normalizedTextContextMode: $normalizedTextContextMode,
             providerKey: $providerKey,
             providerVersion: $providerVersion,
             modelKey: $modelKey,
@@ -128,6 +138,8 @@ final class ContentSafetyEvaluationResult
         array $reasonCodes = [],
         array $rawResponse = [],
         array $requestPayload = [],
+        ?string $normalizedTextContext = null,
+        ?string $normalizedTextContextMode = null,
         ?string $providerKey = null,
         ?string $providerVersion = null,
         ?string $modelKey = null,
@@ -146,6 +158,8 @@ final class ContentSafetyEvaluationResult
             reasonCodes: $reasonCodes,
             rawResponse: $rawResponse,
             requestPayload: $requestPayload,
+            normalizedTextContext: $normalizedTextContext,
+            normalizedTextContextMode: $normalizedTextContextMode,
             providerKey: $providerKey,
             providerVersion: $providerVersion,
             modelKey: $modelKey,
@@ -200,6 +214,8 @@ final class ContentSafetyEvaluationResult
             'reason_codes_json' => $this->reasonCodes,
             'raw_response_json' => $this->rawResponse,
             'request_payload_json' => $this->requestPayload,
+            'normalized_text_context' => $this->normalizedTextContext,
+            'normalized_text_context_mode' => $this->normalizedTextContextMode,
         ];
     }
 
@@ -213,8 +229,50 @@ final class ContentSafetyEvaluationResult
             'blocked' => $this->blocked,
             'review_required' => $this->reviewRequired,
             'category_scores' => $this->categoryScores,
+            'input_scope_used' => $this->normalizedProvider['input_scope_used'] ?? null,
             'input_path_used' => $this->normalizedProvider['input_path_used'] ?? null,
+            'normalized_text_context' => $this->normalizedTextContext,
+            'normalized_text_context_mode' => $this->normalizedTextContextMode,
             'reason_codes' => $this->reasonCodes,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $metadata
+     */
+    public function withExecutionMetadata(array $metadata): self
+    {
+        $rawResponse = $this->rawResponse;
+        $rawResponse['execution'] = array_merge(
+            (array) ($rawResponse['execution'] ?? []),
+            $metadata,
+        );
+
+        $normalizedProvider = $this->normalizedProvider;
+        $normalizedProvider['execution'] = array_merge(
+            (array) ($normalizedProvider['execution'] ?? []),
+            $metadata,
+        );
+
+        return new self(
+            decision: $this->decision,
+            blocked: $this->blocked,
+            reviewRequired: $this->reviewRequired,
+            categoryScores: $this->categoryScores,
+            providerCategories: $this->providerCategories,
+            providerCategoryScores: $this->providerCategoryScores,
+            providerCategoryInputTypes: $this->providerCategoryInputTypes,
+            normalizedProvider: $normalizedProvider,
+            reasonCodes: $this->reasonCodes,
+            rawResponse: $rawResponse,
+            requestPayload: $this->requestPayload,
+            normalizedTextContext: $this->normalizedTextContext,
+            normalizedTextContextMode: $this->normalizedTextContextMode,
+            providerKey: $this->providerKey,
+            providerVersion: $this->providerVersion,
+            modelKey: $this->modelKey,
+            modelSnapshot: $this->modelSnapshot,
+            thresholdVersion: $this->thresholdVersion,
+        );
     }
 }

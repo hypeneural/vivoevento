@@ -6,6 +6,7 @@ use App\Modules\Events\Models\Event;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Services\MediaAssetUrlService;
 use App\Modules\Wall\Queries\BuildWallInsightsQuery;
+use App\Modules\Wall\Support\WallSourceNormalizer;
 use App\Shared\Support\PhoneNumber;
 use BackedEnum;
 use Illuminate\Support\Collection;
@@ -45,7 +46,7 @@ class WallInsightsService
                     'senderKey' => $senderKey,
                     'displayName' => $this->displayName($mediaItem),
                     'maskedContact' => $this->maskedContact($mediaItem),
-                    'source' => $this->normalizeSource($mediaItem->source_type),
+                    'source' => WallSourceNormalizer::normalize($mediaItem->source_type),
                     'mediaCount' => 0,
                     'lastSentAt' => null,
                     'avatarUrl' => $mediaItem->inboundMessage?->sender_avatar_url,
@@ -63,7 +64,7 @@ class WallInsightsService
                 )
             ) {
                 $aggregates[$senderKey]['lastSentAt'] = $createdAt;
-                $aggregates[$senderKey]['source'] = $this->normalizeSource($mediaItem->source_type);
+                $aggregates[$senderKey]['source'] = WallSourceNormalizer::normalize($mediaItem->source_type);
                 $aggregates[$senderKey]['displayName'] = $this->displayName($mediaItem);
                 $aggregates[$senderKey]['maskedContact'] = $this->maskedContact($mediaItem);
                 $aggregates[$senderKey]['avatarUrl'] = $mediaItem->inboundMessage?->sender_avatar_url;
@@ -85,7 +86,7 @@ class WallInsightsService
                 'previewUrl' => $this->mediaAssets->thumbnail($mediaItem),
                 'senderName' => $this->displayName($mediaItem),
                 'senderKey' => $this->senderKey($mediaItem),
-                'source' => $this->normalizeSource($mediaItem->source_type),
+                'source' => WallSourceNormalizer::normalize($mediaItem->source_type),
                 'createdAt' => $mediaItem->created_at?->toIso8601String(),
                 'approvedAt' => $this->enumValue($mediaItem->moderation_status) === 'approved'
                     ? $mediaItem->updated_at?->toIso8601String()
@@ -102,7 +103,7 @@ class WallInsightsService
     private function sourceMix(Collection $rows): array
     {
         return $rows
-            ->groupBy(fn ($row) => $this->normalizeSource($row->source_type))
+            ->groupBy(fn ($row) => WallSourceNormalizer::normalize($row->source_type))
             ->map(fn (Collection $group, string $source) => [
                 'source' => $source,
                 'count' => (int) $group->sum(fn ($row) => (int) $row->aggregate),
@@ -155,17 +156,6 @@ class WallInsightsService
         }
 
         return substr($phone, 0, 4).'...'.substr($phone, -2);
-    }
-
-    private function normalizeSource(?string $sourceType): string
-    {
-        return match (true) {
-            $sourceType === 'telegram' => 'telegram',
-            in_array($sourceType, ['public_upload', 'upload', 'channel'], true) => 'upload',
-            in_array($sourceType, ['manual', 'manual_override'], true) => 'manual',
-            in_array($sourceType, ['gallery', 'public_link', 'qrcode'], true) => 'gallery',
-            default => 'whatsapp',
-        };
     }
 
     private function recentStatus(EventMedia $mediaItem): string

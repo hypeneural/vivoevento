@@ -78,13 +78,7 @@ class SubscriptionController extends BaseController
             ->latest()
             ->paginate(20);
 
-        $invoices->setCollection(
-            $invoices->getCollection()->map(
-                fn ($invoice) => BillingInvoiceResource::make($invoice)->resolve()
-            )
-        );
-
-        return $this->success($invoices);
+        return $this->paginated(BillingInvoiceResource::collection($invoices));
     }
 
     /**

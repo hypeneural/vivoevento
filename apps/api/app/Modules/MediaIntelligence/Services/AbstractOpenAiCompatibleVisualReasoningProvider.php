@@ -73,6 +73,8 @@ abstract class AbstractOpenAiCompatibleVisualReasoningProvider implements Visual
             ],
             'requestPayload' => $requestPayload,
             'promptContext' => $promptContext,
+            'normalizedTextContext' => data_get($promptContext, 'normalized_text_context'),
+            'normalizedTextContextMode' => data_get($promptContext, 'normalized_text_context_mode'),
             'providerKey' => $this->providerKey(),
             'providerVersion' => (string) ($config['provider_version'] ?? ($this->providerKey() . '-openai-v1')),
             'modelKey' => (string) ($settings->model_key ?: ($config['model'] ?? '')),

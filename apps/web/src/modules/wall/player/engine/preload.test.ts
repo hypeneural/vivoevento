@@ -2,8 +2,8 @@
  * Tests for engine/preload.ts (Phase 0.1)
  */
 
-import { describe, it, expect } from 'vitest';
-import { resolveNextPreloadItem } from '../engine/preload';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { preloadNextItem, preloadVideoAuto, resolveNextPreloadItem } from '../engine/preload';
 import type { WallRuntimeItem, WallSettings, WallSenderRuntimeStats } from '../types';
 
 function makeItem(id: string, overrides?: Partial<WallRuntimeItem>): WallRuntimeItem {
@@ -103,5 +103,53 @@ describe('resolveNextPreloadItem', () => {
     const result = resolveNextPreloadItem(items, 'a', defaultSettings, emptySenderStats);
     expect(result).not.toBeNull();
     expect(result!.id).not.toBe('b');
+  });
+});
+
+describe('video preload helpers', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('creates a muted preload=auto video element for proactive buffering', () => {
+    const originalCreateElement = document.createElement.bind(document);
+    const created: HTMLVideoElement[] = [];
+
+    vi.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {
+      const element = originalCreateElement(tagName);
+      if (tagName.toLowerCase() === 'video') {
+        created.push(element as HTMLVideoElement);
+      }
+      return element;
+    }) as typeof document.createElement);
+
+    preloadVideoAuto('https://cdn.test/video.mp4');
+
+    expect(created).toHaveLength(1);
+    expect(created[0].preload).toBe('auto');
+    expect(created[0].muted).toBe(true);
+    expect(created[0].src).toContain('https://cdn.test/video.mp4');
+  });
+
+  it('uses video preloading when the next item is a video', async () => {
+    const originalCreateElement = document.createElement.bind(document);
+    const created: HTMLVideoElement[] = [];
+
+    vi.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {
+      const element = originalCreateElement(tagName);
+      if (tagName.toLowerCase() === 'video') {
+        created.push(element as HTMLVideoElement);
+      }
+      return element;
+    }) as typeof document.createElement);
+
+    await preloadNextItem(makeItem('video-next', {
+      url: 'https://cdn.test/video-next.mp4',
+      type: 'video',
+    }));
+
+    expect(created).toHaveLength(1);
+    expect(created[0].preload).toBe('auto');
+    expect(created[0].src).toContain('https://cdn.test/video-next.mp4');
   });
 });

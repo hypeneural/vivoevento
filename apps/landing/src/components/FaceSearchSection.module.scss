@@ -138,9 +138,9 @@
 
 .targetBox {
   position: absolute;
-  inset: 12% 22% 18% 22%;
+  inset: 16% 24% 22% 20%;
   border: 1px solid rgba($c-accent, 0.4);
-  border-radius: 28px;
+  border-radius: 22px;
   box-shadow: 0 0 0 1px rgba($c-accent, 0.08);
 
   span {
@@ -182,11 +182,11 @@
 
 .crosshair {
   position: absolute;
-  top: 42%;
-  left: 50%;
-  width: 3.2rem;
-  height: 3.2rem;
-  margin: -1.6rem 0 0 -1.6rem;
+  top: 46%;
+  left: 49%;
+  width: 2.6rem;
+  height: 2.6rem;
+  margin: -1.3rem 0 0 -1.3rem;
   border-radius: 50%;
   border: 1px solid rgba($c-accent, 0.46);
   box-shadow: 0 0 0 1px rgba($c-accent, 0.1);
@@ -228,12 +228,24 @@
 
 .faceNode {
   position: absolute;
-  width: 0.42rem;
-  height: 0.42rem;
-  margin: -0.21rem 0 0 -0.21rem;
+  width: 0.38rem;
+  height: 0.38rem;
+  margin: -0.19rem 0 0 -0.19rem;
   border-radius: 50%;
   background: $c-accent;
-  box-shadow: 0 0 16px rgba($c-accent, 0.34);
+  box-shadow: 0 0 12px rgba($c-accent, 0.4);
+  animation: node-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes node-pulse {
+  0%, 100% {
+    opacity: 0.65;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.4);
+  }
 }
 
 .selfieTag {

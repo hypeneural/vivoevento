@@ -98,6 +98,170 @@ Achados reais da implementacao:
   - o palco passa a refletir a midia escolhida;
   - o detalhe lateral dedicado continua como proxima fatia, nao como pre-requisito para este bloco.
 
+Segunda fatia executada de acordo com este plano:
+
+- frontend:
+  - `useWallRealtimeSync`
+  - `useWallPollingFallback`
+  - `WallRecentMediaDetailsSheet`
+  - integracao do polling leve nas queries de evento, settings, diagnostics e insights
+  - detalhe responsivo por `Sheet` no desktop e `Drawer` no mobile
+  - polimento visual leve no trilho e no palco
+
+Testes automatizados executados nesta segunda fatia:
+
+- frontend:
+  - `cd apps/web && npm run test -- src/modules/wall/hooks/useWallPollingFallback.test.tsx src/modules/wall/hooks/useWallRealtimeSync.test.tsx src/modules/wall/components/manager/recent/WallRecentMediaDetailsSheet.test.tsx src/modules/wall/pages/EventWallManagerPage.test.tsx`
+  - `17` testes passando
+- frontend:
+  - `cd apps/web && npm run type-check`
+  - sem erros
+
+Achados reais desta segunda fatia:
+
+- o manager agora opera em modo hibrido de fato:
+  - `connected` e `connecting` desligam polling;
+  - `disconnected` e `offline` ligam polling leve;
+  - reconexao invalida `settings`, `diagnostics`, `insights` e `event.detail`.
+- o detalhe da midia recente entrou sem criar uma segunda navegacao:
+  - `Sheet` no desktop;
+  - `Drawer` no mobile;
+  - selecao do trilho continua estavel durante refetch.
+- o polimento visual ficou dentro do orcamento de animacao definido no plano:
+  - transicao curta no palco com `AnimatePresence`;
+  - badge `Agora` nos itens muito recentes;
+  - sem autoplay no trilho;
+  - sem animar listas inteiras ou KPIs.
+
+Terceira fatia executada de acordo com este plano:
+
+- frontend:
+  - `WallCommandToolbar`
+  - `useWallRecentMediaTimeline`
+  - navegacao por setas na toolbar principal
+  - tabs do palco com ativacao automatica em conteudo pre-carregado
+  - tabs do inspector com ativacao manual
+  - pausa do trilho recente em hover e foco
+  - navegacao por teclado no trilho recente
+  - manutencao do item selecionado visivel no trilho
+
+Testes automatizados executados nesta terceira fatia:
+
+- frontend:
+  - `cd apps/web && npm run test -- src/modules/wall/components/manager/layout/WallCommandToolbar.test.tsx src/modules/wall/hooks/useWallRecentMediaTimeline.test.tsx src/modules/wall/pages/EventWallManagerPage.test.tsx`
+  - `16` testes passando
+- frontend regressao do modulo:
+  - `cd apps/web && npm run test -- src/modules/wall`
+  - `183` testes passando
+- frontend:
+  - `cd apps/web && npm run type-check`
+  - sem erros
+- backend regressao do modulo:
+  - `cd apps/api && php artisan test --filter=Wall`
+  - `57` testes passando
+
+Achados reais desta terceira fatia:
+
+- a toolbar principal do manager agora segue o contrato de interacao previsto:
+  - `Tab` entra no grupo;
+  - `ArrowLeft`, `ArrowRight`, `Home` e `End` navegam entre os comandos;
+  - a acao principal continua no mesmo trilho visual do header.
+- a estrategia final das tabs ficou fechada assim:
+  - palco com ativacao automatica porque o conteudo relevante ja esta pre-carregado;
+  - inspector com ativacao manual para evitar troca acidental de contexto em navegacao por teclado.
+- o trilho recente deixou de ser apenas clicavel:
+  - aceita teclado;
+  - pausa em hover e foco;
+  - mantem o item selecionado visivel sem recentrar de forma agressiva.
+- a coluna da direita saiu do modelo de inspector infinito e passou a operar por abas:
+  - `Fila`
+  - `Aparencia`
+  - `Anuncios`
+
+Quarta fatia executada de acordo com este plano:
+
+- backend:
+  - enriquecimento real de `sequence_preview` com:
+    - `preview_url`
+    - `source_type`
+- frontend:
+  - `WallHeroStage`
+  - `WallDraftPreviewCard`
+  - `WallUpcomingTimeline`
+  - `WallQueueTab`
+  - integracao do preview inicial do rascunho sem `iframe`
+  - integracao de thumbnails e origem em `Proximas fotos`
+  - reducao do peso direto de `EventWallManagerPage.tsx`
+
+Testes automatizados executados nesta quarta fatia:
+
+- frontend:
+  - `cd apps/web && npm run test -- src/modules/wall/pages/EventWallManagerPage.test.tsx`
+  - `11` testes passando
+- frontend regressao do modulo:
+  - `cd apps/web && npm run test -- src/modules/wall`
+  - `185` testes passando
+- frontend:
+  - `cd apps/web && npm run type-check`
+  - sem erros
+- backend regressao do modulo:
+  - `cd apps/api && php artisan test --filter=Wall`
+  - `57` testes passando
+
+Achados reais desta quarta fatia:
+
+- o palco agora tem uma previa inicial de rascunho sem `iframe`:
+  - ela ainda nao e o renderer compartilhado final do player;
+  - mas ja responde a layout, animacao, marca, QR, creditos e miniaturas laterais.
+- `Proximas fotos` deixou de ser apenas texto:
+  - cada item agora pode mostrar thumb;
+  - origem normalizada;
+  - badges de reprise e destaque.
+- a quebra da pagina principal entrou em fase real:
+  - o palco ja foi extraido para `WallHeroStage`;
+  - a fila do inspector saiu para `WallQueueTab`;
+  - `EventWallManagerPage.tsx` caiu de `1864` para `1593` linhas nesta rodada.
+- a extracao do inspector ainda nao tinha terminado por completo nesta fatia:
+  - `Aparencia` e `Anuncios` ficaram como proxima rodada;
+  - a reducao de tamanho ja foi material sem reabrir risco desnecessario no formulario.
+
+Quinta fatia executada de acordo com este plano:
+
+- frontend:
+  - `WallAppearanceTab`
+  - `WallAdsTab`
+  - integracao dos dois tabs na pagina principal
+  - remocao dos blocos inline restantes do inspector
+  - nova reducao do peso direto de `EventWallManagerPage.tsx`
+
+Testes automatizados executados nesta quinta fatia:
+
+- frontend:
+  - `cd apps/web && npm run test -- src/modules/wall/components/manager/inspector/WallAppearanceTab.test.tsx src/modules/wall/components/manager/inspector/WallAdsTab.test.tsx src/modules/wall/pages/EventWallManagerPage.test.tsx`
+  - `13` testes passando
+- frontend regressao do modulo:
+  - `cd apps/web && npm run test -- src/modules/wall`
+  - `187` testes passando
+- frontend:
+  - `cd apps/web && npm run type-check`
+  - sem erros
+- backend regressao do modulo:
+  - `cd apps/api && php artisan test --filter=Wall`
+  - `57` testes passando
+
+Achados reais desta quinta fatia:
+
+- a extracao do inspector fechou o escopo previsto para esta sprint:
+  - `WallAppearanceTab` entrou na pagina principal;
+  - `WallAdsTab` entrou na pagina principal;
+  - o fluxo de salvar, subir anuncio, reordenar e remover criativo continuou verde nos testes da pagina.
+- o arquivo principal deixou de carregar os dois maiores blocos inline restantes:
+  - `EventWallManagerPage.tsx` caiu de `1593` para `1215` linhas;
+  - a pagina agora ficou mais proxima de orquestracao do que de formulario bruto.
+- os testes de caracterizacao dos tabs extraidos agora seguram o contrato dos componentes fora da pagina:
+  - `WallAppearanceTab.test.tsx`
+  - `WallAdsTab.test.tsx`
+
 ## Resultado esperado ao fim da sprint
 
 Ao final desta sprint, a tela `/events/:id/wall` deve permitir:
@@ -937,8 +1101,8 @@ Responsabilidades:
 
 #### Hook tests
 
-- [useWallPollingFallback.test.ts](C:/laragon/www/eventovivo/apps/web/src/modules/wall/hooks/useWallPollingFallback.test.ts)
-- [useWallRealtimeSync.test.ts](C:/laragon/www/eventovivo/apps/web/src/modules/wall/hooks/useWallRealtimeSync.test.ts)
+- [useWallPollingFallback.test.tsx](C:/laragon/www/eventovivo/apps/web/src/modules/wall/hooks/useWallPollingFallback.test.tsx)
+- [useWallRealtimeSync.test.tsx](C:/laragon/www/eventovivo/apps/web/src/modules/wall/hooks/useWallRealtimeSync.test.tsx)
 
 Casos:
 
@@ -1040,13 +1204,15 @@ Criar ou expandir:
 
 - [EventWallManagerPage.test.tsx](C:/laragon/www/eventovivo/apps/web/src/modules/wall/pages/EventWallManagerPage.test.tsx)
 - [useWallTopInsights.test.ts](C:/laragon/www/eventovivo/apps/web/src/modules/wall/hooks/useWallTopInsights.test.ts)
-- [useWallPollingFallback.test.ts](C:/laragon/www/eventovivo/apps/web/src/modules/wall/hooks/useWallPollingFallback.test.ts)
-- [useWallRealtimeSync.test.ts](C:/laragon/www/eventovivo/apps/web/src/modules/wall/hooks/useWallRealtimeSync.test.ts)
+- [useWallPollingFallback.test.tsx](C:/laragon/www/eventovivo/apps/web/src/modules/wall/hooks/useWallPollingFallback.test.tsx)
+- [useWallRealtimeSync.test.tsx](C:/laragon/www/eventovivo/apps/web/src/modules/wall/hooks/useWallRealtimeSync.test.tsx)
 - [useWallSelectedMedia.test.ts](C:/laragon/www/eventovivo/apps/web/src/modules/wall/hooks/useWallSelectedMedia.test.ts)
 - [useWallRecentMediaTimeline.test.ts](C:/laragon/www/eventovivo/apps/web/src/modules/wall/hooks/useWallRecentMediaTimeline.test.ts)
 - [WallTopInsightsRail.test.tsx](C:/laragon/www/eventovivo/apps/web/src/modules/wall/components/manager/top/WallTopInsightsRail.test.tsx)
 - [WallLiveMediaTimelineStrip.test.tsx](C:/laragon/www/eventovivo/apps/web/src/modules/wall/components/manager/top/WallLiveMediaTimelineStrip.test.tsx)
 - [WallRecentMediaDetailsSheet.test.tsx](C:/laragon/www/eventovivo/apps/web/src/modules/wall/components/manager/recent/WallRecentMediaDetailsSheet.test.tsx)
+- [WallDraftPreviewCard.test.tsx](C:/laragon/www/eventovivo/apps/web/src/modules/wall/components/manager/stage/WallDraftPreviewCard.test.tsx)
+- [WallUpcomingTimeline.test.tsx](C:/laragon/www/eventovivo/apps/web/src/modules/wall/components/manager/stage/WallUpcomingTimeline.test.tsx)
 
 ## Comandos de validacao por bloco
 
@@ -1065,8 +1231,8 @@ php artisan test --filter=WallInsightsServiceTest
 cd apps/web
 npm run test -- src/modules/wall/pages/EventWallManagerPage.test.tsx
 npm run test -- src/modules/wall/hooks/useWallTopInsights.test.ts
-npm run test -- src/modules/wall/hooks/useWallPollingFallback.test.ts
-npm run test -- src/modules/wall/hooks/useWallRealtimeSync.test.ts
+npm run test -- src/modules/wall/hooks/useWallPollingFallback.test.tsx
+npm run test -- src/modules/wall/hooks/useWallRealtimeSync.test.tsx
 npm run test -- src/modules/wall/hooks/useWallSelectedMedia.test.ts
 npm run test -- src/modules/wall/hooks/useWallRecentMediaTimeline.test.ts
 ```
@@ -1086,42 +1252,55 @@ npm run type-check
 
 ### Backend
 
-- [ ] rota `GET /events/{event}/wall/insights`
-- [ ] controller fino
-- [ ] query de agregacao
-- [ ] service de montagem
-- [ ] resource de resposta
-- [ ] `previewUrl` em thumb
-- [ ] `source` normalizado
-- [ ] testes de contrato e policy
+- [x] rota `GET /events/{event}/wall/insights`
+- [x] controller fino
+- [x] query de agregacao
+- [x] service de montagem
+- [x] resource de resposta
+- [x] `previewUrl` em thumb
+- [x] `source` normalizado
+- [x] testes de contrato e policy
+- [x] `sequence_preview.preview_url`
+- [x] `sequence_preview.source_type`
 
 ### Frontend
 
-- [ ] query keys novas
-- [ ] `getEventWallInsights`
-- [ ] `useWallTopInsights`
-- [ ] `WallTopInsightsRail`
-- [ ] `WallTopContributorCard`
-- [ ] `WallTotalMediaCard`
-- [ ] `WallLiveMediaTimelineStrip`
-- [ ] `WallRecentMediaDetailsSheet`
-- [ ] `useWallSelectedMedia`
-- [ ] `useWallRecentMediaTimeline`
-- [ ] `useWallRealtimeSync`
-- [ ] `useWallPollingFallback`
+- [x] query keys novas
+- [x] `getEventWallInsights`
+- [x] `useWallTopInsights`
+- [x] `WallTopInsightsRail`
+- [x] `WallTopContributorCard`
+- [x] `WallTotalMediaCard`
+- [x] `WallLiveMediaTimelineStrip`
+- [x] `WallRecentMediaDetailsSheet`
+- [x] `useWallSelectedMedia`
+- [x] `useWallRecentMediaTimeline`
+- [x] `useWallRealtimeSync`
+- [x] `useWallPollingFallback`
+- [x] `WallHeroStage`
+- [x] `WallDraftPreviewCard`
+- [x] `WallUpcomingTimeline`
+- [x] `WallQueueTab`
+- [x] `WallAppearanceTab` integrado na pagina principal
+- [x] `WallAdsTab` integrado na pagina principal
+- [x] `EventWallManagerPage.tsx` abaixo de `1600` linhas
+- [x] `EventWallManagerPage.tsx` abaixo de `1300` linhas
 
 ### UX/UI
 
-- [ ] copy simplificada
-- [ ] `Skeleton` so no primeiro paint
-- [ ] `placeholderData` durante refetch
-- [ ] selecao persistida
-- [ ] hover e focus states
-- [ ] detalhe responsivo
-- [ ] toolbar com navegacao por setas
-- [ ] tabs com estrategia correta de ativacao
-- [ ] trilho sem autoplay implicito
-- [ ] nenhum dado essencial dependente apenas de hover
+- [x] copy simplificada
+- [x] `Skeleton` so no primeiro paint
+- [x] `placeholderData` durante refetch
+- [x] selecao persistida
+- [x] hover e focus states
+- [x] detalhe responsivo
+- [x] toolbar com navegacao por setas
+- [x] tabs com estrategia correta de ativacao
+- [x] trilho sem autoplay implicito
+- [x] nenhum dado essencial dependente apenas de hover
+- [x] previa inicial do rascunho sem `iframe`
+- [x] `Proximas fotos` com thumb e origem
+- [ ] preview com renderer compartilhado do player
 
 ## Riscos e cuidados
 

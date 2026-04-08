@@ -486,8 +486,8 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
     - Posicionar link de privacidade perto de CTAs principais
     - _Requirements: 28, 33_
 
-- [ ] 24. Remover componentes obsoletos
-  - [ ] 24.1 Remover seções antigas
+- [x] 24. Remover componentes obsoletos
+  - [x] 24.1 Remover seções antigas
     - Remover DynamicGallerySection.tsx e .module.scss
     - Remover InteractiveGamesSection.tsx e .module.scss
     - Remover DynamicWallSection.tsx e .module.scss
@@ -496,13 +496,13 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
     - Remover ComparisonSection.tsx e .module.scss
     - _Requirements: 14, 1_
   
-  - [ ] 24.2 Atualizar App.tsx com nova estrutura
+  - [x] 24.2 Atualizar App.tsx com nova estrutura
     - Atualizar imports para novos componentes
     - Garantir ordem correta: Hero → HowItWorks → CaptureChannels → ExperienceModules → AISafety → FaceRecognition → Audience → Testimonials → Pricing → FAQ → FinalCTA
     - Validar que total de seções é ≤12
     - _Requirements: 1, 14_
 
-- [ ] 25. Checkpoint - Validar implementação completa
+- [x] 25. Checkpoint - Validar implementação completa
   - ✅ Build verde
   - ✅ Type-check verde
   - ✅ Sem erros de console
@@ -537,7 +537,7 @@ Refatoração profunda da landing page com foco em conversão comercial, reduzin
     - Validar FCP ≤1.5s
     - _Requirements: 17, 24, 40_
   
-  - [ ] 26.4 Validar SEO e structured data
+  - [-] 26.4 Validar SEO e structured data
     - Executar Google Rich Results Test
     - Validar preview social (Facebook, Twitter, LinkedIn)
     - Validar canonical tags

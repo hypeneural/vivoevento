@@ -1,0 +1,299 @@
+@use '../styles/variables' as *;
+@use '../styles/mixins' as *;
+
+.hero {
+  padding-top: calc(#{$header-height} + 3rem);
+  padding-bottom: clamp(3rem, 6vw, 5rem);
+  overflow: clip;
+}
+
+.grid {
+  display: grid;
+  gap: 3rem;
+  align-items: center;
+}
+
+.copyColumn {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  align-content: start;
+  gap: 1.5rem;
+}
+
+.title {
+  @include display-title;
+  max-width: 14ch;
+  line-height: 0.96;
+  overflow: visible;
+}
+
+.titleLead,
+.titleAccent {
+  display: block;
+  padding-right: 0.08em;
+}
+
+.titleLead {
+  color: $c-white;
+  font-size: clamp(3.6rem, 9vw, 6.2rem);
+}
+
+.titleAccent {
+  margin-top: 0.12rem;
+  font-size: clamp(3.4rem, 8.5vw, 5.9rem);
+  @include text-gradient($c-accent, $c-accent-warm);
+}
+
+.lead {
+  max-width: 36rem;
+  color: $c-white-80;
+  font-size: clamp(1.08rem, 2.2vw, 1.22rem);
+  line-height: 1.5;
+}
+
+// Trust Points Simplificados
+.trustPoints {
+  display: grid;
+  gap: 0.9rem;
+  max-width: 32rem;
+}
+
+.trustPoint {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: $c-white-80;
+  font-size: 1rem;
+  font-weight: 600;
+
+  svg {
+    flex-shrink: 0;
+    color: $c-accent-green;
+  }
+}
+
+// CTAs Simplificados
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.textAction {
+  @include button-reset;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 3.5rem;
+  color: $c-white-70;
+  font-weight: 700;
+  font-size: 0.98rem;
+  transition: color 180ms ease, transform 180ms ease;
+}
+
+.textAction:hover {
+  color: $c-accent;
+  transform: translateX(2px);
+}
+
+// Visual Simplificado
+.visualColumn {
+  position: relative;
+}
+
+.visualShell {
+  @include surface(rgba(8, 14, 26, 0.7), 1px solid rgba(115, 236, 255, 0.12), 20px);
+  position: relative;
+  overflow: hidden;
+  border-radius: 32px;
+  padding: 1.5rem;
+  box-shadow:
+    $shadow-soft,
+    0 0 80px rgba(115, 236, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 30%),
+      radial-gradient(circle at 20% 15%, rgba($c-accent, 0.1), transparent 28%),
+      radial-gradient(circle at 80% 15%, rgba($c-accent-warm, 0.1), transparent 28%);
+    pointer-events: none;
+  }
+}
+
+.mockup {
+  position: relative;
+  z-index: 1;
+  border-radius: 24px;
+  overflow: hidden;
+  background: rgba(5, 9, 19, 0.6);
+  aspect-ratio: 4 / 3;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.9;
+  }
+}
+
+.statusBadge {
+  position: absolute;
+  top: 2rem;
+  right: 2rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 2.8rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(5, 9, 19, 0.85);
+  backdrop-filter: blur(12px);
+  color: $c-white-80;
+  font-weight: 700;
+  font-size: 0.88rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.statusDot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background: $c-accent-green;
+  box-shadow: 0 0 0 0 rgba($c-accent-green, 0.5);
+  animation: pulse 1.8s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba($c-accent-green, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba($c-accent-green, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba($c-accent-green, 0);
+  }
+}
+
+// Responsive
+@media (min-width: 1024px) {
+  .hero {
+    padding-top: calc(#{$header-height} + 2rem);
+    min-height: calc(100svh - #{$header-height});
+    display: flex;
+    align-items: center;
+  }
+
+  .grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: 4rem;
+    align-items: center;
+  }
+
+  .copyColumn {
+    padding-top: 0;
+  }
+
+  .titleLead {
+    font-size: clamp(4rem, 5.5vw, 5.8rem);
+  }
+
+  .titleAccent {
+    font-size: clamp(3.8rem, 5.2vw, 5.5rem);
+  }
+}
+
+@media (max-width: 1023px) {
+  .hero {
+    padding-top: calc(#{$header-height} + 2rem);
+  }
+
+  .copyColumn :global(.eyebrow) {
+    display: none;
+  }
+
+  .grid {
+    gap: 2rem;
+  }
+
+  .titleLead {
+    font-size: clamp(3rem, 14vw, 4.2rem);
+  }
+
+  .titleAccent {
+    font-size: clamp(2.9rem, 13vw, 4rem);
+  }
+
+  .lead {
+    font-size: 1.04rem;
+  }
+
+  .trustPoints {
+    gap: 0.75rem;
+  }
+
+  .trustPoint {
+    font-size: 0.95rem;
+  }
+
+  .actions {
+    gap: 0.8rem;
+  }
+
+  .textAction {
+    min-height: auto;
+    font-size: 0.92rem;
+  }
+
+  .statusBadge {
+    top: 1.5rem;
+    right: 1.5rem;
+    min-height: 2.5rem;
+    padding: 0 0.85rem;
+    font-size: 0.82rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero {
+    padding-bottom: 2rem;
+  }
+
+  .copyColumn {
+    gap: 1.2rem;
+  }
+
+  .title {
+    max-width: 100%;
+  }
+
+  .titleLead {
+    font-size: clamp(2.6rem, 12vw, 3.4rem);
+  }
+
+  .titleAccent {
+    font-size: clamp(2.5rem, 11vw, 3.2rem);
+  }
+
+  .lead {
+    font-size: 1rem;
+  }
+
+  .visualShell {
+    padding: 1rem;
+  }
+
+  .statusBadge {
+    position: static;
+    margin-top: 1rem;
+    width: fit-content;
+  }
+}

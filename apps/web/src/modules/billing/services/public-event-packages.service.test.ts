@@ -51,7 +51,7 @@ describe('publicEventPackagesService', () => {
     const packages = await publicEventPackagesService.list();
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      expect.stringContaining('/public/event-packages'),
+      expect.stringContaining('/public/event-packages?target_audience=direct_customer'),
       expect.objectContaining({
         method: 'GET',
       }),

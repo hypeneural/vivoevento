@@ -5,7 +5,7 @@ namespace App\Modules\ContentModeration\Http\Controllers;
 use App\Modules\ContentModeration\Actions\UpsertEventContentModerationSettingsAction;
 use App\Modules\ContentModeration\Http\Requests\UpsertEventContentModerationSettingsRequest;
 use App\Modules\ContentModeration\Http\Resources\EventContentModerationSettingResource;
-use App\Modules\ContentModeration\Models\EventContentModerationSetting;
+use App\Modules\ContentModeration\Services\ContentModerationSettingsResolver;
 use App\Modules\Events\Models\Event;
 use App\Shared\Http\BaseController;
 use App\Shared\Support\EventAccessService;
@@ -18,13 +18,11 @@ class EventContentModerationSettingsController extends BaseController
         Request $request,
         Event $event,
         EventAccessService $eventAccess,
+        ContentModerationSettingsResolver $resolver,
     ): JsonResponse {
         abort_unless($eventAccess->can($request->user(), $event, 'media.moderate'), 403);
 
-        $settings = $event->contentModerationSettings()->firstOrNew(
-            ['event_id' => $event->id],
-            EventContentModerationSetting::defaultAttributes(),
-        );
+        $settings = $resolver->resolveForEvent($event);
 
         return $this->success(new EventContentModerationSettingResource($settings));
     }

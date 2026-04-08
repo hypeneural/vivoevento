@@ -7,6 +7,7 @@ use App\Modules\MediaProcessing\Actions\FinalizeMediaDecisionAction;
 use App\Modules\MediaProcessing\Events\MediaRejected;
 use App\Modules\MediaProcessing\Enums\ModerationStatus;
 use App\Modules\MediaProcessing\Models\EventMedia;
+use App\Modules\MediaProcessing\Services\MediaEffectiveStateResolver;
 use App\Modules\MediaProcessing\Services\MediaPipelineDegradationPolicy;
 use App\Modules\MediaProcessing\Services\MediaProcessingRunService;
 use App\Modules\MediaProcessing\Services\PipelineFailureClassifier;
@@ -35,7 +36,7 @@ class RunModerationJob implements ShouldBeUnique, ShouldQueue
     public function __construct(
         public readonly int $eventMediaId,
     ) {
-        $this->onQueue('media-fast');
+        $this->onQueue('media-audit');
     }
 
     public function uniqueId(): string
@@ -69,12 +70,13 @@ class RunModerationJob implements ShouldBeUnique, ShouldQueue
             'model_key' => 'decision-matrix-v1',
             'input_ref' => $media->originalStoragePath(),
             'idempotency_key' => "moderation:{$media->id}",
-            'queue_name' => 'media-fast',
+            'queue_name' => 'media-audit',
         ]);
 
         try {
             $previousModerationStatus = $media->moderation_status;
             $media = app(FinalizeMediaDecisionAction::class)->execute($media);
+            $resolvedState = app(MediaEffectiveStateResolver::class)->resolve($media);
 
             $runService->finishStage($run, [
                 'decision_key' => $media->moderation_status?->value,
@@ -83,11 +85,35 @@ class RunModerationJob implements ShouldBeUnique, ShouldQueue
                     'publication_status' => $media->publication_status?->value,
                     'safety_status' => $media->safety_status,
                     'vlm_status' => $media->vlm_status,
+                    'effective_media_state' => $resolvedState['effective_media_state'],
+                    'safety_decision' => $resolvedState['safety_decision'],
+                    'context_decision' => $resolvedState['context_decision'],
+                    'operator_decision' => $resolvedState['operator_decision'],
+                    'publication_decision' => $resolvedState['publication_decision'],
                 ],
                 'metrics_json' => [
                     'event_moderation_mode' => $media->event?->moderation_mode?->value,
+                    'safety_is_blocking' => $resolvedState['safety_is_blocking'],
+                    'context_is_blocking' => $resolvedState['context_is_blocking'],
                 ],
             ]);
+
+            Log::channel((string) config('observability.queue_log_channel', config('logging.default')))
+                ->info('media_pipeline.moderation_resolved', [
+                    'event_media_id' => $media->id,
+                    'moderation_status' => $media->moderation_status?->value,
+                    'publication_status' => $media->publication_status?->value,
+                    'effective_media_state' => $resolvedState['effective_media_state'],
+                    'safety_status' => $media->safety_status,
+                    'safety_decision' => $resolvedState['safety_decision'],
+                    'safety_is_blocking' => $resolvedState['safety_is_blocking'],
+                    'vlm_status' => $media->vlm_status,
+                    'context_decision' => $resolvedState['context_decision'],
+                    'context_is_blocking' => $resolvedState['context_is_blocking'],
+                    'operator_decision' => $resolvedState['operator_decision'],
+                    'publication_decision' => $resolvedState['publication_decision'],
+                    'decision_source' => $media->decision_source?->value,
+                ]);
 
             if ($previousModerationStatus !== ModerationStatus::Rejected && $media->moderation_status === ModerationStatus::Rejected) {
                 event(MediaRejected::fromMedia($media));
@@ -132,7 +158,7 @@ class RunModerationJob implements ShouldBeUnique, ShouldQueue
     public function tags(): array
     {
         return [
-            'queue:media-fast',
+            'queue:media-audit',
             'pipeline:moderation',
             "event_media:{$this->eventMediaId}",
         ];
@@ -143,7 +169,7 @@ class RunModerationJob implements ShouldBeUnique, ShouldQueue
         Log::channel((string) config('observability.queue_log_channel', config('logging.default')))
             ->error('media_pipeline.job_failed', [
                 'job' => static::class,
-                'queue' => 'media-fast',
+                'queue' => 'media-audit',
                 'stage' => 'moderation',
                 'event_media_id' => $this->eventMediaId,
                 'exception_class' => $exception::class,

@@ -411,6 +411,12 @@ class RUMManager {
   private sendMetrics(metrics: RUMMetric[]): void {
     if (typeof navigator === 'undefined') return;
     
+    // Only send in production or when analytics endpoint is available
+    if (!import.meta.env.PROD) {
+      console.log('[RUM] Metrics (dev mode, not sent):', metrics);
+      return;
+    }
+    
     const body = JSON.stringify({
       metrics,
       session: {

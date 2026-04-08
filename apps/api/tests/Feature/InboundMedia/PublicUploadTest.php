@@ -104,7 +104,56 @@ it('accepts multiple public image uploads for an active live event', function ()
         ->and($storedMedia->every(fn (EventMedia $media) => $media->face_index_status === 'skipped'))->toBeTrue();
 
     Queue::assertPushed(GenerateMediaVariantsJob::class, 2);
-    Queue::assertPushed(GenerateMediaVariantsJob::class, fn (GenerateMediaVariantsJob $job) => $job->queue === 'media-fast');
+    Queue::assertPushed(GenerateMediaVariantsJob::class, fn (GenerateMediaVariantsJob $job) => $job->queue === 'media-variants');
+});
+
+it('accepts a single public video upload for an active live event', function () {
+    Storage::fake('public');
+    Queue::fake();
+
+    $event = Event::factory()->active()->create([
+        'moderation_mode' => 'manual',
+    ]);
+
+    EventModule::create([
+        'event_id' => $event->id,
+        'module_key' => 'live',
+        'is_enabled' => true,
+    ]);
+
+    $mp4Header = "\x00\x00\x00\x18\x66\x74\x79\x70\x69\x73\x6F\x6D\x00\x00\x02\x00\x69\x73\x6F\x6D\x69\x73\x6F\x32";
+    $tmpPath = tempnam(sys_get_temp_dir(), 'public_mp4_');
+    file_put_contents($tmpPath, $mp4Header . str_repeat("\x00", 1024));
+
+    $file = new UploadedFile($tmpPath, 'entrada.mp4', 'video/mp4', null, true);
+
+    $response = $this->withHeaders(['Accept' => 'application/json'])->post(
+        "/api/v1/public/events/{$event->upload_slug}/upload",
+        [
+            'sender_name' => 'Marina',
+            'caption' => 'Video da pista',
+            'file' => $file,
+        ]
+    );
+
+    $this->assertApiSuccess($response, 201);
+    $response->assertJsonPath('data.uploaded_count', 1);
+    $response->assertJsonPath('data.moderation', 'pending');
+
+    $media = EventMedia::query()->where('event_id', $event->id)->latest('id')->first();
+
+    expect($media)->not->toBeNull()
+        ->and($media?->media_type)->toBe('video')
+        ->and($media?->mime_type)->toBe('video/mp4')
+        ->and($media?->original_disk)->toBe('public')
+        ->and($media?->client_filename)->toBe('entrada.mp4');
+
+    Storage::disk('public')->assertExists($media->original_path);
+
+    Queue::assertPushed(GenerateMediaVariantsJob::class, 1);
+    Queue::assertPushed(GenerateMediaVariantsJob::class, fn (GenerateMediaVariantsJob $job) => $job->queue === 'media-variants');
+
+    @unlink($tmpPath);
 });
 
 it('marks uploaded media with queued face indexing when face search is enabled', function () {
@@ -142,7 +191,7 @@ it('marks uploaded media with queued face indexing when face search is enabled',
     expect($media)->not->toBeNull()
         ->and($media?->face_index_status)->toBe('queued');
 
-    Queue::assertPushed(GenerateMediaVariantsJob::class, fn (GenerateMediaVariantsJob $job) => $job->queue === 'media-fast');
+    Queue::assertPushed(GenerateMediaVariantsJob::class, fn (GenerateMediaVariantsJob $job) => $job->queue === 'media-variants');
 });
 
 it('shows a closed state and rejects uploads when the event is not available', function () {

@@ -5,34 +5,41 @@ namespace App\Modules\MediaProcessing\Actions;
 use App\Modules\MediaProcessing\Enums\MediaDecisionSource;
 use App\Modules\MediaProcessing\Enums\ModerationStatus;
 use App\Modules\MediaProcessing\Models\EventMedia;
+use Illuminate\Support\Facades\DB;
 
 class FinalizeMediaDecisionAction
 {
     public function execute(EventMedia $media): EventMedia
     {
-        $media->loadMissing('event.faceSearchSettings', 'event.mediaIntelligenceSettings', 'event.contentModerationSettings');
+        return DB::transaction(function () use ($media): EventMedia {
+            $lockedMedia = EventMedia::query()
+                ->whereKey($media->getKey())
+                ->lockForUpdate()
+                ->with(['event.faceSearchSettings', 'event.mediaIntelligenceSettings', 'event.contentModerationSettings'])
+                ->first();
 
-        if (! $media->event) {
-            return $media;
-        }
+            if (! $lockedMedia || ! $lockedMedia->event) {
+                return $media->fresh(['event', 'variants', 'inboundMessage']) ?? $media;
+            }
 
-        $updates = $this->normalizedStatuses($media);
-        $nextModerationStatus = $this->nextModerationStatus($media, $updates);
-        $nextDecisionSource = $this->nextDecisionSource($media, $updates);
+            $updates = $this->normalizedStatuses($lockedMedia);
+            $nextModerationStatus = $this->nextModerationStatus($lockedMedia, $updates);
+            $nextDecisionSource = $this->nextDecisionSource($lockedMedia, $updates);
 
-        if ($nextModerationStatus && $media->moderation_status !== $nextModerationStatus) {
-            $updates['moderation_status'] = $nextModerationStatus;
-        }
+            if ($nextModerationStatus && $lockedMedia->moderation_status !== $nextModerationStatus) {
+                $updates['moderation_status'] = $nextModerationStatus;
+            }
 
-        if ($nextDecisionSource && $media->decision_source !== $nextDecisionSource) {
-            $updates['decision_source'] = $nextDecisionSource;
-        }
+            if ($nextDecisionSource && $lockedMedia->decision_source !== $nextDecisionSource) {
+                $updates['decision_source'] = $nextDecisionSource;
+            }
 
-        if ($updates !== []) {
-            $media->forceFill($updates)->save();
-        }
+            if ($updates !== []) {
+                $lockedMedia->forceFill($updates)->save();
+            }
 
-        return $media->fresh(['event', 'variants', 'inboundMessage']);
+            return $lockedMedia->fresh(['event', 'variants', 'inboundMessage']);
+        }, 3);
     }
 
     private function normalizedStatuses(EventMedia $media): array

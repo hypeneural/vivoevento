@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -40,9 +40,23 @@ vi.mock('../api', () => ({
   runEventWallAction: vi.fn(),
 }));
 
-vi.mock('../hooks/useWallManagerRealtime', () => ({
-  useWallManagerRealtime: () => 'connected',
+vi.mock('../hooks/useWallRealtimeSync', () => ({
+  useWallRealtimeSync: () => 'connected',
   realtimeLabel: () => 'Atualizacao ao vivo ativa',
+}));
+
+vi.mock('../hooks/useWallPollingFallback', () => ({
+  useWallPollingFallback: () => ({
+    isPollingFallbackActive: false,
+    eventIntervalMs: false,
+    settingsIntervalMs: false,
+    insightsIntervalMs: false,
+    diagnosticsIntervalMs: false,
+  }),
+}));
+
+vi.mock('@/hooks/use-mobile', () => ({
+  useIsMobile: () => false,
 }));
 
 vi.mock('@/hooks/use-toast', () => ({
@@ -281,8 +295,10 @@ describe('EventWallManagerPage', () => {
           position: 1,
           eta_seconds: 0,
           item_id: 'media_1',
+          preview_url: 'https://cdn.example.com/upcoming-ana.jpg',
           sender_name: 'Ana',
           sender_key: 'sender-ana',
+          source_type: 'upload',
           duplicate_cluster_key: null,
           is_featured: false,
           is_replay: false,
@@ -292,8 +308,10 @@ describe('EventWallManagerPage', () => {
           position: 2,
           eta_seconds: 8,
           item_id: 'media_2',
+          preview_url: null,
           sender_name: 'Pedro',
           sender_key: 'sender-pedro',
+          source_type: 'whatsapp',
           duplicate_cluster_key: null,
           is_featured: false,
           is_replay: false,
@@ -340,15 +358,24 @@ describe('EventWallManagerPage', () => {
     });
     expect(screen.getByText(/Total de midias/i)).toBeInTheDocument();
     expect(screen.getByText(/Ultimas chegadas/i)).toBeInTheDocument();
+    expect(screen.getByText(/Previa do rascunho/i)).toBeInTheDocument();
     expect(await screen.findByText(/Diagnostico operacional/i)).toBeInTheDocument();
-    expect(screen.getByText(/Previsao da fila/i)).toBeInTheDocument();
     expect(screen.getByText(/Tela player-alpha/i)).toBeInTheDocument();
 
     await waitFor(() => {
       expect(simulateEventWallMock).toHaveBeenCalled();
     });
 
+    const aoVivoTab = screen.getByRole('tab', { name: /Ao vivo/i });
+
+    await act(async () => {
+      aoVivoTab.focus();
+      fireEvent.keyDown(aoVivoTab, { key: 'ArrowRight' });
+      await Promise.resolve();
+    });
+
     expect(await screen.findByText(/Ana/)).toBeInTheDocument();
+    expect(screen.getAllByText(/^Upload$/i).length).toBeGreaterThan(0);
     expect(await screen.findByText(/55s/)).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getAllByText(/Saudavel/i).length).toBeGreaterThan(0);
@@ -370,6 +397,82 @@ describe('EventWallManagerPage', () => {
     expect(screen.getAllByText(/Carla/i).length).toBeGreaterThan(0);
   }, 15000);
 
+  it('abre o detalhe lateral da midia recente selecionada', async () => {
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', {
+      name: /Selecionar midia recente de Carla/i,
+    }));
+
+    fireEvent.click(await screen.findByRole('button', {
+      name: /Ver detalhes da midia selecionada/i,
+    }));
+
+    expect(await screen.findByText(/Detalhes da midia recente/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Carla/i).length).toBeGreaterThan(0);
+  }, 15000);
+
+  it('navega pelos comandos principais do toolbar com as setas', async () => {
+    renderPage();
+
+    const voltar = await screen.findByRole('link', { name: /Voltar/i });
+    const abrirTelao = screen.getByRole('button', { name: /Abrir telao/i });
+    const pausar = screen.getByRole('button', { name: /^Pausar$/i });
+
+    voltar.focus();
+    fireEvent.keyDown(voltar, { key: 'ArrowRight' });
+    expect(abrirTelao).toHaveFocus();
+
+    fireEvent.keyDown(abrirTelao, { key: 'ArrowRight' });
+    expect(pausar).toHaveFocus();
+  }, 15000);
+
+  it('usa ativacao automatica nas tabs do palco', async () => {
+    renderPage();
+
+    const aoVivoTab = await screen.findByRole('tab', { name: /Ao vivo/i });
+
+    await act(async () => {
+      aoVivoTab.focus();
+      fireEvent.keyDown(aoVivoTab, { key: 'ArrowRight' });
+      await Promise.resolve();
+    });
+
+    const proximasTab = await screen.findByRole('tab', { name: /Proximas fotos/i });
+
+    await waitFor(() => {
+      expect(proximasTab).toHaveAttribute('aria-selected', 'true');
+    });
+  }, 15000);
+
+  it('usa ativacao manual nas tabs do inspector', async () => {
+    renderPage();
+
+    const filaTab = await screen.findByRole('tab', { name: /Fila/i });
+
+    await act(async () => {
+      filaTab.focus();
+      fireEvent.keyDown(filaTab, { key: 'ArrowRight' });
+      await Promise.resolve();
+    });
+
+    const aparenciaTab = await screen.findByRole('tab', { name: /Aparencia/i });
+
+    expect(aparenciaTab).toHaveFocus();
+    expect(aparenciaTab).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getAllByText(/Comportamento base/i).length).toBeGreaterThan(0);
+
+    await act(async () => {
+      fireEvent.keyDown(aparenciaTab, { key: 'Enter' });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(aparenciaTab).toHaveAttribute('aria-selected', 'true');
+    });
+    expect(screen.getAllByText(/Estilo da exibicao/i).length).toBeGreaterThan(0);
+  }, 15000);
+
   it('sends a player command from the diagnostics panel', async () => {
     renderPage();
 
@@ -383,6 +486,13 @@ describe('EventWallManagerPage', () => {
 
   it('renders the sponsor ads section and uploads a new creative', async () => {
     renderPage();
+
+    const anunciosTab = await screen.findByRole('tab', { name: /Anuncios/i });
+    fireEvent.click(anunciosTab);
+
+    await waitFor(() => {
+      expect(anunciosTab).toHaveAttribute('aria-selected', 'true');
+    });
 
     expect(await screen.findByText(/Patrocinadores no telao/i)).toBeInTheDocument();
     expect(await screen.findByText(/Patrocinador 1/i)).toBeInTheDocument();
@@ -409,6 +519,13 @@ describe('EventWallManagerPage', () => {
   it('reorders sponsor creatives from the wall manager', async () => {
     renderPage();
 
+    const anunciosTab = await screen.findByRole('tab', { name: /Anuncios/i });
+    fireEvent.click(anunciosTab);
+
+    await waitFor(() => {
+      expect(anunciosTab).toHaveAttribute('aria-selected', 'true');
+    });
+
     expect(await screen.findByText(/Patrocinador 1/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Descer anuncio 1/i }));
@@ -420,6 +537,13 @@ describe('EventWallManagerPage', () => {
 
   it('persists sponsor scheduling settings from the wall manager', async () => {
     renderPage();
+
+    const anunciosTab = await screen.findByRole('tab', { name: /Anuncios/i });
+    fireEvent.click(anunciosTab);
+
+    await waitFor(() => {
+      expect(anunciosTab).toHaveAttribute('aria-selected', 'true');
+    });
 
     expect(await screen.findByText(/Patrocinador 1/i)).toBeInTheDocument();
 
@@ -450,6 +574,13 @@ describe('EventWallManagerPage', () => {
 
   it('removes sponsor creatives from the wall manager', async () => {
     renderPage();
+
+    const anunciosTab = await screen.findByRole('tab', { name: /Anuncios/i });
+    fireEvent.click(anunciosTab);
+
+    await waitFor(() => {
+      expect(anunciosTab).toHaveAttribute('aria-selected', 'true');
+    });
 
     expect(await screen.findByText(/Patrocinador 1/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Remover anuncio 1/i }));

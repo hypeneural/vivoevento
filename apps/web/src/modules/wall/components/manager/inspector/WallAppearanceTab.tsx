@@ -1,0 +1,195 @@
+import { Settings } from 'lucide-react';
+
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import type { ApiWallOptionsResponse, ApiWallSettings } from '@/lib/api-types';
+
+import { HelpLabel, HelpTooltip } from '../../WallManagerHelp';
+import { WallManagerSection } from '../../WallManagerSection';
+import { WALL_SLIDER_FIELDS, WALL_TOGGLE_FIELDS } from '../../../manager-config';
+
+type UpdateDraft = <K extends keyof ApiWallSettings>(key: K, value: ApiWallSettings[K]) => void;
+
+interface WallAppearanceTabProps {
+  wallSettings: ApiWallSettings;
+  options: ApiWallOptionsResponse;
+  onDraftChange: UpdateDraft;
+}
+
+export function WallAppearanceTab({
+  wallSettings,
+  options,
+  onDraftChange,
+}: WallAppearanceTabProps) {
+  return (
+    <>
+      <WallManagerSection
+        title={(
+          <span className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Ajustes da exibicao
+            <HelpTooltip helpKey="slideshowSection" />
+          </span>
+        )}
+        description="As alteracoes abaixo ficam neste aparelho ate voce tocar em salvar. Isso ajuda quem opera no celular e funciona melhor em internet lenta."
+      >
+        <div className="space-y-5">
+          {WALL_SLIDER_FIELDS.map((field) => {
+            const settingValue = wallSettings[field.key] as number;
+
+            return (
+              <div key={field.key}>
+                <HelpLabel helpKey={field.helpKey}>{field.label}</HelpLabel>
+                <div className="mt-2 flex items-center gap-3">
+                  <Slider
+                    value={[field.toControlValue(settingValue)]}
+                    min={field.min}
+                    max={field.max}
+                    step={field.step}
+                    onValueChange={([value]) => onDraftChange(field.key, field.fromControlValue(value))}
+                    className="flex-1"
+                  />
+                  <span className="w-12 text-right text-sm font-medium">{field.formatValue(settingValue)}</span>
+                </div>
+              </div>
+            );
+          })}
+
+          {WALL_TOGGLE_FIELDS.map((field) => (
+            <div key={field.key} className="flex items-center justify-between gap-3">
+              <div>
+                <HelpLabel helpKey={field.helpKey}>{field.label}</HelpLabel>
+                <p className="text-[11px] text-muted-foreground">{field.description}</p>
+              </div>
+              <Switch
+                checked={wallSettings[field.key] as boolean}
+                onCheckedChange={(checked) => onDraftChange(field.key, checked)}
+              />
+            </div>
+          ))}
+
+          {wallSettings.show_neon ? (
+            <div className="grid gap-4 rounded-2xl border border-border/60 bg-background/60 p-4 sm:grid-cols-[minmax(0,1fr)_96px]">
+              <div className="space-y-2">
+                <HelpLabel helpKey="neonText" className="text-sm">Texto da chamada</HelpLabel>
+                <Input
+                  value={wallSettings.neon_text ?? ''}
+                  onChange={(event) => onDraftChange('neon_text', event.target.value)}
+                  placeholder="Compartilhe o melhor momento da noite"
+                />
+              </div>
+              <div className="space-y-2">
+                <HelpLabel helpKey="neonColor" className="text-sm">Cor da chamada</HelpLabel>
+                <Input
+                  type="color"
+                  value={wallSettings.neon_color ?? '#ffffff'}
+                  onChange={(event) => onDraftChange('neon_color', event.target.value)}
+                  className="h-11 w-20 p-1"
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </WallManagerSection>
+
+      <WallManagerSection
+        title={(
+          <span className="flex items-center gap-2">
+            Visual e troca de fotos
+            <HelpTooltip helpKey="layoutSection" />
+          </span>
+        )}
+        description="Escolha aqui o estilo de exibicao e a animacao de troca entre as midias."
+      >
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <HelpLabel helpKey="layout" className="text-sm">Estilo da exibicao</HelpLabel>
+            <Select value={wallSettings.layout} onValueChange={(value) => onDraftChange('layout', value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o estilo" />
+              </SelectTrigger>
+              <SelectContent>
+                {options.layouts.map((layout) => (
+                  <SelectItem key={layout.value} value={layout.value}>{layout.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <HelpLabel helpKey="transition" className="text-sm">Animacao de troca</HelpLabel>
+            <Select
+              value={wallSettings.transition_effect}
+              onValueChange={(value) => onDraftChange('transition_effect', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a animacao" />
+              </SelectTrigger>
+              <SelectContent>
+                {options.transitions.map((transition) => (
+                  <SelectItem key={transition.value} value={transition.value}>{transition.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <HelpLabel helpKey="orientation" className="text-sm">Orientacao aceita</HelpLabel>
+            <Select
+              value={wallSettings.accepted_orientation ?? 'all'}
+              onValueChange={(value) => onDraftChange('accepted_orientation', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a orientacao" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as orientacoes</SelectItem>
+                <SelectItem value="landscape">Apenas paisagem (horizontal)</SelectItem>
+                <SelectItem value="portrait">Apenas retrato (vertical)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              Filtra quais midias aparecem no telao por orientacao. Midias quadradas passam em qualquer filtro.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <HelpLabel helpKey="sideThumbnails">Miniaturas laterais</HelpLabel>
+              <p className="text-[11px] text-muted-foreground">
+                Exibe uma faixa com as proximas midias na lateral do telao, mantendo o publico engajado.
+              </p>
+            </div>
+            <Switch
+              checked={wallSettings.show_side_thumbnails ?? true}
+              onCheckedChange={(checked) => onDraftChange('show_side_thumbnails', checked)}
+            />
+          </div>
+        </div>
+      </WallManagerSection>
+
+      <WallManagerSection
+        title={(
+          <span className="flex items-center gap-2">
+            Mensagem quando nao ha fotos
+            <HelpTooltip helpKey="idleSection" />
+          </span>
+        )}
+        description="Use este texto para orientar o publico quando o telao ainda estiver esperando novas midias."
+      >
+        <div className="space-y-2">
+          <HelpLabel helpKey="instructions" className="text-sm">Texto de espera</HelpLabel>
+          <Textarea
+            value={wallSettings.instructions_text ?? ''}
+            onChange={(event) => onDraftChange('instructions_text', event.target.value)}
+            className="min-h-[120px]"
+            placeholder="Envie sua foto para aparecer no telao em tempo real."
+          />
+        </div>
+      </WallManagerSection>
+    </>
+  );
+}

@@ -36,6 +36,10 @@ class EventMediaSafetyEvaluationFactory extends Factory
                 'provider' => 'noop',
             ],
             'request_payload_json' => null,
+            'normalized_text_context' => null,
+            'normalized_text_context_mode' => null,
+            'policy_snapshot_json' => null,
+            'policy_sources_json' => null,
             'completed_at' => now(),
         ];
     }

@@ -8,6 +8,15 @@ use Illuminate\Validation\Validator;
 
 class UpsertEventContentModerationSettingsRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('objective_safety_scope') && ! $this->has('analysis_scope')) {
+            $this->merge([
+                'analysis_scope' => $this->input('objective_safety_scope'),
+            ]);
+        }
+    }
+
     public function authorize(): bool
     {
         return $this->user()?->can('media.moderate') ?? false;
@@ -16,19 +25,27 @@ class UpsertEventContentModerationSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'enabled' => ['required', 'boolean'],
-            'provider_key' => ['required', 'string', 'in:openai,noop'],
-            'mode' => ['nullable', 'string', 'in:enforced,observe_only'],
-            'threshold_version' => ['nullable', 'string', 'max:100'],
-            'fallback_mode' => ['required', 'string', 'in:review,block'],
-            'hard_block_thresholds' => ['required', 'array'],
-            'review_thresholds' => ['required', 'array'],
+            'inherit_global' => ['sometimes', 'boolean'],
+            'enabled' => ['sometimes', 'boolean'],
+            'provider_key' => ['sometimes', 'string', 'in:openai,noop'],
+            'mode' => ['sometimes', 'string', 'in:enforced,observe_only'],
+            'threshold_version' => ['sometimes', 'string', 'max:100'],
+            'fallback_mode' => ['sometimes', 'string', 'in:review,block'],
+            'analysis_scope' => ['sometimes', 'string', 'in:image_only,image_and_text_context'],
+            'objective_safety_scope' => ['sometimes', 'string', 'in:image_only,image_and_text_context'],
+            'normalized_text_context_mode' => ['sometimes', 'string', 'in:none,body_only,caption_only,body_plus_caption,operator_summary'],
+            'hard_block_thresholds' => ['sometimes', 'array'],
+            'review_thresholds' => ['sometimes', 'array'],
         ];
     }
 
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
+            if ((bool) $this->boolean('inherit_global')) {
+                return;
+            }
+
             $thresholdGroups = [
                 'hard_block_thresholds' => (array) $this->input('hard_block_thresholds', []),
                 'review_thresholds' => (array) $this->input('review_thresholds', []),
@@ -37,6 +54,10 @@ class UpsertEventContentModerationSettingsRequest extends FormRequest
             $knownCategories = array_keys(EventContentModerationSetting::defaultReviewThresholds());
 
             foreach ($thresholdGroups as $groupKey => $thresholds) {
+                if (! $this->has($groupKey)) {
+                    continue;
+                }
+
                 foreach ($knownCategories as $category) {
                     $value = $thresholds[$category] ?? null;
 

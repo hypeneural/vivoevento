@@ -2,6 +2,7 @@
 
 namespace App\Modules\Billing\Http\Controllers;
 
+use App\Modules\Billing\Enums\EventPackageAudience;
 use App\Modules\Billing\Http\Requests\ListEventPackagesRequest;
 use App\Modules\Billing\Http\Resources\EventPackageResource;
 use App\Modules\Billing\Models\EventPackage;
@@ -33,7 +34,7 @@ class EventPackageController extends BaseController
     public function publicIndex(ListEventPackagesRequest $request): JsonResponse
     {
         $packages = (new ListEventPackagesQuery(
-            targetAudience: $request->targetAudience(),
+            targetAudience: $request->targetAudience() ?? EventPackageAudience::DirectCustomer,
             activeOnly: true,
         ))->query()->get();
 

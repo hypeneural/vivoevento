@@ -1,5 +1,5 @@
 /**
- * WallPlayerRoot — The main wall player composition.
+ * WallPlayerRoot - The main wall player composition.
  *
  * Renders the appropriate screen based on player state:
  * - booting: loading spinner
@@ -15,7 +15,6 @@
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { useWallPlayer } from '../hooks/useWallPlayer';
 import { usePerformanceMode } from '../hooks/usePerformanceMode';
-import { useAdEngine } from '../hooks/useAdEngine';
 import { resolveRenderableLayout, shouldRenderFloatingCaption } from '../engine/layoutStrategy';
 import { WALL_CAPTION_PANEL, WALL_TEXT_PRIMARY } from '../design/tokens';
 import AdOverlay from './AdOverlay';
@@ -56,27 +55,17 @@ export function WallPlayerRoot({ code }: { code: string }) {
     errorMessage,
     connectionStatus,
     lastSyncAt,
-    ads,
+    handleAdFinished,
   } = useWallPlayer(code);
 
   const { reducedEffects, modeLabel } = usePerformanceMode();
   const { visible: toastVisible, message: toastMessage } = useNewPhotoToast();
-
-  // Ad engine — sits alongside the main engine
-  const adEngine = useAdEngine({
-    mode: state.settings?.ad_mode ?? 'disabled',
-    frequency: state.settings?.ad_frequency ?? 5,
-    intervalMinutes: state.settings?.ad_interval_minutes ?? 3,
-    ads,
-    currentItemId: state.currentItemId,
-    isPlaying: state.status === 'playing',
-  });
+  const isAdShowing = Boolean(state.currentAd);
 
   const activeLayout = currentItem && state.settings
     ? resolveRenderableLayout(state.settings.layout, currentItem)
     : null;
 
-  // Multi-item layouts don't show side thumbnails
   const isMultiItemLayout = activeLayout === 'carousel' || activeLayout === 'mosaic' || activeLayout === 'grid';
 
   const sideThumbs = useSideThumbnails(
@@ -86,13 +75,13 @@ export function WallPlayerRoot({ code }: { code: string }) {
       enabled:
         state.status === 'playing'
         && (state.settings?.show_side_thumbnails ?? false)
-        && !isMultiItemLayout,
+        && !isMultiItemLayout
+        && !isAdShowing,
     },
   );
 
   return (
     <PlayerShell backgroundUrl={state.settings?.background_url}>
-      {/* Branding overlay */}
       <BrandingOverlay
         showBranding={state.settings?.show_branding ?? true}
         showQr={
@@ -106,20 +95,17 @@ export function WallPlayerRoot({ code }: { code: string }) {
         neonText={state.settings?.neon_text}
         neonColor={state.settings?.neon_color}
         partnerLogoUrl={state.settings?.partner_logo_url}
-        showSenderCredit={state.settings?.show_sender_credit ?? false}
-        senderCredit={currentItem?.sender_name}
+        showSenderCredit={!isAdShowing && (state.settings?.show_sender_credit ?? false)}
+        senderCredit={isAdShowing ? null : currentItem?.sender_name}
         syncLabel={resolveSyncLabel(isSyncing, connectionStatus, modeLabel)}
         reducedMotion={reducedEffects}
       />
 
-      {/* Connection status */}
       <ConnectionOverlay
         connectionStatus={connectionStatus}
         isSyncing={isSyncing}
         lastSyncAt={lastSyncAt}
       />
-
-      {/* ─── State-based rendering ────────────────────────── */}
 
       {state.status === 'expired' || state.status === 'stopped' ? (
         <ExpiredScreen
@@ -153,28 +139,28 @@ export function WallPlayerRoot({ code }: { code: string }) {
         />
       ) : currentItem && state.settings ? (
         <>
-          {adEngine.currentAd ? (
+          {state.currentAd ? (
             <AdOverlay
-              ad={adEngine.currentAd}
-              onFinished={adEngine.onAdFinished}
+              ad={state.currentAd}
+              onFinished={handleAdFinished}
               reducedMotion={reducedEffects}
             />
           ) : (
             <LayoutRenderer media={currentItem} settings={state.settings} reducedMotion={reducedEffects} allItems={state.items} />
           )}
-          <FloatingCaption
-            layout={activeLayout ?? 'fullscreen'}
-            text={currentItem.caption}
-          />
-          {/* Featured badge */}
-          <FeaturedBadge isFeatured={currentItem.is_featured} reducedMotion={reducedEffects} />
-          {/* Side thumbnails */}
+          {!isAdShowing ? (
+            <FloatingCaption
+              layout={activeLayout ?? 'fullscreen'}
+              text={currentItem.caption}
+            />
+          ) : null}
+          {!isAdShowing ? (
+            <FeaturedBadge isFeatured={currentItem.is_featured} reducedMotion={reducedEffects} />
+          ) : null}
           {sideThumbs.enabled ? (
             <SideThumbnails leftItems={sideThumbs.leftItems} rightItems={sideThumbs.rightItems} />
           ) : null}
-          {/* New photo toast */}
           <NewPhotoToast visible={toastVisible} message={toastMessage} reducedMotion={reducedEffects} />
-          {/* Paused badge */}
           {state.status === 'paused' ? (
             <div className="pointer-events-none absolute inset-x-0 top-[max(16px,2vh)] z-30 flex justify-center px-[max(16px,2vw)]">
               <div className="rounded-full border border-amber-400/30 bg-amber-500/15 px-5 py-2 text-sm font-medium uppercase tracking-[0.3em] text-amber-100 shadow-[0_16px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl">

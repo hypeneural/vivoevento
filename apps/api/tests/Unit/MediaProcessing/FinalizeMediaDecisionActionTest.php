@@ -146,3 +146,35 @@ it('keeps ai moderation waiting for vlm gate when safety is observe_only and alr
         ->and($resolved->decision_source)->toBe(MediaDecisionSource::AiVlm)
         ->and($resolved->vlm_status)->toBe('queued');
 });
+
+it('resolves against the latest persisted media row instead of stale in memory attributes', function () {
+    $event = \App\Modules\Events\Models\Event::factory()->active()->create([
+        'moderation_mode' => 'ai',
+    ]);
+
+    \Database\Factories\EventMediaIntelligenceSettingFactory::new()->gate()->create([
+        'event_id' => $event->id,
+        'enabled' => true,
+    ]);
+
+    $staleMedia = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'moderation_status' => ModerationStatus::Pending->value,
+        'publication_status' => \App\Modules\MediaProcessing\Enums\PublicationStatus::Published->value,
+        'safety_status' => 'queued',
+        'vlm_status' => 'queued',
+        'decision_source' => null,
+    ]);
+
+    EventMedia::query()->whereKey($staleMedia->id)->update([
+        'safety_status' => 'pass',
+        'vlm_status' => 'rejected',
+    ]);
+
+    $resolved = app(FinalizeMediaDecisionAction::class)->execute($staleMedia);
+
+    expect($resolved->safety_status)->toBe('pass')
+        ->and($resolved->vlm_status)->toBe('rejected')
+        ->and($resolved->moderation_status)->toBe(ModerationStatus::Pending)
+        ->and($resolved->decision_source)->toBe(MediaDecisionSource::AiVlm);
+});

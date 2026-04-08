@@ -2,10 +2,8 @@
 
 namespace App\Modules\MediaProcessing\Http\Resources;
 
-use App\Modules\MediaProcessing\Enums\MediaProcessingStatus;
-use App\Modules\MediaProcessing\Enums\ModerationStatus;
-use App\Modules\MediaProcessing\Enums\PublicationStatus;
 use App\Modules\MediaProcessing\Services\MediaAssetUrlService;
+use App\Modules\MediaProcessing\Services\MediaEffectiveStateResolver;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -14,6 +12,7 @@ class EventMediaResource extends JsonResource
     public function toArray(Request $request): array
     {
         $assets = app(MediaAssetUrlService::class);
+        $state = app(MediaEffectiveStateResolver::class)->resolve($this->resource);
 
         return [
             'id' => $this->id,
@@ -32,13 +31,20 @@ class EventMediaResource extends JsonResource
             ),
             'media_type' => $this->media_type,
             'channel' => $this->channel(),
-            'status' => $this->frontendStatus(),
+            'status' => $state['effective_media_state'],
+            'effective_media_state' => $state['effective_media_state'],
             'processing_status' => $this->processing_status?->value,
             'moderation_status' => $this->moderation_status?->value,
             'publication_status' => $this->publication_status?->value,
             'safety_status' => $this->safety_status,
             'face_index_status' => $this->face_index_status,
             'vlm_status' => $this->vlm_status,
+            'safety_decision' => $state['safety_decision'],
+            'safety_is_blocking' => $state['safety_is_blocking'],
+            'context_decision' => $state['context_decision'],
+            'context_is_blocking' => $state['context_is_blocking'],
+            'operator_decision' => $state['operator_decision'],
+            'publication_decision' => $state['publication_decision'],
             'decision_source' => $this->decision_source?->value,
             'decision_overridden_at' => $this->decision_overridden_at?->toIso8601String(),
             'decision_overridden_by_user_id' => $this->decision_overridden_by_user_id,
@@ -97,32 +103,6 @@ class EventMediaResource extends JsonResource
             default => 'upload',
         };
     }
-
-    private function frontendStatus(): string
-    {
-        if ($this->publication_status === PublicationStatus::Published) {
-            return 'published';
-        }
-
-        if ($this->moderation_status === ModerationStatus::Rejected) {
-            return 'rejected';
-        }
-
-        if ($this->moderation_status === ModerationStatus::Approved) {
-            return 'approved';
-        }
-
-        if ($this->moderation_status === ModerationStatus::Pending) {
-            return 'pending_moderation';
-        }
-
-        return match ($this->processing_status) {
-            MediaProcessingStatus::Failed => 'error',
-            MediaProcessingStatus::Downloaded, MediaProcessingStatus::Processed => 'processing',
-            default => 'received',
-        };
-    }
-
     private function orientation(): string
     {
         $width = (int) ($this->width ?? 0);

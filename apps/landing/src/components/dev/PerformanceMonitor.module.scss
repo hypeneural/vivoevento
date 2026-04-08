@@ -11,7 +11,7 @@
   border-radius: 50%;
   background: rgba($c-bg-dark, 0.9);
   backdrop-filter: blur(8px);
-  color: $c-text-primary;
+  color: $c-white;
   font-size: 1.5rem;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -50,7 +50,7 @@
     margin: 0;
     font-size: 0.875rem;
     font-weight: 600;
-    color: $c-text-primary;
+    color: $c-white;
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
@@ -62,14 +62,14 @@
   padding: 0;
   border: none;
   background: transparent;
-  color: rgba($c-text-primary, 0.6);
+  color: $c-white-64;
   font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
   transition: color 0.2s ease;
   
   &:hover {
-    color: $c-text-primary;
+    color: $c-white;
   }
 }
 
@@ -86,12 +86,12 @@
   justify-content: space-between;
   padding: 0.5rem;
   border-radius: 4px;
-  background: rgba($c-text-primary, 0.03);
+  background: rgba($c-white, 0.03);
 }
 
 .label {
   font-weight: 600;
-  color: rgba($c-text-primary, 0.7);
+  color: $c-white-64;
   text-transform: uppercase;
   font-size: 0.75rem;
   letter-spacing: 0.05em;
@@ -109,7 +109,7 @@
   margin-bottom: 1rem;
   padding: 0.75rem;
   border-radius: 4px;
-  background: rgba($c-text-primary, 0.03);
+  background: rgba($c-white, 0.03);
 }
 
 .legendItem {
@@ -117,7 +117,7 @@
   align-items: center;
   gap: 0.375rem;
   font-size: 0.75rem;
-  color: rgba($c-text-primary, 0.6);
+  color: $c-white-64;
 }
 
 .dot {
@@ -133,7 +133,7 @@
   p {
     margin: 0.25rem 0;
     font-size: 0.75rem;
-    color: rgba($c-text-primary, 0.5);
+    color: $c-white-48;
     
     &:first-child {
       margin-top: 0;
@@ -147,9 +147,9 @@
   kbd {
     padding: 0.125rem 0.375rem;
     border-radius: 3px;
-    background: rgba($c-text-primary, 0.1);
+    background: rgba($c-white, 0.1);
     font-family: inherit;
     font-size: 0.7rem;
-    color: $c-text-primary;
+    color: $c-white;
   }
 }

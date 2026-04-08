@@ -27,6 +27,8 @@ class EventContentModerationSettingFactory extends Factory
                 'self_harm' => 0.6,
             ],
             'fallback_mode' => 'review',
+            'analysis_scope' => 'image_and_text_context',
+            'normalized_text_context_mode' => 'body_plus_caption',
             'enabled' => true,
         ];
     }

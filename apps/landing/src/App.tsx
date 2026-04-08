@@ -14,17 +14,14 @@ import { initWebVitalsOptimizations } from "@/utils/webVitals";
 import { initRUM, getRUMConfig } from "@/utils/rum";
 
 // Lazy load seções abaixo da dobra
+// Nova estrutura: 12 seções principais (redução de 16 para 12)
 const HowItWorksSection = lazy(() => import("@/components/HowItWorksSection").then(m => ({ default: m.HowItWorksSection })));
 const CaptureChannelsSection = lazy(() => import("@/components/CaptureChannelsSection").then(m => ({ default: m.CaptureChannelsSection })));
-const PersonaSelector = lazy(() => import("@/components/PersonaSelector").then(m => ({ default: m.PersonaSelector })));
 const ExperienceModulesSection = lazy(() => import("@/components/ExperienceModulesSection"));
-const EcosystemSection = lazy(() => import("@/components/EcosystemSection"));
 const AISafetySection = lazy(() => import("@/components/AISafetySection"));
 const FaceSearchSection = lazy(() => import("@/components/FaceSearchSection"));
-const TechnicalTrustSection = lazy(() => import("@/components/TechnicalTrustSection"));
-const ComparisonSection = lazy(() => import("@/components/ComparisonSection"));
-const TestimonialsSection = lazy(() => import("@/components/TestimonialsSection"));
 const AudienceSection = lazy(() => import("@/components/AudienceSection"));
+const TestimonialsSection = lazy(() => import("@/components/TestimonialsSection"));
 const PricingSection = lazy(() => import("@/components/PricingSection"));
 const FAQSection = lazy(() => import("@/components/FAQSection"));
 const FinalCTASection = lazy(() => import("@/components/FinalCTASection"));
@@ -108,6 +105,8 @@ export default function App() {
               </ErrorBoundary>
 
               {/* Seções abaixo da dobra com lazy loading */}
+              {/* Ordem: Hero → HowItWorks → CaptureChannels → ExperienceModules → AISafety → FaceRecognition → Audience → Testimonials → Pricing → FAQ → FinalCTA */}
+              
               <ErrorBoundary componentName="Como Funciona">
                 <Suspense fallback={<SectionFallback />}>
                   <HowItWorksSection />
@@ -120,21 +119,9 @@ export default function App() {
                 </Suspense>
               </ErrorBoundary>
 
-              <ErrorBoundary componentName="Seletor de Persona">
-                <Suspense fallback={<SectionFallback />}>
-                  <PersonaSelector />
-                </Suspense>
-              </ErrorBoundary>
-
               <ErrorBoundary componentName="Módulos de Experiência">
                 <Suspense fallback={<SectionFallback />}>
                   <ExperienceModulesSection />
-                </Suspense>
-              </ErrorBoundary>
-
-              <ErrorBoundary componentName="Ecossistema">
-                <Suspense fallback={<SectionFallback />}>
-                  <EcosystemSection />
                 </Suspense>
               </ErrorBoundary>
 
@@ -150,27 +137,15 @@ export default function App() {
                 </Suspense>
               </ErrorBoundary>
 
-              <ErrorBoundary componentName="Confiança Técnica">
+              <ErrorBoundary componentName="Para Quem É">
                 <Suspense fallback={<SectionFallback />}>
-                  <TechnicalTrustSection />
-                </Suspense>
-              </ErrorBoundary>
-
-              <ErrorBoundary componentName="Comparação">
-                <Suspense fallback={<SectionFallback />}>
-                  <ComparisonSection />
+                  <AudienceSection />
                 </Suspense>
               </ErrorBoundary>
 
               <ErrorBoundary componentName="Depoimentos" showCTA>
                 <Suspense fallback={<SectionFallback />}>
                   <TestimonialsSection />
-                </Suspense>
-              </ErrorBoundary>
-
-              <ErrorBoundary componentName="Para Quem É">
-                <Suspense fallback={<SectionFallback />}>
-                  <AudienceSection />
                 </Suspense>
               </ErrorBoundary>
 

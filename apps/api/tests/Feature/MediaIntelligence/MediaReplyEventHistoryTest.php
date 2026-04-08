@@ -83,6 +83,10 @@ it('filters real event history by event, preset name, sender query and provider'
             'preset_id' => 10,
             'preset_source' => 'event',
             'instruction_source' => 'event',
+            'normalized_text_context' => 'Texto recebido do convidado',
+            'normalized_text_context_mode' => 'body_only',
+            'context_scope' => 'image_and_text_context',
+            'reply_scope' => 'image_only',
         ],
     ]);
 
@@ -184,6 +188,10 @@ it('shows a real event history entry with prompt context and payloads', function
             'variables' => ['nome_do_evento' => 'Evento Teste'],
             'resolved' => 'Use Evento Teste.',
             'preset_name' => 'Festas vibrantes',
+            'normalized_text_context' => 'Legenda enviada pelo convidado',
+            'normalized_text_context_mode' => 'caption_only',
+            'context_scope' => 'image_only',
+            'reply_scope' => 'image_and_text_context',
         ],
     ]);
 
@@ -212,6 +220,10 @@ it('shows a real event history entry with prompt context and payloads', function
         ->assertJsonPath('data.prompt_resolved', 'Use Evento Teste.')
         ->assertJsonPath('data.prompt_variables.nome_do_evento', 'Evento Teste')
         ->assertJsonPath('data.preset_name', 'Festas vibrantes')
+        ->assertJsonPath('data.normalized_text_context', 'Legenda enviada pelo convidado')
+        ->assertJsonPath('data.normalized_text_context_mode', 'caption_only')
+        ->assertJsonPath('data.context_scope', 'image_only')
+        ->assertJsonPath('data.reply_scope', 'image_and_text_context')
         ->assertJsonPath('data.reply_text', 'Momento especial!')
         ->assertJsonPath('data.request_payload.model', 'openai/gpt-4.1-mini')
         ->assertJsonPath('data.response_payload.reply_text', 'Momento especial!');

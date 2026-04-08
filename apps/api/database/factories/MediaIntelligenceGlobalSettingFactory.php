@@ -11,13 +11,6 @@ class MediaIntelligenceGlobalSettingFactory extends Factory
 
     public function definition(): array
     {
-        return [
-            'reply_text_prompt' => MediaIntelligenceGlobalSetting::defaultReplyTextPrompt(),
-            'reply_text_fixed_templates_json' => [],
-            'reply_prompt_preset_id' => null,
-            'reply_ai_rate_limit_enabled' => false,
-            'reply_ai_rate_limit_max_messages' => 10,
-            'reply_ai_rate_limit_window_minutes' => 10,
-        ];
+        return MediaIntelligenceGlobalSetting::defaultAttributes();
     }
 }

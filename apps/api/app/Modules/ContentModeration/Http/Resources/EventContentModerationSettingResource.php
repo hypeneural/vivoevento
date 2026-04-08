@@ -19,6 +19,10 @@ class EventContentModerationSettingResource extends JsonResource
             'hard_block_thresholds' => $this->hard_block_thresholds_json ?? [],
             'review_thresholds' => $this->review_thresholds_json ?? [],
             'fallback_mode' => $this->fallback_mode,
+            'analysis_scope' => $this->analysis_scope,
+            'objective_safety_scope' => $this->analysis_scope,
+            'normalized_text_context_mode' => $this->normalized_text_context_mode,
+            'inherits_global' => (bool) ($this->inherits_global ?? false),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

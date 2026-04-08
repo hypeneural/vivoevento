@@ -1246,13 +1246,19 @@ Observacao importante:
 
 ## 10.6 Sinal real dos testes automatizados
 
-Resultado desta rodada:
+Resultados validados nesta analise:
 
-- backend:
+- rodada backend focada:
   - `93 passed`
   - `3 failed`
-- frontend:
-  - `17 passed`
+- rodada frontend focada:
+  - `10 passed`
+
+Leitura de consistencia:
+
+- a bateria backend repetiu os mesmos 3 pontos de falha;
+- a bateria frontend focada ficou verde;
+- isso reforca que a principal lacuna atual esta no endurecimento do backend e dos fixtures de provider.
 
 Falhas backend relevantes:
 
@@ -1473,6 +1479,408 @@ Tarefas frontend:
 - testes de toggle `alcool/cigarro`;
 - testes do historico e filtros.
 
+## 11A. Plano Revisado Com Base Na Stack Atual
+
+Este plano revisado substitui a sequencia recomendada do bloco anterior.
+
+Ele reflete melhor:
+
+- a stack real ja existente;
+- a necessidade de resposta quase imediata no fluxo;
+- a necessidade de custo-beneficio em producao;
+- a necessidade de estados consolidados mais fortes;
+- a necessidade de explicacao operacional para usuario leigo.
+
+## IA-MOD-R1 - Separar as camadas e endurecer o estado final da midia
+
+Objetivo:
+
+- separar `Safety objetiva`, `bloqueio contextual`, `decisao operacional` e `publicacao` como camadas tecnicas independentes;
+- calcular um `effective_media_state` coerente para o dominio.
+
+Tarefas:
+
+- manter estados tecnicos por etapa:
+  - `safety_decision`
+  - `context_decision`
+  - `operator_decision`
+  - `publication_decision`
+- criar `effective_media_state` calculado no backend;
+- impedir que a API exponha como `published` uma midia que tenha rejeicao relevante ativa;
+- revisar resources, filtros e labels do painel para usar o estado consolidado.
+
+Status desta rodada:
+
+- [x] resolver backend para `effective_media_state`
+- [x] exposicao de `safety_decision`, `context_decision`, `operator_decision` e `publication_decision`
+- [x] ajuste do `status` do resource para usar estado consolidado
+- [x] cobertura automatizada para conflito `published` + rejeicao contextual bloqueante
+
+Criterio de aceite:
+
+- a trilha tecnica por etapa continua rastreavel;
+- o estado consolidado nunca mascara uma rejeicao relevante.
+
+## IA-MOD-R2 - Resolver a politica em quatro camadas e salvar snapshot versionado
+
+Objetivo:
+
+- transformar a configuracao em politica resolvida, rastreavel e explicavel.
+
+Tarefas:
+
+- suportar estas camadas:
+  - `preset`
+  - `global`
+  - `event_override`
+  - `runtime_override`
+- criar `policy_snapshot_json` com os valores efetivos usados na avaliacao;
+- criar `policy_sources_json` indicando a origem efetiva de cada campo;
+- versionar a politica para auditoria e replay tecnico;
+- restringir `runtime_override` a perfis supervisor/administrador.
+
+Status desta rodada:
+
+- [x] persistencia de `policy_snapshot_json` em `event_media_safety_evaluations`
+- [x] persistencia de `policy_sources_json` em `event_media_safety_evaluations`
+- [x] persistencia de `policy_snapshot_json` em `event_media_vlm_evaluations`
+- [x] persistencia de `policy_sources_json` em `event_media_vlm_evaluations`
+- [x] exposicao de snapshot/source no payload detalhado da midia
+- [x] semantica do snapshot ajustada para manter `provider_key` e `model_key` como politica efetiva, promovendo override apenas quando houve fallback real
+
+Criterio de aceite:
+
+- cada avaliacao guarda a politica efetiva e a origem de cada campo;
+- operador comum ve apenas `Herdando do global` ou `Personalizado`.
+
+## IA-MOD-R3 - Criar configuracao global real de Safety objetiva
+
+Objetivo:
+
+- tirar defaults duros do codigo e administrar Safety como produto.
+
+Tarefas:
+
+- criar `content_moderation_global_settings`;
+- criar action, request, resource e endpoints administrativos;
+- permitir override por evento;
+- explicitar se a analise usa:
+  - `somente imagem`
+  - `imagem + contexto textual`
+- persistir no log o escopo efetivo aplicado.
+
+Status desta rodada:
+
+- [x] tabela `content_moderation_global_settings`
+- [x] model/factory/action/request/resource/controller para configuracao global de safety
+- [x] endpoints administrativos:
+  - `GET /api/v1/content-moderation/global-settings`
+  - `PATCH /api/v1/content-moderation/global-settings`
+- [x] heranca efetiva `global -> evento` no endpoint do evento
+- [x] reset do evento para voltar a herdar o global via `inherit_global=true`
+- [x] runtime do pipeline de safety usando configuracao global quando nao existe override do evento
+- [x] `analysis_scope` inicial para safety objetiva:
+  - `image_only`
+  - `image_and_text_context`
+- [x] log/run result da safety enriquecidos com `input_scope_used`
+
+Validacao desta rodada:
+
+- [x] `ContentModerationGlobalSettingsTest`
+- [x] `ContentModerationSettingsTest`
+- [x] `ContentModerationPipelineTest`
+- [x] `OpenAiContentModerationProviderTest`
+- [x] regressao ampliada das areas tocadas: `113 passed`, `814 assertions`
+
+Criterio de aceite:
+
+- existe configuracao global editavel;
+- evento pode herdar ou sobrepor;
+- o log mostra qual escopo de Safety foi usado.
+
+## IA-MOD-R4 - Separar scopes por camada e normalizar o contexto textual
+
+Objetivo:
+
+- reduzir ruido, aumentar explicabilidade e evitar que `caption` e `body_text` crus contaminem todas as decisoes.
+
+Tarefas:
+
+- separar:
+  - `objective_safety_scope`
+  - `context_scope`
+  - `reply_scope`
+- criar `normalized_text_context_mode` com opcoes:
+  - `none`
+  - `body_only`
+  - `caption_only`
+  - `body_plus_caption`
+  - `operator_summary`
+- persistir `normalized_text_context`;
+- exibir no historico se a decisao usou:
+  - apenas imagem
+  - imagem + texto recebido
+  - imagem + resumo operacional
+
+Status desta rodada:
+
+- [x] alias semantico de `objective_safety_scope` sobre o `analysis_scope` de safety
+- [x] `context_scope` em `event_media_intelligence_settings`
+- [x] `reply_scope` em `event_media_intelligence_settings`
+- [x] `normalized_text_context_mode` em safety global, safety por evento e VLM por evento
+- [x] builder backend para `normalized_text_context`
+- [x] persistencia de `normalized_text_context` e `normalized_text_context_mode` em:
+  - `event_media_safety_evaluations`
+  - `event_media_vlm_evaluations`
+- [x] `prompt_context_json` enriquecido com:
+  - `context_scope`
+  - `reply_scope`
+  - `normalized_text_context`
+  - `normalized_text_context_mode`
+- [x] historico real de respostas expondo escopo e texto normalizado
+
+Validacao desta rodada:
+
+- [x] `NormalizedTextContextBuilderTest`
+- [x] `ContentModerationGlobalSettingsTest`
+- [x] `ContentModerationSettingsTest`
+- [x] `OpenAiContentModerationProviderTest`
+- [x] `ContentModerationPipelineTest`
+- [x] `MediaIntelligenceSettingsTest`
+- [x] `UpsertEventMediaIntelligenceSettingsActionTest`
+- [x] `OpenAiCompatibleVisualReasoningPayloadFactoryTest`
+- [x] `MediaIntelligencePipelineTest`
+- [x] `MediaReplyEventHistoryTest`
+- [x] regressao focal de `R4`: `38 passed`, `250 assertions`
+- [x] regressao ampliada das areas tocadas apos `R4` + `R8`: `176 passed`, `1246 assertions`
+
+Criterio de aceite:
+
+- cada camada usa apenas o escopo configurado para ela;
+- operador consegue entender qual texto entrou ou nao entrou na decisao.
+
+## IA-MOD-R5 - Trocar prompt bruto por politica estruturada + builder backend
+
+Objetivo:
+
+- tornar o bloqueio contextual gerenciavel, barato de operar e menos dependente de prompt livre.
+
+Tarefas:
+
+- criar campos estruturados:
+  - `allow_alcohol`
+  - `allow_tobacco`
+  - `required_people_context`
+  - `blocked_terms_json`
+  - `allowed_exceptions_json`
+  - `freeform_instruction`
+- manter `freeform_instruction` como complementar, nao como regra principal;
+- criar `ContextualModerationPolicyResolver`;
+- criar builder backend do prompt a partir da politica resolvida;
+- mapear presets de produto:
+  - `Casamento equilibrado`
+  - `Casamento rigido`
+  - `Formatura`
+  - `Corporativo restrito`
+  - `Aniversario infantil`
+  - `Homologacao livre`
+
+Criterio de aceite:
+
+- o operador basico consegue configurar o caso principal com preset + poucos toggles;
+- o modo avancado continua disponivel sem exigir prompt livre para regra de negocio basica.
+
+## IA-MOD-R6 - Evoluir o schema contextual e separar elegibilidade de publicacao
+
+Objetivo:
+
+- transformar a resposta contextual em decisao estruturada e realmente operacional.
+
+Tarefas:
+
+- adicionar ao schema:
+  - `reason_code`
+  - `matched_policies`
+  - `matched_exceptions`
+  - `input_scope_used`
+  - `input_types_considered`
+  - `confidence_band`
+  - `publish_eligibility`
+- atualizar parser, DTO, persistencia e resources;
+- separar claramente:
+  - `approve`
+  - `review_only`
+  - `reject`
+- usar `publish_eligibility` para apoiar `effective_media_state`.
+
+Criterio de aceite:
+
+- rejeicao contextual aparece com motivo estruturado e filtravel;
+- casos incertos podem cair em revisao sem serem confundidos com aprovacao plena.
+
+## IA-MOD-R7 - Mover a administracao principal para `IA > Moderacao de midia`
+
+Objetivo:
+
+- colocar a experiencia de configuracao no lugar certo do produto e reduzir complexidade no detalhe do evento.
+
+Tarefas:
+
+- criar pagina dedicada com abas:
+  - `Visao geral`
+  - `Safety objetiva`
+  - `Contexto do evento`
+  - `Historico`
+- criar bloco lateral fixo:
+  - `Politica efetiva agora`
+- no detalhe do evento, deixar apenas:
+  - resumo operacional
+  - status de heranca
+  - CTA `Personalizar politica deste evento`
+- modelar a UI em tres modos:
+  - `Basico`
+  - `Avancado`
+  - `Auditoria`
+
+Criterio de aceite:
+
+- a edicao completa fica centralizada em `IA > Moderacao de midia`;
+- o detalhe do evento deixa de expor configuracao bruta para operador leigo.
+
+## IA-MOD-R8 - Endurecer o backend para producao real
+
+Objetivo:
+
+- garantir rapidez, idempotencia e seguranca sob alta concorrencia.
+
+Tarefas:
+
+- aplicar idempotencia por webhook e anexo;
+- endurecer jobs criticos com:
+  - `ShouldBeUnique`
+  - `WithoutOverlapping`
+  - `ThrottlesExceptions`
+- proteger finalizacao de decisao com transacao + lock;
+- garantir que `PublishMediaJob` seja reentrante e idempotente;
+- revisar segmentacao das filas de negocio:
+  - `inbound-webhooks`
+  - `media-download`
+  - `media-variants`
+  - `media-safety`
+  - `media-context`
+  - `media-publish`
+  - `media-audit`
+- acompanhar throughput, runtime e falhas via Horizon antes de aumentar infraestrutura.
+
+Status desta rodada:
+
+- [x] log de finalizacao de moderacao enriquecido com estado consolidado e relevancia de cada camada
+- [x] fallback de provider por camada
+- [x] endurecimento transacional explicito da finalizacao
+- [x] revisao fina da segmentacao de filas
+- [x] separacao pratica do antigo `media-fast` em:
+  - `media-variants`
+  - `media-audit`
+- [x] alinhamento de `queue_name`, tags, waits do Horizon e `queue:monitor`
+- [x] manutencao pragmatica das filas que ja estavam isoladas e com bom custo-beneficio:
+  - `webhooks`
+  - `media-download`
+  - `media-safety`
+  - `media-vlm`
+  - `media-publish`
+
+Validacao desta rodada:
+
+- [x] `ContentModerationPipelineTest`
+- [x] `MediaIntelligencePipelineTest`
+- [x] `FinalizeMediaDecisionActionTest`
+- [x] `ContentModerationProviderManagerTest`
+- [x] `VisualReasoningProviderManagerTest`
+- [x] `ContentModerationCircuitBreakerTest`
+- [x] `VllmVisualReasoningProviderTest`
+- [x] `HorizonConfigTest`
+- [x] `QueueMonitorScheduleTest`
+- [x] `MediaPipelineJobsTest`
+- [x] `PublicUploadTest`
+- [x] regressao ampliada das areas tocadas: `176 passed`, `1246 assertions`
+
+Criterio de aceite:
+
+- o fluxo permanece rapido para o usuario;
+- retries e duplicacoes nao geram estado corrompido;
+- throughput e gargalos ficam visiveis de forma objetiva.
+
+## IA-MOD-R9 - Criar historico operacional explicavel
+
+Objetivo:
+
+- trocar feed tecnico cru por explicacao operacional util.
+
+Tarefas:
+
+- criar historico de eventos reais com filtros por:
+  - evento
+  - periodo
+  - preset/politica
+  - modelo
+  - sucesso ou falha
+  - remetente
+- exibir por item:
+  - miniatura
+  - tipo de midia
+  - origem
+  - `effective_media_state`
+  - motivo humano
+  - `reason_code`
+  - politica ativa
+  - heranca do global
+  - texto considerado ou nao
+- manter drawer tecnico com:
+  - prompt resolvido
+  - payload
+  - schema retornado
+  - snapshot da politica
+
+Criterio de aceite:
+
+- operador comum entende o comportamento da IA sem abrir payload cru;
+- auditoria tecnica continua possivel quando necessario.
+
+## IA-MOD-R10 - Criar laboratorio e testes automatizados
+
+Objetivo:
+
+- validar politica antes de publicar e impedir regressao silenciosa.
+
+Tarefas de produto:
+
+- criar simulacao/laboratorio com ate `3` midias para homologar a politica antes de ativar;
+- mostrar Safety, contexto, resposta e elegibilidade final lado a lado.
+
+Tarefas backend:
+
+- unit para resolvedor de politica;
+- unit para builder contextual;
+- unit para calculo de `effective_media_state`;
+- feature para scopes separados;
+- feature para merge `preset + global + event_override + runtime_override`;
+- feature para historico operacional;
+- feature para idempotencia e concorrencia de jobs criticos.
+
+Tarefas frontend:
+
+- testes de resumo lateral reativo;
+- testes de heranca global/evento;
+- testes de presets e toggles basicos;
+- testes de filtros do historico;
+- testes de modos `Basico`, `Avancado` e `Auditoria`;
+- testes de `placeholderData`, prefetch e transicoes sem flicker forte nas trocas principais.
+
+Criterio de aceite:
+
+- baterias backend e frontend verdes cobrindo cenarios centrais;
+- laboratorio permite homologar a politica sem contaminar producao.
+
 Critério de aceite:
 
 - baterias backend e frontend verdes cobrindo os cenarios principais.
@@ -1481,40 +1889,54 @@ Critério de aceite:
 
 ## 12. Recomendacao De Sequencia
 
-1. implementar `IA-MOD-01`
-2. implementar `IA-MOD-02`
-3. implementar `IA-MOD-03`
-4. implementar `IA-MOD-04`
-5. implementar `IA-MOD-05`
-6. implementar `IA-MOD-06`
-7. implementar `IA-MOD-07`
-8. rodar homologacao real com:
-   - imagem
-   - imagem + caption
-   - video
-   - sticker
-   - audio
+1. implementar `IA-MOD-R1`
+2. implementar `IA-MOD-R2`
+3. implementar `IA-MOD-R3`
+4. implementar `IA-MOD-R4`
+5. implementar `IA-MOD-R8`
+6. implementar `IA-MOD-R5`
+7. implementar `IA-MOD-R6`
+8. implementar `IA-MOD-R7`
+9. implementar `IA-MOD-R9`
+10. implementar `IA-MOD-R10`
+11. rodar homologacao real com:
+    - imagem
+    - imagem + texto
+    - video
+    - sticker
+    - audio
+12. usar o laboratorio antes de promover politica para producao
 
 ---
 
 ## 13. Conclusao
 
-O sistema ja tem base suficiente para subir de nivel, mas a fronteira entre as camadas esta mal definida.
+O sistema ja tem base suficiente para subir de nivel, mas a fronteira entre as camadas ainda esta frouxa para operacao forte em producao.
 
 Hoje:
 
 - a OpenAI Moderations API cobre a `Safety objetiva`;
 - o `VLM` esta cobrindo `bloqueio contextual`;
-- o produto ainda apresenta isso de forma confusa para o operador.
+- o pipeline tecnico ja existe;
+- o painel administrativo e o estado consolidado ainda apresentam isso de forma confusa para o operador.
 
 A decisao correta agora e:
 
 - separar as camadas;
+- endurecer o estado consolidado da midia com `effective_media_state`;
 - estruturar a politica contextual em banco;
-- permitir configuracao global e override por evento;
-- adicionar `analysis_scope`;
-- enriquecer o historico com motivo e politica efetiva;
-- mover tudo para a area de `IA` no painel.
+- resolver a politica por `preset + global + event_override + runtime_override`;
+- separar scopes por camada e normalizar o contexto textual;
+- enriquecer o schema contextual com motivo, confianca e elegibilidade de publicacao;
+- mover a administracao principal para `IA > Moderacao de midia`;
+- manter o detalhe do evento como resumo operacional e override simples;
+- endurecer filas, locks, idempotencia e observabilidade antes de escalar infraestrutura.
+
+Leitura final:
+
+- isso preserva custo-beneficio porque reaproveita a stack atual em vez de reinventar o pipeline;
+- isso preserva performance porque foca primeiro em fila, estado, cache, prefetch e UI reativa;
+- isso preserva seguranca porque separa melhor as decisoes e deixa a auditoria realmente explicavel.
 
 ## Fontes Oficiais Validadas
 
@@ -1524,3 +1946,14 @@ A decisao correta agora e:
   - `https://developers.openai.com/api/docs/guides/moderation#content-classifications`
 - OpenAI structured outputs:
   - `https://developers.openai.com/api/docs/guides/structured-outputs#structured-outputs-vs-json-mode`
+- Laravel Queues:
+  - `https://laravel.com/docs/12.x/queues`
+- Laravel Horizon:
+  - `https://laravel.com/docs/12.x/horizon`
+- TanStack Query React docs:
+  - `https://tanstack.com/query/latest/docs/framework/react/`
+- React Hook Form docs:
+  - `https://react-hook-form.com/docs/useform`
+  - `https://react-hook-form.com/docs/useformcontext`
+  - `https://react-hook-form.com/docs/usefieldarray`
+  - `https://react-hook-form.com/docs/usewatch`

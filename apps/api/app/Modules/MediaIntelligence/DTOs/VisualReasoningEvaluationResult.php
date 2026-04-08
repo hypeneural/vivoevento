@@ -22,6 +22,8 @@ final class VisualReasoningEvaluationResult
         public readonly array $rawResponse = [],
         public readonly array $requestPayload = [],
         public readonly ?array $promptContext = null,
+        public readonly ?string $normalizedTextContext = null,
+        public readonly ?string $normalizedTextContextMode = null,
         public readonly ?string $providerKey = null,
         public readonly ?string $providerVersion = null,
         public readonly ?string $modelKey = null,
@@ -47,6 +49,8 @@ final class VisualReasoningEvaluationResult
         array $rawResponse = [],
         array $requestPayload = [],
         ?array $promptContext = null,
+        ?string $normalizedTextContext = null,
+        ?string $normalizedTextContextMode = null,
         ?string $providerKey = null,
         ?string $providerVersion = null,
         ?string $modelKey = null,
@@ -67,6 +71,8 @@ final class VisualReasoningEvaluationResult
             rawResponse: $rawResponse,
             requestPayload: $requestPayload,
             promptContext: $promptContext,
+            normalizedTextContext: $normalizedTextContext,
+            normalizedTextContextMode: $normalizedTextContextMode,
             providerKey: $providerKey,
             providerVersion: $providerVersion,
             modelKey: $modelKey,
@@ -93,6 +99,8 @@ final class VisualReasoningEvaluationResult
         array $rawResponse = [],
         array $requestPayload = [],
         ?array $promptContext = null,
+        ?string $normalizedTextContext = null,
+        ?string $normalizedTextContextMode = null,
         ?string $providerKey = null,
         ?string $providerVersion = null,
         ?string $modelKey = null,
@@ -113,6 +121,8 @@ final class VisualReasoningEvaluationResult
             rawResponse: $rawResponse,
             requestPayload: $requestPayload,
             promptContext: $promptContext,
+            normalizedTextContext: $normalizedTextContext,
+            normalizedTextContextMode: $normalizedTextContextMode,
             providerKey: $providerKey,
             providerVersion: $providerVersion,
             modelKey: $modelKey,
@@ -139,6 +149,8 @@ final class VisualReasoningEvaluationResult
         array $rawResponse = [],
         array $requestPayload = [],
         ?array $promptContext = null,
+        ?string $normalizedTextContext = null,
+        ?string $normalizedTextContextMode = null,
         ?string $providerKey = null,
         ?string $providerVersion = null,
         ?string $modelKey = null,
@@ -159,6 +171,8 @@ final class VisualReasoningEvaluationResult
             rawResponse: $rawResponse,
             requestPayload: $requestPayload,
             promptContext: $promptContext,
+            normalizedTextContext: $normalizedTextContext,
+            normalizedTextContextMode: $normalizedTextContextMode,
             providerKey: $providerKey,
             providerVersion: $providerVersion,
             modelKey: $modelKey,
@@ -224,6 +238,8 @@ final class VisualReasoningEvaluationResult
             'tags_json' => $this->tags,
             'raw_response_json' => $this->rawResponse,
             'request_payload_json' => $this->requestPayload,
+            'normalized_text_context' => $this->normalizedTextContext,
+            'normalized_text_context_mode' => $this->normalizedTextContextMode,
             'prompt_context_json' => $this->promptContext,
             'tokens_input' => $this->tokensInput,
             'tokens_output' => $this->tokensOutput,
@@ -244,6 +260,49 @@ final class VisualReasoningEvaluationResult
             'tags' => $this->tags,
             'response_schema_version' => $this->responseSchemaVersion,
             'mode_applied' => $this->modeApplied,
+            'normalized_text_context' => $this->normalizedTextContext,
+            'normalized_text_context_mode' => $this->normalizedTextContextMode,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $metadata
+     */
+    public function withExecutionMetadata(array $metadata): self
+    {
+        $rawResponse = $this->rawResponse;
+        $rawResponse['execution'] = array_merge(
+            (array) ($rawResponse['execution'] ?? []),
+            $metadata,
+        );
+
+        $promptContext = is_array($this->promptContext) ? $this->promptContext : [];
+        $promptContext['execution'] = array_merge(
+            (array) ($promptContext['execution'] ?? []),
+            $metadata,
+        );
+
+        return new self(
+            decision: $this->decision,
+            reviewRequired: $this->reviewRequired,
+            reason: $this->reason,
+            shortCaption: $this->shortCaption,
+            replyText: $this->replyText,
+            tags: $this->tags,
+            rawResponse: $rawResponse,
+            requestPayload: $this->requestPayload,
+            promptContext: $promptContext,
+            normalizedTextContext: $this->normalizedTextContext,
+            normalizedTextContextMode: $this->normalizedTextContextMode,
+            providerKey: $this->providerKey,
+            providerVersion: $this->providerVersion,
+            modelKey: $this->modelKey,
+            modelSnapshot: $this->modelSnapshot,
+            promptVersion: $this->promptVersion,
+            responseSchemaVersion: $this->responseSchemaVersion,
+            modeApplied: $this->modeApplied,
+            tokensInput: $this->tokensInput,
+            tokensOutput: $this->tokensOutput,
+        );
     }
 }

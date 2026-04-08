@@ -27,6 +27,8 @@ O foco aqui e responder:
 - `apps/web/src/modules/wall/WallPage.tsx`
 - `apps/web/src/modules/wall/pages/EventWallManagerPage.tsx`
 - `apps/web/src/modules/wall/hooks/useWallManagerRealtime.ts`
+- `apps/web/src/modules/wall/hooks/useWallRealtimeSync.ts`
+- `apps/web/src/modules/wall/hooks/useWallPollingFallback.ts`
 - `apps/web/src/modules/wall/api.ts`
 - `apps/web/src/modules/wall/manager-config.ts`
 - `apps/web/src/modules/wall/wall-settings.ts`
@@ -59,14 +61,20 @@ O foco aqui e responder:
 
 Leitura curta:
 
-- a pagina atual do manager do telao esta funcional, mas excessivamente concentrada em uma unica tela;
-- a implementacao mistura operacao critica, diagnostico tecnico, previsao de fila e configuracao detalhada no mesmo fluxo;
-- o manager usa WebSocket para invalidar queries e atualizar status, mas nao tem fallback de polling quando o canal privado cai;
+- a pagina atual do manager do telao ja saiu do estado inicial de "inspector infinito" e entrou na primeira fase real de cockpit;
+- a implementacao agora separa melhor operacao critica, diagnostico tecnico, previsao de fila e configuracao por contexto;
+- o manager agora usa WebSocket para invalidar queries e fallback de polling leve quando o canal privado cai;
 - o player publico usa um modelo hibrido: boot HTTP + WebSocket + heartbeat HTTP + resync HTTP periodico;
-- o bloco "Estado do telao" ainda nao e um preview real do template, e sim um card de estado com CTA para abrir o player;
+- o palco agora ja tem uma primeira previa do rascunho sem `iframe`, mas ela ainda nao e o renderer compartilhado definitivo do player;
 - a lista "Ordem mais provavel das proximas 12 exibicoes" e uma simulacao com a fila real + draft atual, nao um espelho autoritativo do que esta passando na TV;
 - "Tela d7e1d73a...cfd4" nao e o codigo do telao; e o `player_instance_id` do navegador/player;
 - `R2 | L0 | E0 | S0` significa `ready`, `loading`, `error`, `stale`;
+- o topo do workspace ja ganhou um trilho vivo com selecao persistida, detalhe responsivo e sem autoplay;
+- a barra principal ja funciona como toolbar com navegacao por setas;
+- o palco agora usa ativacao automatica apenas nas tabs pre-carregadas;
+- o inspector agora usa ativacao manual para nao trocar de contexto por acidente;
+- `Aparencia` e `Anuncios` ja sairam de blocos inline e passaram a componentes proprios do inspector;
+- `Proximas fotos` ja mostra thumb e origem quando a simulacao traz esses campos;
 - para subir muito a usabilidade, o caminho certo nao e colocar mais cards na lateral; e separar a experiencia em:
   - barra operacional fixa;
   - workspace principal com preview/monitor;
@@ -80,7 +88,12 @@ Leitura curta:
 
 - `apps/web/src/modules/wall/WallPage.tsx` decide entre `WallHubPage` e `EventWallManagerPage`.
 - Quando existe `:id`, a rota cai em `EventWallManagerPage`.
-- A pagina hoje concentra quase tudo em um unico arquivo React com `1789` linhas.
+- A pagina ainda concentra muita orquestracao em um unico arquivo React, mas a extracao ja ficou material:
+  - `WallHeroStage` saiu para componente proprio;
+  - `WallQueueTab` saiu para componente proprio;
+  - `WallAppearanceTab` saiu para componente proprio;
+  - `WallAdsTab` saiu para componente proprio;
+  - `EventWallManagerPage.tsx` esta em `1215` linhas nesta rodada.
 
 ### Queries da pagina
 
@@ -89,6 +102,7 @@ O manager abre estas queries:
 - `getEventDetail(eventId)`
 - `getEventWallSettings(eventId)`
 - `getWallOptions()`
+- `getEventWallInsights(eventId)`
 - `getEventWallDiagnostics(eventId)`
 - `getEventWallAds(eventId)`
 - `simulateEventWall(eventId, simulationDraft)`
@@ -107,26 +121,27 @@ O manager abre estas queries:
 O layout principal e:
 
 - coluna esquerda com:
-  - estado do telao;
+  - pulso do evento;
+  - transmissao em tabs:
+    - `Ao vivo`
+    - `Proximas fotos`
   - diagnostico operacional;
   - acoes avancadas.
 - coluna direita fixa de `420px` com:
-  - previsao da fila;
-  - modo do telao;
-  - fila e justica;
-  - ajustes da exibicao;
-  - visual e troca de fotos;
-  - patrocinadores;
-  - mensagem de idle.
+  - cabecalho de configuracao do telao;
+  - abas manuais:
+    - `Fila`
+    - `Aparencia`
+    - `Anuncios`
 
 ### Consequencia de UX
 
-Essa organizacao produz quatro efeitos ruins:
+Essa organizacao melhorou quatro pontos relevantes, mas ainda deixa gaps importantes:
 
-1. o operador ve muita coisa ao mesmo tempo, sem hierarquia de tarefa;
-2. a coluna lateral virou um "inspector infinito";
-3. a preview visual do wall nao existe de verdade;
-4. as acoes mais importantes ficam espalhadas entre header, meio da tela e rodape sticky.
+1. o operador agora entende melhor o fluxo `ver -> entender -> agir`;
+2. a coluna lateral deixou de ser um inspector infinito e passou a ter contexto por aba;
+3. a preview visual ainda nao e o renderer real do wall;
+4. a pagina ainda precisa amadurecer `preview real` e `monitor live autoritativo` como proximas fatias.
 
 ## 2. Stack atual do manager do telao
 
@@ -168,11 +183,12 @@ Ao abrir `/events/:id/wall`, a pagina:
 1. busca o evento;
 2. busca `wall/settings`;
 3. busca `wall/options`;
-4. busca `wall/diagnostics`;
-5. busca `wall/ads`;
-6. monta um `draft` local a partir de `settings`;
-7. com debounce de `650ms`, envia esse draft para `POST /events/{event}/wall/simulate`;
-8. usa a resposta para preencher a previsao da fila.
+4. busca `wall/insights`;
+5. busca `wall/diagnostics`;
+6. busca `wall/ads`;
+7. monta um `draft` local a partir de `settings`;
+8. com debounce de `650ms`, envia esse draft para `POST /events/{event}/wall/simulate`;
+9. usa a resposta para preencher a previsao da fila e a previa inicial do rascunho.
 
 ### Caracteristica importante
 
@@ -197,7 +213,7 @@ O manager usa:
 
 - canal privado `event.{eventId}.wall`;
 - `pusher-js` em `apps/web/src/modules/wall/realtime/pusher.ts`;
-- hook `useWallManagerRealtime`.
+- hooks `useWallRealtimeSync` e `useWallPollingFallback`.
 
 O manager escuta estes eventos:
 
@@ -208,21 +224,42 @@ O manager escuta estes eventos:
 
 Quando esses eventos chegam, ele invalida queries do TanStack Query:
 
-- `wall.byEvent(eventId)`
+- `wall.settings(eventId)`
 - `wall.diagnostics(eventId)`
+- `wall.insights(eventId)`
 - `events.detail(eventId)`
 
 ### Ponto importante
 
-O manager hoje nao faz polling de fallback.
+O manager agora faz polling de fallback apenas quando o canal privado esta degradado.
 
-Se o canal privado cair:
+Regra atual:
 
-- o badge muda para `disconnected` ou `offline`;
-- mas `settings` e `diagnostics` nao entram em `refetchInterval`;
-- a tela passa a depender de refresh manual ou de alguma nova acao do operador.
+- `connected`:
+  - sem polling;
+- `connecting`:
+  - sem polling;
+- `disconnected`:
+  - polling leve de fallback;
+- `offline`:
+  - polling leve de fallback.
 
-Isso e um gap real.
+Intervalos aplicados nesta fase:
+
+- `event.detail`:
+  - `30000ms`
+- `wall.settings`:
+  - `20000ms`
+- `wall.insights`:
+  - `15000ms`
+- `wall.diagnostics`:
+  - `10000ms`
+
+Ao reconectar:
+
+- o manager invalida `settings`, `diagnostics`, `insights` e `event.detail`;
+- corta o polling de fallback;
+- volta ao modo realtime puro.
 
 ### Player publico do telao
 
@@ -244,7 +281,7 @@ O player publico usa:
 - atualizacao de conteudo e comandos: WebSocket
 - telemetria de cada tela: heartbeat HTTP
 - recuperacao de consistencia do player: resync HTTP periodico
-- fallback do manager: ainda inexistente
+- fallback do manager: polling leve condicionado ao estado do canal privado
 
 ## 5. Como funcionam as conexoes mostradas no diagnostico
 
@@ -483,7 +520,9 @@ Cada item da sequencia hoje traz:
 - `position`
 - `eta_seconds`
 - `item_id`
+- `preview_url`
 - `sender_name`
+- `source_type`
 - `sender_key`
 - `duplicate_cluster_key`
 - `is_featured`
@@ -494,13 +533,15 @@ Cada item da sequencia hoje traz:
 
 Ainda nao vem:
 
-- imagem/thumbnail da foto
-- `source_type`
 - icone de origem
 - caption
 - layout efetivo da exibicao
 
-Por isso o bloco atual vira uma lista de chips em texto, funcional para calibracao, mas fraco para operacao visual.
+Leitura atualizada:
+
+- o bloco deixou de ser apenas lista textual;
+- a operacao ja consegue ler thumb e origem na previsao;
+- ainda falta enriquecer legenda, layout efetivo e semantica visual mais completa.
 
 ## 8. Como funcionam os estados do telao
 
@@ -609,15 +650,20 @@ Hoje o operador precisa percorrer:
 
 Isso divide o foco operacional.
 
-## 9.2 A tela de "estado" nao e preview
+## 9.2 A previa atual ainda nao e fiel o bastante
 
-O bloco "Estado do telao":
+O manager ja saiu do placeholder puro e agora tem uma `Previa do rascunho`.
 
-- nao reutiliza o renderer real do player;
-- nao mostra layout, transicao, thumbnails, branding ou QR reais;
-- so mostra um placeholder com CTA "Abrir telao".
+Mesmo assim, ela ainda tem limites importantes:
 
-Para um editor visual, isso e insuficiente.
+- ainda nao reutiliza o renderer compartilhado final do player;
+- ainda nao espelha runtime real ou clock real da exibicao;
+- ainda simplifica alguns comportamentos visuais.
+
+Leitura:
+
+- a direcao tecnica esta correta porque abandonou `iframe`;
+- mas ainda falta a etapa de `preview fiel` para fechar a experiencia de edicao visual.
 
 ## 9.3 A coluna lateral ficou longa demais
 
@@ -1008,7 +1054,8 @@ Enriquecer `WallSimulationPreviewItem` com:
 Observacao:
 
 `WallPayloadFactory::media()` ja conhece `url` e `source_type`.
-Hoje o problema e que `WallSimulationService` nao repassa esses campos no `sequence_preview`.
+Nesta fase, `WallSimulationService` ja repassa `preview_url` e `source_type` no `sequence_preview`.
+As proximas pendencias aqui continuam sendo `caption`, `layout_hint` e uma camada visual mais rica no frontend.
 
 ## Icones de origem
 
@@ -1139,6 +1186,13 @@ Motivo:
 Para esta tela virar cockpit de verdade, nao basta o contrato de API.
 
 Tambem precisamos de contrato de interacao.
+
+Estado desta rodada:
+
+- toolbar principal implementada com navegacao por setas;
+- tabs do palco implementadas com ativacao automatica;
+- tabs do inspector implementadas com ativacao manual;
+- trilho recente implementado com pausa em hover e foco, navegacao por teclado e manutencao do item selecionado visivel.
 
 ### Toolbar de comando
 
@@ -1643,9 +1697,9 @@ Payload minimo:
 
 ## 16.3 Endpoint agregado de insights
 
-Hoje o manager abre varias queries separadas, mas ainda nao existe um agregado proprio para o topo vivo.
+Hoje o manager ja conta com um agregado proprio para o topo vivo.
 
-Faz sentido adicionar:
+Endpoint atual:
 
 - `GET /events/{event}/wall/insights`
 
@@ -1724,10 +1778,13 @@ Leitura:
 
 ## 16.4 Enriquecer `sequence_preview`
 
-Adicionar:
+Nesta fase, dois enriquecimentos ja entraram no contrato real:
 
 - `preview_url`
 - `source_type`
+
+Pendencias que continuam valendo para a proxima rodada:
+
 - `sender_display_name`
 - `is_video`
 

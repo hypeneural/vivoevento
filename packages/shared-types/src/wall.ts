@@ -215,8 +215,10 @@ export interface WallSimulationPreviewItem {
   position: number;
   eta_seconds: number;
   item_id: string;
+  preview_url?: string | null;
   sender_name: string;
   sender_key: string;
+  source_type?: 'whatsapp' | 'telegram' | 'upload' | 'manual' | 'gallery' | null;
   duplicate_cluster_key?: string | null;
   is_featured: boolean;
   is_replay: boolean;

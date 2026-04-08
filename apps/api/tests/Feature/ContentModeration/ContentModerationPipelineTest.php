@@ -2,6 +2,7 @@
 
 use App\Modules\ContentModeration\DTOs\ContentSafetyEvaluationResult;
 use App\Modules\ContentModeration\Jobs\AnalyzeContentSafetyJob;
+use App\Modules\ContentModeration\Models\ContentModerationGlobalSetting;
 use App\Modules\ContentModeration\Models\EventContentModerationSetting;
 use App\Modules\ContentModeration\Models\EventMediaSafetyEvaluation;
 use App\Modules\ContentModeration\Services\ContentModerationProviderInterface;
@@ -84,10 +85,24 @@ it('persists a safety evaluation when content moderation is enabled', function (
         'provider_key' => 'fake-safety',
         'enabled' => true,
         'threshold_version' => 'policy-v2',
+        'analysis_scope' => 'image_and_text_context',
+        'normalized_text_context_mode' => 'body_only',
+    ]);
+
+    $inbound = \App\Modules\InboundMedia\Models\InboundMessage::query()->create([
+        'event_id' => $event->id,
+        'provider' => 'whatsapp',
+        'message_id' => 'msg-safety-body-only',
+        'provider_message_id' => 'wamid-safety-body-only',
+        'message_type' => 'image',
+        'body_text' => 'Texto do remetente para safety',
+        'status' => 'processed',
+        'received_at' => now(),
     ]);
 
     $media = EventMedia::factory()->create([
         'event_id' => $event->id,
+        'inbound_message_id' => $inbound->id,
         'safety_status' => 'queued',
     ]);
 
@@ -105,9 +120,90 @@ it('persists a safety evaluation when content moderation is enabled', function (
     expect($evaluation)->not->toBeNull()
         ->and($evaluation?->decision)->toBe('review')
         ->and($evaluation?->review_required)->toBeTrue()
-        ->and($evaluation?->threshold_version)->toBe('policy-v2');
+        ->and($evaluation?->threshold_version)->toBe('policy-v2')
+        ->and(data_get($evaluation?->policy_snapshot_json, 'provider_key'))->toBe('fake-safety')
+        ->and(data_get($evaluation?->policy_snapshot_json, 'mode'))->toBe('enforced')
+        ->and(data_get($evaluation?->policy_snapshot_json, 'fallback_mode'))->toBe('review')
+        ->and(data_get($evaluation?->policy_snapshot_json, 'analysis_scope'))->toBe('image_and_text_context')
+        ->and(data_get($evaluation?->policy_snapshot_json, 'normalized_text_context_mode'))->toBe('body_only')
+        ->and(data_get($evaluation?->policy_snapshot_json, 'threshold_version'))->toBe('policy-v2')
+        ->and(data_get($evaluation?->policy_sources_json, 'provider_key'))->toBe('event_setting')
+        ->and(data_get($evaluation?->policy_sources_json, 'threshold_version'))->toBe('event_setting')
+        ->and($evaluation?->normalized_text_context)->toBe('Texto do remetente para safety')
+        ->and($evaluation?->normalized_text_context_mode)->toBe('body_only');
 
     Queue::assertPushed(RunModerationJob::class, fn (RunModerationJob $job) => $job->eventMediaId === $media->id);
+});
+
+it('uses global content moderation settings when event-specific settings are absent', function () {
+    Queue::fake();
+
+    app()->bind(ContentModerationProviderInterface::class, fn () => new class implements ContentModerationProviderInterface
+    {
+        public function evaluate(
+            EventMedia $media,
+            EventContentModerationSetting $settings,
+        ): ContentSafetyEvaluationResult {
+            return ContentSafetyEvaluationResult::review(
+                categoryScores: [
+                    'nudity' => 0.68,
+                ],
+                reasonCodes: ['nudity.review'],
+                rawResponse: [
+                    'provider' => 'fake-safety',
+                ],
+                providerKey: 'fake-safety',
+                providerVersion: 'test-v1',
+                modelKey: 'fake-model',
+                modelSnapshot: 'fake-model@2026-04-01',
+                thresholdVersion: $settings->threshold_version,
+            );
+        }
+    });
+
+    ContentModerationGlobalSetting::query()->create([
+        'id' => 1,
+        'enabled' => true,
+        'provider_key' => 'fake-safety',
+        'mode' => 'enforced',
+        'threshold_version' => 'global-policy-v3',
+        'fallback_mode' => 'review',
+        'analysis_scope' => 'image_only',
+        'hard_block_thresholds_json' => [
+            'nudity' => 0.95,
+            'violence' => 0.95,
+            'self_harm' => 0.95,
+        ],
+        'review_thresholds_json' => [
+            'nudity' => 0.60,
+            'violence' => 0.60,
+            'self_harm' => 0.60,
+        ],
+    ]);
+
+    $event = Event::factory()->active()->create([
+        'moderation_mode' => 'ai',
+    ]);
+
+    $media = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'safety_status' => 'queued',
+    ]);
+
+    app(AnalyzeContentSafetyJob::class, ['eventMediaId' => $media->id])->handle();
+
+    $media->refresh();
+
+    $evaluation = EventMediaSafetyEvaluation::query()
+        ->where('event_media_id', $media->id)
+        ->latest('id')
+        ->first();
+
+    expect($media->safety_status)->toBe('review')
+        ->and($evaluation)->not->toBeNull()
+        ->and($evaluation?->threshold_version)->toBe('global-policy-v3')
+        ->and(data_get($evaluation?->policy_snapshot_json, 'analysis_scope'))->toBe('image_only')
+        ->and(data_get($evaluation?->policy_sources_json, 'analysis_scope'))->toBe('global_setting');
 });
 
 it('skips provider execution when the event is not in ai moderation mode', function () {

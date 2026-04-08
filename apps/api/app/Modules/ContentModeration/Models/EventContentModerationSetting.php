@@ -48,6 +48,8 @@ class EventContentModerationSetting extends Model
             'hard_block_thresholds_json' => self::defaultHardBlockThresholds(),
             'review_thresholds_json' => self::defaultReviewThresholds(),
             'fallback_mode' => 'review',
+            'analysis_scope' => 'image_and_text_context',
+            'normalized_text_context_mode' => 'body_plus_caption',
             'enabled' => false,
         ];
     }
@@ -60,6 +62,8 @@ class EventContentModerationSetting extends Model
         'hard_block_thresholds_json',
         'review_thresholds_json',
         'fallback_mode',
+        'analysis_scope',
+        'normalized_text_context_mode',
         'enabled',
     ];
 

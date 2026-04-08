@@ -79,11 +79,14 @@ export function reportWebVital(metric: WebVitalMetric): void {
       userAgent: navigator.userAgent,
     });
     
-    navigator.sendBeacon('/api/analytics/web-vitals', body);
+    // Only send in production or when analytics endpoint is available
+    if (import.meta.env.PROD) {
+      navigator.sendBeacon('/api/analytics/web-vitals', body);
+    }
   }
   
   // Log in development
-  if (process.env.NODE_ENV === 'development') {
+  if (import.meta.env.DEV) {
     console.log(`[Web Vitals] ${metric.name}:`, {
       value: metric.value,
       rating: metric.rating,

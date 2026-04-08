@@ -4,6 +4,8 @@ namespace App\Modules\MediaIntelligence\Actions;
 
 use App\Modules\MediaIntelligence\DTOs\VisualReasoningEvaluationResult;
 use App\Modules\MediaIntelligence\Models\EventMediaVlmEvaluation;
+use App\Modules\MediaIntelligence\Services\OpenAiCompatibleVisualReasoningPayloadFactory;
+use App\Modules\MediaIntelligence\Services\VisualReasoningPolicySnapshotFactory;
 use App\Modules\MediaIntelligence\Services\VisualReasoningProviderInterface;
 use App\Modules\MediaProcessing\Models\EventMedia;
 
@@ -11,6 +13,8 @@ class EvaluateMediaPromptAction
 {
     public function __construct(
         private readonly VisualReasoningProviderInterface $provider,
+        private readonly VisualReasoningPolicySnapshotFactory $policySnapshots,
+        private readonly OpenAiCompatibleVisualReasoningPayloadFactory $payloadFactory,
     ) {}
 
     public function execute(EventMedia $media): VisualReasoningEvaluationResult
@@ -43,12 +47,36 @@ class EvaluateMediaPromptAction
         }
 
         $result = $this->provider->evaluate($media, $settings);
+        $resolvedPromptContext = array_merge(
+            $settings ? ($this->payloadFactory->promptContext($media, $settings) ?? []) : [],
+            $result->promptContext ?? [],
+        );
+        $execution = (array) data_get($result->rawResponse, 'execution', []);
+        $runtimeOverrides = [
+            'provider_version' => $result->providerVersion,
+            'model_snapshot' => $result->modelSnapshot,
+        ];
+
+        if (data_get($execution, 'fallback_from')) {
+            $runtimeOverrides['provider_key'] = $result->providerKey;
+            $runtimeOverrides['model_key'] = $result->modelKey;
+        }
+
+        $policy = $this->policySnapshots->build($settings, $runtimeOverrides);
+        $evaluationAttributes = $result->toEvaluationAttributes();
+        $evaluationAttributes['prompt_context_json'] = $resolvedPromptContext !== [] ? $resolvedPromptContext : null;
+        $evaluationAttributes['normalized_text_context'] = $result->normalizedTextContext
+            ?? data_get($resolvedPromptContext, 'normalized_text_context');
+        $evaluationAttributes['normalized_text_context_mode'] = $result->normalizedTextContextMode
+            ?? data_get($resolvedPromptContext, 'normalized_text_context_mode');
 
         EventMediaVlmEvaluation::query()->create(array_merge(
-            $result->toEvaluationAttributes(),
+            $evaluationAttributes,
             [
                 'event_id' => $media->event_id,
                 'event_media_id' => $media->id,
+                'policy_snapshot_json' => $policy['snapshot'],
+                'policy_sources_json' => $policy['sources'],
                 'completed_at' => now(),
             ],
         ));

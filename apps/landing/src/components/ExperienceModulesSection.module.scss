@@ -6,7 +6,7 @@
   padding-block: clamp(4rem, 8vw, 8rem);
   position: relative;
   overflow: hidden;
-  min-height: 100vh;
+  min-height: auto;
 
   &::before {
     content: "";
@@ -23,7 +23,7 @@
 
 @media (min-width: 960px) {
   .section {
-    min-height: clamp(100vh, 110vh, 120vh);
+    min-height: auto;
   }
 }
 

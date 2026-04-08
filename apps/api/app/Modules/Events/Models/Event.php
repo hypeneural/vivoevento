@@ -250,9 +250,8 @@ class Event extends Model
     public function isContentModerationObserveOnly(): bool
     {
         /** @var \App\Modules\ContentModeration\Models\EventContentModerationSetting|null $settings */
-        $settings = $this->relationLoaded('contentModerationSettings')
-            ? $this->contentModerationSettings
-            : $this->contentModerationSettings()->first();
+        $settings = app(\App\Modules\ContentModeration\Services\ContentModerationSettingsResolver::class)
+            ->resolveForEvent($this);
 
         return $this->isAiModeration()
             && (bool) ($settings?->enabled ?? false)

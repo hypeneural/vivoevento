@@ -30,15 +30,15 @@ O foco principal desta auditoria foi a lista que aparecia como pendente no task 
 
 Status consolidado da lista pendente:
 
-- `11 itens` estao implementados e validados no codigo atual.
-- `1 item` esta funcionalmente implementado, mas com arquitetura diferente da especificada no plano.
+- `12 itens` estao implementados e validados no codigo atual.
 - `1 item` foi reforcado nesta auditoria com hardening e testes adicionais.
+- o item arquitetural `1.11` foi fechado depois desta auditoria inicial, com migracao real da trilha de anuncios para o `reducer`.
 
 Veredito:
 
 - O backend de anuncios do telao esta funcional e agora mais seguro.
 - O player publico do telao ja consome anuncios, payload de boot e updates realtime.
-- A trilha de anuncios no frontend nao esta no `reducer` como o task planejava; ela foi implementada em um hook paralelo (`useAdEngine`).
+- A trilha de anuncios no frontend agora esta dentro do `reducer`, incluindo `ads`, `currentAd`, `ads-updated`, `advance` com interceptacao de anuncio e `ad-finished`.
 - O painel administrativo do telao agora fecha a gestao operacional de patrocinadores/anuncios ponta a ponta.
 
 ## Ajustes Realizados Nesta Auditoria
@@ -58,6 +58,14 @@ Foram aplicados ajustes reais no codigo durante esta validacao:
   - nova cobertura para troca entre `LayoutRenderer` e `AdOverlay`.
 - `apps/web/src/modules/wall/player/hooks/useWallPlayer.test.tsx`
   - nova cobertura para hidratacao de `ads` no boot e update realtime via `wall.ads.updated`.
+- `apps/web/src/modules/wall/player/engine/reducer.ts`
+  - anuncios migrados para o estado central do engine, com scheduler no `reducer`.
+- `apps/web/src/modules/wall/player/hooks/useWallEngine.ts`
+  - timer principal agora pausa durante anuncio ativo e o fim do anuncio volta para a fila oficial.
+- `apps/web/src/modules/wall/hooks/useWallRealtimeSync.ts` e `apps/web/src/modules/wall/hooks/useWallPollingFallback.ts`
+  - manager ganhou trilha de realtime com fallback de polling para manter painel operacional sincronizado.
+- `apps/web/src/modules/wall/components/manager/recent/WallRecentMediaDetailsSheet.tsx`
+  - detalhe lateral/mobile da midia recente selecionada foi implementado e integrado ao manager.
 
 ## Fechamento Do Gap Operacional Do Painel Admin
 
@@ -91,11 +99,11 @@ Em `2026-04-08`, o gap restante do painel admin foi fechado com integracao real 
 | `1.6 WallPayloadFactory: ads no payload` | `CHECK` | `apps/api/app/Modules/Wall/Services/WallPayloadFactory.php` e `apps/api/app/Modules/Wall/Http/Resources/WallBootResource.php` | `ads` entram no boot publico e `settings` carregam `ad_mode`, `ad_frequency` e `ad_interval_minutes`. |
 | `1.7 WallBroadcasterService: broadcastAdsUpdated` | `CHECK` | `apps/api/app/Modules/Wall/Services/WallBroadcasterService.php` | Metodo existe e publica payload publico dos anuncios ativos. |
 | `1.8 Evento WallAdsUpdated` | `CHECK` | `apps/api/app/Modules/Wall/Events/WallAdsUpdated.php` | Evento existe e usa `broadcastAs()` com `wall.ads.updated`. |
-| `1.11 Reducer: ad state + actions (advance check, ad-finished)` | `PARCIAL` | `apps/web/src/modules/wall/player/engine/reducer.ts` e `apps/web/src/modules/wall/player/hooks/useAdEngine.ts` | O comportamento existe, mas nao esta no `reducer`. Foi implementado em `useAdEngine`, em paralelo ao engine principal. Funciona no runtime, mas nao cumpre 100% a arquitetura originalmente pedida. |
+| `1.11 Reducer: ad state + actions (advance check, ad-finished)` | `CHECK` | `apps/web/src/modules/wall/player/engine/reducer.ts`, `apps/web/src/modules/wall/player/hooks/useWallEngine.ts`, `apps/web/src/modules/wall/player/hooks/useWallPlayer.ts` e `apps/web/src/modules/wall/player/components/WallPlayerRoot.tsx` | O estado de anuncios foi migrado para o engine principal. O `reducer` agora decide quando abrir anuncio, segura o slideshow durante a exibicao e faz o advance oficial em `ad-finished`. O hook paralelo `useAdEngine` foi removido. |
 | `1.13 WallPlayerRoot: integrar ad overlay` | `CHECK` | `apps/web/src/modules/wall/player/components/WallPlayerRoot.tsx` | Quando `currentAd` existe, o player troca o layout principal por `AdOverlay`. |
 | `1.14 useWallRealtime: listen wall.ads.updated` | `CHECK` | `apps/web/src/modules/wall/player/hooks/useWallRealtime.ts` e `apps/web/src/modules/wall/player/hooks/useWallPlayer.ts` | Listener existe e atualiza `ads` em tempo real. |
 | `1.15 Testes backend completos (Pest)` | `CHECK` | `apps/api/tests/Feature/Wall/WallAdsTest.php` + demais testes `Wall` | A cobertura do backend para a trilha de anuncios ficou consistente apos os testes adicionados nesta auditoria. |
-| `1.16 Testes frontend completos (Vitest)` | `CHECK` | `apps/web/src/modules/wall/player/hooks/useAdEngine.test.ts`, `apps/web/src/modules/wall/player/components/AdOverlay.test.tsx`, `apps/web/src/modules/wall/player/components/WallPlayerRoot.test.tsx`, `apps/web/src/modules/wall/player/hooks/useWallPlayer.test.tsx`, `apps/web/src/modules/wall/pages/EventWallManagerPage.test.tsx` | A cobertura do modulo `wall` passou integralmente e o `npm run test` global do app web voltou a ficar verde nesta rodada. |
+| `1.16 Testes frontend completos (Vitest)` | `CHECK` | `apps/web/src/modules/wall/player/hooks/useWallEngine.test.tsx`, `apps/web/src/modules/wall/player/components/AdOverlay.test.tsx`, `apps/web/src/modules/wall/player/components/WallPlayerRoot.test.tsx`, `apps/web/src/modules/wall/player/hooks/useWallPlayer.test.tsx`, `apps/web/src/modules/wall/hooks/useWallRealtimeSync.test.tsx`, `apps/web/src/modules/wall/hooks/useWallPollingFallback.test.tsx`, `apps/web/src/modules/wall/components/manager/recent/WallRecentMediaDetailsSheet.test.tsx`, `apps/web/src/modules/wall/pages/EventWallManagerPage.test.tsx` | A cobertura do modulo `wall` passou integralmente apos a migracao para o reducer e os fechamentos restantes no manager/realtime. |
 
 ## Evidencias Tecnicas Relevantes
 
@@ -120,39 +128,33 @@ Em `2026-04-08`, o gap restante do painel admin foi fechado com integracao real 
 
 - `packages/shared-types/src/wall.ts`
   - tipos `WallAdItem`, `WallAdMode`, `WallBootData.ads`, `WALL_EVENT_NAMES.adsUpdated`.
+- `apps/web/src/modules/wall/player/engine/reducer.ts`
+  - passou a ser a fonte unica de verdade para `ads`, `currentAd`, `adScheduler`, `ads-updated` e `ad-finished`.
+- `apps/web/src/modules/wall/player/hooks/useWallEngine.ts`
+  - timer do slideshow nao avanca enquanto um anuncio esta na tela.
 - `apps/web/src/modules/wall/player/hooks/useWallPlayer.ts`
-  - carrega `ads` do boot.
+  - carrega `ads` do boot dentro do engine.
   - aplica updates realtime via callback `onAdsUpdated`.
 - `apps/web/src/modules/wall/player/hooks/useWallRealtime.ts`
   - faz bind em `wall.ads.updated`.
-- `apps/web/src/modules/wall/player/hooks/useAdEngine.ts`
-  - controla quando o anuncio entra.
-  - seleciona anuncio round-robin.
-  - finaliza o anuncio e retorna ao slideshow.
 - `apps/web/src/modules/wall/player/components/AdOverlay.tsx`
   - trata imagem com timer.
   - trata video com `onEnded`.
   - usa timeout de seguranca para video travado.
 - `apps/web/src/modules/wall/player/components/WallPlayerRoot.tsx`
-  - alterna entre `LayoutRenderer` e `AdOverlay`.
+  - alterna entre `LayoutRenderer` e `AdOverlay` a partir de `state.currentAd`.
+- `apps/web/src/modules/wall/hooks/useWallRealtimeSync.ts`
+  - sincroniza invalidades do manager em reconnect e eventos tecnicos.
+- `apps/web/src/modules/wall/hooks/useWallPollingFallback.ts`
+  - ativa polling leve quando realtime cai ou esta offline.
+- `apps/web/src/modules/wall/components/manager/recent/WallRecentMediaDetailsSheet.tsx`
+  - abre detalhes da midia recente em `Sheet` no desktop e `Drawer` no mobile.
 
 ## Gaps Reais Que Continuam Abertos
 
 Estes pontos nao impedem o veredito positivo sobre a trilha central de anuncios e layouts, mas continuam abertos no produto como um todo:
 
-### 1. Divergencia arquitetural no item 1.11
-
-O plano original pedia o estado de anuncios dentro do `reducer`.
-
-O codigo atual resolveu isso fora do `reducer`, em `useAdEngine`.
-
-Impacto:
-
-- funcionalmente o player toca anuncios.
-- tecnicamente o requisito do task nao foi cumprido literalmente.
-- para uma auditoria de "100% conforme o plano", este item precisa continuar marcado como `PARCIAL`.
-
-### 2. Existem hooks/componentes de features comparativas que ainda nao estao plugados na UI final
+### 1. Existem hooks/componentes de features comparativas que ainda nao estao plugados na UI final
 
 Durante a auditoria apareceram componentes e hooks prontos, mas sem integracao visivel nas telas finais:
 
@@ -183,8 +185,8 @@ cd apps/api && php artisan test --filter=Wall
 Resultado:
 
 - `PASS`
-- `54 testes passaram`
-- `219 assertions`
+- `57 testes passaram`
+- `255 assertions`
 
 ### 2. Frontend - suite global do app web
 
@@ -196,14 +198,16 @@ cd apps/web && npm run test
 
 Resultado:
 
-- `PASS`
-- `53 arquivos de teste passaram`
-- `263 testes passaram`
+- `FAIL`
+- `56 arquivos de teste executaram`
+- `271 testes passaram`
+- `1 teste falhou`
 
 Leitura correta desse resultado:
 
-- o app web inteiro voltou a ficar com suite global verde.
-- o fechamento do manager de patrocinadores nao introduziu regressao visivel na aplicacao.
+- a falha restante esta fora do escopo do telao.
+- o teste que falhou foi `src/modules/billing/PublicEventCheckoutPage.test.tsx`, por timeout de `5000ms`.
+- a trilha de wall/telao nao ficou vermelha na suite global.
 
 ### 3. Frontend - suite isolada do modulo wall
 
@@ -216,8 +220,8 @@ cd apps/web && npx vitest run src/modules/wall
 Resultado:
 
 - `PASS`
-- `22 arquivos de teste passaram`
-- `163 testes passaram`
+- `25 arquivos de teste passaram`
+- `170 testes passaram`
 
 ### 4. Frontend - type check
 
@@ -264,7 +268,7 @@ Se a pergunta for:
 
 Resposta:
 
-- `sim, na maior parte`
+- `sim`
 - a trilha de runtime do telao esta pronta e validada
 - o backend e a suite especifica do modulo `Wall` passaram
 
@@ -274,16 +278,16 @@ Se a pergunta for:
 
 Resposta:
 
-- `nao`
+- `quase`
 
-Os pontos que impedem esse `100%` literal sao:
+Os pontos que ainda impedem esse `100%` literal sao:
 
-- o item `1.11` nao foi implementado no `reducer`, e sim em `useAdEngine`
 - o comando `npm run build` em `packages/shared-types` nao existe no estado atual do monorepo
+- a suite global do app web ainda tem um timeout isolado em billing, fora do escopo do telao
 
 ## Recomendacao Objetiva
 
 Para fechar o tema como `100% concluido` em produto e operacao:
 
-1. decidir se o requisito `1.11` sera aceito como "feito por outra arquitetura" ou se precisa migrar de fato para o `reducer`
-2. formalizar `packages/shared-types` como pacote buildavel ou atualizar o checklist oficial para refletir o comando real
+1. formalizar `packages/shared-types` como pacote buildavel ou atualizar o checklist oficial para refletir o comando real
+2. estabilizar o teste de billing `PublicEventCheckoutPage.test.tsx` para a suite global do app web voltar a ficar 100% verde

@@ -9,9 +9,11 @@ use App\Modules\MediaProcessing\Models\MediaProcessingRun;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 
 it('opens the content moderation circuit after repeated failures and keeps processing healthy media', function () {
     Queue::fake();
+    Storage::fake('public');
 
     config()->set('content_moderation.providers.openai.api_key', 'test-key');
     config()->set('content_moderation.providers.openai.circuit_breaker.failure_threshold', 2);
@@ -52,6 +54,11 @@ it('opens the content moderation circuit after repeated failures and keeps proce
             'height' => 512,
             'size_bytes' => 2048,
         ]);
+
+        Storage::disk('public')->put(
+            "events/{$event->id}/variants/{$media->id}/fast_preview-{$index}.webp",
+            'fake-image-binary',
+        );
 
         return $media;
     });

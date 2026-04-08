@@ -99,7 +99,8 @@ return [
     'waits' => [
         'redis:broadcasts' => (int) env('HORIZON_WAIT_BROADCASTS', 10),
         'redis:face-index' => (int) env('HORIZON_WAIT_FACE_INDEX', 180),
-        'redis:media-fast' => (int) env('HORIZON_WAIT_MEDIA_FAST', 45),
+        'redis:media-variants' => (int) env('HORIZON_WAIT_MEDIA_VARIANTS', 45),
+        'redis:media-audit' => (int) env('HORIZON_WAIT_MEDIA_AUDIT', 45),
         'redis:media-process' => (int) env('HORIZON_WAIT_MEDIA_PROCESS', 90),
         'redis:media-safety' => (int) env('HORIZON_WAIT_MEDIA_SAFETY', 60),
         'redis:media-vlm' => (int) env('HORIZON_WAIT_MEDIA_VLM', 90),
@@ -254,9 +255,9 @@ return [
             'balanceMaxShift' => 1,
             'balanceCooldown' => 3,
         ],
-        'supervisor-media-fast' => [
+        'supervisor-media-variants' => [
             'connection' => 'redis',
-            'queue' => ['media-fast'],
+            'queue' => ['media-variants'],
             'balance' => false,
             'autoScalingStrategy' => 'time',
             'maxProcesses' => 1,
@@ -265,6 +266,21 @@ return [
             'memory' => 512,
             'tries' => 3,
             'timeout' => 120,
+            'nice' => 0,
+            'balanceMaxShift' => 1,
+            'balanceCooldown' => 3,
+        ],
+        'supervisor-media-audit' => [
+            'connection' => 'redis',
+            'queue' => ['media-audit'],
+            'balance' => false,
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 1800,
+            'maxJobs' => 1000,
+            'memory' => 320,
+            'tries' => 3,
+            'timeout' => 60,
             'nice' => 0,
             'balanceMaxShift' => 1,
             'balanceCooldown' => 3,
@@ -460,9 +476,13 @@ return [
                 'minProcesses' => (int) env('HORIZON_MEDIA_DOWNLOAD_MIN_PROCESSES', 1),
                 'maxProcesses' => (int) env('HORIZON_MEDIA_DOWNLOAD_MAX_PROCESSES', 3),
             ],
-            'supervisor-media-fast' => [
-                'minProcesses' => (int) env('HORIZON_MEDIA_FAST_MIN_PROCESSES', 1),
-                'maxProcesses' => (int) env('HORIZON_MEDIA_FAST_MAX_PROCESSES', 2),
+            'supervisor-media-variants' => [
+                'minProcesses' => (int) env('HORIZON_MEDIA_VARIANTS_MIN_PROCESSES', 1),
+                'maxProcesses' => (int) env('HORIZON_MEDIA_VARIANTS_MAX_PROCESSES', 2),
+            ],
+            'supervisor-media-audit' => [
+                'minProcesses' => (int) env('HORIZON_MEDIA_AUDIT_MIN_PROCESSES', 1),
+                'maxProcesses' => (int) env('HORIZON_MEDIA_AUDIT_MAX_PROCESSES', 2),
             ],
             'supervisor-face-index' => [
                 'minProcesses' => (int) env('HORIZON_FACE_INDEX_MIN_PROCESSES', 1),
@@ -520,7 +540,10 @@ return [
             'supervisor-media-download' => [
                 'maxProcesses' => 1,
             ],
-            'supervisor-media-fast' => [
+            'supervisor-media-variants' => [
+                'maxProcesses' => 1,
+            ],
+            'supervisor-media-audit' => [
                 'maxProcesses' => 1,
             ],
             'supervisor-face-index' => [

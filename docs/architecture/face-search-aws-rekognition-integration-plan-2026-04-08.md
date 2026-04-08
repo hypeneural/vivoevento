@@ -109,6 +109,49 @@ Conclusao:
 - a AWS nao resolve magicamente crowd e tiny faces extremos;
 - ela melhora muito a chance de um MVP profissional de producao, desde que a arquitetura do modulo seja ajustada corretamente.
 
+### Smoke real de conectividade validado antes da implementacao
+
+Antes de iniciar a implementacao, foi executado um smoke real local em `2026-04-08` com:
+
+- `STS GetCallerIdentity`
+- `Rekognition CreateCollection`
+- `DescribeCollection`
+- `ListCollections`
+- `ListFaces`
+- `DeleteCollection`
+
+Script usado:
+
+- `apps/api/scripts/face-search-aws-smoke.php`
+
+Resultado:
+
+- `STS=OK`
+- `Account=426912654290`
+- `Arn=arn:aws:iam::426912654290:user/eventovivo`
+- `Rekognition collections flow=OK`
+- `FaceModelVersion=7.0`
+- `Region=eu-central-1`
+
+Leitura:
+
+- a credencial esta valida;
+- a assinatura e a regiao estao corretas;
+- a policy ja cobre o baseline de collections do MVP;
+- ainda falta um smoke com imagem real para validar:
+  - `IndexFaces`
+  - `SearchFacesByImage`
+  - `DeleteFaces`
+
+Observacao operacional:
+
+- o projeto ja usa `AWS_*` para storage local/MinIO;
+- por isso o smoke AWS foi feito com variaveis dedicadas:
+  - `FACE_SEARCH_AWS_SMOKE_ACCESS_KEY_ID`
+  - `FACE_SEARCH_AWS_SMOKE_SECRET_ACCESS_KEY`
+  - `FACE_SEARCH_AWS_SMOKE_REGION`
+- isso evita quebrar o ambiente local de arquivos antes da trilha AWS estar implementada de verdade.
+
 ---
 
 ## Como Nossa Stack Esta Hoje
@@ -163,6 +206,32 @@ Conclusao:
 
 - nao basta adicionar `aws` ao `provider_key`;
 - precisamos subir uma camada acima do provider.
+
+### Ultimas verificacoes pre-implementacao na stack atual
+
+Inspecao final no codigo atual confirmou estes pontos de atrito reais:
+
+- `EventFaceSearchSetting` ainda so modela configuracao local;
+- `UpsertEventFaceSearchSettingsRequest` ainda so valida o contrato local;
+- `EventFaceSearchSettingResource` ainda nao expoe nenhum campo AWS;
+- `FaceSearchServiceProvider` ainda so registra detection provider, embedding provider e vector store;
+- `SearchFacesBySelfieAction` ainda esta diretamente acoplada a:
+  - `FaceDetectionProviderInterface`
+  - `FaceEmbeddingProviderInterface`
+  - `FaceVectorStoreInterface`
+- o modulo ainda nao tem persistencia para:
+  - `face_search_provider_records`
+  - `face_search_queries` com backend AWS
+- o modulo ainda nao tem:
+  - `AwsRekognitionClientFactory`
+  - `FaceSearchBackendInterface`
+  - `FaceSearchRouter`
+  - `SelfiePreflightService`
+
+Leitura:
+
+- a arquitetura alvo esta correta;
+- mas a implementacao precisa comecar pelos contratos e pela camada de roteamento, nao por chamadas AWS soltas dentro da action atual.
 
 ---
 

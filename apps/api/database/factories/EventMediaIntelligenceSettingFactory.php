@@ -11,25 +11,13 @@ class EventMediaIntelligenceSettingFactory extends Factory
 
     public function definition(): array
     {
-        return [
-            'event_id' => EventFactory::new(),
-            'provider_key' => 'vllm',
-            'model_key' => 'Qwen/Qwen2.5-VL-3B-Instruct',
-            'enabled' => true,
-            'mode' => 'enrich_only',
-            'prompt_version' => 'foundation-v1',
-            'approval_prompt' => EventMediaIntelligenceSetting::defaultApprovalPrompt(),
-            'caption_style_prompt' => EventMediaIntelligenceSetting::defaultCaptionStylePrompt(),
-            'response_schema_version' => 'foundation-v1',
-            'timeout_ms' => 12000,
-            'fallback_mode' => 'review',
-            'require_json_output' => true,
-            'reply_text_enabled' => false,
-            'reply_text_mode' => 'disabled',
-            'reply_prompt_override' => null,
-            'reply_fixed_templates_json' => [],
-            'reply_prompt_preset_id' => null,
-        ];
+        return array_merge(
+            EventMediaIntelligenceSetting::defaultAttributes(),
+            [
+                'event_id' => EventFactory::new(),
+                'enabled' => true,
+            ],
+        );
     }
 
     public function disabled(): static

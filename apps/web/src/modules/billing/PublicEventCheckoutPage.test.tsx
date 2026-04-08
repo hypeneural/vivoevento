@@ -14,6 +14,7 @@ const createCheckoutMock = vi.fn();
 const getCheckoutMock = vi.fn();
 const createPagarmeCardTokenMock = vi.fn();
 const writeTextMock = vi.fn();
+const refreshSessionMock = vi.fn();
 
 vi.mock('@/app/providers/AuthProvider', () => ({
   useAuth: () => useAuthMock(),
@@ -173,7 +174,9 @@ function fillPixForm() {
 
 describe('PublicEventCheckoutPage', () => {
   beforeEach(() => {
-    useAuthMock.mockReturnValue({ isAuthenticated: false });
+    refreshSessionMock.mockReset();
+    refreshSessionMock.mockResolvedValue(undefined);
+    useAuthMock.mockReturnValue({ isAuthenticated: false, refreshSession: refreshSessionMock });
     listPackagesMock.mockResolvedValue([makePackage()]);
     createCheckoutMock.mockReset();
     getCheckoutMock.mockReset();
@@ -219,6 +222,10 @@ describe('PublicEventCheckoutPage', () => {
         title: 'Casamento Camila e Bruno',
         city: 'Florianopolis',
       },
+    });
+
+    await waitFor(() => {
+      expect(refreshSessionMock).toHaveBeenCalledTimes(1);
     });
 
     await screen.findByText(/pix gerado com sucesso/i);

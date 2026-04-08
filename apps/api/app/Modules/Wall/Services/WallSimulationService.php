@@ -5,6 +5,7 @@ namespace App\Modules\Wall\Services;
 use App\Modules\Wall\Enums\WallEventPhase;
 use App\Modules\Wall\Enums\WallSelectionMode;
 use App\Modules\Wall\Models\EventWallSetting;
+use App\Modules\Wall\Support\WallSourceNormalizer;
 use App\Modules\Wall\Support\WallSelectionPreset;
 use Carbon\CarbonImmutable;
 use Throwable;
@@ -57,8 +58,10 @@ class WallSimulationService
                 'position' => $position,
                 'eta_seconds' => (int) round((($position - 1) * $intervalMs) / 1000),
                 'item_id' => $currentItem['id'],
+                'preview_url' => $currentItem['preview_url'],
                 'sender_name' => $currentItem['sender_name'] ?: 'Convidado',
                 'sender_key' => $currentItem['senderKey'],
+                'source_type' => $currentItem['source_type'],
                 'duplicate_cluster_key' => $currentItem['duplicateClusterKey'],
                 'is_featured' => (bool) $currentItem['is_featured'],
                 'is_replay' => (int) $currentItem['play_count'] > 1,
@@ -145,8 +148,10 @@ class WallSimulationService
         return [
             'id' => $payload['id'],
             'url' => $payload['url'] ?? null,
+            'preview_url' => $payload['preview_url'] ?? null,
             'type' => $payload['type'] ?? 'image',
             'sender_name' => $payload['sender_name'] ?? null,
+            'source_type' => WallSourceNormalizer::normalize($payload['source_type'] ?? null),
             'sender_key' => $payload['sender_key'] ?? null,
             'senderKey' => $payload['sender_key'] ?? $payload['id'],
             'duplicateClusterKey' => $payload['duplicate_cluster_key'] ?? null,

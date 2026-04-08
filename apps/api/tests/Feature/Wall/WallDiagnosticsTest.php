@@ -224,15 +224,25 @@ it('simulates the next wall slides using the real event queue and draft settings
     \App\Modules\MediaProcessing\Models\EventMedia::factory()->published()->create([
         'event_id' => $event->id,
         'inbound_message_id' => $messageB->id,
-        'source_type' => 'whatsapp',
+        'source_type' => 'public_upload',
         'published_at' => now()->subMinute(),
     ]);
 
-    \App\Modules\MediaProcessing\Models\EventMedia::factory()->published()->create([
+    $carlaPublished = \App\Modules\MediaProcessing\Models\EventMedia::factory()->published()->create([
         'event_id' => $event->id,
         'inbound_message_id' => $messageC->id,
-        'source_type' => 'whatsapp',
+        'source_type' => 'telegram',
         'published_at' => now(),
+    ]);
+
+    $carlaPublished->variants()->create([
+        'variant_key' => 'thumb',
+        'disk' => 'public',
+        'path' => "events/{$event->id}/variants/{$carlaPublished->id}/thumb.webp",
+        'mime_type' => 'image/webp',
+        'width' => 320,
+        'height' => 320,
+        'size_bytes' => 32145,
     ]);
 
     $response = $this->apiPost("/events/{$event->id}/wall/simulate", [
@@ -262,6 +272,8 @@ it('simulates the next wall slides using the real event queue and draft settings
         ->assertJsonPath('data.summary.event_phase_label', 'Festa')
         ->assertJsonPath('data.summary.active_senders', 3)
         ->assertJsonPath('data.sequence_preview.0.sender_name', 'Carla')
+        ->assertJsonPath('data.sequence_preview.0.source_type', 'telegram')
+        ->assertJsonPath('data.sequence_preview.0.preview_url', rtrim((string) config('app.url'), '/')."/storage/events/{$event->id}/variants/{$carlaPublished->id}/thumb.webp")
         ->assertJsonPath('data.sequence_preview.1.sender_name', 'Bruno')
         ->assertJsonPath('data.sequence_preview.2.sender_name', 'Ana');
 });

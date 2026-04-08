@@ -145,7 +145,7 @@ it('prefers fast preview assets and exposes enriched processing runs in the deta
         'model_snapshot' => 'intervention-image-v4',
         'input_ref' => "events/{$event->id}/variants/{$media->id}/fast_preview.webp",
         'decision_key' => 'generated',
-        'queue_name' => 'media-fast',
+        'queue_name' => 'media-audit',
         'worker_ref' => 'worker-a',
         'result_json' => ['variant_keys' => ['fast_preview', 'gallery']],
         'metrics_json' => ['generated_count' => 2],
@@ -162,7 +162,7 @@ it('prefers fast preview assets and exposes enriched processing runs in the deta
 
     $this->assertApiSuccess($response);
     $response->assertJsonPath('data.preview_url', rtrim((string) config('app.url'), '/')."/storage/events/{$event->id}/variants/{$media->id}/fast_preview.webp")
-        ->assertJsonPath('data.processing_runs.0.queue_name', 'media-fast')
+        ->assertJsonPath('data.processing_runs.0.queue_name', 'media-audit')
         ->assertJsonPath('data.processing_runs.0.worker_ref', 'worker-a')
         ->assertJsonPath('data.processing_runs.0.provider_version', 'v4')
         ->assertJsonPath('data.processing_runs.0.model_snapshot', 'intervention-image-v4')
@@ -466,6 +466,46 @@ it('shows an aggregated ai debug payload with trace ids, provider logs and chann
         ->assertJsonPath('data.feedback.whatsapp.0.trace_id', $traceId)
         ->assertJsonPath('data.feedback.whatsapp_dispatch_logs.0.endpoint_used', '/send-text')
         ->assertJsonPath('data.feedback.telegram.0.trace_id', $traceId);
+});
+
+it('exposes the effective media state and stage decisions when a blocking contextual rejection conflicts with publication flags', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+        'moderation_mode' => 'ai',
+    ]);
+
+    \Database\Factories\EventMediaIntelligenceSettingFactory::new()->gate()->create([
+        'event_id' => $event->id,
+        'enabled' => true,
+    ]);
+
+    $media = EventMedia::factory()->published()->create([
+        'event_id' => $event->id,
+        'safety_status' => 'pass',
+        'vlm_status' => 'rejected',
+    ]);
+
+    $listResponse = $this->apiGet("/events/{$event->id}/media");
+
+    $this->assertApiPaginated($listResponse);
+    $listResponse->assertJsonPath('data.0.status', 'rejected')
+        ->assertJsonPath('data.0.effective_media_state', 'rejected')
+        ->assertJsonPath('data.0.safety_decision', 'approved')
+        ->assertJsonPath('data.0.context_decision', 'rejected')
+        ->assertJsonPath('data.0.context_is_blocking', true)
+        ->assertJsonPath('data.0.publication_decision', 'published');
+
+    $detailResponse = $this->apiGet("/media/{$media->id}");
+
+    $this->assertApiSuccess($detailResponse);
+    $detailResponse->assertJsonPath('data.status', 'rejected')
+        ->assertJsonPath('data.effective_media_state', 'rejected')
+        ->assertJsonPath('data.safety_decision', 'approved')
+        ->assertJsonPath('data.context_decision', 'rejected')
+        ->assertJsonPath('data.context_is_blocking', true)
+        ->assertJsonPath('data.publication_decision', 'published');
 });
 
 it('marks caption source as human when the stored caption differs from the latest vlm short caption', function () {

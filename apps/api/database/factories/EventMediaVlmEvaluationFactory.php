@@ -33,11 +33,15 @@ class EventMediaVlmEvaluationFactory extends Factory
             'request_payload_json' => [
                 'model' => 'Qwen/Qwen2.5-VL-3B-Instruct',
             ],
+            'normalized_text_context' => null,
+            'normalized_text_context_mode' => null,
             'prompt_context_json' => [
                 'template' => 'Use {nome_do_evento}.',
                 'variables' => ['nome_do_evento' => 'Evento Teste'],
                 'resolved' => 'Use Evento Teste.',
             ],
+            'policy_snapshot_json' => null,
+            'policy_sources_json' => null,
             'tokens_input' => 120,
             'tokens_output' => 42,
             'completed_at' => now(),

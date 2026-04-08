@@ -533,11 +533,13 @@ it('returns billing history from real invoices instead of event purchases', func
     $response = $this->apiGet('/billing/invoices');
 
     $this->assertApiSuccess($response);
-    $response->assertJsonPath('data.data.0.invoice_number', 'EVV-TEST-000001');
-    $response->assertJsonPath('data.data.0.package.code', 'interactive-event');
-    $response->assertJsonPath('data.data.0.plan', null);
-    $response->assertJsonPath('data.data.0.order.mode', 'event_package');
-    $response->assertJsonPath('data.data.0.payment.status', 'paid');
+    $response->assertJsonPath('data.0.invoice_number', 'EVV-TEST-000001');
+    $response->assertJsonPath('data.0.package.code', 'interactive-event');
+    $response->assertJsonPath('data.0.plan', null);
+    $response->assertJsonPath('data.0.order.mode', 'event_package');
+    $response->assertJsonPath('data.0.payment.status', 'paid');
+    $response->assertJsonPath('meta.page', 1);
+    $response->assertJsonPath('meta.total', 1);
 });
 
 it('cancels a pending event-package billing order through the configured gateway', function () {

@@ -92,6 +92,17 @@ export interface WallPlayerState {
   event: WallEventSummary | null;
   settings: WallSettings | null;
   items: WallRuntimeItem[];
+  ads: WallAdItem[];
+  currentAd: WallAdItem | null;
+  adBaseItemId?: string | null;
+  adScheduler: {
+    mode: WallAdMode;
+    frequency: number;
+    photosSinceLastAd: number;
+    lastAdPlayedAt: number | null;
+    lastAdIndex: number;
+    skipNextAdCheck: boolean;
+  };
   senderStats: Record<string, WallSenderRuntimeStats>;
   currentIndex: number;
   currentItemId?: string | null;

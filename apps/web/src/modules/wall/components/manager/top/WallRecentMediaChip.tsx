@@ -1,3 +1,4 @@
+import { forwardRef, type KeyboardEvent } from 'react';
 import type { ApiWallInsightsRecentItem } from '@/lib/api-types';
 import { Star } from 'lucide-react';
 
@@ -7,28 +8,38 @@ import { formatWallRecentStatusLabel } from '@/modules/wall/wall-copy';
 import { getWallSourceMeta } from '@/modules/wall/wall-source-meta';
 import { formatWallRelativeTime } from '@/modules/wall/wall-view-models';
 
-export function WallRecentMediaChip({
-  item,
-  selected,
-  onSelect,
-}: {
+interface WallRecentMediaChipProps {
   item: ApiWallInsightsRecentItem;
   selected: boolean;
   onSelect?: (item: ApiWallInsightsRecentItem) => void;
-}) {
+  onOpen?: (item: ApiWallInsightsRecentItem) => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void;
+}
+
+export const WallRecentMediaChip = forwardRef<HTMLButtonElement, WallRecentMediaChipProps>(({
+  item,
+  selected,
+  onSelect,
+  onOpen,
+  onKeyDown,
+}, ref) => {
   const sourceMeta = getWallSourceMeta(item.source);
+  const isNewArrival = item.createdAt ? (Date.now() - new Date(item.createdAt).getTime()) <= 60_000 : false;
 
   return (
     <button
+      ref={ref}
       type="button"
       aria-pressed={selected}
       aria-label={`Selecionar midia recente de ${item.senderName || 'Convidado'}`}
       onClick={() => onSelect?.(item)}
+      onDoubleClick={() => onOpen?.(item)}
+      onKeyDown={onKeyDown}
       className={cn(
-        'group flex min-w-[158px] flex-col gap-2 rounded-2xl border p-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'group flex min-w-[158px] flex-col gap-2 rounded-2xl border p-2 text-left transition-[border-color,background-color,box-shadow,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         selected
-          ? 'border-primary bg-primary/10 shadow-sm'
-          : 'border-border/60 bg-background/70 hover:border-primary/40 hover:bg-background',
+          ? 'border-primary bg-primary/10 shadow-sm ring-1 ring-primary/20'
+          : 'border-border/60 bg-background/70 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-background',
       )}
     >
       <div className="relative overflow-hidden rounded-2xl bg-muted">
@@ -55,6 +66,12 @@ export function WallRecentMediaChip({
             Destaque
           </span>
         ) : null}
+
+        {isNewArrival ? (
+          <span className="absolute bottom-2 right-2 inline-flex rounded-full border border-white/15 bg-neutral-950/70 px-2 py-0.5 text-[10px] font-medium text-white">
+            Agora
+          </span>
+        ) : null}
       </div>
 
       <div className="space-y-1">
@@ -71,4 +88,6 @@ export function WallRecentMediaChip({
       </span>
     </button>
   );
-}
+});
+
+WallRecentMediaChip.displayName = 'WallRecentMediaChip';

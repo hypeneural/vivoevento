@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type {
+  WallAdItem,
   WallBootData,
   WallMediaDeletedPayload,
   WallMediaItem,
@@ -76,7 +77,7 @@ export function useWallEngine(code: string) {
   const lastAdvanceAtRef = useRef<number>(Date.now());
 
   useEffect(() => {
-    if (state.status !== 'playing' || !state.settings || state.items.length === 0) {
+    if (state.status !== 'playing' || state.currentAd || !state.settings || state.items.length === 0) {
       return;
     }
 
@@ -106,7 +107,7 @@ export function useWallEngine(code: string) {
       window.clearTimeout(timeout);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [state.currentItemId, state.items.length, state.settings, state.status]);
+  }, [state.currentAd, state.currentItemId, state.items.length, state.settings, state.status]);
 
   const currentItem = useMemo(() => {
     if (!state.currentItemId) {
@@ -211,6 +212,15 @@ export function useWallEngine(code: string) {
     dispatch({ type: 'media-deleted', id: payload.id });
   }, []);
 
+  const handleAdsUpdated = useCallback((ads: WallAdItem[]) => {
+    dispatch({ type: 'ads-updated', ads });
+  }, []);
+
+  const handleAdFinished = useCallback(() => {
+    lastAdvanceAtRef.current = Date.now();
+    dispatch({ type: 'ad-finished' });
+  }, []);
+
   const markExpired = useCallback((message?: string | null) => {
     dispatch({ type: 'mark-expired' });
     setErrorMessage(message || 'O telao foi encerrado.');
@@ -242,6 +252,8 @@ export function useWallEngine(code: string) {
     handleNewMedia,
     handleMediaUpdated,
     handleMediaDeleted,
+    handleAdsUpdated,
+    handleAdFinished,
     markExpired,
     markSyncError,
     resetAssetStatuses,

@@ -11,11 +11,13 @@ export function WallTopInsightsRail({
   isLoading,
   selectedMediaId,
   onSelectMedia,
+  onOpenMedia,
 }: {
   insights?: ApiWallInsightsResponse | null;
   isLoading?: boolean;
   selectedMediaId?: string | null;
   onSelectMedia?: (mediaId: string) => void;
+  onOpenMedia?: (mediaId: string) => void;
 }) {
   if (isLoading && !insights) {
     return (
@@ -48,6 +50,7 @@ export function WallTopInsightsRail({
         items={payload.recentItems}
         selectedMediaId={selectedMediaId}
         onSelectItem={(item) => onSelectMedia?.(item.id)}
+        onOpenItem={(item) => onOpenMedia?.(item.id)}
       />
     </div>
   );

@@ -10,6 +10,7 @@ use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Services\MediaAssetUrlService;
 use App\Shared\Exceptions\ProviderMisconfiguredException;
 use App\Shared\Support\ExternalImageUrlPolicy;
+use App\Shared\Support\NormalizedTextContextBuilder;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
@@ -17,12 +18,17 @@ use RuntimeException;
 
 class OpenAiContentModerationProvider implements ContentModerationProviderInterface
 {
+    private readonly NormalizedTextContextBuilder $textContexts;
+
     public function __construct(
         private readonly HttpFactory $http,
         private readonly MediaAssetUrlService $assetUrls,
         private readonly ContentSafetyThresholdEvaluator $thresholds,
         private readonly ExternalImageUrlPolicy $imageUrlPolicy,
-    ) {}
+        ?NormalizedTextContextBuilder $textContexts = null,
+    ) {
+        $this->textContexts = $textContexts ?? app(NormalizedTextContextBuilder::class);
+    }
 
     public function evaluate(
         EventMedia $media,
@@ -46,10 +52,16 @@ class OpenAiContentModerationProvider implements ContentModerationProviderInterf
             ],
         ];
 
-        $textContext = trim(implode("\n", array_filter([
-            $media->caption,
-            $media->inboundMessage?->body_text,
-        ])));
+        $analysisScope = (string) ($settings->analysis_scope ?? 'image_and_text_context');
+        $normalizedContext = $this->textContexts->build(
+            (string) ($settings->normalized_text_context_mode ?? 'body_plus_caption'),
+            caption: $media->caption,
+            bodyText: $media->inboundMessage?->body_text,
+            operatorSummary: null,
+        );
+        $textContext = $analysisScope === 'image_and_text_context'
+            ? (string) ($normalizedContext['text'] ?? '')
+            : '';
 
         if ($textContext !== '') {
             $input[] = [
@@ -102,9 +114,12 @@ class OpenAiContentModerationProvider implements ContentModerationProviderInterf
             'categories' => $providerCategories,
             'category_scores' => $providerCategoryScores,
             'category_applied_input_types' => $providerCategoryInputTypes,
+            'input_scope_used' => $analysisScope,
             'input_path_used' => $imageInput['path_used'],
             'input_source_ref' => $imageInput['source_ref'] ?? null,
             'input_mime_type' => $imageInput['mime_type'] ?? null,
+            'normalized_text_context' => $normalizedContext['text'],
+            'normalized_text_context_mode' => $normalizedContext['mode'],
         ];
 
         $categoryScores = $this->mapCategoryScores($providerCategoryScores);
@@ -133,11 +148,16 @@ class OpenAiContentModerationProvider implements ContentModerationProviderInterf
                 'id' => $payload['id'] ?? null,
                 'model' => $payload['model'] ?? ($config['model'] ?? 'omni-moderation-latest'),
                 'results' => $payload['results'] ?? [],
+                'input_scope_used' => $analysisScope,
                 'input_path_used' => $imageInput['path_used'],
                 'input_source_ref' => $imageInput['source_ref'] ?? null,
                 'input_mime_type' => $imageInput['mime_type'] ?? null,
+                'normalized_text_context' => $normalizedContext['text'],
+                'normalized_text_context_mode' => $normalizedContext['mode'],
             ],
             'requestPayload' => $requestPayload,
+            'normalizedTextContext' => $normalizedContext['text'],
+            'normalizedTextContextMode' => $normalizedContext['mode'],
             'providerKey' => 'openai',
             'providerVersion' => (string) ($config['provider_version'] ?? 'openai-http-v1'),
             'modelKey' => (string) ($config['model'] ?? 'omni-moderation-latest'),

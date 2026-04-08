@@ -11,7 +11,8 @@ return [
     'queue_busy_connection' => env('QUEUE_MONITOR_CONNECTION', 'redis'),
     'queue_busy_thresholds' => [
         'webhooks' => (int) env('QUEUE_BUSY_WEBHOOKS_MAX', 25),
-        'media-fast' => (int) env('QUEUE_BUSY_MEDIA_FAST_MAX', 50),
+        'media-variants' => (int) env('QUEUE_BUSY_MEDIA_VARIANTS_MAX', 50),
+        'media-audit' => (int) env('QUEUE_BUSY_MEDIA_AUDIT_MAX', 50),
         'media-publish' => (int) env('QUEUE_BUSY_MEDIA_PUBLISH_MAX', 25),
         'broadcasts' => (int) env('QUEUE_BUSY_BROADCASTS_MAX', 50),
     ],

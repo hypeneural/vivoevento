@@ -100,6 +100,131 @@ it('maps the openai moderation payload into the internal result dto', function (
     });
 });
 
+it('omits text context when analysis scope is image_only', function () {
+    config()->set('content_moderation.providers.openai.api_key', 'test-key');
+    config()->set('content_moderation.providers.openai.model', 'omni-moderation-latest');
+
+    Http::fake([
+        'https://api.openai.com/v1/moderations' => Http::response([
+            'id' => 'modr_image_only',
+            'model' => 'omni-moderation-latest',
+            'results' => [[
+                'flagged' => false,
+                'categories' => [],
+                'category_scores' => [
+                    'sexual' => 0.01,
+                    'violence' => 0.01,
+                    'self-harm' => 0.00,
+                ],
+                'category_applied_input_types' => [],
+            ]],
+        ]),
+    ]);
+
+    $settings = EventContentModerationSetting::factory()->make([
+        'provider_key' => 'openai',
+        'analysis_scope' => 'image_only',
+    ]);
+
+    $media = EventMedia::factory()->make([
+        'caption' => 'Legenda humana',
+        'original_disk' => 'public',
+        'original_path' => 'events/10/originals/photo.jpg',
+    ]);
+
+    $media->setRelation('inboundMessage', new \App\Modules\InboundMedia\Models\InboundMessage([
+        'body_text' => 'Texto do remetente',
+    ]));
+
+    $assetUrls = \Mockery::mock(MediaAssetUrlService::class);
+    $assetUrls->shouldReceive('preview')
+        ->once()
+        ->withArgs(fn (EventMedia $arg) => $arg === $media)
+        ->andReturn('https://cdn.eventovivo.test/events/10/originals/photo.jpg');
+
+    $provider = new OpenAiContentModerationProvider(
+        app(\Illuminate\Http\Client\Factory::class),
+        $assetUrls,
+        app(ContentSafetyThresholdEvaluator::class),
+        app(ExternalImageUrlPolicy::class),
+    );
+
+    $provider->evaluate($media, $settings);
+
+    Http::assertSent(function ($request) {
+        $payload = $request->data();
+
+        return $request->url() === 'https://api.openai.com/v1/moderations'
+            && count($payload['input']) === 1
+            && $payload['input'][0]['type'] === 'image_url';
+    });
+});
+
+it('uses normalized body text only when safety scope includes text context', function () {
+    config()->set('content_moderation.providers.openai.api_key', 'test-key');
+    config()->set('content_moderation.providers.openai.model', 'omni-moderation-latest');
+
+    Http::fake([
+        'https://api.openai.com/v1/moderations' => Http::response([
+            'id' => 'modr_body_only',
+            'model' => 'omni-moderation-latest',
+            'results' => [[
+                'flagged' => false,
+                'categories' => [],
+                'category_scores' => [
+                    'sexual' => 0.01,
+                    'violence' => 0.01,
+                    'self-harm' => 0.00,
+                ],
+                'category_applied_input_types' => [],
+            ]],
+        ]),
+    ]);
+
+    $settings = EventContentModerationSetting::factory()->make([
+        'provider_key' => 'openai',
+        'analysis_scope' => 'image_and_text_context',
+        'normalized_text_context_mode' => 'body_only',
+    ]);
+
+    $media = EventMedia::factory()->make([
+        'caption' => 'Legenda que nao deve entrar',
+        'original_disk' => 'public',
+        'original_path' => 'events/10/originals/photo.jpg',
+    ]);
+
+    $media->setRelation('inboundMessage', new \App\Modules\InboundMedia\Models\InboundMessage([
+        'body_text' => 'Texto do remetente considerado',
+    ]));
+
+    $assetUrls = \Mockery::mock(MediaAssetUrlService::class);
+    $assetUrls->shouldReceive('preview')
+        ->once()
+        ->withArgs(fn (EventMedia $arg) => $arg === $media)
+        ->andReturn('https://cdn.eventovivo.test/events/10/originals/photo.jpg');
+
+    $provider = new OpenAiContentModerationProvider(
+        app(\Illuminate\Http\Client\Factory::class),
+        $assetUrls,
+        app(ContentSafetyThresholdEvaluator::class),
+        app(ExternalImageUrlPolicy::class),
+    );
+
+    $result = $provider->evaluate($media, $settings);
+
+    expect($result->normalizedTextContext)->toBe('Texto do remetente considerado')
+        ->and($result->normalizedTextContextMode)->toBe('body_only');
+
+    Http::assertSent(function ($request) {
+        $payload = $request->data();
+
+        return $request->url() === 'https://api.openai.com/v1/moderations'
+            && count($payload['input']) === 2
+            && $payload['input'][1]['type'] === 'text'
+            && $payload['input'][1]['text'] === 'Texto do remetente considerado';
+    });
+});
+
 it('falls back to data url when no public preview url is available', function () {
     Storage::fake('public');
 

@@ -162,10 +162,25 @@ it('persists a vlm evaluation and completes the stage when the provider succeeds
         'event_id' => $event->id,
         'enabled' => true,
         'mode' => 'enrich_only',
+        'context_scope' => 'image_and_text_context',
+        'reply_scope' => 'image_only',
+        'normalized_text_context_mode' => 'body_only',
+    ]);
+
+    $inbound = \App\Modules\InboundMedia\Models\InboundMessage::query()->create([
+        'event_id' => $event->id,
+        'provider' => 'whatsapp',
+        'message_id' => 'msg-vlm-body-only',
+        'provider_message_id' => 'wamid-vlm-body-only',
+        'message_type' => 'image',
+        'body_text' => 'Texto recebido para a analise contextual',
+        'status' => 'processed',
+        'received_at' => now(),
     ]);
 
     $media = EventMedia::factory()->create([
         'event_id' => $event->id,
+        'inbound_message_id' => $inbound->id,
         'caption' => null,
         'vlm_status' => 'queued',
     ]);
@@ -196,7 +211,22 @@ it('persists a vlm evaluation and completes the stage when the provider succeeds
     expect($evaluation)->not->toBeNull()
         ->and($evaluation?->decision)->toBe('approve')
         ->and($evaluation?->short_caption)->toBe('Entrada especial na festa.')
-        ->and($evaluation?->reply_text)->toBe('Memorias que fazem o coracao sorrir! 🎉📸');
+        ->and($evaluation?->reply_text)->toBe('Memorias que fazem o coracao sorrir! 🎉📸')
+        ->and(data_get($evaluation?->policy_snapshot_json, 'provider_key'))->toBe('vllm')
+        ->and(data_get($evaluation?->policy_snapshot_json, 'mode'))->toBe('enrich_only')
+        ->and(data_get($evaluation?->policy_snapshot_json, 'fallback_mode'))->toBe('review')
+        ->and(data_get($evaluation?->policy_snapshot_json, 'context_scope'))->toBe('image_and_text_context')
+        ->and(data_get($evaluation?->policy_snapshot_json, 'reply_scope'))->toBe('image_only')
+        ->and(data_get($evaluation?->policy_snapshot_json, 'normalized_text_context_mode'))->toBe('body_only')
+        ->and(data_get($evaluation?->policy_snapshot_json, 'prompt_version'))->toBe('foundation-v1')
+        ->and(data_get($evaluation?->policy_sources_json, 'provider_key'))->toBe('event_setting')
+        ->and(data_get($evaluation?->policy_sources_json, 'mode'))->toBe('event_setting')
+        ->and($evaluation?->normalized_text_context)->toBe('Texto recebido para a analise contextual')
+        ->and($evaluation?->normalized_text_context_mode)->toBe('body_only')
+        ->and(data_get($evaluation?->prompt_context_json, 'normalized_text_context'))->toBe('Texto recebido para a analise contextual')
+        ->and(data_get($evaluation?->prompt_context_json, 'normalized_text_context_mode'))->toBe('body_only')
+        ->and(data_get($evaluation?->prompt_context_json, 'context_scope'))->toBe('image_and_text_context')
+        ->and(data_get($evaluation?->prompt_context_json, 'reply_scope'))->toBe('image_only');
 
     $run = MediaProcessingRun::query()
         ->where('event_media_id', $media->id)

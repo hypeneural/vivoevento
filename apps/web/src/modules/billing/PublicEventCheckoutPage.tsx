@@ -786,7 +786,7 @@ function restoreFormValuesFromResumeDraft(draft: CheckoutResumeDraft): CheckoutF
 export default function PublicEventCheckoutPage({
   pollingIntervalMs = POLLING_INTERVAL_MS,
 }: PublicEventCheckoutPageProps = {}) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, refreshSession } = useAuth();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -946,14 +946,25 @@ export default function PublicEventCheckoutPage({
         cardToken = token.id;
       }
 
-      return publicEventCheckoutService.create(buildCheckoutPayload(values, cardToken));
+      const response = await publicEventCheckoutService.create(buildCheckoutPayload(values, cardToken));
+
+      if (response.token) {
+        setToken(response.token);
+
+        try {
+          await refreshSession();
+        } catch {
+          // Keep the checkout response visible even if the session bootstrap fails transiently.
+        }
+      }
+
+      return response;
     },
     onSuccess: (response) => {
       setSubmitError(null);
       setIdentityConflict(null);
       setResumeNotice(null);
       form.clearErrors();
-      if (response.token) setToken(response.token);
       clearResumeDraft();
       setResumeDraft(null);
       setResumeInitialized(false);
@@ -1209,6 +1220,11 @@ export default function PublicEventCheckoutPage({
                     <Button asChild size="lg" className="h-12 rounded-2xl bg-white text-emerald-950 hover:bg-emerald-50">
                       <Link to={checkoutResponse.onboarding.next_path}>Abrir painel do evento</Link>
                     </Button>
+                    {isAuthenticated ? (
+                      <Button asChild variant="outline" size="lg" className="h-12 rounded-2xl border-white/20 bg-transparent text-white hover:bg-white/10">
+                        <Link to="/plans">Ver cobranca e faturas</Link>
+                      </Button>
+                    ) : null}
                     <Button asChild variant="outline" size="lg" className="h-12 rounded-2xl border-white/20 bg-transparent text-white hover:bg-white/10">
                       <a href="#checkout-status">Acompanhar status do pagamento</a>
                     </Button>

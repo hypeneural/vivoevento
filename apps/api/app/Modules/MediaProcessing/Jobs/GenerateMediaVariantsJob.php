@@ -35,7 +35,7 @@ class GenerateMediaVariantsJob implements ShouldBeUnique, ShouldQueue
     public function __construct(
         public readonly int $eventMediaId,
     ) {
-        $this->onQueue('media-fast');
+        $this->onQueue('media-variants');
     }
 
     public function uniqueId(): string
@@ -70,7 +70,7 @@ class GenerateMediaVariantsJob implements ShouldBeUnique, ShouldQueue
             'model_key' => 'intervention-image-v4',
             'input_ref' => $media->originalStoragePath(),
             'idempotency_key' => "variants:{$media->id}",
-            'queue_name' => 'media-fast',
+            'queue_name' => 'media-variants',
         ]);
 
         try {
@@ -158,7 +158,7 @@ class GenerateMediaVariantsJob implements ShouldBeUnique, ShouldQueue
     public function tags(): array
     {
         return [
-            'queue:media-fast',
+            'queue:media-variants',
             'pipeline:variants',
             "event_media:{$this->eventMediaId}",
         ];
@@ -169,7 +169,7 @@ class GenerateMediaVariantsJob implements ShouldBeUnique, ShouldQueue
         Log::channel((string) config('observability.queue_log_channel', config('logging.default')))
             ->error('media_pipeline.job_failed', [
                 'job' => static::class,
-                'queue' => 'media-fast',
+                'queue' => 'media-variants',
                 'stage' => 'variants',
                 'event_media_id' => $this->eventMediaId,
                 'exception_class' => $exception::class,

@@ -22,6 +22,7 @@ class WallPayloadFactory
         return [
             'id' => $this->mediaIdentifier($media),
             'url' => $this->mediaAssets->wall($media),
+            'preview_url' => $this->mediaAssets->thumbnail($media),
             'original_url' => $this->mediaAssets->original($media),
             'type' => $media->media_type ?? 'image',
             'sender_name' => $this->resolveSenderName($media),

@@ -13,7 +13,7 @@ class EventMediaIntelligenceSetting extends Model
 
     public const DEFAULT_PROMPT_VERSION = 'foundation-v1';
 
-    public const DEFAULT_RESPONSE_SCHEMA_VERSION = 'foundation-v1';
+    public const DEFAULT_RESPONSE_SCHEMA_VERSION = 'contextual-v2';
 
     /**
      * @return array<string, mixed>
@@ -33,6 +33,17 @@ class EventMediaIntelligenceSetting extends Model
             'response_schema_version' => self::DEFAULT_RESPONSE_SCHEMA_VERSION,
             'timeout_ms' => 12000,
             'fallback_mode' => 'review',
+            'context_scope' => 'image_and_text_context',
+            'reply_scope' => 'image_and_text_context',
+            'normalized_text_context_mode' => 'body_plus_caption',
+            'contextual_policy_preset_key' => 'homologacao_livre',
+            'policy_version' => 'contextual-policy-v1',
+            'allow_alcohol' => true,
+            'allow_tobacco' => true,
+            'required_people_context' => 'optional',
+            'blocked_terms_json' => [],
+            'allowed_exceptions_json' => [],
+            'freeform_instruction' => null,
             'require_json_output' => true,
             'reply_text_enabled' => false,
             'reply_text_mode' => MediaReplyTextMode::Disabled->value,
@@ -74,6 +85,17 @@ class EventMediaIntelligenceSetting extends Model
         'response_schema_version',
         'timeout_ms',
         'fallback_mode',
+        'context_scope',
+        'reply_scope',
+        'normalized_text_context_mode',
+        'contextual_policy_preset_key',
+        'policy_version',
+        'allow_alcohol',
+        'allow_tobacco',
+        'required_people_context',
+        'blocked_terms_json',
+        'allowed_exceptions_json',
+        'freeform_instruction',
         'require_json_output',
         'reply_text_enabled',
         'reply_text_mode',
@@ -85,6 +107,10 @@ class EventMediaIntelligenceSetting extends Model
     protected $casts = [
         'enabled' => 'boolean',
         'timeout_ms' => 'integer',
+        'allow_alcohol' => 'boolean',
+        'allow_tobacco' => 'boolean',
+        'blocked_terms_json' => 'array',
+        'allowed_exceptions_json' => 'array',
         'require_json_output' => 'boolean',
         'reply_text_enabled' => 'boolean',
         'reply_fixed_templates_json' => 'array',
@@ -116,6 +142,19 @@ class EventMediaIntelligenceSetting extends Model
         }
 
         return self::normalizeReplyTextMode($mode, $legacyEnabled);
+    }
+
+    public function contextualFreeformInstruction(): ?string
+    {
+        $freeform = trim((string) ($this->freeform_instruction ?? ''));
+
+        if ($freeform !== '') {
+            return $freeform;
+        }
+
+        $legacyPrompt = trim((string) ($this->approval_prompt ?? ''));
+
+        return $legacyPrompt !== '' ? $legacyPrompt : null;
     }
 
     protected static function newFactory(): \Database\Factories\EventMediaIntelligenceSettingFactory

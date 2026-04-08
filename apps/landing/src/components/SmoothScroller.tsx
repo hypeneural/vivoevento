@@ -19,7 +19,6 @@ export function SmoothScroller({ children }: { children: ReactNode }) {
       gestureOrientation: "vertical",
       smoothWheel: true,
       wheelMultiplier: 0.95,
-      smoothTouch: false,
       touchMultiplier: 2,
     });
 
@@ -49,7 +48,7 @@ export function SmoothScroller({ children }: { children: ReactNode }) {
 
         if (lenisRef.current) {
           lenisRef.current.scrollTo(target, {
-            offset: -118,
+            offset: -96,
             duration: 1.05,
           });
         } else {

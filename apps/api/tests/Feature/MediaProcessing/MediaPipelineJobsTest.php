@@ -94,7 +94,7 @@ it('generate variants job marks media processed emits variants event and queues 
     expect($variantsRun)->not->toBeNull()
         ->and($variantsRun?->status)->toBe('completed')
         ->and($variantsRun?->decision_key)->toBe('generated')
-        ->and($variantsRun?->queue_name)->toBe('media-fast')
+        ->and($variantsRun?->queue_name)->toBe('media-variants')
         ->and($variantsRun?->worker_ref)->not->toBe('')
         ->and($variantsRun?->result_json['generated_count'] ?? null)->toBe(4)
         ->and($variantsRun?->result_json['perceptual_hash'] ?? null)->not->toBeNull()
@@ -188,7 +188,7 @@ it('run moderation job approves media and queues publication for no moderation e
 
     expect($run)->not->toBeNull()
         ->and($run?->decision_key)->toBe('approved')
-        ->and($run?->queue_name)->toBe('media-fast');
+        ->and($run?->queue_name)->toBe('media-audit');
 
     Queue::assertPushed(PublishMediaJob::class, fn (PublishMediaJob $job) => $job->eventMediaId === $media->id);
 });
@@ -269,13 +269,13 @@ it('run moderation job keeps media pending for ai moderation events when safety 
 
 it('exposes horizon tags for media pipeline jobs', function () {
     expect((new GenerateMediaVariantsJob(101))->tags())->toBe([
-        'queue:media-fast',
+        'queue:media-variants',
         'pipeline:variants',
         'event_media:101',
     ]);
 
     expect((new RunModerationJob(202))->tags())->toBe([
-        'queue:media-fast',
+        'queue:media-audit',
         'pipeline:moderation',
         'event_media:202',
     ]);

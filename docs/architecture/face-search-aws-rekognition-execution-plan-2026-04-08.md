@@ -29,7 +29,8 @@ Este plano existe para responder 7 perguntas de execucao:
 - [x] baseline atual do modulo `FaceSearch` executado com sucesso.
 - [x] bateria TDD de contratos AWS criada em modo opt-in.
 - [x] validacao red da bateria TDD executada antes da implementacao.
-- [ ] pacote AWS ainda nao integrado no codigo.
+- [x] smoke real de conectividade AWS executado com credencial valida.
+- [x] SDK base `aws/aws-sdk-php` instalado no `apps/api` para smoke e futura integracao.
 - [ ] backend roteavel `aws_rekognition` ainda nao implementado.
 - [ ] persistencia de provider records AWS ainda nao implementada.
 - [ ] preflight de selfie ainda nao implementado.
@@ -51,9 +52,9 @@ Ultima bateria executada:
 Bateria TDD opt-in executada:
 
 - comando:
-  - `$env:RUN_FACE_SEARCH_AWS_TDD='1'; php artisan test tests/Unit/FaceSearch/FaceSearchAwsConfigContractTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryContractTest.php tests/Unit/FaceSearch/FaceSearchRouterContractTest.php tests/Unit/FaceSearch/SelfiePreflightServiceContractTest.php tests/Feature/FaceSearch/FaceSearchAwsSettingsContractTest.php`
+  - `$env:RUN_FACE_SEARCH_AWS_TDD='1'; php artisan test tests/Unit/FaceSearch/FaceSearchAwsConfigContractTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryContractTest.php tests/Unit/FaceSearch/FaceSearchRouterContractTest.php tests/Unit/FaceSearch/SelfiePreflightServiceContractTest.php tests/Feature/FaceSearch/FaceSearchAwsSettingsContractTest.php tests/Unit/FaceSearch/SearchFacesBySelfieAwsArchitectureContractTest.php tests/Unit/FaceSearch/FaceSearchProviderRecordContractTest.php`
 - resultado:
-  - `5 failed`
+  - `7 failed`
 - leitura:
   - os contratos red confirmaram exatamente os blocos que ainda faltam antes de qualquer rollout AWS.
 
@@ -64,6 +65,71 @@ Lacunas objetivas confirmadas pelos testes TDD:
 - falta `FaceSearchBackendInterface` e `FaceSearchRouter`;
 - falta `SelfiePreflightService`;
 - a API de settings ainda nao aceita nem devolve os campos AWS por evento.
+- `SearchFacesBySelfieAction` ainda esta acoplada diretamente a detector, embedder e vector store locais;
+- falta `FaceSearchProviderRecord` como modelo de persistencia para estado remoto do provider.
+
+Verificacoes finais na stack atual:
+
+- `EventFaceSearchSetting` hoje so conhece campos locais:
+  - `provider_key`
+  - `embedding_model_key`
+  - `vector_store_key`
+  - `search_strategy`
+  - `min_face_size_px`
+  - `min_quality_score`
+  - `search_threshold`
+- `UpsertEventFaceSearchSettingsRequest` hoje valida apenas configuracao local e publica;
+- `EventFaceSearchSettingResource` hoje nao expoe nenhum campo AWS;
+- `FaceSearchServiceProvider` hoje so registra:
+  - detection providers
+  - embedding providers
+  - vector store
+- `SearchFacesBySelfieAction` hoje depende diretamente de:
+  - `FaceDetectionProviderInterface`
+  - `FaceEmbeddingProviderInterface`
+  - `FaceVectorStoreInterface`
+- o modulo hoje nao tem:
+  - provider records
+  - query records especificos de backend
+  - jobs de provisionamento de collection
+  - health check de backend gerenciado
+
+Smoke real AWS executado antes da implementacao:
+
+- script:
+  - `apps/api/scripts/face-search-aws-smoke.php`
+- variaveis locais usadas:
+  - `FACE_SEARCH_AWS_SMOKE_ACCESS_KEY_ID`
+  - `FACE_SEARCH_AWS_SMOKE_SECRET_ACCESS_KEY`
+  - `FACE_SEARCH_AWS_SMOKE_REGION`
+- motivo dessas variaveis dedicadas:
+  - o projeto ja usa `AWS_*` para storage local/MinIO;
+  - sobrescrever `AWS_ACCESS_KEY_ID` e correlatas quebraria o ambiente local de arquivos.
+
+Resultado real validado em `2026-04-08`:
+
+- `STS GetCallerIdentity`:
+  - `OK`
+  - `Account=426912654290`
+  - `Arn=arn:aws:iam::426912654290:user/eventovivo`
+- `Rekognition`:
+  - `CreateCollection=OK`
+  - `DescribeCollection=OK`
+  - `FaceModelVersion=7.0`
+  - `ListCollections=OK`
+  - `ListFaces=OK`
+  - `DeleteCollection=OK`
+
+Leitura:
+
+- a credencial esta valida;
+- a regiao `eu-central-1` esta funcional;
+- a policy ja cobre o baseline operacional do MVP para collections;
+- o SDK base ja esta disponivel no projeto;
+- ainda falta validar com imagem real:
+  - `IndexFaces`
+  - `SearchFacesByImage`
+  - `DeleteFaces`
 
 ---
 

@@ -3,6 +3,10 @@ import type { ApiWallInsightsResponse } from '@/lib/api-types';
 const previousData = (current: ApiWallInsightsResponse | undefined) => current;
 
 export const wallQueryOptions = {
+  event: {
+    staleTime: 30 * 1000,
+    gcTime: 10 * 60 * 1000,
+  },
   options: {
     staleTime: Infinity,
     gcTime: 60 * 60 * 1000,

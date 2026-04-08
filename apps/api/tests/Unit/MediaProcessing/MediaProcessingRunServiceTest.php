@@ -12,11 +12,11 @@ it('stores operational metadata when a stage starts and finishes', function () {
         'provider_version' => 'v4',
         'model_key' => 'intervention-image-v4',
         'model_snapshot' => 'intervention-image-v4',
-        'queue_name' => 'media-fast',
+        'queue_name' => 'media-audit',
         'idempotency_key' => "variants:{$media->id}",
     ]);
 
-    expect($run->queue_name)->toBe('media-fast')
+    expect($run->queue_name)->toBe('media-audit')
         ->and($run->provider_version)->toBe('v4')
         ->and($run->model_snapshot)->toBe('intervention-image-v4')
         ->and($run->worker_ref)->not->toBe('');

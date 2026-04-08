@@ -3,15 +3,12 @@
 namespace App\Modules\FaceSearch\Actions;
 
 use App\Modules\Events\Models\Event;
-use App\Modules\FaceSearch\DTOs\DetectedFaceData;
 use App\Modules\FaceSearch\DTOs\FaceQualityAssessmentData;
 use App\Modules\FaceSearch\Models\EventFaceSearchRequest;
 use App\Modules\FaceSearch\Models\EventFaceSearchSetting;
 use App\Modules\FaceSearch\Queries\CollapseFaceSearchMatchesQuery;
-use App\Modules\FaceSearch\Services\FaceDetectionProviderInterface;
-use App\Modules\FaceSearch\Services\FaceEmbeddingProviderInterface;
-use App\Modules\FaceSearch\Services\FaceQualityGateService;
-use App\Modules\FaceSearch\Services\FaceVectorStoreInterface;
+use App\Modules\FaceSearch\Services\FaceSearchRouter;
+use App\Modules\FaceSearch\Services\SelfiePreflightService;
 use App\Modules\MediaProcessing\Enums\ModerationStatus;
 use App\Modules\MediaProcessing\Enums\PublicationStatus;
 use App\Modules\MediaProcessing\Models\EventMedia;
@@ -20,16 +17,13 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
-use Intervention\Image\Laravel\Facades\Image;
 use Throwable;
 
 class SearchFacesBySelfieAction
 {
     public function __construct(
-        private readonly FaceDetectionProviderInterface $detector,
-        private readonly FaceEmbeddingProviderInterface $embedder,
-        private readonly FaceVectorStoreInterface $vectorStore,
-        private readonly FaceQualityGateService $qualityGate,
+        private readonly FaceSearchRouter $router,
+        private readonly SelfiePreflightService $selfiePreflight,
         private readonly CollapseFaceSearchMatchesQuery $collapseMatches,
     ) {}
 
@@ -99,19 +93,21 @@ class SearchFacesBySelfieAction
                 ]);
             }
 
-            $probeMedia = new EventMedia([
-                'event_id' => $event->id,
-                'media_type' => 'image',
-                'source_type' => $publicSearch ? 'public_face_search' : 'internal_face_search',
-            ]);
-
-            $detectedFaces = array_values($this->detector->detect($probeMedia, $settings, $binary));
+            $preflight = $this->selfiePreflight->validateForSearch(
+                event: $event,
+                settings: $settings,
+                binary: $binary,
+                publicSearch: $publicSearch,
+            );
 
             $request->forceFill([
-                'faces_detected' => count($detectedFaces),
+                'faces_detected' => $preflight['detected_faces_count'],
             ])->save();
 
-            ['face' => $face, 'assessment' => $assessment] = $this->resolveSearchFace($settings, $detectedFaces);
+            /** @var EventMedia $probeMedia */
+            $probeMedia = $preflight['probe_media'];
+            $face = $preflight['face'];
+            $assessment = $preflight['assessment'];
 
             $request->forceFill([
                 'query_face_quality_score' => $face->qualityScore,
@@ -125,18 +121,15 @@ class SearchFacesBySelfieAction
                 ]);
             }
 
-            $cropBinary = $this->cropFace($binary, $face);
-            $embedding = $this->embedder->embed($probeMedia, $settings, $cropBinary, $face);
-
             $candidateLimit = min(200, max(1, (int) $settings->top_k) * 4);
             $collapsedMatches = $this->collapseMatches->execute(
-                $this->vectorStore->search(
-                    eventId: $event->id,
-                    queryEmbedding: $embedding->vector,
+                $this->router->searchBySelfie(
+                    event: $event,
+                    settings: $settings,
+                    probeMedia: $probeMedia,
+                    binary: $binary,
+                    face: $face,
                     topK: $candidateLimit,
-                    threshold: $settings->search_threshold,
-                    searchableOnly: true,
-                    searchStrategy: $settings->search_strategy ?: (string) config('face_search.default_search_strategy', 'exact'),
                 ),
             );
 
@@ -177,35 +170,6 @@ class SearchFacesBySelfieAction
 
             throw $exception;
         }
-    }
-
-    /**
-     * @param array<int, DetectedFaceData> $detectedFaces
-     * @return array{face:DetectedFaceData, assessment:FaceQualityAssessmentData}
-     */
-    private function resolveSearchFace(
-        EventFaceSearchSetting $settings,
-        array $detectedFaces,
-    ): array {
-        if ($detectedFaces === []) {
-            throw ValidationException::withMessages([
-                'selfie' => ['Nao encontramos um rosto valido na selfie enviada.'],
-            ]);
-        }
-
-        if (count($detectedFaces) > 1) {
-            throw ValidationException::withMessages([
-                'selfie' => ['Envie uma selfie com apenas uma pessoa visivel.'],
-            ]);
-        }
-
-        $face = $detectedFaces[0];
-        $assessment = $this->qualityGate->assess($face, $settings);
-
-        return [
-            'face' => $face,
-            'assessment' => $assessment,
-        ];
     }
 
     /**
@@ -327,17 +291,5 @@ class SearchFacesBySelfieAction
         $media = $query->get();
 
         return $media->keyBy('id');
-    }
-
-    private function cropFace(string $binary, DetectedFaceData $face): string
-    {
-        $cropped = Image::decode($binary)->crop(
-            $face->boundingBox->width,
-            $face->boundingBox->height,
-            $face->boundingBox->x,
-            $face->boundingBox->y,
-        );
-
-        return (string) $cropped->encodeUsingMediaType('image/webp', 88);
     }
 }

@@ -1,34 +1,23 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   AlertTriangle,
-  ArrowDown,
   ArrowLeft,
-  ArrowUp,
-  Check,
-  Copy,
   ExternalLink,
   Loader2,
-  Monitor,
   Pause,
   Play,
   Power,
   RefreshCw,
   RotateCcw,
   Save,
-  Settings,
   Square,
   Trash2,
 } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import type {
   ApiWallAdItem,
@@ -45,8 +34,15 @@ import { PageHeader } from '@/shared/components/PageHeader';
 import { getEventDetail } from '@/modules/events/api';
 import { EVENT_STATUS_LABELS } from '@/modules/events/types';
 
-import { HelpLabel, HelpTooltip } from '../components/WallManagerHelp';
+import { HelpTooltip } from '../components/WallManagerHelp';
 import { WallManagerSection } from '../components/WallManagerSection';
+import { WallAdsTab } from '../components/manager/inspector/WallAdsTab';
+import { WallAppearanceTab } from '../components/manager/inspector/WallAppearanceTab';
+import { WallCommandToolbar } from '../components/manager/layout/WallCommandToolbar';
+import { WallInspectorTabs } from '../components/manager/inspector/WallInspectorTabs';
+import { WallQueueTab } from '../components/manager/inspector/WallQueueTab';
+import { WallRecentMediaDetailsSheet } from '../components/manager/recent/WallRecentMediaDetailsSheet';
+import { WallHeroStage } from '../components/manager/stage/WallHeroStage';
 import { WallTopInsightsRail } from '../components/manager/top/WallTopInsightsRail';
 import {
   fallbackOptions,
@@ -54,8 +50,6 @@ import {
   WALL_EVENT_PHASE_OPTIONS,
   WALL_REPLAY_MINUTE_OPTIONS,
   WALL_SELECTION_MODE_OPTIONS,
-  WALL_SLIDER_FIELDS,
-  WALL_TOGGLE_FIELDS,
   WALL_VOLUME_THRESHOLD_OPTIONS,
   WALL_WINDOW_MINUTE_OPTIONS,
 } from '../manager-config';
@@ -73,10 +67,11 @@ import {
   updateEventWallSettings,
   type EventWallAction,
 } from '../api';
-import { realtimeLabel, useWallManagerRealtime } from '../hooks/useWallManagerRealtime';
+import { useWallPollingFallback } from '../hooks/useWallPollingFallback';
 import { useWallSelectedMedia } from '../hooks/useWallSelectedMedia';
 import { useWallTopInsights } from '../hooks/useWallTopInsights';
-import { WALL_INSIGHTS_COPY, formatWallRecentStatusLabel } from '../wall-copy';
+import { realtimeLabel, useWallRealtimeSync } from '../hooks/useWallRealtimeSync';
+import { wallQueryOptions } from '../wall-query-options';
 import {
   applyWallSelectionPreset,
   areWallSettingsEqual,
@@ -86,8 +81,6 @@ import {
   prepareWallSettingsPayload,
   resolveWallSelectionModeOption,
 } from '../wall-settings';
-import { getWallSourceMeta } from '../wall-source-meta';
-import { formatWallRelativeTime } from '../wall-view-models';
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-neutral-500/20 text-neutral-300 border-neutral-500/30',
@@ -160,18 +153,6 @@ function clampIntegerInput(value: string | number | undefined, fallback: number,
   return Math.max(min, Math.min(max, Math.trunc(parsed)));
 }
 
-function formatFileSize(sizeBytes: number): string {
-  if (sizeBytes < 1024) {
-    return `${sizeBytes} B`;
-  }
-
-  if (sizeBytes < 1024 * 1024) {
-    return `${Math.round(sizeBytes / 102.4) / 10} KB`;
-  }
-
-  return `${Math.round(sizeBytes / 104857.6) / 10} MB`;
-}
-
 export default function EventWallManagerPage() {
   const { id } = useParams<{ id: string }>();
   const eventId = id ?? '';
@@ -184,29 +165,41 @@ export default function EventWallManagerPage() {
   const [simulationFingerprint, setSimulationFingerprint] = useState('');
   const [selectedAdFile, setSelectedAdFile] = useState<File | null>(null);
   const [selectedAdDuration, setSelectedAdDuration] = useState('10');
+  const [isRecentDetailsOpen, setIsRecentDetailsOpen] = useState(false);
+  const [activeStageTab, setActiveStageTab] = useState<'live' | 'upcoming'>('live');
+  const [activeInspectorTab, setActiveInspectorTab] = useState<'queue' | 'appearance' | 'ads'>('queue');
   const adFileInputRef = useRef<HTMLInputElement | null>(null);
+  const realtimeState = useWallRealtimeSync(eventId);
+  const pollingFallback = useWallPollingFallback(realtimeState);
 
   const eventQuery = useQuery({
     queryKey: queryKeys.events.detail(eventId),
     enabled: eventId !== '',
     queryFn: () => getEventDetail(eventId),
+    ...wallQueryOptions.event,
+    refetchInterval: pollingFallback.eventIntervalMs,
   });
 
   const settingsQuery = useQuery({
     queryKey: queryKeys.wall.settings(eventId),
     enabled: eventId !== '',
     queryFn: () => getEventWallSettings(eventId),
+    ...wallQueryOptions.settings,
+    refetchInterval: pollingFallback.settingsIntervalMs,
   });
 
   const optionsQuery = useQuery({
     queryKey: queryKeys.wall.options(),
     queryFn: getWallOptions,
+    ...wallQueryOptions.options,
   });
 
   const diagnosticsQuery = useQuery({
     queryKey: queryKeys.wall.diagnostics(eventId),
     enabled: eventId !== '',
     queryFn: () => getEventWallDiagnostics(eventId),
+    ...wallQueryOptions.diagnostics,
+    refetchInterval: pollingFallback.diagnosticsIntervalMs,
   });
 
   const adsQuery = useQuery({
@@ -214,7 +207,9 @@ export default function EventWallManagerPage() {
     enabled: eventId !== '',
     queryFn: () => getEventWallAds(eventId),
   });
-  const insightsQuery = useWallTopInsights(eventId);
+  const insightsQuery = useWallTopInsights(eventId, {
+    refetchInterval: pollingFallback.insightsIntervalMs,
+  });
 
   useEffect(() => {
     if (settingsQuery.data?.settings) {
@@ -265,10 +260,6 @@ export default function EventWallManagerPage() {
   const eventPhases = options.event_phases?.length
     ? options.event_phases
     : WALL_EVENT_PHASE_OPTIONS;
-  const realtimeState = useWallManagerRealtime(eventId);
-  const adMode = wallSettings?.ad_mode ?? 'disabled';
-  const adFrequency = wallSettings?.ad_frequency ?? 5;
-  const adIntervalMinutes = wallSettings?.ad_interval_minutes ?? 3;
   const wallAds = useMemo(
     () => sortWallAds(adsQuery.data ?? []),
     [adsQuery.data],
@@ -351,7 +342,15 @@ export default function EventWallManagerPage() {
     selectedMedia,
     selectMedia,
   } = useWallSelectedMedia(insightsRecentItems);
-  const selectedMediaSourceMeta = selectedMedia ? getWallSourceMeta(selectedMedia.source) : null;
+
+  function handleSelectRecentMedia(mediaId: string) {
+    selectMedia(mediaId);
+  }
+
+  function handleOpenRecentMediaDetails(mediaId: string) {
+    selectMedia(mediaId);
+    setIsRecentDetailsOpen(true);
+  }
 
   function updateDraft<K extends keyof ApiWallSettings>(key: K, value: ApiWallSettings[K]) {
     setDraft((current) => (current ? { ...current, [key]: value } : current));
@@ -635,42 +634,57 @@ export default function EventWallManagerPage() {
         title={`Telao / ${event.title}`}
         description={headerDescription}
         actions={(
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-            <Button asChild variant="ghost" size="sm">
-              <Link to="/wall">
-                <ArrowLeft className="mr-1.5 h-4 w-4" />
-                Voltar
-              </Link>
-            </Button>
-            <span className={`inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wider ${STATUS_COLORS[status] || STATUS_COLORS.draft}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${isLive ? 'animate-pulse bg-emerald-400' : 'bg-current opacity-50'}`} />
-              {settings.status_label}
-            </span>
-            <span className={`inline-flex items-center justify-center rounded-full border px-3 py-1 text-xs font-medium ${REALTIME_COLORS[realtimeState]}`}>
-              {realtimeLabel(realtimeState)}
-            </span>
-            <HelpTooltip helpKey="realtime" />
-            {isLive ? (
-              <Button variant="destructive" size="sm" onClick={() => void handleAction('pause')} disabled={isBusy}>
-                <Pause className="mr-1 h-4 w-4" />
-                Pausar
+          <div className="flex flex-col gap-2 sm:items-end">
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <span className={`inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wider ${STATUS_COLORS[status] || STATUS_COLORS.draft}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${isLive ? 'animate-pulse bg-emerald-400' : 'bg-current opacity-50'}`} />
+                {settings.status_label}
+              </span>
+              <span className={`inline-flex items-center justify-center rounded-full border px-3 py-1 text-xs font-medium ${REALTIME_COLORS[realtimeState]}`}>
+                {realtimeLabel(realtimeState)}
+              </span>
+              <HelpTooltip helpKey="realtime" />
+              <span className="inline-flex items-center justify-center rounded-full border border-border/60 bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
+                {hasUnsavedChanges ? 'Alteracoes pendentes' : 'Tudo salvo'}
+              </span>
+            </div>
+
+            <WallCommandToolbar
+              ariaLabel="Comandos principais do telao"
+              className="w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end"
+            >
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/wall">
+                  <ArrowLeft className="mr-1.5 h-4 w-4" />
+                  Voltar
+                </Link>
               </Button>
-            ) : isPaused ? (
-              <Button size="sm" onClick={() => void handleAction('start')} disabled={isBusy}>
-                <Play className="mr-1 h-4 w-4" />
-                Resumir
+              <Button variant="outline" size="sm" onClick={openScreen} disabled={!settings.public_url}>
+                <ExternalLink className="mr-1.5 h-4 w-4" />
+                Abrir telao
               </Button>
-            ) : !isTerminal ? (
-              <Button size="sm" onClick={() => void handleAction('start')} disabled={isBusy}>
-                <Play className="mr-1 h-4 w-4" />
-                Iniciar telao
-              </Button>
-            ) : (
-              <Button variant="outline" size="sm" onClick={() => void handleAction('reset')} disabled={isBusy}>
-                <RefreshCw className="mr-1 h-4 w-4" />
-                Resetar
-              </Button>
-            )}
+              {isLive ? (
+                <Button variant="destructive" size="sm" onClick={() => void handleAction('pause')} disabled={isBusy}>
+                  <Pause className="mr-1 h-4 w-4" />
+                  Pausar
+                </Button>
+              ) : isPaused ? (
+                <Button size="sm" onClick={() => void handleAction('start')} disabled={isBusy}>
+                  <Play className="mr-1 h-4 w-4" />
+                  Resumir
+                </Button>
+              ) : !isTerminal ? (
+                <Button size="sm" onClick={() => void handleAction('start')} disabled={isBusy}>
+                  <Play className="mr-1 h-4 w-4" />
+                  Iniciar telao
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => void handleAction('reset')} disabled={isBusy}>
+                  <RefreshCw className="mr-1 h-4 w-4" />
+                  Resetar
+                </Button>
+              )}
+            </WallCommandToolbar>
           </div>
         )}
       />
@@ -685,116 +699,35 @@ export default function EventWallManagerPage() {
               insights={insights}
               isLoading={insightsQuery.isLoading}
               selectedMediaId={selectedMediaId}
-              onSelectMedia={selectMedia}
+              onSelectMedia={handleSelectRecentMedia}
+              onOpenMedia={handleOpenRecentMediaDetails}
             />
           </WallManagerSection>
 
-          <WallManagerSection
-            title="Estado do telao"
-            description="Veja rapidamente se o telao esta ativo, pausado ou aguardando inicio."
-          >
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-              <div className="overflow-hidden rounded-3xl border border-border/60 bg-muted/30">
-                <div className="aspect-[4/3] sm:aspect-video">
-                  {selectedMedia ? (
-                    <div className="relative h-full overflow-hidden bg-neutral-950">
-                      {selectedMedia.previewUrl ? (
-                        <img
-                          src={selectedMedia.previewUrl}
-                          alt={`Midia recente enviada por ${selectedMedia.senderName || 'Convidado'}`}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-white/70">
-                          Essa midia chegou sem miniatura pronta para o palco.
-                        </div>
-                      )}
-
-                      <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/40 to-transparent" />
-                      <div className="absolute inset-x-0 bottom-0 space-y-3 p-5 text-white">
-                        <div className="space-y-1">
-                          <p className="text-xs uppercase tracking-[0.18em] text-white/60">
-                            {WALL_INSIGHTS_COPY.selectedMedia}
-                          </p>
-                          <h3 className="text-xl font-semibold">
-                            {selectedMedia.senderName || 'Convidado'}
-                          </h3>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 text-xs">
-                          {selectedMediaSourceMeta ? (
-                            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 font-medium ${selectedMediaSourceMeta.chipClassName}`}>
-                              <selectedMediaSourceMeta.Icon className="h-3.5 w-3.5" />
-                              {selectedMediaSourceMeta.label}
-                            </span>
-                          ) : null}
-                          <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-2 py-1 font-medium text-white/80">
-                            {formatWallRecentStatusLabel(selectedMedia.status)}
-                          </span>
-                          <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-2 py-1 font-medium text-white/80">
-                            {formatWallRelativeTime(selectedMedia.createdAt, 'Agora')}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ) : isLive || isPaused ? (
-                    <div className="flex h-full items-center justify-center bg-gradient-to-br from-neutral-900 via-neutral-950 to-neutral-900 px-6 text-center">
-                      <div className="space-y-3">
-                        <Monitor className="mx-auto h-14 w-14 text-orange-400/80" />
-                        <p className="text-base font-medium text-white/80 sm:text-lg">
-                          {isLive ? 'Telao ativo exibindo as midias em tempo real.' : 'Telao pausado aguardando novo comando.'}
-                        </p>
-                        <Button variant="outline" size="sm" onClick={openScreen}>
-                          <ExternalLink className="mr-1.5 h-4 w-4" />
-                          Abrir telao
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex h-full items-center justify-center px-6 text-center">
-                      <div className="space-y-3">
-                        <Monitor className="mx-auto h-12 w-12 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">
-                          O telao ainda nao esta em exibicao. Inicie o telao para comecar a mostrar as midias.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                {selectedMedia ? (
-                  <InfoCard
-                    label={WALL_INSIGHTS_COPY.selectedMedia}
-                    value={selectedMedia.senderName || 'Convidado'}
-                    detail={[
-                      selectedMediaSourceMeta?.label,
-                      formatWallRecentStatusLabel(selectedMedia.status),
-                      formatWallRelativeTime(selectedMedia.createdAt, 'Agora'),
-                    ].filter(Boolean).join(' - ')}
-                  />
-                ) : null}
-                <InfoCard label="Evento" value={event.title} detail={formatEventSchedule(event.starts_at, event.location_name)} />
-                <InfoCard
-                  label="Codigo do telao"
-                  value={settings.wall_code}
-                  detail="Use este codigo para identificar o telao em suporte ou operacao."
-                  action={(
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={copyWallCode}>
-                      {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
-                    </Button>
-                  )}
-                  helpKey="wallCode"
-                />
-                <InfoCard
-                  label="Alteracoes pendentes"
-                  value={hasUnsavedChanges ? 'Sim' : 'Nao'}
-                  detail={hasUnsavedChanges ? 'Existe ajuste local esperando salvar.' : 'Tudo salvo e sincronizado.'}
-                />
-              </div>
-            </div>
-          </WallManagerSection>
+          <WallHeroStage
+            activeTab={activeStageTab}
+            onTabChange={setActiveStageTab}
+            isLive={isLive}
+            isPaused={isPaused}
+            status={status}
+            selectedMedia={selectedMedia}
+            eventTitle={event.title}
+            eventSchedule={formatEventSchedule(event.starts_at, event.location_name)}
+            wallCode={settings.wall_code}
+            copied={copied}
+            onCopyWallCode={copyWallCode}
+            hasUnsavedChanges={hasUnsavedChanges}
+            onOpenSelectedMediaDetails={() => setIsRecentDetailsOpen(true)}
+            wallSettings={wallSettings}
+            selectionSummary={selectionSummary}
+            simulationSummary={simulationSummary}
+            simulationPreview={simulationPreview}
+            simulationExplanation={simulationExplanation}
+            isSimulationLoading={simulationQuery.isLoading}
+            isSimulationError={simulationQuery.isError}
+            isSimulationRefreshing={simulationQuery.isFetching}
+            isSimulationDraftPending={isSimulationDraftPending}
+          />
 
           <WallManagerSection
             title="Diagnostico operacional"
@@ -919,747 +852,49 @@ export default function EventWallManagerPage() {
         </div>
 
         <div className="space-y-4">
-          <WallManagerSection
-            title={(
-              <span className="flex items-center gap-2">
-                <RefreshCw className="h-4 w-4" />
-                Previsao da fila
-              </span>
-            )}
-            description="Mostra a ordem mais provavel de exibicao com a fila atual do evento e as configuracoes que voce esta ajustando."
-          >
-            <div className="space-y-4">
-              <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-2">
-                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Resumo da politica</p>
-                    <p className="text-sm leading-relaxed text-foreground/90">{selectionSummary}</p>
-                  </div>
-                  <span className={`rounded-full border px-3 py-1 text-[11px] font-medium ${isSimulationDraftPending || simulationQuery.isFetching ? 'border-amber-500/30 bg-amber-500/10 text-amber-700' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'}`}>
-                    {isSimulationDraftPending || simulationQuery.isFetching ? 'Atualizando' : 'Fila real'}
-                  </span>
-                </div>
-              </div>
+          <WallInspectorTabs activeTab={activeInspectorTab} onTabChange={setActiveInspectorTab} />
 
-              {simulationQuery.isLoading && !simulationSummary ? (
-                <div className="flex min-h-[120px] items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 text-sm text-muted-foreground">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Calculando a proxima ordem de exibicao...
-                </div>
-              ) : simulationQuery.isError ? (
-                <div className="rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-4 text-sm text-destructive">
-                  Nao foi possivel gerar a simulacao com a fila atual do evento.
-                </div>
-              ) : simulationSummary ? (
-                <>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <CompactMetricCard
-                      label="ETA media da primeira aparicao"
-                      value={formatDurationSeconds(simulationSummary.estimated_first_appearance_seconds)}
-                      detail={`${simulationSummary.active_senders} remetentes ativos na amostra atual.`}
-                    />
-                    <CompactMetricCard
-                      label="Risco de monopolizacao"
-                      value={formatLevelLabel(simulationSummary.monopolization_risk)}
-                      detail={`Modo ${simulationSummary.selection_mode_label.toLowerCase()} em ${simulationSummary.event_phase_label.toLowerCase()} com ${simulationSummary.queue_items} itens na fila real.`}
-                    />
-                    <CompactMetricCard
-                      label="Intensidade do frescor"
-                      value={formatLevelLabel(simulationSummary.freshness_intensity)}
-                      detail="Quanto o telao tende a parecer realmente ao vivo com a configuracao atual."
-                    />
-                    <CompactMetricCard
-                      label="Nivel de fairness"
-                      value={formatLevelLabel(simulationSummary.fairness_level)}
-                      detail="Quanto a fila protege contra monopolizacao por remetente."
-                    />
-                  </div>
+          {activeInspectorTab === 'queue' ? (
+            <WallQueueTab
+              wallSettings={wallSettings}
+              selectionModes={selectionModes}
+              eventPhases={eventPhases}
+              selectionSummary={selectionSummary}
+              onSelectionModeChange={handleSelectionModeChange}
+              onDraftChange={updateDraft}
+              onSelectionPolicyChange={updateSelectionPolicy}
+            />
+          ) : null}
 
-                  <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
-                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                      Ordem mais provavel das proximas {simulationPreview.length} exibicoes
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {simulationPreview.map((slide) => (
-                        <span key={`${slide.position}-${slide.item_id}`} className="rounded-full border border-border/60 bg-background px-3 py-1.5 text-xs text-foreground/85">
-                          {slide.eta_seconds}s | {slide.sender_name}{slide.is_replay ? ' | reprise' : ''}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+          {activeInspectorTab === 'appearance' ? (
+            <WallAppearanceTab
+              wallSettings={wallSettings}
+              options={options}
+              onDraftChange={updateDraft}
+            />
+          ) : null}
 
-                  {simulationExplanation.length > 0 ? (
-                    <div className="space-y-2 rounded-2xl border border-border/60 bg-muted/20 p-4">
-                      {simulationExplanation.map((line) => (
-                        <p key={line} className="text-sm leading-relaxed text-muted-foreground">{formatSimulationExplanation(line)}</p>
-                      ))}
-                    </div>
-                  ) : null}
-                </>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-border/60 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
-                  Ajuste as configuracoes do telao para ver a previsao com a fila atual do evento.
-                </div>
-              )}
-            </div>
-          </WallManagerSection>
-
-          <WallManagerSection
-            title={(
-              <span className="flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                Modo do telao
-                <HelpTooltip helpKey="selectionMode" />
-              </span>
-            )}
-            description="Escolha primeiro o comportamento base da fila. Os controles abaixo podem refinar esse preset."
-          >
-            <div className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <HelpLabel helpKey="selectionMode" className="text-sm">Comportamento base</HelpLabel>
-                  <Select value={wallSettings.selection_mode} onValueChange={handleSelectionModeChange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o modo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {selectionModes.map((mode) => (
-                        <SelectItem key={mode.value} value={mode.value}>{mode.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <HelpLabel helpKey="eventPhase" className="text-sm">Fase do evento</HelpLabel>
-                  <Select value={wallSettings.event_phase} onValueChange={(value) => updateDraft('event_phase', value as ApiWallSettings['event_phase'])}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a fase" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {eventPhases.map((phase) => (
-                        <SelectItem key={phase.value} value={phase.value}>{phase.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    {eventPhases.find((phase) => phase.value === wallSettings.event_phase)?.description
-                      ?? 'A fase aplica contexto operacional por cima do modo escolhido.'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
-                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Resumo do comportamento</p>
-                <p className="mt-2 text-sm leading-relaxed text-foreground/90">{selectionSummary}</p>
-              </div>
-            </div>
-          </WallManagerSection>
-
-          <WallManagerSection
-            title={(
-              <span className="flex items-center gap-2">
-                Fila e justica
-                <HelpTooltip helpKey="fairnessSection" />
-              </span>
-            )}
-            description="Essas regras evitam que uma unica pessoa domine o telao ao enviar muitas fotos."
-          >
-            <div className="space-y-5">
-              <div>
-                <HelpLabel helpKey="maxEligibleItems">Backlog elegivel por remetente</HelpLabel>
-                <div className="mt-2 flex items-center gap-3">
-                  <Slider
-                    value={[wallSettings.selection_policy.max_eligible_items_per_sender]}
-                    min={1}
-                    max={12}
-                    step={1}
-                    onValueChange={([value]) => updateSelectionPolicy('max_eligible_items_per_sender', value)}
-                    className="flex-1"
-                  />
-                  <span className="w-12 text-right text-sm font-medium">
-                    {wallSettings.selection_policy.max_eligible_items_per_sender}
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <HelpLabel helpKey="maxReplaysPerItem">Maximo de repeticoes por foto</HelpLabel>
-                <div className="mt-2 flex items-center gap-3">
-                  <Slider
-                    value={[wallSettings.selection_policy.max_replays_per_item]}
-                    min={0}
-                    max={6}
-                    step={1}
-                    onValueChange={([value]) => updateSelectionPolicy('max_replays_per_item', value)}
-                    className="flex-1"
-                  />
-                  <span className="w-12 text-right text-sm font-medium">
-                    {wallSettings.selection_policy.max_replays_per_item}
-                  </span>
-                </div>
-                <p className="mt-2 text-[11px] text-muted-foreground">
-                  Se todas as fotos atingirem esse limite, a tela libera novas reprises para a exibicao nao ficar vazia.
-                </p>
-              </div>
-
-              <div className="space-y-4 rounded-2xl border border-border/60 bg-background/60 p-4">
-                <div>
-                  <HelpLabel helpKey="replayAdaptiveSection">Repeticao por volume da fila</HelpLabel>
-                  <p className="text-[11px] text-muted-foreground">
-                    Esse ajuste fica salvo no telao para manter o mesmo comportamento em qualquer aparelho conectado.
-                  </p>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <HelpLabel helpKey="lowVolumeThreshold" className="text-sm">Fila baixa ate</HelpLabel>
-                    <Select
-                      value={String(wallSettings.selection_policy.low_volume_max_items)}
-                      onValueChange={(value) => updateSelectionPolicy('low_volume_max_items', Number(value))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o limite" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {WALL_VOLUME_THRESHOLD_OPTIONS.map((value) => (
-                          <SelectItem key={`low-${value}`} value={String(value)}>{value} itens</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <HelpLabel helpKey="mediumVolumeThreshold" className="text-sm">Fila media ate</HelpLabel>
-                    <Select
-                      value={String(wallSettings.selection_policy.medium_volume_max_items)}
-                      onValueChange={(value) => updateSelectionPolicy('medium_volume_max_items', Number(value))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o limite" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {WALL_VOLUME_THRESHOLD_OPTIONS
-                          .filter((option) => option > wallSettings.selection_policy.low_volume_max_items)
-                          .map((value) => (
-                            <SelectItem key={`medium-${value}`} value={String(value)}>{value} itens</SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="space-y-2">
-                    <HelpLabel helpKey="replayIntervalLow" className="text-sm">Repeticao com fila curta</HelpLabel>
-                    <Select
-                      value={String(wallSettings.selection_policy.replay_interval_low_minutes)}
-                      onValueChange={(value) => updateSelectionPolicy('replay_interval_low_minutes', Number(value))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Tempo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {WALL_REPLAY_MINUTE_OPTIONS.map((value) => (
-                          <SelectItem key={`replay-low-${value}`} value={String(value)}>{value} min</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <HelpLabel helpKey="replayIntervalMedium" className="text-sm">Repeticao com fila media</HelpLabel>
-                    <Select
-                      value={String(wallSettings.selection_policy.replay_interval_medium_minutes)}
-                      onValueChange={(value) => updateSelectionPolicy('replay_interval_medium_minutes', Number(value))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Tempo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {WALL_REPLAY_MINUTE_OPTIONS.map((value) => (
-                          <SelectItem key={`replay-medium-${value}`} value={String(value)}>{value} min</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <HelpLabel helpKey="replayIntervalHigh" className="text-sm">Repeticao com fila cheia</HelpLabel>
-                    <Select
-                      value={String(wallSettings.selection_policy.replay_interval_high_minutes)}
-                      onValueChange={(value) => updateSelectionPolicy('replay_interval_high_minutes', Number(value))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Tempo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {WALL_REPLAY_MINUTE_OPTIONS.map((value) => (
-                          <SelectItem key={`replay-high-${value}`} value={String(value)}>{value} min</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <HelpLabel helpKey="senderCooldown" className="text-sm">Tempo minimo entre aparicoes</HelpLabel>
-                <Select
-                  value={String(wallSettings.selection_policy.sender_cooldown_seconds)}
-                  onValueChange={(value) => updateSelectionPolicy('sender_cooldown_seconds', Number(value))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o cooldown" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {WALL_COOLDOWN_OPTIONS.map((value) => (
-                      <SelectItem key={value} value={String(value)}>
-                        {value === 0 ? 'Sem cooldown' : `${value}s`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <HelpLabel helpKey="senderWindowLimit">Limite por remetente na janela</HelpLabel>
-                <div className="mt-2 flex items-center gap-3">
-                  <Slider
-                    value={[wallSettings.selection_policy.sender_window_limit]}
-                    min={1}
-                    max={6}
-                    step={1}
-                    onValueChange={([value]) => updateSelectionPolicy('sender_window_limit', value)}
-                    className="flex-1"
-                  />
-                  <span className="w-12 text-right text-sm font-medium">
-                    {wallSettings.selection_policy.sender_window_limit}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <HelpLabel helpKey="senderWindowMinutes" className="text-sm">Janela de controle</HelpLabel>
-                <Select
-                  value={String(wallSettings.selection_policy.sender_window_minutes)}
-                  onValueChange={(value) => updateSelectionPolicy('sender_window_minutes', Number(value))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a janela" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {WALL_WINDOW_MINUTE_OPTIONS.map((value) => (
-                      <SelectItem key={value} value={String(value)}>{value} min</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <HelpLabel helpKey="fairnessSection">Evitar repetir o mesmo remetente</HelpLabel>
-                  <p className="text-[11px] text-muted-foreground">
-                    Mantem a alternancia entre convidados quando houver outra midia pronta.
-                  </p>
-                </div>
-                <Switch
-                  checked={wallSettings.selection_policy.avoid_same_sender_if_alternative_exists}
-                  onCheckedChange={(checked) => updateSelectionPolicy('avoid_same_sender_if_alternative_exists', checked)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <HelpLabel helpKey="antiDuplicateSequence">Anti-sequencia parecida</HelpLabel>
-                  <p className="text-[11px] text-muted-foreground">
-                    Evita puxar fotos muito parecidas do mesmo grupo quando houver alternativa.
-                  </p>
-                </div>
-                <Switch
-                  checked={wallSettings.selection_policy.avoid_same_duplicate_cluster_if_alternative_exists}
-                  onCheckedChange={(checked) => updateSelectionPolicy('avoid_same_duplicate_cluster_if_alternative_exists', checked)}
-                />
-              </div>
-            </div>
-          </WallManagerSection>
-
-          <WallManagerSection
-            title={(
-              <span className="flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                Ajustes da exibicao
-                <HelpTooltip helpKey="slideshowSection" />
-              </span>
-            )}
-            description="As alteracoes abaixo ficam neste aparelho ate voce tocar em salvar. Isso ajuda quem opera no celular e funciona melhor em internet lenta."
-          >
-            <div className="space-y-5">
-              {WALL_SLIDER_FIELDS.map((field) => {
-                const settingValue = wallSettings[field.key] as number;
-
-                return (
-                  <div key={field.key}>
-                    <HelpLabel helpKey={field.helpKey}>{field.label}</HelpLabel>
-                    <div className="mt-2 flex items-center gap-3">
-                      <Slider
-                        value={[field.toControlValue(settingValue)]}
-                        min={field.min}
-                        max={field.max}
-                        step={field.step}
-                        onValueChange={([value]) => updateDraft(field.key, field.fromControlValue(value))}
-                        className="flex-1"
-                      />
-                      <span className="w-12 text-right text-sm font-medium">{field.formatValue(settingValue)}</span>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {WALL_TOGGLE_FIELDS.map((field) => (
-                <div key={field.key} className="flex items-center justify-between gap-3">
-                  <div>
-                    <HelpLabel helpKey={field.helpKey}>{field.label}</HelpLabel>
-                    <p className="text-[11px] text-muted-foreground">{field.description}</p>
-                  </div>
-                  <Switch
-                    checked={wallSettings[field.key] as boolean}
-                    onCheckedChange={(checked) => updateDraft(field.key, checked)}
-                  />
-                </div>
-              ))}
-
-              {wallSettings.show_neon ? (
-                <div className="grid gap-4 rounded-2xl border border-border/60 bg-background/60 p-4 sm:grid-cols-[minmax(0,1fr)_96px]">
-                  <div className="space-y-2">
-                    <HelpLabel helpKey="neonText" className="text-sm">Texto da chamada</HelpLabel>
-                    <Input
-                      value={wallSettings.neon_text ?? ''}
-                      onChange={(event) => updateDraft('neon_text', event.target.value)}
-                      placeholder="Compartilhe o melhor momento da noite"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <HelpLabel helpKey="neonColor" className="text-sm">Cor da chamada</HelpLabel>
-                    <Input
-                      type="color"
-                      value={wallSettings.neon_color ?? '#ffffff'}
-                      onChange={(event) => updateDraft('neon_color', event.target.value)}
-                      className="h-11 w-20 p-1"
-                    />
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </WallManagerSection>
-
-          <WallManagerSection
-            title={(
-              <span className="flex items-center gap-2">
-                Visual e troca de fotos
-                <HelpTooltip helpKey="layoutSection" />
-              </span>
-            )}
-            description="Escolha aqui o estilo de exibicao e a animacao de troca entre as midias."
-          >
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <HelpLabel helpKey="layout" className="text-sm">Estilo da exibicao</HelpLabel>
-                <Select value={wallSettings.layout} onValueChange={(value) => updateDraft('layout', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o estilo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {options.layouts.map((layout) => (
-                      <SelectItem key={layout.value} value={layout.value}>{layout.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <HelpLabel helpKey="transition" className="text-sm">Animacao de troca</HelpLabel>
-                <Select value={wallSettings.transition_effect} onValueChange={(value) => updateDraft('transition_effect', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a animacao" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {options.transitions.map((transition) => (
-                      <SelectItem key={transition.value} value={transition.value}>{transition.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <HelpLabel helpKey="orientation" className="text-sm">Orientação aceita</HelpLabel>
-                <Select value={wallSettings.accepted_orientation ?? 'all'} onValueChange={(value) => updateDraft('accepted_orientation', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a orientação" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as orientações</SelectItem>
-                    <SelectItem value="landscape">Apenas paisagem (horizontal)</SelectItem>
-                    <SelectItem value="portrait">Apenas retrato (vertical)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-[11px] text-muted-foreground">
-                  Filtra quais mídias aparecem no telão por orientação. Mídias quadradas passam em qualquer filtro.
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <HelpLabel helpKey="sideThumbnails">Miniaturas laterais</HelpLabel>
-                  <p className="text-[11px] text-muted-foreground">
-                    Exibe uma faixa com as próximas mídias na lateral do telão, mantendo o público engajado.
-                  </p>
-                </div>
-                <Switch
-                  checked={wallSettings.show_side_thumbnails ?? true}
-                  onCheckedChange={(checked) => updateDraft('show_side_thumbnails', checked)}
-                />
-              </div>
-            </div>
-          </WallManagerSection>
-
-          <WallManagerSection
-            title={(
-              <span className="flex items-center gap-2">
-                Patrocinadores no telao
-              </span>
-            )}
-            description="Configure quando os anuncios entram no slideshow e gerencie os criativos ativos do evento."
-          >
-            <div className="space-y-5">
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <div className="space-y-4 rounded-2xl border border-border/60 bg-background/60 p-4">
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Modo de exibicao dos anuncios</p>
-                    <Select value={adMode} onValueChange={(value) => updateDraft('ad_mode', value as ApiWallSettings['ad_mode'])}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o modo de anuncios" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="disabled">Desativado</SelectItem>
-                        <SelectItem value="by_photos">A cada X fotos</SelectItem>
-                        <SelectItem value="by_minutes">A cada X minutos</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-[11px] text-muted-foreground">
-                      Videos de patrocinador sao reproduzidos sem som para respeitar autoplay nos navegadores.
-                    </p>
-                  </div>
-
-                  {adMode === 'by_photos' ? (
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">Frequencia por fotos</p>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={100}
-                        value={String(adFrequency)}
-                        onChange={(event) => updateDraft('ad_frequency', clampIntegerInput(event.target.value, 5, 1, 100))}
-                      />
-                      <p className="text-[11px] text-muted-foreground">
-                        O anuncio entra depois de cada bloco de fotos exibidas pelo slideshow.
-                      </p>
-                    </div>
-                  ) : null}
-
-                  {adMode === 'by_minutes' ? (
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">Intervalo por minutos</p>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={60}
-                        value={String(adIntervalMinutes)}
-                        onChange={(event) => updateDraft('ad_interval_minutes', clampIntegerInput(event.target.value, 3, 1, 60))}
-                      />
-                      <p className="text-[11px] text-muted-foreground">
-                        Use esse modo quando quiser ciclos mais previsiveis para patrocinadores em eventos longos.
-                      </p>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="space-y-4 rounded-2xl border border-border/60 bg-background/60 p-4">
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Adicionar novo criativo</p>
-                    <Input
-                      ref={adFileInputRef}
-                      aria-label="Arquivo do patrocinador"
-                      type="file"
-                      accept=".jpg,.jpeg,.png,.webp,.gif,.mp4,image/jpeg,image/png,image/webp,image/gif,video/mp4"
-                      onChange={(event) => setSelectedAdFile(event.target.files?.[0] ?? null)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Duracao da imagem em segundos</p>
-                    <Input
-                      aria-label="Duracao do anuncio"
-                      type="number"
-                      min={3}
-                      max={120}
-                      disabled={selectedAdIsVideo || !selectedAdFile}
-                      value={selectedAdDuration}
-                      onChange={(event) => setSelectedAdDuration(event.target.value)}
-                    />
-                    <p className="text-[11px] text-muted-foreground">
-                      Para video, a duracao vem do proprio arquivo e o player avanca ao terminar.
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                    {selectedAdFile
-                      ? `Selecionado: ${selectedAdFile.name} · ${formatFileSize(selectedAdFile.size)}`
-                      : 'Formatos aceitos: JPG, PNG, WebP, GIF e MP4. Tamanho maximo: 20 MB.'}
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      onClick={() => void handleAdUpload()}
-                      disabled={!selectedAdFile || uploadAdMutation.isPending}
-                    >
-                      {uploadAdMutation.isPending ? (
-                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                      ) : null}
-                      Enviar anuncio
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={resetAdUploadForm}
-                      disabled={!selectedAdFile || uploadAdMutation.isPending}
-                    >
-                      Limpar selecao
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium">Criativos ativos</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      A ordem abaixo define a sequencia usada pelo player em round-robin.
-                    </p>
-                  </div>
-                  <span className="rounded-full border border-border/70 bg-background px-3 py-1 text-xs text-muted-foreground">
-                    {wallAds.length} item(ns)
-                  </span>
-                </div>
-
-                {adsQuery.isLoading ? (
-                  <div className="rounded-2xl border border-border/60 bg-background/60 px-4 py-6 text-sm text-muted-foreground">
-                    Carregando anuncios do telao...
-                  </div>
-                ) : wallAds.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-border/60 bg-background/60 px-4 py-8 text-sm text-muted-foreground">
-                    Nenhum anuncio cadastrado ainda. Envie o primeiro criativo para liberar a monetizacao do telao.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {wallAds.map((ad, index) => (
-                      <div key={ad.id} className="rounded-2xl border border-border/60 bg-background/70 p-4">
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
-                          <div className="h-24 w-full overflow-hidden rounded-xl border border-border/60 bg-muted/30 lg:w-40">
-                            {ad.media_type === 'image' && ad.url ? (
-                              <img
-                                src={ad.url}
-                                alt={`Criativo ${index + 1}`}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                                Video MP4
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold">Patrocinador {index + 1}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {ad.media_type === 'video' ? 'Video' : 'Imagem'}
-                              {' · '}
-                              {ad.media_type === 'video' ? 'termina no fim do video' : `${ad.duration_seconds}s na tela`}
-                            </p>
-                            {ad.url ? (
-                              <a
-                                href={ad.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="mt-2 inline-flex text-xs font-medium text-primary underline-offset-4 hover:underline"
-                              >
-                                Abrir criativo
-                              </a>
-                            ) : null}
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              aria-label={`Subir anuncio ${index + 1}`}
-                              disabled={index === 0 || reorderAdsMutation.isPending}
-                              onClick={() => void handleMoveAd(ad.id, -1)}
-                            >
-                              <ArrowUp className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              aria-label={`Descer anuncio ${index + 1}`}
-                              disabled={index === wallAds.length - 1 || reorderAdsMutation.isPending}
-                              onClick={() => void handleMoveAd(ad.id, 1)}
-                            >
-                              <ArrowDown className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="icon"
-                              aria-label={`Remover anuncio ${index + 1}`}
-                              disabled={deleteAdMutation.isPending}
-                              onClick={() => void handleDeleteAd(ad)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </WallManagerSection>
-
-          <WallManagerSection
-            title={(
-              <span className="flex items-center gap-2">
-                Mensagem quando nao ha fotos
-                <HelpTooltip helpKey="idleSection" />
-              </span>
-            )}
-            description="Use este texto para orientar o publico quando o telao ainda estiver esperando novas midias."
-          >
-            <div className="space-y-2">
-              <HelpLabel helpKey="instructions" className="text-sm">Texto de espera</HelpLabel>
-              <Textarea
-                value={wallSettings.instructions_text ?? ''}
-                onChange={(event) => updateDraft('instructions_text', event.target.value)}
-                className="min-h-[120px]"
-                placeholder="Envie sua foto para aparecer no telao em tempo real."
-              />
-            </div>
-          </WallManagerSection>
+          {activeInspectorTab === 'ads' ? (
+            <WallAdsTab
+              wallSettings={wallSettings}
+              wallAds={wallAds}
+              adsLoading={adsQuery.isLoading}
+              uploadPending={uploadAdMutation.isPending}
+              deletePending={deleteAdMutation.isPending}
+              reorderPending={reorderAdsMutation.isPending}
+              selectedAdFile={selectedAdFile}
+              selectedAdDuration={selectedAdDuration}
+              selectedAdIsVideo={selectedAdIsVideo}
+              adFileInputRef={adFileInputRef}
+              onDraftChange={updateDraft}
+              onAdFileChange={setSelectedAdFile}
+              onAdDurationChange={setSelectedAdDuration}
+              onUploadAd={() => void handleAdUpload()}
+              onResetAdUploadForm={resetAdUploadForm}
+              onDeleteAd={(ad) => void handleDeleteAd(ad)}
+              onMoveAd={(adId, direction) => void handleMoveAd(adId, direction)}
+            />
+          ) : null}
         </div>
       </div>
 
@@ -1693,35 +928,13 @@ export default function EventWallManagerPage() {
           </div>
         </div>
       ) : null}
-    </motion.div>
-  );
-}
 
-function InfoCard({
-  label,
-  value,
-  detail,
-  action,
-  helpKey,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-  action?: ReactNode;
-  helpKey?: Parameters<typeof HelpTooltip>[0]['helpKey'];
-}) {
-  return (
-    <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
-          {helpKey ? <HelpTooltip helpKey={helpKey} /> : null}
-        </div>
-        {action}
-      </div>
-      <p className="mt-2 text-base font-semibold">{value}</p>
-      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{detail}</p>
-    </div>
+      <WallRecentMediaDetailsSheet
+        open={isRecentDetailsOpen && selectedMedia !== null}
+        onOpenChange={setIsRecentDetailsOpen}
+        item={selectedMedia}
+      />
+    </motion.div>
   );
 }
 
@@ -1815,20 +1028,6 @@ function shortPlayerId(playerInstanceId: string) {
     : `${playerInstanceId.slice(0, 8)}...${playerInstanceId.slice(-4)}`;
 }
 
-function formatDurationSeconds(value?: number | null) {
-  if (value == null) {
-    return 'Sem dado';
-  }
-
-  if (value < 60) {
-    return `${value}s`;
-  }
-
-  const minutes = Math.floor(value / 60);
-  const seconds = value % 60;
-  return `${minutes}m ${seconds}s`;
-}
-
 function formatPercentLabel(value?: number | null) {
   if (value == null) {
     return 'Sem dado';
@@ -1873,12 +1072,6 @@ function formatTimestampLabel(value?: string | null) {
   } catch {
     return 'Sem sinal';
   }
-}
-
-function formatLevelLabel(value: 'low' | 'medium' | 'high') {
-  if (value === 'high') return 'Alta';
-  if (value === 'medium') return 'Media';
-  return 'Baixa';
 }
 
 function formatWallHealthLabel(value: ApiWallDiagnosticsSummary['health_status']) {
@@ -1950,20 +1143,6 @@ function formatLooseLabel(value?: string | null, fallback = 'Sem dado') {
   }
 
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-}
-
-function formatSimulationExplanation(line: string) {
-  return line
-    .replace(
-      'a simulacao usou a fila real atual do evento com o draft das configuracoes do wall.',
-      'a previsao usou a fila atual do evento com as configuracoes que voce esta ajustando no telao.',
-    )
-    .replace(/\bsimulacao\b/gi, 'previsao')
-    .replace(/\bdraft das configuracoes do wall\b/gi, 'configuracoes que voce esta ajustando no telao')
-    .replace(/\bdraft\b/gi, 'rascunho')
-    .replace(/\bwall\b/gi, 'telao')
-    .replace(/\bselector\b/gi, 'organizador da fila')
-    .replace(/\breplay\b/gi, 'reprise');
 }
 
 function formatPersistentStorage(value: ApiWallPersistentStorage) {

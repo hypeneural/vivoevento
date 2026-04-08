@@ -1,14 +1,21 @@
 <?php
 
-it('configures a dedicated fast lane in horizon', function () {
-    expect(config('horizon.waits.redis:media-fast'))->toBe(45)
-        ->and(config('horizon.defaults.supervisor-media-fast.queue'))->toBe(['media-fast'])
-        ->and(config('horizon.defaults.supervisor-media-fast.balance'))->toBeFalse()
-        ->and(config('horizon.defaults.supervisor-media-fast.timeout'))->toBe(120)
-        ->and(config('horizon.defaults.supervisor-media-fast.maxTime'))->toBe(1800)
-        ->and(config('horizon.defaults.supervisor-media-fast.maxJobs'))->toBe(1000)
-        ->and(config('horizon.environments.production.supervisor-media-fast.maxProcesses'))->toBe(2)
-        ->and(config('horizon.environments.local.supervisor-media-fast.maxProcesses'))->toBe(1);
+it('configures dedicated variants and audit lanes in horizon', function () {
+    expect(config('horizon.waits.redis:media-variants'))->toBe(45)
+        ->and(config('horizon.defaults.supervisor-media-variants.queue'))->toBe(['media-variants'])
+        ->and(config('horizon.defaults.supervisor-media-variants.balance'))->toBeFalse()
+        ->and(config('horizon.defaults.supervisor-media-variants.timeout'))->toBe(120)
+        ->and(config('horizon.defaults.supervisor-media-variants.maxTime'))->toBe(1800)
+        ->and(config('horizon.defaults.supervisor-media-variants.maxJobs'))->toBe(1000)
+        ->and(config('horizon.environments.production.supervisor-media-variants.maxProcesses'))->toBe(2)
+        ->and(config('horizon.environments.local.supervisor-media-variants.maxProcesses'))->toBe(1)
+        ->and(config('horizon.waits.redis:media-audit'))->toBe(45)
+        ->and(config('horizon.defaults.supervisor-media-audit.queue'))->toBe(['media-audit'])
+        ->and(config('horizon.defaults.supervisor-media-audit.balance'))->toBeFalse()
+        ->and(config('horizon.defaults.supervisor-media-audit.timeout'))->toBe(60)
+        ->and(config('horizon.defaults.supervisor-media-audit.maxJobs'))->toBe(1000)
+        ->and(config('horizon.environments.production.supervisor-media-audit.maxProcesses'))->toBe(2)
+        ->and(config('horizon.environments.local.supervisor-media-audit.maxProcesses'))->toBe(1);
 });
 
 it('configures dedicated whatsapp supervisors for production webhooks', function () {

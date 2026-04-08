@@ -19,6 +19,9 @@ it('upserts media intelligence settings for an event', function () {
         'timeout_ms' => 9000,
         'fallback_mode' => 'review',
         'require_json_output' => true,
+        'context_scope' => 'image_only',
+        'reply_scope' => 'image_and_text_context',
+        'normalized_text_context_mode' => 'body_only',
         'reply_text_mode' => 'ai',
         'reply_prompt_override' => 'Responda com uma frase curta e emoji coerente com a foto.',
     ]);
@@ -28,6 +31,9 @@ it('upserts media intelligence settings for an event', function () {
         ->and($settings->model_key)->toBe('Qwen/Qwen2.5-VL-7B-Instruct')
         ->and($settings->mode)->toBe('gate')
         ->and($settings->timeout_ms)->toBe(9000)
+        ->and($settings->context_scope)->toBe('image_only')
+        ->and($settings->reply_scope)->toBe('image_and_text_context')
+        ->and($settings->normalized_text_context_mode)->toBe('body_only')
         ->and($settings->reply_text_mode)->toBe('ai')
         ->and($settings->reply_text_enabled)->toBeTrue()
         ->and($settings->reply_prompt_override)->toBe('Responda com uma frase curta e emoji coerente com a foto.');
@@ -41,6 +47,9 @@ it('upserts media intelligence settings for an event', function () {
         'prompt_version' => 'wedding-v2',
         'fallback_mode' => 'review',
         'require_json_output' => true,
+        'context_scope' => 'image_only',
+        'reply_scope' => 'image_and_text_context',
+        'normalized_text_context_mode' => 'body_only',
         'reply_text_mode' => 'ai',
         'reply_text_enabled' => true,
     ]);

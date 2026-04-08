@@ -126,3 +126,82 @@ it('injects the selected preset before the effective event-aware instruction', f
         ->and(data_get($payload, 'messages.1.content.0.text'))
         ->toContain('Use Formatura 2026 apenas quando soar natural.');
 });
+
+it('uses normalized body text only for contextual analysis when context scope includes text', function () {
+    $event = Event::factory()->create([
+        'title' => 'Formatura 2026',
+    ]);
+
+    $media = EventMedia::factory()->make([
+        'event_id' => $event->id,
+        'caption' => 'Legenda que nao deve entrar no contexto',
+    ]);
+    $media->setRelation('event', $event);
+    $media->setRelation('inboundMessage', new \App\Modules\InboundMedia\Models\InboundMessage([
+        'body_text' => 'Texto recebido pelo WhatsApp',
+    ]));
+
+    $settings = EventMediaIntelligenceSetting::factory()->make([
+        'event_id' => $event->id,
+        'context_scope' => 'image_and_text_context',
+        'reply_scope' => 'image_only',
+        'normalized_text_context_mode' => 'body_only',
+    ]);
+
+    $payload = app(OpenAiCompatibleVisualReasoningPayloadFactory::class)->build(
+        $media,
+        $settings,
+        'https://example.com/test.jpg',
+        [
+            'model' => 'openai/gpt-4.1-mini',
+            'temperature' => 0.1,
+            'max_completion_tokens' => 300,
+        ],
+    );
+
+    expect(data_get($payload, 'messages.1.content.0.text'))
+        ->toContain('Texto associado ao envio considerado na analise: Texto recebido pelo WhatsApp')
+        ->and(data_get($payload, 'messages.1.content.0.text'))
+        ->not->toContain('Legenda que nao deve entrar no contexto');
+});
+
+it('keeps contextual analysis image only while using caption text for automatic reply instructions', function () {
+    $event = Event::factory()->create([
+        'title' => 'Aniversario',
+    ]);
+
+    $media = EventMedia::factory()->make([
+        'event_id' => $event->id,
+        'caption' => 'Legenda prioritaria para a resposta',
+    ]);
+    $media->setRelation('event', $event);
+    $media->setRelation('inboundMessage', new \App\Modules\InboundMedia\Models\InboundMessage([
+        'body_text' => 'Texto que nao deve entrar',
+    ]));
+
+    $settings = EventMediaIntelligenceSetting::factory()->make([
+        'event_id' => $event->id,
+        'reply_text_mode' => 'ai',
+        'context_scope' => 'image_only',
+        'reply_scope' => 'image_and_text_context',
+        'normalized_text_context_mode' => 'caption_only',
+    ]);
+
+    $payload = app(OpenAiCompatibleVisualReasoningPayloadFactory::class)->build(
+        $media,
+        $settings,
+        'https://example.com/test.jpg',
+        [
+            'model' => 'openai/gpt-4.1-mini',
+            'temperature' => 0.1,
+            'max_completion_tokens' => 300,
+        ],
+    );
+
+    expect(data_get($payload, 'messages.1.content.0.text'))
+        ->not->toContain('Texto associado ao envio considerado na analise')
+        ->and(data_get($payload, 'messages.1.content.0.text'))
+        ->toContain('Contexto textual disponivel para orientar a resposta automatica: Legenda prioritaria para a resposta')
+        ->and(data_get($payload, 'messages.1.content.0.text'))
+        ->not->toContain('Texto que nao deve entrar');
+});
