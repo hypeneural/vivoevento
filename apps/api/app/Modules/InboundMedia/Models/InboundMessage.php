@@ -12,7 +12,7 @@ class InboundMessage extends Model
     use HasFactory;
 
     protected $fillable = [
-        'event_id', 'event_channel_id', 'provider', 'message_id', 'message_type',
+        'event_id', 'event_channel_id', 'trace_id', 'provider', 'message_id', 'message_type',
         'chat_external_id', 'sender_external_id', 'sender_phone', 'sender_lid',
         'sender_name', 'sender_avatar_url', 'body_text', 'media_url',
         'reference_message_id', 'from_me', 'normalized_payload_json', 'status',

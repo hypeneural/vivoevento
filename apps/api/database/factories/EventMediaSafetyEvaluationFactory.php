@@ -35,6 +35,7 @@ class EventMediaSafetyEvaluationFactory extends Factory
             'raw_response_json' => [
                 'provider' => 'noop',
             ],
+            'request_payload_json' => null,
             'completed_at' => now(),
         ];
     }

@@ -3,6 +3,7 @@
 namespace App\Modules\WhatsApp\Listeners;
 
 use App\Modules\MediaProcessing\Events\MediaPublished;
+use App\Modules\MediaIntelligence\Services\PublishedMediaReplyTextResolver;
 use App\Modules\WhatsApp\Services\WhatsAppFeedbackAutomationService;
 use App\Modules\WhatsApp\Services\WhatsAppFeedbackContextResolver;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -13,7 +14,11 @@ class SendFeedbackOnMediaPublished implements ShouldQueue
 
     public function handle(MediaPublished $event): void
     {
-        $media = $event->resolveMedia();
+        $media = $event->resolveMedia()?->loadMissing([
+            'event.mediaIntelligenceSettings',
+            'latestVlmEvaluation',
+            'inboundMessage',
+        ]);
 
         if (! $media || ! $media->event || ! $media->inboundMessage) {
             return;
@@ -31,12 +36,16 @@ class SendFeedbackOnMediaPublished implements ShouldQueue
             return;
         }
 
-        app(WhatsAppFeedbackAutomationService::class)->sendPublishedReaction(
+        $replyResolution = app(PublishedMediaReplyTextResolver::class)->resolveContext($media);
+
+        app(WhatsAppFeedbackAutomationService::class)->sendPublishedFeedback(
             event: $media->event,
             instance: $instance,
             context: $context,
             inboundMessage: $media->inboundMessage,
             eventMedia: $media,
+            replyText: $replyResolution['reply_text'] ?? null,
+            resolution: $replyResolution,
         );
     }
 }

@@ -8,7 +8,7 @@ return [
     'default_embedding_model' => env('FACE_SEARCH_EMBEDDING_MODEL', 'face-embedding-foundation-v1'),
     'embedding_dimension' => (int) env('FACE_SEARCH_EMBEDDING_DIMENSION', 512),
     'crop_disk' => env('FACE_SEARCH_CROP_DISK', 'ai-private'),
-    'min_face_size_px' => (int) env('FACE_SEARCH_MIN_FACE_SIZE_PX', 96),
+    'min_face_size_px' => (int) env('FACE_SEARCH_MIN_FACE_SIZE_PX', 24),
     'min_quality_score' => (float) env('FACE_SEARCH_MIN_QUALITY_SCORE', 0.60),
     'search_threshold' => (float) env('FACE_SEARCH_SEARCH_THRESHOLD', 0.50),
     'top_k' => (int) env('FACE_SEARCH_TOP_K', 50),

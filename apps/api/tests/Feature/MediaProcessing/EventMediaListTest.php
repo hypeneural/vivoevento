@@ -2,12 +2,23 @@
 
 use App\Modules\Events\Models\Event;
 use App\Modules\Events\Models\EventModule;
+use App\Modules\InboundMedia\Models\ChannelWebhookLog;
 use App\Modules\InboundMedia\Models\InboundMessage;
 use App\Modules\ContentModeration\Models\EventMediaSafetyEvaluation;
 use App\Modules\MediaIntelligence\Models\EventMediaVlmEvaluation;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Models\MediaProcessingRun;
 use App\Modules\MediaProcessing\Models\EventMediaVariant;
+use App\Modules\Telegram\Models\TelegramMessageFeedback;
+use App\Modules\WhatsApp\Enums\MessageDirection;
+use App\Modules\WhatsApp\Enums\MessageStatus;
+use App\Modules\WhatsApp\Enums\MessageType;
+use App\Modules\WhatsApp\Models\WhatsAppChat;
+use App\Modules\WhatsApp\Models\WhatsAppDispatchLog;
+use App\Modules\WhatsApp\Models\WhatsAppInboundEvent;
+use App\Modules\WhatsApp\Models\WhatsAppInstance;
+use App\Modules\WhatsApp\Models\WhatsAppMessage;
+use App\Modules\WhatsApp\Models\WhatsAppMessageFeedback;
 
 it('lists event media with a paginated frontend friendly schema', function () {
     [$user, $organization] = $this->actingAsOwner();
@@ -203,6 +214,7 @@ it('shows the latest safety and vlm evaluations in the media detail payload', fu
             'category_applied_input_types' => ['violence' => ['image']],
             'input_path_used' => 'image_url',
         ],
+        'request_payload_json' => ['model' => 'omni-moderation-latest'],
         'completed_at' => now(),
     ]);
 
@@ -222,7 +234,14 @@ it('shows the latest safety and vlm evaluations in the media detail payload', fu
         'decision' => 'approve',
         'reason' => 'Imagem compativel com o evento.',
         'short_caption' => 'Entrada especial na festa.',
+        'reply_text' => 'Memorias que fazem o coracao sorrir! 🎉📸',
         'tags_json' => ['festa', 'retrato'],
+        'request_payload_json' => ['model' => 'openai/gpt-4.1-mini'],
+        'prompt_context_json' => [
+            'template' => 'Use {nome_do_evento} quando fizer sentido.',
+            'variables' => ['nome_do_evento' => $event->title],
+            'resolved' => 'Use '.$event->title.' quando fizer sentido.',
+        ],
         'completed_at' => now(),
     ]);
 
@@ -235,12 +254,218 @@ it('shows the latest safety and vlm evaluations in the media detail payload', fu
         ->assertJsonPath('data.latest_safety_evaluation.provider_category_scores.violence', 0.03)
         ->assertJsonPath('data.latest_safety_evaluation.provider_category_input_types.violence.0', 'image')
         ->assertJsonPath('data.latest_safety_evaluation.normalized_provider.input_path_used', 'image_url')
+        ->assertJsonPath('data.latest_safety_evaluation.request_payload.model', 'omni-moderation-latest')
         ->assertJsonPath('data.caption_source_hint', 'vlm')
         ->assertJsonPath('data.latest_vlm_evaluation.id', $latestVlm->id)
         ->assertJsonPath('data.latest_vlm_evaluation.decision', 'approve')
         ->assertJsonPath('data.latest_vlm_evaluation.reason', 'Imagem compativel com o evento.')
         ->assertJsonPath('data.latest_vlm_evaluation.short_caption', 'Entrada especial na festa.')
-        ->assertJsonPath('data.latest_vlm_evaluation.tags.0', 'festa');
+        ->assertJsonPath('data.latest_vlm_evaluation.reply_text', 'Memorias que fazem o coracao sorrir! 🎉📸')
+        ->assertJsonPath('data.latest_vlm_evaluation.tags.0', 'festa')
+        ->assertJsonPath('data.latest_vlm_evaluation.request_payload.model', 'openai/gpt-4.1-mini')
+        ->assertJsonPath('data.latest_vlm_evaluation.prompt_context.variables.nome_do_evento', $event->title);
+});
+
+it('shows an aggregated ai debug payload with trace ids, provider logs and channel feedback logs', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+        'title' => 'Evento Debug IA',
+    ]);
+
+    $traceId = 'trace-whatsapp-debug-001';
+
+    $inboundMessage = InboundMessage::query()->create([
+        'event_id' => $event->id,
+        'provider' => 'zapi',
+        'trace_id' => $traceId,
+        'message_id' => '2A20028071DA23E04188',
+        'message_type' => 'image',
+        'chat_external_id' => '120363499999999999-group',
+        'sender_external_id' => '11111111111111@lid',
+        'sender_phone' => '554899991111',
+        'sender_name' => 'Participante Debug',
+        'body_text' => 'Foto para homologacao',
+        'media_url' => 'https://cdn.fixture.test/debug.jpg',
+        'normalized_payload_json' => [
+            '_event_context' => [
+                'event_id' => $event->id,
+                'trace_id' => $traceId,
+                'provider_message_id' => '2A20028071DA23E04188',
+                'chat_external_id' => '120363499999999999-group',
+                'sender_external_id' => '11111111111111@lid',
+                'intake_source' => 'whatsapp_group',
+            ],
+        ],
+        'status' => 'processed',
+        'received_at' => now()->subMinute(),
+        'processed_at' => now()->subSecond(),
+    ]);
+
+    $media = EventMedia::factory()->published()->create([
+        'event_id' => $event->id,
+        'inbound_message_id' => $inboundMessage->id,
+        'source_type' => 'whatsapp_group',
+        'caption' => 'Entrada especial no evento.',
+    ]);
+
+    ChannelWebhookLog::query()->create([
+        'event_channel_id' => null,
+        'provider' => 'zapi',
+        'provider_update_id' => 'upd-debug-1',
+        'trace_id' => $traceId,
+        'message_id' => '2A20028071DA23E04188',
+        'detected_type' => 'image',
+        'routing_status' => 'normalized',
+        'payload_json' => ['type' => 'ReceivedCallback'],
+        'inbound_message_id' => $inboundMessage->id,
+    ]);
+
+    $instance = WhatsAppInstance::factory()->connected()->create([
+        'organization_id' => $organization->id,
+        'external_instance_id' => 'INSTANCE-DEBUG-001',
+    ]);
+
+    WhatsAppInboundEvent::query()->create([
+        'instance_id' => $instance->id,
+        'provider_key' => 'zapi',
+        'trace_id' => $traceId,
+        'provider_message_id' => '2A20028071DA23E04188',
+        'event_type' => 'message',
+        'payload_json' => ['type' => 'ReceivedCallback'],
+        'normalized_json' => ['message_id' => '2A20028071DA23E04188'],
+        'processing_status' => 'processed',
+        'received_at' => now()->subMinute(),
+        'processed_at' => now()->subSecond(),
+    ]);
+
+    $chat = WhatsAppChat::query()->create([
+        'instance_id' => $instance->id,
+        'external_chat_id' => '120363499999999999-group',
+        'type' => 'group',
+        'group_id' => '120363499999999999-group',
+        'display_name' => 'Grupo Debug',
+        'is_group' => true,
+    ]);
+
+    $outboundMessage = WhatsAppMessage::query()->create([
+        'instance_id' => $instance->id,
+        'chat_id' => $chat->id,
+        'direction' => MessageDirection::Outbound,
+        'provider_message_id' => 'WA-OUT-001',
+        'reply_to_provider_message_id' => '2A20028071DA23E04188',
+        'type' => MessageType::Text,
+        'text_body' => 'Memorias que fazem o coracao sorrir! 🎉📸',
+        'status' => MessageStatus::Sent,
+        'recipient_phone' => '120363499999999999-group',
+        'sent_at' => now(),
+    ]);
+
+    WhatsAppDispatchLog::query()->create([
+        'instance_id' => $instance->id,
+        'message_id' => $outboundMessage->id,
+        'provider_key' => 'zapi',
+        'endpoint_used' => '/send-text',
+        'request_json' => [
+            'phone' => '120363499999999999-group',
+            'messageId' => '2A20028071DA23E04188',
+        ],
+        'response_json' => [
+            'messageId' => 'WA-OUT-001',
+        ],
+        'http_status' => 200,
+        'success' => true,
+        'duration_ms' => 412,
+    ]);
+
+    EventMediaSafetyEvaluation::factory()->create([
+        'event_id' => $event->id,
+        'event_media_id' => $media->id,
+        'provider_key' => 'openai',
+        'model_key' => 'omni-moderation-latest',
+        'decision' => 'pass',
+        'request_payload_json' => ['model' => 'omni-moderation-latest'],
+        'raw_response_json' => ['results' => [['flagged' => false]]],
+        'normalized_provider_json' => ['input_path_used' => 'data_url'],
+        'completed_at' => now(),
+    ]);
+
+    EventMediaVlmEvaluation::factory()->create([
+        'event_id' => $event->id,
+        'event_media_id' => $media->id,
+        'provider_key' => 'openrouter',
+        'model_key' => 'openai/gpt-4.1-mini',
+        'decision' => 'approve',
+        'short_caption' => 'Entrada especial no evento.',
+        'reply_text' => 'Memorias que fazem o coracao sorrir! 🎉📸',
+        'request_payload_json' => ['model' => 'openai/gpt-4.1-mini'],
+        'raw_response_json' => ['reply_text' => 'Memorias que fazem o coracao sorrir! 🎉📸'],
+        'prompt_context_json' => [
+            'template' => 'Use {nome_do_evento} quando fizer sentido.',
+            'variables' => ['nome_do_evento' => $event->title],
+            'resolved' => 'Use Evento Debug IA quando fizer sentido.',
+        ],
+        'completed_at' => now(),
+    ]);
+
+    WhatsAppMessageFeedback::query()->create([
+        'event_id' => $event->id,
+        'instance_id' => $instance->id,
+        'trace_id' => $traceId,
+        'inbound_message_id' => $inboundMessage->id,
+        'event_media_id' => $media->id,
+        'outbound_message_id' => $outboundMessage->id,
+        'inbound_provider_message_id' => '2A20028071DA23E04188',
+        'chat_external_id' => '120363499999999999-group',
+        'sender_external_id' => '11111111111111@lid',
+        'feedback_kind' => 'reply',
+        'feedback_phase' => 'published',
+        'status' => 'sent',
+        'reply_text' => 'Memorias que fazem o coracao sorrir! 🎉📸',
+        'resolution_json' => [
+            'mode' => 'ai',
+            'source' => 'vlm',
+            'reply_text' => 'Memorias que fazem o coracao sorrir! 🎉📸',
+        ],
+        'attempted_at' => now()->subSecond(),
+        'completed_at' => now(),
+    ]);
+
+    TelegramMessageFeedback::query()->create([
+        'event_id' => $event->id,
+        'event_channel_id' => null,
+        'trace_id' => $traceId,
+        'inbound_message_id' => $inboundMessage->id,
+        'event_media_id' => $media->id,
+        'inbound_provider_message_id' => '81',
+        'chat_external_id' => '9007199254740991',
+        'sender_external_id' => '9007199254740991',
+        'feedback_kind' => 'reply',
+        'feedback_phase' => 'published',
+        'status' => 'sent',
+        'reply_text' => 'Memorias que fazem o coracao sorrir! 🎉📸',
+        'resolution_json' => [
+            'mode' => 'ai',
+            'source' => 'vlm',
+        ],
+        'attempted_at' => now()->subSecond(),
+        'completed_at' => now(),
+    ]);
+
+    $response = $this->apiGet("/media/{$media->id}/ia-debug");
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.trace_id', $traceId)
+        ->assertJsonPath('data.inbound.message.trace_id', $traceId)
+        ->assertJsonPath('data.inbound.webhook_logs.0.trace_id', $traceId)
+        ->assertJsonPath('data.inbound.whatsapp_events.0.trace_id', $traceId)
+        ->assertJsonPath('data.safety.request_payload.model', 'omni-moderation-latest')
+        ->assertJsonPath('data.vlm.request_payload.model', 'openai/gpt-4.1-mini')
+        ->assertJsonPath('data.vlm.prompt_context.variables.nome_do_evento', $event->title)
+        ->assertJsonPath('data.feedback.whatsapp.0.trace_id', $traceId)
+        ->assertJsonPath('data.feedback.whatsapp_dispatch_logs.0.endpoint_used', '/send-text')
+        ->assertJsonPath('data.feedback.telegram.0.trace_id', $traceId);
 });
 
 it('marks caption source as human when the stored caption differs from the latest vlm short caption', function () {

@@ -1,5 +1,7 @@
 import type {
   WallAcceptedOrientation,
+  WallAdItem,
+  WallAdMode,
   WallBootData,
   WallEventSummary,
   WallExpiredPayload,
@@ -22,6 +24,8 @@ import type {
 
 export type {
   WallAcceptedOrientation,
+  WallAdItem,
+  WallAdMode,
   WallBootData,
   WallEventSummary,
   WallExpiredPayload,

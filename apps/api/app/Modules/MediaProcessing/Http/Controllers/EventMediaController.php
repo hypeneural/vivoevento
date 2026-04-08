@@ -27,6 +27,7 @@ use App\Modules\MediaProcessing\Http\Requests\ListModerationMediaRequest;
 use App\Modules\MediaProcessing\Http\Requests\ReprocessEventMediaStageRequest;
 use App\Modules\MediaProcessing\Http\Requests\ShowEventMediaPipelineMetricsRequest;
 use App\Modules\MediaProcessing\Http\Requests\UpsertEventMediaSenderBlockRequest;
+use App\Modules\MediaProcessing\Http\Resources\EventMediaAiDebugResource;
 use App\Modules\MediaProcessing\Http\Requests\UpdateEventMediaFeaturedRequest;
 use App\Modules\MediaProcessing\Http\Requests\UpdateEventMediaPinnedRequest;
 use App\Modules\MediaProcessing\Http\Resources\EventMediaDetailResource;
@@ -39,6 +40,11 @@ use App\Modules\MediaProcessing\Services\MediaAuditLogger;
 use App\Modules\MediaProcessing\Services\MediaPipelineMetricsService;
 use App\Modules\MediaProcessing\Services\ModerationBroadcasterService;
 use App\Modules\MediaProcessing\Services\EventMediaSenderContextService;
+use App\Modules\InboundMedia\Models\ChannelWebhookLog;
+use App\Modules\Telegram\Models\TelegramMessageFeedback;
+use App\Modules\WhatsApp\Models\WhatsAppDispatchLog;
+use App\Modules\WhatsApp\Models\WhatsAppInboundEvent;
+use App\Modules\WhatsApp\Models\WhatsAppMessageFeedback;
 use App\Shared\Http\BaseController;
 use App\Shared\Support\EventAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -196,6 +202,180 @@ class EventMediaController extends BaseController
         return $this->success(new EventMediaDetailResource(
             $eventMedia
         ));
+    }
+
+    public function aiDebug(
+        Request $request,
+        EventMedia $eventMedia,
+        EventAccessService $eventAccess,
+    ): JsonResponse {
+        $eventMedia->loadMissing([
+            'event',
+            'inboundMessage',
+            'latestSafetyEvaluation',
+            'latestVlmEvaluation',
+        ]);
+
+        abort_unless($eventAccess->can($request->user(), $eventMedia->event, 'media.view'), 403);
+
+        $inboundMessage = $eventMedia->inboundMessage;
+        $traceId = $inboundMessage?->trace_id
+            ?? data_get($inboundMessage?->normalized_payload_json, '_event_context.trace_id');
+        $providerMessageId = data_get($inboundMessage?->normalized_payload_json, '_event_context.provider_message_id')
+            ?? $inboundMessage?->message_id;
+
+        $webhookLogs = $inboundMessage
+            ? ChannelWebhookLog::query()
+                ->where('inbound_message_id', $inboundMessage->id)
+                ->orderBy('id')
+                ->get()
+            : collect();
+
+        $whatsAppEventsQuery = WhatsAppInboundEvent::query();
+
+        if ($providerMessageId) {
+            $whatsAppEventsQuery->where('provider_message_id', $providerMessageId);
+        } elseif ($traceId) {
+            $whatsAppEventsQuery->where('trace_id', $traceId);
+        } else {
+            $whatsAppEventsQuery->whereRaw('1 = 0');
+        }
+
+        $whatsAppEvents = $whatsAppEventsQuery
+            ->orderByDesc('id')
+            ->get();
+
+        $whatsAppFeedbacks = WhatsAppMessageFeedback::query()
+            ->with('outboundMessage')
+            ->where('event_media_id', $eventMedia->id)
+            ->orderBy('id')
+            ->get();
+
+        $telegramFeedbacks = TelegramMessageFeedback::query()
+            ->where('event_media_id', $eventMedia->id)
+            ->orderBy('id')
+            ->get();
+
+        $whatsAppDispatchLogs = WhatsAppDispatchLog::query()
+            ->whereIn('message_id', $whatsAppFeedbacks->pluck('outbound_message_id')->filter()->all())
+            ->orderBy('id')
+            ->get();
+
+        return $this->success(new EventMediaAiDebugResource([
+            'media_id' => $eventMedia->id,
+            'event_id' => $eventMedia->event_id,
+            'trace_id' => $traceId,
+            'inbound_message' => $inboundMessage ? [
+                'id' => $inboundMessage->id,
+                'trace_id' => $inboundMessage->trace_id,
+                'provider' => $inboundMessage->provider,
+                'message_id' => $inboundMessage->message_id,
+                'message_type' => $inboundMessage->message_type,
+                'chat_external_id' => $inboundMessage->chat_external_id,
+                'sender_external_id' => $inboundMessage->sender_external_id,
+                'sender_phone' => $inboundMessage->sender_phone,
+                'sender_name' => $inboundMessage->sender_name,
+                'status' => $inboundMessage->status,
+                'normalized_payload' => $inboundMessage->normalized_payload_json ?? [],
+                'received_at' => $inboundMessage->received_at?->toIso8601String(),
+                'processed_at' => $inboundMessage->processed_at?->toIso8601String(),
+            ] : null,
+            'webhook_logs' => $webhookLogs->map(fn (ChannelWebhookLog $log) => [
+                'id' => $log->id,
+                'trace_id' => $log->trace_id,
+                'provider' => $log->provider,
+                'provider_update_id' => $log->provider_update_id,
+                'message_id' => $log->message_id,
+                'detected_type' => $log->detected_type,
+                'routing_status' => $log->routing_status,
+                'error_message' => $log->error_message,
+                'payload' => $log->payload_json ?? [],
+                'created_at' => $log->created_at?->toIso8601String(),
+                'updated_at' => $log->updated_at?->toIso8601String(),
+            ])->values()->all(),
+            'whatsapp_events' => $whatsAppEvents->map(fn (WhatsAppInboundEvent $event) => [
+                'id' => $event->id,
+                'trace_id' => $event->trace_id,
+                'provider_key' => $event->provider_key?->value ?? $event->provider_key,
+                'provider_message_id' => $event->provider_message_id,
+                'event_type' => $event->event_type,
+                'processing_status' => $event->processing_status?->value ?? $event->processing_status,
+                'payload' => $event->payload_json ?? [],
+                'normalized' => $event->normalized_json ?? [],
+                'error_message' => $event->error_message,
+                'received_at' => $event->received_at?->toIso8601String(),
+                'processed_at' => $event->processed_at?->toIso8601String(),
+            ])->values()->all(),
+            'safety' => $eventMedia->latestSafetyEvaluation ? [
+                'id' => $eventMedia->latestSafetyEvaluation->id,
+                'provider_key' => $eventMedia->latestSafetyEvaluation->provider_key,
+                'model_key' => $eventMedia->latestSafetyEvaluation->model_key,
+                'decision' => $eventMedia->latestSafetyEvaluation->decision,
+                'blocked' => (bool) $eventMedia->latestSafetyEvaluation->blocked,
+                'review_required' => (bool) $eventMedia->latestSafetyEvaluation->review_required,
+                'request_payload' => $eventMedia->latestSafetyEvaluation->request_payload_json ?? [],
+                'raw_response' => $eventMedia->latestSafetyEvaluation->raw_response_json ?? [],
+                'normalized_provider' => $eventMedia->latestSafetyEvaluation->normalized_provider_json ?? [],
+                'reason_codes' => $eventMedia->latestSafetyEvaluation->reason_codes_json ?? [],
+                'completed_at' => $eventMedia->latestSafetyEvaluation->completed_at?->toIso8601String(),
+            ] : null,
+            'vlm' => $eventMedia->latestVlmEvaluation ? [
+                'id' => $eventMedia->latestVlmEvaluation->id,
+                'provider_key' => $eventMedia->latestVlmEvaluation->provider_key,
+                'model_key' => $eventMedia->latestVlmEvaluation->model_key,
+                'decision' => $eventMedia->latestVlmEvaluation->decision,
+                'review_required' => (bool) $eventMedia->latestVlmEvaluation->review_required,
+                'short_caption' => $eventMedia->latestVlmEvaluation->short_caption,
+                'reply_text' => $eventMedia->latestVlmEvaluation->reply_text,
+                'request_payload' => $eventMedia->latestVlmEvaluation->request_payload_json ?? [],
+                'raw_response' => $eventMedia->latestVlmEvaluation->raw_response_json ?? [],
+                'prompt_context' => $eventMedia->latestVlmEvaluation->prompt_context_json ?? [],
+                'completed_at' => $eventMedia->latestVlmEvaluation->completed_at?->toIso8601String(),
+            ] : null,
+            'whatsapp_feedbacks' => $whatsAppFeedbacks->map(fn (WhatsAppMessageFeedback $feedback) => [
+                'id' => $feedback->id,
+                'trace_id' => $feedback->trace_id,
+                'feedback_kind' => $feedback->feedback_kind,
+                'feedback_phase' => $feedback->feedback_phase,
+                'status' => $feedback->status,
+                'reaction_emoji' => $feedback->reaction_emoji,
+                'reply_text' => $feedback->reply_text,
+                'resolution' => $feedback->resolution_json ?? [],
+                'outbound_message_id' => $feedback->outbound_message_id,
+                'error_message' => $feedback->error_message,
+                'attempted_at' => $feedback->attempted_at?->toIso8601String(),
+                'completed_at' => $feedback->completed_at?->toIso8601String(),
+            ])->values()->all(),
+            'telegram_feedbacks' => $telegramFeedbacks->map(fn (TelegramMessageFeedback $feedback) => [
+                'id' => $feedback->id,
+                'trace_id' => $feedback->trace_id,
+                'feedback_kind' => $feedback->feedback_kind,
+                'feedback_phase' => $feedback->feedback_phase,
+                'status' => $feedback->status,
+                'reaction_emoji' => $feedback->reaction_emoji,
+                'chat_action' => $feedback->chat_action,
+                'reply_text' => $feedback->reply_text,
+                'resolution' => $feedback->resolution_json ?? [],
+                'error_message' => $feedback->error_message,
+                'attempted_at' => $feedback->attempted_at?->toIso8601String(),
+                'completed_at' => $feedback->completed_at?->toIso8601String(),
+            ])->values()->all(),
+            'whatsapp_dispatch_logs' => $whatsAppDispatchLogs->map(fn (WhatsAppDispatchLog $log) => [
+                'id' => $log->id,
+                'message_id' => $log->message_id,
+                'provider_key' => $log->provider_key?->value ?? $log->provider_key,
+                'endpoint_used' => $log->endpoint_used,
+                'request' => $log->request_json ?? [],
+                'response' => $log->response_json ?? [],
+                'http_status' => $log->http_status,
+                'success' => (bool) $log->success,
+                'error_message' => $log->error_message,
+                'duration_ms' => $log->duration_ms,
+                'created_at' => method_exists($log->created_at, 'toIso8601String')
+                    ? $log->created_at->toIso8601String()
+                    : $log->created_at,
+            ])->values()->all(),
+        ]));
     }
 
     public function approve(

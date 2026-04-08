@@ -30,9 +30,12 @@ class ProcessInboundWebhookJob implements ShouldQueue
             ?? null;
 
         $providerUpdateId = $this->providerUpdateId();
+        $traceId = data_get($this->payload, '_event_context.trace_id')
+            ?? data_get($this->payload, '_trace_id');
         $values = [
             'event_channel_id' => data_get($this->payload, '_event_context.event_channel_id'),
             'message_id' => $messageId,
+            'trace_id' => is_string($traceId) && trim($traceId) !== '' ? trim($traceId) : null,
             'detected_type' => $this->detectType($this->payload),
             'routing_status' => 'received',
             'payload_json' => $this->payload,

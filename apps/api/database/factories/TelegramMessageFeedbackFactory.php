@@ -28,6 +28,7 @@ class TelegramMessageFeedbackFactory extends Factory
         return [
             'event_id' => $event->id,
             'event_channel_id' => $channel->id,
+            'trace_id' => null,
             'inbound_provider_message_id' => (string) fake()->numberBetween(1, 9999),
             'chat_external_id' => (string) fake()->numberBetween(100000, 999999),
             'sender_external_id' => (string) fake()->numberBetween(100000, 999999),
@@ -35,6 +36,7 @@ class TelegramMessageFeedbackFactory extends Factory
             'feedback_phase' => 'detected',
             'status' => 'sent',
             'reaction_emoji' => "\u{23F3}",
+            'resolution_json' => null,
             'attempted_at' => now(),
             'completed_at' => now(),
         ];

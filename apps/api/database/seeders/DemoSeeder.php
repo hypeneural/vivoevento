@@ -45,6 +45,28 @@ class DemoSeeder extends Seeder
             ]
         );
 
+        // ─── Local Super Admin ──────────────────────────────
+        $localSuperAdmin = User::updateOrCreate(
+            ['email' => 'superadmin@eventovivo.com.br'],
+            [
+                'name' => 'Super Admin Local',
+                'phone' => '5548996553954',
+                'password' => 'Evv.SuperAdmin!2026#R9m4',
+                'email_verified_at' => now(),
+                'status' => 'active',
+            ]
+        );
+        $localSuperAdmin->assignRole('super-admin');
+
+        OrganizationMember::firstOrCreate(
+            ['organization_id' => $org->id, 'user_id' => $localSuperAdmin->id],
+            [
+                'role_key' => 'super-admin',
+                'is_owner' => true,
+                'joined_at' => now(),
+            ]
+        );
+
         // ─── Demo Partner ───────────────────────────────────
         $partner = User::firstOrCreate(
             ['email' => 'parceiro@eventovivo.com.br'],

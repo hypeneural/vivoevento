@@ -4,6 +4,7 @@ import { BrainCircuit, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import type { ApiEventDetail } from '@/lib/api-types';
+import { aiMediaRepliesService } from '@/modules/ai/api';
 import {
   getEventMediaIntelligenceSettings,
   updateEventMediaIntelligenceSettings,
@@ -26,6 +27,10 @@ export function EventMediaIntelligenceSettingsCard({
   const settingsQuery = useQuery({
     queryKey: ['event-media-intelligence-settings', eventId],
     queryFn: () => getEventMediaIntelligenceSettings(eventId),
+  });
+  const presetsQuery = useQuery({
+    queryKey: ['ia-media-reply-presets', 'event-form'],
+    queryFn: () => aiMediaRepliesService.listPresets(),
   });
 
   const updateMutation = useMutation({
@@ -70,6 +75,7 @@ export function EventMediaIntelligenceSettingsCard({
           <EventMediaIntelligenceSettingsForm
             settings={settingsQuery.data}
             eventModerationMode={eventModerationMode}
+            presets={presetsQuery.data ?? []}
             isPending={updateMutation.isPending}
             onSubmit={(payload) => updateMutation.mutate(payload)}
           />

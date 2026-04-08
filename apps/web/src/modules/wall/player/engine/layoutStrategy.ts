@@ -51,3 +51,13 @@ export function resolvePrimaryMediaFit(
 export function shouldRenderFloatingCaption(layout: RenderableLayout): boolean {
   return layout === 'fullscreen' || layout === 'cinematic';
 }
+
+const MULTI_ITEM_LAYOUTS = new Set<string>(['carousel', 'mosaic', 'grid']);
+
+/**
+ * Returns true if the layout requires multiple items displayed simultaneously.
+ * Multi-item layouts are never auto-resolved—they must be explicitly chosen.
+ */
+export function isMultiItemLayout(layout: string): boolean {
+  return MULTI_ITEM_LAYOUTS.has(layout);
+}

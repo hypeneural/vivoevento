@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generate OG Image Placeholders</title>
+  <style>
+    body {
+      font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 30px;
+    }
+    .canvas-wrapper {
+      margin-bottom: 40px;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    canvas {
+      width: 100%;
+      height: auto;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    button {
+      background: #6366F1;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      margin-top: 10px;
+    }
+    button:hover {
+      background: #4F46E5;
+    }
+    .info {
+      color: #666;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎨 Generate OG Image Placeholders</h1>
+    <p>Generate placeholder Open Graph images for social media previews. Right-click on each image to save.</p>
+    
+    <div class="canvas-wrapper">
+      <h2>Default</h2>
+      <canvas id="canvas-default" width="1200" height="630"></canvas>
+      <button onclick="downloadCanvas('canvas-default', 'og-image-default.jpg')">Download</button>
+      <p class="info">For base landing page (no persona)</p>
+    </div>
+    
+    <div class="canvas-wrapper">
+      <h2>Assessora</h2>
+      <canvas id="canvas-assessora" width="1200" height="630"></canvas>
+      <button onclick="downloadCanvas('canvas-assessora', 'og-image-assessora.jpg')">Download</button>
+      <p class="info">For assessoras and cerimonialistas</p>
+    </div>
+    
+    <div class="canvas-wrapper">
+      <h2>Social</h2>
+      <canvas id="canvas-social" width="1200" height="630"></canvas>
+      <button onclick="downloadCanvas('canvas-social', 'og-image-social.jpg')">Download</button>
+      <p class="info">For weddings, debutantes, and parties</p>
+    </div>
+    
+    <div class="canvas-wrapper">
+      <h2>Corporativo</h2>
+      <canvas id="canvas-corporativo" width="1200" height="630"></canvas>
+      <button onclick="downloadCanvas('canvas-corporativo', 'og-image-corporativo.jpg')">Download</button>
+      <p class="info">For corporate events and activations</p>
+    </div>
+  </div>
+
+  <script>
+    const configs = {
+      'canvas-default': {
+        gradient: ['#6366F1', '#4F46E5'],
+        headline: 'Transforme fotos em\nexperiências ao vivo',
+        subtext: 'Sem app • Moderação IA • Busca facial',
+        emoji: '📸'
+      },
+      'canvas-assessora': {
+        gradient: ['#8B5CF6', '#7C3AED'],
+        headline: 'Controle total e\nsegurança operacional',
+        subtext: 'Para assessoras e cerimonialistas',
+        emoji: '🎯'
+      },
+      'canvas-social': {
+        gradient: ['#EC4899', '#DB2777'],
+        headline: 'Fotos ao vivo com\nemoção e facilidade',
+        subtext: 'Para casamentos, debutantes e festas',
+        emoji: '💕'
+      },
+      'canvas-corporativo': {
+        gradient: ['#10B981', '#059669'],
+        headline: 'Engajamento\nem escala',
+        subtext: 'Para eventos corporativos e ativações',
+        emoji: '🚀'
+      }
+    };
+
+    function drawOGImage(canvasId, config) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext('2d');
+      
+      // Gradient background
+      const gradient = ctx.createLinearGradient(0, 0, 1200, 630);
+      gradient.addColorStop(0, config.gradient[0]);
+      gradient.addColorStop(1, config.gradient[1]);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 1200, 630);
+      
+      // Logo area (top-left)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.fillRect(40, 40, 200, 60);
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 32px sans-serif';
+      ctx.fillText('Evento Vivo', 60, 82);
+      
+      // Emoji
+      ctx.font = '120px sans-serif';
+      ctx.fillText(config.emoji, 900, 200);
+      
+      // Headline
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 72px sans-serif';
+      const lines = config.headline.split('\n');
+      lines.forEach((line, i) => {
+        ctx.fillText(line, 60, 280 + (i * 90));
+      });
+      
+      // Subtext
+      ctx.font = '32px sans-serif';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.fillText(config.subtext, 60, 520);
+      
+      // Footer
+      ctx.font = '24px sans-serif';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.fillText('eventovivo.com.br', 60, 580);
+    }
+
+    function downloadCanvas(canvasId, filename) {
+      const canvas = document.getElementById(canvasId);
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = canvas.toDataURL('image/jpeg', 0.95);
+      link.click();
+    }
+
+    // Generate all images on load
+    window.onload = () => {
+      Object.entries(configs).forEach(([canvasId, config]) => {
+        drawOGImage(canvasId, config);
+      });
+    };
+  </script>
+</body>
+</html>

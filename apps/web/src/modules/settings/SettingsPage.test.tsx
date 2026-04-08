@@ -13,6 +13,8 @@ const uploadCurrentOrganizationLogoMock = vi.fn();
 const inviteCurrentOrganizationTeamMemberMock = vi.fn();
 const removeCurrentOrganizationTeamMemberMock = vi.fn();
 const updateCurrentUserPreferencesMock = vi.fn();
+const getMediaIntelligenceGlobalSettingsMock = vi.fn();
+const updateMediaIntelligenceGlobalSettingsMock = vi.fn();
 
 vi.mock('@/app/providers/AuthProvider', () => ({
   useAuth: () => useAuthMock(),
@@ -33,6 +35,8 @@ vi.mock('./api', () => ({
     inviteCurrentOrganizationTeamMember: (...args: unknown[]) => inviteCurrentOrganizationTeamMemberMock(...args),
     removeCurrentOrganizationTeamMember: (...args: unknown[]) => removeCurrentOrganizationTeamMemberMock(...args),
     updateCurrentUserPreferences: (...args: unknown[]) => updateCurrentUserPreferencesMock(...args),
+    getMediaIntelligenceGlobalSettings: (...args: unknown[]) => getMediaIntelligenceGlobalSettingsMock(...args),
+    updateMediaIntelligenceGlobalSettings: (...args: unknown[]) => updateMediaIntelligenceGlobalSettingsMock(...args),
   },
 }));
 
@@ -141,6 +145,13 @@ describe('SettingsPage', () => {
     inviteCurrentOrganizationTeamMemberMock.mockResolvedValue({ success: true, data: {} });
     removeCurrentOrganizationTeamMemberMock.mockResolvedValue({ success: true });
     updateCurrentUserPreferencesMock.mockResolvedValue({ success: true, data: {} });
+    getMediaIntelligenceGlobalSettingsMock.mockResolvedValue({
+      id: 1,
+      reply_text_prompt: 'Frase curta, com emoji e baseada na foto.',
+      created_at: null,
+      updated_at: null,
+    });
+    updateMediaIntelligenceGlobalSettingsMock.mockResolvedValue({ success: true, data: {} });
   });
 
   it('switches visible settings sections when the user changes tabs', async () => {
@@ -208,6 +219,7 @@ describe('SettingsPage', () => {
 
     renderPage();
 
+    expect(screen.queryByRole('tab', { name: /^ia$/i })).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /permiss/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /integrac/i })).toBeInTheDocument();
   });
@@ -238,6 +250,7 @@ describe('SettingsPage', () => {
 
     renderPage();
 
+    expect(screen.queryByRole('tab', { name: /^ia$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: /permiss/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: /integrac/i })).not.toBeInTheDocument();
   });
@@ -268,6 +281,7 @@ describe('SettingsPage', () => {
     renderPage();
 
     expect(listCurrentOrganizationTeamMock).not.toHaveBeenCalled();
+    expect(screen.queryByRole('tab', { name: /^ia$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: /equipe/i })).not.toBeInTheDocument();
   });
 

@@ -5,6 +5,7 @@ namespace App\Modules\FaceSearch\Services;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use RuntimeException;
+use Throwable;
 
 class CompreFaceSmokeService
 {
@@ -40,7 +41,11 @@ class CompreFaceSmokeService
         $detections = [];
 
         foreach ($entries as $entry) {
-            $detections[] = $this->runDetectionProbe($entry);
+            try {
+                $detections[] = $this->runDetectionProbe($entry);
+            } catch (Throwable $exception) {
+                $detections[] = $this->failedDetectionProbe($entry, $exception);
+            }
         }
 
         $report['detections'] = $detections;
@@ -235,11 +240,45 @@ class CompreFaceSmokeService
     }
 
     /**
+     * @param array<string, mixed> $entry
+     * @return array<string, mixed>
+     */
+    private function failedDetectionProbe(array $entry, Throwable $exception): array
+    {
+        return [
+            'id' => $entry['id'],
+            'event_id' => $entry['event_id'],
+            'person_id' => $entry['person_id'],
+            'quality_label' => $entry['quality_label'],
+            'scene_type' => $entry['scene_type'],
+            'expected_positive_set' => $entry['expected_positive_set'],
+            'selected_relative_path' => $entry['selected_relative_path'],
+            'path_used' => $entry['path_used'],
+            'latency_ms' => null,
+            'embedding_dimension' => 0,
+            'detected_faces_count' => 0,
+            'selected_face_strategy' => (string) data_get($entry, 'target_face_selection.strategy', 'largest'),
+            'selected_face_value' => (int) data_get($entry, 'target_face_selection.value', 1),
+            'selected_face_bbox' => null,
+            'detector_latency_ms' => null,
+            'calculator_latency_ms' => null,
+            'plugins_versions' => [],
+            'request_outcome' => 'failed',
+            'error_message' => $exception->getMessage(),
+            'embedding' => [],
+        ];
+    }
+
+    /**
      * @param Collection<int, array<string, mixed>> $detections
      * @return array<int, array<string, mixed>>
      */
     private function runVerificationChecks(Collection $detections): array
     {
+        if ($detections->contains(fn (array $probe): bool => ($probe['request_outcome'] ?? null) !== 'success')) {
+            return [];
+        }
+
         $checks = [];
         $successful = $detections->filter(fn (array $probe): bool => ($probe['request_outcome'] ?? null) === 'success');
         $byPerson = $successful->groupBy('person_id');

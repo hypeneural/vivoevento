@@ -17,6 +17,11 @@ const settings = {
   timeout_ms: 12000,
   fallback_mode: 'review',
   require_json_output: true,
+  reply_text_mode: 'ai',
+  reply_text_enabled: true,
+  reply_prompt_override: 'Use o nome do evento se ele ajudar naturalmente.',
+  reply_prompt_preset_id: null,
+  reply_fixed_templates: [],
   created_at: null,
   updated_at: null,
 } as const;
@@ -48,6 +53,10 @@ describe('EventMediaIntelligenceSettingsForm', () => {
         timeout_ms: 12000,
         fallback_mode: 'review',
         require_json_output: true,
+        reply_text_mode: 'ai',
+        reply_prompt_override: 'Use o nome do evento se ele ajudar naturalmente.',
+        reply_prompt_preset_id: null,
+        reply_fixed_templates: [],
       });
     });
   });
@@ -87,5 +96,85 @@ describe('EventMediaIntelligenceSettingsForm', () => {
         }),
       );
     });
+  });
+
+  it('submits null when the event reply override is cleared', async () => {
+    const onSubmit = vi.fn();
+
+    render(
+      <EventMediaIntelligenceSettingsForm
+        settings={settings}
+        eventModerationMode="ai"
+        onSubmit={onSubmit}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/texto de instrucao do evento/i), {
+      target: { value: '' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /salvar vlm/i }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reply_text_mode: 'ai',
+          reply_prompt_override: null,
+          reply_prompt_preset_id: null,
+          reply_fixed_templates: [],
+        }),
+      );
+    });
+  });
+
+  it('submits fixed templates when the response mode is texto fixo aleatorio', async () => {
+    const onSubmit = vi.fn();
+
+    render(
+      <EventMediaIntelligenceSettingsForm
+        settings={{
+          ...settings,
+          reply_text_mode: 'fixed_random',
+          reply_text_enabled: true,
+          reply_prompt_override: null,
+          reply_fixed_templates: [
+            'Memorias que fazem o coracao sorrir! 🎉📸',
+            'Momento de risadas e lembrancas! 📱🎉',
+          ],
+        }}
+        eventModerationMode="ai"
+        onSubmit={onSubmit}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /salvar vlm/i }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reply_text_mode: 'fixed_random',
+          reply_prompt_override: null,
+          reply_prompt_preset_id: null,
+          reply_fixed_templates: [
+            'Memorias que fazem o coracao sorrir! 🎉📸',
+            'Momento de risadas e lembrancas! 📱🎉',
+          ],
+        }),
+      );
+    });
+  });
+
+  it('renders visible labels in portugues for the automatic response flow', () => {
+    render(
+      <EventMediaIntelligenceSettingsForm
+        settings={settings}
+        eventModerationMode="ai"
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/tipo de resposta automatica/i)).toBeInTheDocument();
+    expect(screen.getByText(/contrato da resposta automatica/i)).toBeInTheDocument();
+    expect(screen.getByText(/^provedor$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/texto de instrucao do evento/i)).toBeInTheDocument();
   });
 });

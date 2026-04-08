@@ -3,6 +3,8 @@
 namespace App\Modules\MediaIntelligence\Jobs;
 
 use App\Modules\MediaIntelligence\Actions\EvaluateMediaPromptAction;
+use App\Modules\MediaIntelligence\Services\MediaReplyAiBurstGuardService;
+use App\Modules\MediaIntelligence\Services\PublishedMediaAiReplyDispatcher;
 use App\Modules\MediaProcessing\Jobs\RunModerationJob;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Services\MediaPipelineDegradationPolicy;
@@ -111,35 +113,87 @@ class EvaluateMediaPromptJob implements ShouldBeUnique, ShouldQueue
                 ]);
         } else {
             try {
-                $result = app(EvaluateMediaPromptAction::class)->execute($media);
+                $replyBurstGuard = app(MediaReplyAiBurstGuardService::class)->consume($media);
 
-                $caption = $media->caption;
+                if ($replyBurstGuard && ! $replyBurstGuard['allowed']) {
+                    $media->forceFill([
+                        'vlm_status' => 'skipped',
+                        'last_pipeline_error_code' => null,
+                        'last_pipeline_error_message' => null,
+                    ])->save();
 
-                if (($caption === null || trim($caption) === '') && $result->shortCaption) {
-                    $caption = $result->shortCaption;
+                    $runService->finishStage($run, [
+                        'provider_key' => 'reply-ai-rate-limit',
+                        'provider_version' => 'runbook-v1',
+                        'model_key' => 'reply-ai-rate-limit',
+                        'model_snapshot' => 'reply-ai-rate-limit',
+                        'decision_key' => 'skipped',
+                        'result_json' => [
+                            'skipped' => true,
+                            'reason' => 'reply_ai_rate_limited',
+                            'guard' => $replyBurstGuard,
+                        ],
+                        'metrics_json' => [
+                            'mode_applied' => $settings?->mode,
+                            'review_required' => false,
+                        ],
+                    ]);
+
+                    Log::channel((string) config('observability.queue_log_channel', config('logging.default')))
+                        ->info('media_pipeline.reply_ai_rate_limited', [
+                            'stage' => 'vlm',
+                            'event_media_id' => $media->id,
+                            'event_id' => $media->event_id,
+                            'sender_key' => $replyBurstGuard['sender_key'],
+                            'limiter_key' => $replyBurstGuard['limiter_key'],
+                            'attempts' => $replyBurstGuard['attempts'],
+                            'remaining' => $replyBurstGuard['remaining'],
+                            'available_in_seconds' => $replyBurstGuard['available_in_seconds'],
+                            'max_messages' => $replyBurstGuard['max_messages'],
+                            'window_minutes' => $replyBurstGuard['window_minutes'],
+                            'intake_source' => $replyBurstGuard['intake_source'],
+                        ]);
+                } else {
+                    $result = app(EvaluateMediaPromptAction::class)->execute($media);
+
+                    $caption = $media->caption;
+
+                    if (($caption === null || trim($caption) === '') && $result->shortCaption) {
+                        $caption = $result->shortCaption;
+                    }
+
+                    $media->forceFill([
+                        'vlm_status' => $result->vlmStatus(),
+                        'caption' => $caption,
+                        'last_pipeline_error_code' => null,
+                        'last_pipeline_error_message' => null,
+                    ])->save();
+
+                    $runService->finishStage($run, [
+                        'provider_key' => $result->providerKey,
+                        'provider_version' => $result->providerVersion,
+                        'model_key' => $result->modelKey,
+                        'model_snapshot' => $result->modelSnapshot,
+                        'decision_key' => $result->decision->value,
+                        'result_json' => $result->toRunResult(),
+                        'metrics_json' => [
+                            'mode_applied' => $result->modeApplied,
+                            'review_required' => $result->reviewRequired,
+                            'tokens_input' => $result->tokensInput,
+                            'tokens_output' => $result->tokensOutput,
+                        ],
+                    ]);
+
+                    app(PublishedMediaAiReplyDispatcher::class)->dispatchIfEligible(
+                        $media->fresh([
+                            'event.mediaIntelligenceSettings',
+                            'event.defaultWhatsAppInstance',
+                            'inboundMessage',
+                            'latestVlmEvaluation',
+                        ]),
+                        $result->replyText,
+                    );
                 }
-
-                $media->forceFill([
-                    'vlm_status' => $result->vlmStatus(),
-                    'caption' => $caption,
-                    'last_pipeline_error_code' => null,
-                    'last_pipeline_error_message' => null,
-                ])->save();
-
-                $runService->finishStage($run, [
-                    'provider_key' => $result->providerKey,
-                    'provider_version' => $result->providerVersion,
-                    'model_key' => $result->modelKey,
-                    'model_snapshot' => $result->modelSnapshot,
-                    'decision_key' => $result->decision->value,
-                    'result_json' => $result->toRunResult(),
-                    'metrics_json' => [
-                        'mode_applied' => $result->modeApplied,
-                        'review_required' => $result->reviewRequired,
-                        'tokens_input' => $result->tokensInput,
-                        'tokens_output' => $result->tokensOutput,
-                    ],
-                ]);
             } catch (Throwable $exception) {
                 $media->forceFill([
                     'vlm_status' => 'failed',

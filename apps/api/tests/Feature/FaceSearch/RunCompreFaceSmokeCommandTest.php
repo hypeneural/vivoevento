@@ -204,6 +204,113 @@ it('fails cleanly when the compreface smoke service cannot run', function () {
     ])->assertFailed();
 });
 
+it('keeps the smoke report degraded when one detection fails but the run can continue', function () {
+    $fixtureRoot = base_path('tests/Fixtures/AI/local/test-dataset-degraded');
+    $reportDir = storage_path('app/testing/face-search-smoke/degraded-run');
+
+    File::deleteDirectory($fixtureRoot);
+    File::deleteDirectory($reportDir);
+    File::ensureDirectoryExists($fixtureRoot);
+
+    foreach (['person-a-1.jpg', 'person-a-2.jpg', 'person-b-1.jpg'] as $name) {
+        $file = UploadedFile::fake()->image($name, 64, 64)->size(120);
+        copy($file->getPathname(), $fixtureRoot . DIRECTORY_SEPARATOR . $name);
+    }
+
+    $manifestPath = writeSmokeManifest($fixtureRoot, [
+        [
+            'id' => 'person-a-1',
+            'relative_path' => 'person-a-1.jpg',
+            'event_id' => 'local-event',
+            'person_id' => 'person-a',
+            'expected_positive_set' => ['person-a-1', 'person-a-2'],
+            'quality_label' => 'good',
+            'is_public_search_eligible' => true,
+            'expected_moderation_bucket' => 'safe',
+            'consent_basis' => 'explicit_local_validation',
+            'size_bytes' => filesize($fixtureRoot . DIRECTORY_SEPARATOR . 'person-a-1.jpg'),
+            'requires_derivative_for_compreface' => false,
+        ],
+        [
+            'id' => 'person-a-2',
+            'relative_path' => 'person-a-2.jpg',
+            'event_id' => 'local-event',
+            'person_id' => 'person-a',
+            'expected_positive_set' => ['person-a-1', 'person-a-2'],
+            'quality_label' => 'good',
+            'is_public_search_eligible' => true,
+            'expected_moderation_bucket' => 'safe',
+            'consent_basis' => 'explicit_local_validation',
+            'size_bytes' => filesize($fixtureRoot . DIRECTORY_SEPARATOR . 'person-a-2.jpg'),
+            'requires_derivative_for_compreface' => false,
+        ],
+        [
+            'id' => 'person-b-1',
+            'relative_path' => 'person-b-1.jpg',
+            'event_id' => 'local-event',
+            'person_id' => 'person-b',
+            'expected_positive_set' => ['person-b-1'],
+            'quality_label' => 'good',
+            'is_public_search_eligible' => true,
+            'expected_moderation_bucket' => 'safe',
+            'consent_basis' => 'explicit_local_validation',
+            'size_bytes' => filesize($fixtureRoot . DIRECTORY_SEPARATOR . 'person-b-1.jpg'),
+            'requires_derivative_for_compreface' => false,
+        ],
+    ]);
+
+    $this->mock(CompreFaceClient::class, function (MockInterface $mock) use ($fixtureRoot): void {
+        $expectedBase64A1 = base64_encode((string) File::get($fixtureRoot . DIRECTORY_SEPARATOR . 'person-a-1.jpg'));
+        $expectedBase64A2 = base64_encode((string) File::get($fixtureRoot . DIRECTORY_SEPARATOR . 'person-a-2.jpg'));
+        $expectedBase64B1 = base64_encode((string) File::get($fixtureRoot . DIRECTORY_SEPARATOR . 'person-b-1.jpg'));
+
+        $mock->shouldReceive('detectBase64')
+            ->once()
+            ->withArgs(fn (string $base64): bool => $base64 === $expectedBase64A1)
+            ->andReturn([
+                'result' => [[
+                    'embedding' => [0.1, 0.2, 0.3],
+                ]],
+                'plugins_versions' => ['calculator' => 'facenet.Calculator'],
+            ]);
+
+        $mock->shouldReceive('detectBase64')
+            ->once()
+            ->withArgs(fn (string $base64): bool => $base64 === $expectedBase64A2)
+            ->andThrow(new RuntimeException('No face is found in the given image'));
+
+        $mock->shouldReceive('detectBase64')
+            ->once()
+            ->withArgs(fn (string $base64): bool => $base64 === $expectedBase64B1)
+            ->andReturn([
+                'result' => [[
+                    'embedding' => [0.9, 0.8, 0.7],
+                ]],
+                'plugins_versions' => ['calculator' => 'facenet.Calculator'],
+            ]);
+
+        $mock->shouldNotReceive('verifyEmbeddings');
+    });
+
+    $this->artisan('face-search:smoke-compreface', [
+        '--manifest' => $manifestPath,
+        '--report-dir' => $reportDir,
+    ])->assertSuccessful();
+
+    $reports = File::files($reportDir);
+
+    expect($reports)->toHaveCount(1);
+
+    $report = json_decode((string) File::get($reports[0]->getPathname()), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($report['request_outcome'])->toBe('degraded')
+        ->and($report['detections'])->toHaveCount(3)
+        ->and($report['detections'][1]['request_outcome'])->toBe('failed')
+        ->and($report['detections'][1]['error_message'])->toContain('No face is found')
+        ->and($report['verification_checks'])->toBeArray()
+        ->and($report['verification_checks'])->toHaveCount(0);
+});
+
 /**
  * @param array<int, array<string, mixed>> $entries
  */

@@ -804,6 +804,16 @@ export default function EventDetailPage() {
                       Modo:{' '}
                       <span className="font-medium text-foreground">{event.media_intelligence?.mode ?? 'enrich_only'}</span>
                     </p>
+                    <p className="mt-1">
+                      Resposta automatica:{' '}
+                      <span className="font-medium text-foreground">
+                        {event.media_intelligence?.reply_text_mode === 'fixed_random'
+                          ? 'texto fixo aleatorio'
+                          : event.media_intelligence?.reply_text_mode === 'ai'
+                            ? 'por IA'
+                            : 'desligada'}
+                      </span>
+                    </p>
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground">

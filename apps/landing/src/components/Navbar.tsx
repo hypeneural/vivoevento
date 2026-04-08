@@ -106,11 +106,11 @@ export default function Navbar() {
           <div className={styles.actions}>
             <a className={styles.secondaryAction} href={siteConfig.whatsappUrl} target="_blank" rel="noreferrer">
               <MessageCircle size={16} />
-              Especialista
+              WhatsApp
             </a>
 
             <a className={styles.desktopCta} href={siteConfig.primaryCtaUrl} target="_blank" rel="noreferrer">
-              Agendar demo
+              Agendar demonstração
               <ArrowUpRight size={16} />
             </a>
 
@@ -144,10 +144,10 @@ export default function Navbar() {
 
           <div className={styles.mobileButtons}>
             <a className="button" data-variant="primary" href={siteConfig.primaryCtaUrl} target="_blank" rel="noreferrer">
-              Agendar demonstracao
+              Agendar demonstração
             </a>
             <a className="button" data-variant="ghost" href={siteConfig.whatsappUrl} target="_blank" rel="noreferrer">
-              WhatsApp comercial
+              Falar no WhatsApp
             </a>
           </div>
         </div>

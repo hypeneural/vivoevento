@@ -49,7 +49,7 @@ class RunCompreFaceSmokeCommand extends Command
 
         $filename = sprintf(
             '%s-compreface-%s.json',
-            now()->format('Ymd-His'),
+            now()->format('Ymd-His-u'),
             ($report['dry_run'] ?? false) ? 'dry-run' : 'real-run',
         );
 

@@ -28,6 +28,7 @@ class EventMediaSafetyEvaluation extends Model
         'normalized_provider_json',
         'reason_codes_json',
         'raw_response_json',
+        'request_payload_json',
         'completed_at',
     ];
 
@@ -41,6 +42,7 @@ class EventMediaSafetyEvaluation extends Model
         'normalized_provider_json' => 'array',
         'reason_codes_json' => 'array',
         'raw_response_json' => 'array',
+        'request_payload_json' => 'array',
         'completed_at' => 'datetime',
     ];
 

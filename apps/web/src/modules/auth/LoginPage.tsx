@@ -43,6 +43,7 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isContinuing, setIsContinuing] = useState(false);
   const [resetMethod, setResetMethod] = useState<'whatsapp' | 'email'>('whatsapp');
+  const hasDevQuickAccess = availableUsers.length > 0;
 
   useEffect(() => {
     if (registerResendCountdown <= 0) return;
@@ -296,10 +297,10 @@ export default function LoginPage() {
       setResetCode('');
       setStep('forgot-code');
       toast({
-        title: result.method === 'whatsapp' ? '📱 Código enviado!' : '📧 Código enviado!',
+        title: 'Solicitacao recebida',
         description: result.method === 'whatsapp'
-          ? 'Verifique seu WhatsApp para o código de recuperação.'
-          : 'Verifique seu e-mail para o código de recuperação.',
+          ? 'Se encontrarmos uma conta para este WhatsApp, enviaremos um codigo de recuperacao.'
+          : 'Se encontrarmos uma conta para este e-mail, enviaremos um codigo de recuperacao.',
       });
     } catch (err: any) {
       toast({
@@ -327,10 +328,10 @@ export default function LoginPage() {
       setResetCode('');
 
       toast({
-        title: 'Codigo reenviado',
+        title: 'Solicitacao reenviada',
         description: result.method === 'whatsapp'
-          ? 'Enviamos um novo codigo para o seu WhatsApp.'
-          : 'Enviamos um novo codigo para o seu e-mail.',
+          ? 'Se existir uma conta para este WhatsApp, um novo codigo sera enviado.'
+          : 'Se existir uma conta para este e-mail, um novo codigo sera enviado.',
       });
     } catch (err: any) {
       toast({
@@ -518,36 +519,37 @@ export default function LoginPage() {
                     </button>
                   </div>
 
-                  {/* Dev Quick Access */}
-                  <div className="border-t border-border/50 pt-4 sm:pt-5">
-                    <button
-                      onClick={() => {
-                        const el = document.getElementById('dev-users');
-                        el?.classList.toggle('hidden');
-                      }}
-                      className="flex items-center justify-center gap-1.5 w-full text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
-                    >
-                      <span>Acesso rápido (dev)</span>
-                      <ChevronDown className="h-3 w-3" />
-                    </button>
-                    <div id="dev-users" className="hidden mt-3 space-y-1.5">
-                      {availableUsers.map(u => (
-                        <button
-                          key={u.id}
-                          onClick={() => loginMock(u.id)}
-                          className="flex items-center gap-2.5 w-full p-2 sm:p-2.5 rounded-lg bg-muted/30 hover:bg-muted/60 transition-colors text-left"
-                        >
-                          <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full gradient-primary flex items-center justify-center text-[10px] sm:text-xs font-bold text-primary-foreground shrink-0">
-                            {u.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs sm:text-sm font-medium truncate">{u.name}</p>
-                            <p className="text-[10px] text-muted-foreground truncate">{u.role}</p>
-                          </div>
-                        </button>
-                      ))}
+                  {hasDevQuickAccess ? (
+                    <div className="border-t border-border/50 pt-4 sm:pt-5">
+                      <button
+                        onClick={() => {
+                          const el = document.getElementById('dev-users');
+                          el?.classList.toggle('hidden');
+                        }}
+                        className="flex items-center justify-center gap-1.5 w-full text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                      >
+                        <span>Acesso rápido (dev)</span>
+                        <ChevronDown className="h-3 w-3" />
+                      </button>
+                      <div id="dev-users" className="hidden mt-3 space-y-1.5">
+                        {availableUsers.map(u => (
+                          <button
+                            key={u.id}
+                            onClick={() => loginMock(u.id)}
+                            className="flex items-center gap-2.5 w-full p-2 sm:p-2.5 rounded-lg bg-muted/30 hover:bg-muted/60 transition-colors text-left"
+                          >
+                            <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full gradient-primary flex items-center justify-center text-[10px] sm:text-xs font-bold text-primary-foreground shrink-0">
+                              {u.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs sm:text-sm font-medium truncate">{u.name}</p>
+                              <p className="text-[10px] text-muted-foreground truncate">{u.role}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
                 </motion.div>
               )}
 
@@ -971,8 +973,11 @@ export default function LoginPage() {
                     <h2 className="text-lg sm:text-xl font-semibold">Digite o código</h2>
                     <p className="text-sm text-muted-foreground">
                       {resetMethod === 'whatsapp'
-                        ? 'Enviamos um código de 6 dígitos para seu WhatsApp'
-                        : 'Enviamos um código de 6 dígitos para seu e-mail'}
+                        ? `Se encontrarmos uma conta vinculada a ${forgotDestinationMasked || 'este WhatsApp'}, enviaremos um codigo de 6 digitos por WhatsApp.`
+                        : `Se encontrarmos uma conta vinculada a ${forgotDestinationMasked || 'este e-mail'}, enviaremos um codigo de 6 digitos por e-mail.`}
+                    </p>
+                    <p className="text-xs text-muted-foreground/70">
+                      Por seguranca, nao confirmamos se o contato informado esta cadastrado.
                     </p>
                   </div>
 

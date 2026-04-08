@@ -2,7 +2,7 @@
  * Layout Strategy tests — verifies auto-resolve routing for all layouts.
  */
 import { describe, expect, it } from 'vitest';
-import { resolveRenderableLayout, resolvePrimaryMediaFit, shouldRenderFloatingCaption } from '../engine/layoutStrategy';
+import { resolveRenderableLayout, resolvePrimaryMediaFit, shouldRenderFloatingCaption, isMultiItemLayout } from '../engine/layoutStrategy';
 import type { WallRuntimeItem, WallLayout } from '../types';
 
 function makeMedia(overrides: Partial<WallRuntimeItem> = {}): WallRuntimeItem {
@@ -107,5 +107,39 @@ describe('shouldRenderFloatingCaption', () => {
 
   it('returns false for polaroid', () => {
     expect(shouldRenderFloatingCaption('polaroid')).toBe(false);
+  });
+});
+
+describe('isMultiItemLayout', () => {
+  it('returns true for carousel', () => {
+    expect(isMultiItemLayout('carousel')).toBe(true);
+  });
+
+  it('returns true for mosaic', () => {
+    expect(isMultiItemLayout('mosaic')).toBe(true);
+  });
+
+  it('returns true for grid', () => {
+    expect(isMultiItemLayout('grid')).toBe(true);
+  });
+
+  it('returns false for single-item layouts', () => {
+    const singleLayouts = ['fullscreen', 'cinematic', 'split', 'polaroid', 'kenburns', 'spotlight', 'gallery'];
+    for (const layout of singleLayouts) {
+      expect(isMultiItemLayout(layout)).toBe(false);
+    }
+  });
+
+  it('auto never resolves to a multi-item layout', () => {
+    const orientations = ['horizontal', 'vertical', 'squareish'] as const;
+    for (const orientation of orientations) {
+      for (const is_featured of [true, false]) {
+        for (const caption of [null, 'Some caption']) {
+          const media = makeMedia({ orientation, is_featured, caption });
+          const resolved = resolveRenderableLayout('auto', media);
+          expect(isMultiItemLayout(resolved)).toBe(false);
+        }
+      }
+    }
   });
 });

@@ -51,5 +51,6 @@ describe('LoginPage', () => {
 
     expect(screen.getByText(/acesse sua conta/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /entrar com whatsapp/i })).toBeInTheDocument();
+    expect(screen.queryByText(/\(dev\)/i)).not.toBeInTheDocument();
   });
 });

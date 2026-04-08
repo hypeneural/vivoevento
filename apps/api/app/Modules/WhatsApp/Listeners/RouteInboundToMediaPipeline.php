@@ -119,6 +119,7 @@ class RouteInboundToMediaPipeline implements ShouldQueue
                 'from_me' => $event->normalized->fromMe,
                 'caption' => $event->normalized->caption,
                 'media_url' => $event->normalized->mediaUrl,
+                'trace_id' => data_get($event->normalized->rawPayload, '_trace_id'),
             ]),
         ]);
 
@@ -129,6 +130,7 @@ class RouteInboundToMediaPipeline implements ShouldQueue
             'intake_source' => $context->intakeSource,
             'media_url' => $event->normalized->mediaUrl,
             'type' => $event->normalized->messageType,
+            'trace_id' => data_get($event->normalized->rawPayload, '_trace_id'),
         ]);
 
         $feedback->sendDetectedReaction($context->event, $event->message->instance, [

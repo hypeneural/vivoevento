@@ -924,6 +924,24 @@ export interface ApiEventMediaIntelligenceSettings {
   timeout_ms: number;
   fallback_mode: 'review' | 'skip' | string;
   require_json_output: boolean;
+  reply_text_mode: 'disabled' | 'ai' | 'fixed_random' | string;
+  reply_text_enabled: boolean;
+  reply_prompt_override: string | null;
+  reply_fixed_templates: string[];
+  reply_prompt_preset_id: number | null;
+  reply_prompt_preset?: {
+    id: number;
+    slug: string;
+    name: string;
+    category: string | null;
+    description: string | null;
+    prompt_template: string;
+    sort_order: number;
+    is_active: boolean;
+    created_by: number | null;
+    created_at: string | null;
+    updated_at: string | null;
+  } | null;
   created_at: string | null;
   updated_at: string | null;
 }

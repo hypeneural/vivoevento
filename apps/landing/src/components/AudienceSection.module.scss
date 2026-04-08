@@ -1,87 +1,247 @@
 ﻿@use '../styles/variables' as *;
 @use '../styles/mixins' as *;
 
+.section {
+  min-height: 80vh;
+  display: flex;
+  align-items: center;
+}
+
 .header {
-  margin-bottom: 1.5rem;
+  text-align: center;
+  margin-bottom: 3rem;
 
   :global(.section-title) {
     margin-top: 1rem;
-    max-width: 16ch;
+    max-width: 24ch;
+    margin-left: auto;
+    margin-right: auto;
   }
 }
 
-.tabs {
+.subtitle {
+  margin-top: 1rem;
+  color: $c-white-64;
+  font-size: 1.125rem;
+  max-width: 48ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.cardsGrid {
+  display: grid;
+  gap: 2rem;
+  margin-top: 3rem;
+
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 2.5rem;
+  }
+
+  @media (min-width: 1200px) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.card {
+  @include surface(rgba(10, 16, 29, 0.82), $border-strong, 18px);
+  border-radius: $radius-lg;
+  padding: 2rem;
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
+  flex-direction: column;
+  gap: 1.5rem;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 
-  button {
-    @include button-reset;
-    position: relative;
-    overflow: hidden;
-    min-height: 3rem;
-    padding: 0 0.95rem;
-    border-radius: 999px;
-    border: $border-subtle;
-    background: rgba(255, 255, 255, 0.04);
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
   }
 
-  span:last-child,
-  > button > span {
-    position: relative;
-    z-index: 1;
-    color: $c-white-80;
-    font-weight: 800;
+  &:focus-within {
+    outline: 2px solid $c-accent;
+    outline-offset: 2px;
   }
 }
 
-.tabHighlight {
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
+.cardHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.iconWrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
   background: rgba($c-accent, 0.12);
-  border: 1px solid rgba($c-accent, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.activeTab > span {
+.icon {
+  width: 24px;
+  height: 24px;
   color: $c-accent;
 }
 
-.panelShell {
-  margin-top: 1rem;
+.cardTitle {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: $c-white;
+  line-height: 1.3;
+  margin: 0;
 }
 
-.panel {
-  @include surface(rgba(10, 16, 29, 0.82), $border-strong, 18px);
-  display: grid;
-  gap: 0.85rem;
-  border-radius: $radius-lg;
-  padding: 1rem;
+.cardContent {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  flex: 1;
+}
 
-  div {
+.label {
+  display: block;
+  color: $c-white-48;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.promiseBlock {
+  .promise {
+    font-size: 1.125rem;
+    line-height: 1.5;
+    color: $c-white-80;
+    font-weight: 600;
+    margin: 0;
+  }
+}
+
+.modulesBlock {
+  .modulesList {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+
+    li {
+      padding-left: 1.5rem;
+      position: relative;
+      color: $c-white-80;
+      font-size: 0.9375rem;
+      line-height: 1.5;
+
+      &::before {
+        content: '✓';
+        position: absolute;
+        left: 0;
+        color: $c-accent;
+        font-weight: 700;
+      }
+    }
+  }
+}
+
+.objectionsBlock {
+  .objectionsList {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .objectionItem {
     padding: 1rem;
-    border-radius: 22px;
+    border-radius: 8px;
     background: rgba(255, 255, 255, 0.04);
   }
 
-  small {
-    display: block;
-    color: $c-white-48;
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
+  .question {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: $c-white-80;
+    margin: 0 0 0.5rem 0;
   }
 
-  strong {
-    display: block;
-    margin-top: 0.4rem;
-    font-size: 1rem;
-    color: $c-white-80;
+  .answer {
+    font-size: 0.875rem;
+    color: $c-white-64;
+    margin: 0;
+    line-height: 1.5;
   }
 }
 
-@media (min-width: 980px) {
-  .panel {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+.cardFooter {
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ctaButton {
+  @include button-reset;
+  display: block;
+  width: 100%;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  background: $c-accent;
+  color: $c-white;
+  font-weight: 700;
+  font-size: 1rem;
+  text-align: center;
+  text-decoration: none;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba($c-accent, 0.9);
+    transform: translateY(-2px);
+  }
+
+  &:focus {
+    outline: 2px solid $c-accent;
+    outline-offset: 2px;
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+// Ensure good contrast for accessibility
+@media (prefers-contrast: high) {
+  .card {
+    border: 2px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .label {
+    color: $c-white-64;
+  }
+
+  .question {
+    color: $c-white;
+  }
+}
+
+// Respect reduced motion preference
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
+  }
+
+  .ctaButton {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
   }
 }

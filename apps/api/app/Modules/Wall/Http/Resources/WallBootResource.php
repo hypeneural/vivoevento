@@ -34,6 +34,7 @@ class WallBootResource extends JsonResource
             ],
             'files' => $files,
             'settings' => $payloads->settings($this->resource, runtime: true),
+            'ads' => $payloads->ads($this->resource),
         ];
     }
 }

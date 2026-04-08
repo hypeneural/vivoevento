@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Evento Vivo Favicon - Simplified camera/gallery icon -->
+  <rect width="32" height="32" rx="6" fill="#6366F1"/>
+  <path d="M10 12C10 11.4477 10.4477 11 11 11H13L14 9H18L19 11H21C21.5523 11 22 11.4477 22 12V21C22 21.5523 21.5523 22 21 22H11C10.4477 22 10 21.5523 10 21V12Z" fill="white"/>
+  <circle cx="16" cy="16.5" r="3" fill="#6366F1"/>
+  <circle cx="19.5" cy="13.5" r="0.75" fill="#6366F1"/>
+</svg>

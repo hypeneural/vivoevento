@@ -17,7 +17,7 @@ it('returns default face search settings for an event when none were persisted y
         ->assertJsonPath('data.provider_key', 'noop')
         ->assertJsonPath('data.vector_store_key', 'pgvector')
         ->assertJsonPath('data.search_strategy', 'exact')
-        ->assertJsonPath('data.min_face_size_px', 96)
+        ->assertJsonPath('data.min_face_size_px', 24)
         ->assertJsonPath('data.search_threshold', 0.5)
         ->assertJsonPath('data.top_k', 50);
 });
@@ -111,7 +111,7 @@ it('validates that public selfie search requires face search enabled', function 
         'embedding_model_key' => 'face-embedding-foundation-v1',
         'vector_store_key' => 'pgvector',
         'search_strategy' => 'exact',
-        'min_face_size_px' => 96,
+        'min_face_size_px' => 24,
         'min_quality_score' => 0.60,
         'search_threshold' => 0.35,
         'top_k' => 50,
@@ -135,7 +135,7 @@ it('forbids updating face search settings without permission in the event organi
         'embedding_model_key' => 'face-embedding-foundation-v1',
         'vector_store_key' => 'pgvector',
         'search_strategy' => 'exact',
-        'min_face_size_px' => 96,
+        'min_face_size_px' => 24,
         'min_quality_score' => 0.60,
         'search_threshold' => 0.35,
         'top_k' => 50,

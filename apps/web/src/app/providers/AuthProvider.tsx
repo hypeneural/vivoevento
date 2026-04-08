@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import type { MeResponse, MeUser, MeOrganization, MeAccess, MeSubscription, MeResolvedEntitlements, LoginPayload } from '@/lib/api-types';
-import { authService, clearSession } from '@/modules/auth/services/auth.service';
+import { AUTH_USE_MOCK, authService, clearSession } from '@/modules/auth/services/auth.service';
 import { mockUsers } from '@/shared/mock/data';
 
 // ─── Context ───────────────────────────────────────────────
@@ -148,13 +148,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     hasRole,
     canAccessModule,
     hasFeature,
-    availableUsers: mockUsers.map(u => ({
-      id: u.id,
-      name: u.name,
-      role: u.role,
-      email: u.email,
-      phone: u.phone,
-    })),
+    availableUsers: AUTH_USE_MOCK
+      ? mockUsers.map(u => ({
+          id: u.id,
+          name: u.name,
+          role: u.role,
+          email: u.email,
+          phone: u.phone,
+        }))
+      : [],
   }), [session, isLoading, login, loginMock, logout, refreshSession, can, hasRole, canAccessModule, hasFeature]);
 
   return (

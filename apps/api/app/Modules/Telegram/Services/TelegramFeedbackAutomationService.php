@@ -87,8 +87,10 @@ class TelegramFeedbackAutomationService
         array $context,
         ?InboundMessage $inboundMessage = null,
         ?EventMedia $eventMedia = null,
+        ?string $replyText = null,
+        ?array $resolution = null,
     ): ?TelegramMessageFeedback {
-        return $this->sendReaction(
+        $reaction = $this->sendReaction(
             event: $event,
             context: $context,
             phase: 'published',
@@ -96,7 +98,24 @@ class TelegramFeedbackAutomationService
             inboundMessage: $inboundMessage,
             eventMedia: $eventMedia,
             isBig: true,
+            resolution: $resolution,
         );
+
+        $replyText = trim((string) $replyText);
+
+        if ($replyText !== '') {
+            $this->sendReply(
+                event: $event,
+                context: $context,
+                phase: 'published',
+                message: $replyText,
+                inboundMessage: $inboundMessage,
+                eventMedia: $eventMedia,
+                resolution: $resolution,
+            );
+        }
+
+        return $reaction;
     }
 
     /**
@@ -205,12 +224,13 @@ class TelegramFeedbackAutomationService
         ?InboundMessage $inboundMessage = null,
         ?EventMedia $eventMedia = null,
         bool $isBig = false,
+        ?array $resolution = null,
     ): ?TelegramMessageFeedback {
         if (! $this->isFeedbackEligible($event, $context)) {
             return null;
         }
 
-        $feedback = $this->reserveFeedback($event, $context, 'reaction', $phase, $inboundMessage, $eventMedia);
+        $feedback = $this->reserveFeedback($event, $context, 'reaction', $phase, $inboundMessage, $eventMedia, $resolution);
 
         if ($feedback === null) {
             return null;
@@ -249,12 +269,13 @@ class TelegramFeedbackAutomationService
         string $message,
         ?InboundMessage $inboundMessage = null,
         ?EventMedia $eventMedia = null,
+        ?array $resolution = null,
     ): ?TelegramMessageFeedback {
         if (! $this->isFeedbackEligible($event, $context)) {
             return null;
         }
 
-        $feedback = $this->reserveFeedback($event, $context, 'reply', $phase, $inboundMessage, $eventMedia);
+        $feedback = $this->reserveFeedback($event, $context, 'reply', $phase, $inboundMessage, $eventMedia, $resolution);
 
         if ($feedback === null) {
             return null;
@@ -292,11 +313,13 @@ class TelegramFeedbackAutomationService
         string $phase,
         ?InboundMessage $inboundMessage = null,
         ?EventMedia $eventMedia = null,
+        ?array $resolution = null,
     ): ?TelegramMessageFeedback {
         try {
             return TelegramMessageFeedback::query()->create([
                 'event_id' => $event->id,
                 'event_channel_id' => data_get($context, 'event_channel_id'),
+                'trace_id' => data_get($context, 'trace_id'),
                 'inbound_message_id' => $inboundMessage?->id,
                 'event_media_id' => $eventMedia?->id,
                 'inbound_provider_message_id' => (string) data_get($context, 'provider_message_id'),
@@ -305,6 +328,7 @@ class TelegramFeedbackAutomationService
                 'feedback_kind' => $kind,
                 'feedback_phase' => $phase,
                 'status' => 'pending',
+                'resolution_json' => $resolution,
             ]);
         } catch (QueryException $exception) {
             if (! $this->isUniqueFeedbackException($exception)) {

@@ -23,6 +23,12 @@ class EventMediaIntelligenceSettingResource extends JsonResource
             'timeout_ms' => $this->timeout_ms,
             'fallback_mode' => $this->fallback_mode,
             'require_json_output' => (bool) $this->require_json_output,
+            'reply_text_mode' => $this->resolvedReplyTextMode(),
+            'reply_text_enabled' => $this->automaticReplyEnabled(),
+            'reply_prompt_override' => $this->reply_prompt_override,
+            'reply_fixed_templates' => $this->reply_fixed_templates_json ?? [],
+            'reply_prompt_preset_id' => $this->reply_prompt_preset_id,
+            'reply_prompt_preset' => $this->whenLoaded('replyPromptPreset', fn () => (new MediaReplyPromptPresetResource($this->replyPromptPreset))->resolve()),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

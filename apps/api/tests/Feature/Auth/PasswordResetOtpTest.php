@@ -70,6 +70,39 @@ it('starts password reset flow via whatsapp with otp session metadata', function
     Queue::assertPushed(SendWhatsAppMessageJob::class);
 });
 
+it('keeps forgot-password responses generic when the whatsapp is not in the base', function () {
+    Queue::fake();
+    Notification::fake();
+
+    $instance = createPasswordResetAuthWhatsAppInstance();
+    config(['whatsapp.auth.instance_id' => $instance->id]);
+
+    $response = $this->apiPost('/auth/forgot-password', [
+        'login' => '(51) 99888-7766',
+    ]);
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.method', 'whatsapp');
+    expect($response->json('data.session_token'))->toBeString()->not->toBe('');
+    expect($response->json('data.debug_code'))->toHaveLength(6);
+
+    $this->assertDatabaseMissing('whatsapp_messages', [
+        'instance_id' => $instance->id,
+        'recipient_phone' => '5551998887766',
+    ]);
+
+    Queue::assertNotPushed(SendWhatsAppMessageJob::class);
+    Notification::assertNothingSent();
+
+    $verifyResponse = $this->apiPost('/auth/forgot-password/verify-otp', [
+        'session_token' => $response->json('data.session_token'),
+        'code' => $response->json('data.debug_code'),
+    ]);
+
+    $verifyResponse->assertStatus(422)
+        ->assertJsonValidationErrors(['code']);
+});
+
 it('blocks forgot-password resend before cooldown finishes', function () {
     Queue::fake();
 

@@ -1,9 +1,11 @@
 import { api } from '@/lib/api';
 
 import type {
+  MediaIntelligenceGlobalSettings,
   CurrentOrganizationLogoUploadResponse,
   InviteCurrentOrganizationTeamMemberPayload,
   OrganizationTeamResponse,
+  UpdateMediaIntelligenceGlobalSettingsPayload,
   UpdateCurrentOrganizationBrandingPayload,
   UpdateCurrentOrganizationPayload,
   UpdateCurrentUserPreferencesPayload,
@@ -42,6 +44,16 @@ export const settingsService = {
       body: {
         preferences: payload,
       },
+    });
+  },
+
+  getMediaIntelligenceGlobalSettings() {
+    return api.get<MediaIntelligenceGlobalSettings>('/media-intelligence/global-settings');
+  },
+
+  updateMediaIntelligenceGlobalSettings(payload: UpdateMediaIntelligenceGlobalSettingsPayload) {
+    return api.patch<MediaIntelligenceGlobalSettings>('/media-intelligence/global-settings', {
+      body: payload,
     });
   },
 };

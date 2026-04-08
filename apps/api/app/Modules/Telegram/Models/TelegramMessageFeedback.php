@@ -20,6 +20,7 @@ class TelegramMessageFeedback extends Model
     protected $fillable = [
         'event_id',
         'event_channel_id',
+        'trace_id',
         'inbound_message_id',
         'event_media_id',
         'inbound_provider_message_id',
@@ -31,12 +32,14 @@ class TelegramMessageFeedback extends Model
         'reaction_emoji',
         'chat_action',
         'reply_text',
+        'resolution_json',
         'error_message',
         'attempted_at',
         'completed_at',
     ];
 
     protected $casts = [
+        'resolution_json' => 'array',
         'attempted_at' => 'datetime',
         'completed_at' => 'datetime',
     ];

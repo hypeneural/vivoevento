@@ -35,7 +35,8 @@ import type {
 import { mockUsers, mockOrganizations, buildMockSession } from '@/shared/mock/data';
 import { formatRoleLabel } from '@/shared/auth/labels';
 
-const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false';
+export const AUTH_USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false';
+const USE_MOCK = AUTH_USE_MOCK;
 
 // ─── Persistence ───────────────────────────────────────────
 
@@ -643,6 +644,10 @@ export const authService = {
    * Login with mock user (dev only)
    */
   async loginMock(userId: string): Promise<MeResponse> {
+    if (!USE_MOCK) {
+      throw { status: 403, message: 'Acesso rapido indisponivel neste ambiente.' };
+    }
+
     await delay(300);
     const session = buildMockMeResponse(userId);
     if (!session) throw { status: 404, message: 'Usuário não encontrado' };

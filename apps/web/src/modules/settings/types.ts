@@ -52,3 +52,16 @@ export interface UpdateCurrentUserPreferencesPayload {
   push_notifications?: boolean;
   compact_mode?: boolean;
 }
+
+export interface MediaIntelligenceGlobalSettings {
+  id: number | null;
+  reply_text_prompt: string;
+  reply_text_fixed_templates: string[];
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface UpdateMediaIntelligenceGlobalSettingsPayload {
+  reply_text_prompt: string;
+  reply_text_fixed_templates: string[];
+}

@@ -9,14 +9,19 @@ final class VisualReasoningEvaluationResult
     /**
      * @param array<int, string> $tags
      * @param array<string, mixed> $rawResponse
+     * @param array<string, mixed> $requestPayload
+     * @param array<string, mixed>|null $promptContext
      */
     public function __construct(
         public readonly VisualReasoningDecision $decision,
         public readonly bool $reviewRequired = false,
         public readonly ?string $reason = null,
         public readonly ?string $shortCaption = null,
+        public readonly ?string $replyText = null,
         public readonly array $tags = [],
         public readonly array $rawResponse = [],
+        public readonly array $requestPayload = [],
+        public readonly ?array $promptContext = null,
         public readonly ?string $providerKey = null,
         public readonly ?string $providerVersion = null,
         public readonly ?string $modelKey = null,
@@ -31,12 +36,17 @@ final class VisualReasoningEvaluationResult
     /**
      * @param array<int, string> $tags
      * @param array<string, mixed> $rawResponse
+     * @param array<string, mixed> $requestPayload
+     * @param array<string, mixed>|null $promptContext
      */
     public static function approve(
         ?string $reason = null,
         ?string $shortCaption = null,
+        ?string $replyText = null,
         array $tags = [],
         array $rawResponse = [],
+        array $requestPayload = [],
+        ?array $promptContext = null,
         ?string $providerKey = null,
         ?string $providerVersion = null,
         ?string $modelKey = null,
@@ -52,8 +62,11 @@ final class VisualReasoningEvaluationResult
             reviewRequired: false,
             reason: $reason,
             shortCaption: $shortCaption,
+            replyText: $replyText,
             tags: $tags,
             rawResponse: $rawResponse,
+            requestPayload: $requestPayload,
+            promptContext: $promptContext,
             providerKey: $providerKey,
             providerVersion: $providerVersion,
             modelKey: $modelKey,
@@ -69,12 +82,17 @@ final class VisualReasoningEvaluationResult
     /**
      * @param array<int, string> $tags
      * @param array<string, mixed> $rawResponse
+     * @param array<string, mixed> $requestPayload
+     * @param array<string, mixed>|null $promptContext
      */
     public static function review(
         ?string $reason = null,
         ?string $shortCaption = null,
+        ?string $replyText = null,
         array $tags = [],
         array $rawResponse = [],
+        array $requestPayload = [],
+        ?array $promptContext = null,
         ?string $providerKey = null,
         ?string $providerVersion = null,
         ?string $modelKey = null,
@@ -90,8 +108,11 @@ final class VisualReasoningEvaluationResult
             reviewRequired: true,
             reason: $reason,
             shortCaption: $shortCaption,
+            replyText: $replyText,
             tags: $tags,
             rawResponse: $rawResponse,
+            requestPayload: $requestPayload,
+            promptContext: $promptContext,
             providerKey: $providerKey,
             providerVersion: $providerVersion,
             modelKey: $modelKey,
@@ -107,12 +128,17 @@ final class VisualReasoningEvaluationResult
     /**
      * @param array<int, string> $tags
      * @param array<string, mixed> $rawResponse
+     * @param array<string, mixed> $requestPayload
+     * @param array<string, mixed>|null $promptContext
      */
     public static function reject(
         ?string $reason = null,
         ?string $shortCaption = null,
+        ?string $replyText = null,
         array $tags = [],
         array $rawResponse = [],
+        array $requestPayload = [],
+        ?array $promptContext = null,
         ?string $providerKey = null,
         ?string $providerVersion = null,
         ?string $modelKey = null,
@@ -128,8 +154,11 @@ final class VisualReasoningEvaluationResult
             reviewRequired: false,
             reason: $reason,
             shortCaption: $shortCaption,
+            replyText: $replyText,
             tags: $tags,
             rawResponse: $rawResponse,
+            requestPayload: $requestPayload,
+            promptContext: $promptContext,
             providerKey: $providerKey,
             providerVersion: $providerVersion,
             modelKey: $modelKey,
@@ -191,8 +220,11 @@ final class VisualReasoningEvaluationResult
             'review_required' => $this->reviewRequired,
             'reason' => $this->reason,
             'short_caption' => $this->shortCaption,
+            'reply_text' => $this->replyText,
             'tags_json' => $this->tags,
             'raw_response_json' => $this->rawResponse,
+            'request_payload_json' => $this->requestPayload,
+            'prompt_context_json' => $this->promptContext,
             'tokens_input' => $this->tokensInput,
             'tokens_output' => $this->tokensOutput,
         ];
@@ -208,6 +240,7 @@ final class VisualReasoningEvaluationResult
             'review_required' => $this->reviewRequired,
             'reason' => $this->reason,
             'short_caption' => $this->shortCaption,
+            'reply_text' => $this->replyText,
             'tags' => $this->tags,
             'response_schema_version' => $this->responseSchemaVersion,
             'mode_applied' => $this->modeApplied,

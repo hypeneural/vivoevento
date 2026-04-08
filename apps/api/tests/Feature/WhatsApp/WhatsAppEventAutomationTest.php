@@ -6,10 +6,15 @@ use App\Modules\Events\Enums\EventStatus;
 use App\Modules\Events\Models\Event;
 use App\Modules\InboundMedia\Models\InboundMessage;
 use App\Modules\InboundMedia\Jobs\ProcessInboundWebhookJob as ProcessInboundMediaWebhookJob;
+use App\Modules\MediaIntelligence\DTOs\VisualReasoningEvaluationResult;
+use App\Modules\MediaIntelligence\Jobs\EvaluateMediaPromptJob;
+use App\Modules\MediaIntelligence\Models\EventMediaIntelligenceSetting;
+use App\Modules\MediaIntelligence\Services\VisualReasoningProviderInterface;
 use App\Modules\MediaProcessing\Events\MediaPublished;
 use App\Modules\MediaProcessing\Events\MediaRejected;
 use App\Modules\MediaProcessing\Jobs\RunModerationJob;
 use App\Modules\MediaProcessing\Models\EventMedia;
+use App\Modules\MediaProcessing\Models\EventMediaVariant;
 use App\Modules\MediaProcessing\Enums\ModerationStatus;
 use App\Modules\MediaProcessing\Enums\PublicationStatus;
 use App\Modules\WhatsApp\Enums\GroupBindingType;
@@ -19,6 +24,7 @@ use App\Modules\WhatsApp\Listeners\SendFeedbackOnMediaPublished;
 use App\Modules\WhatsApp\Listeners\SendFeedbackOnMediaRejected;
 use App\Modules\WhatsApp\Models\WhatsAppGroupBinding;
 use App\Modules\WhatsApp\Models\WhatsAppInboxSession;
+use App\Modules\WhatsApp\Models\WhatsAppInboundEvent;
 use App\Modules\WhatsApp\Models\WhatsAppInstance;
 use App\Modules\WhatsApp\Models\WhatsAppMessageFeedback;
 use App\Modules\WhatsApp\Models\WhatsAppMessage;
@@ -94,6 +100,7 @@ function makeInboundEventContextPayload(Event $event, EventChannel $channel, arr
             '_event_context' => [
                 'event_id' => $event->id,
                 'event_channel_id' => $channel->id,
+                'trace_id' => 'trace-whatsapp-feedback-001',
                 'intake_source' => 'whatsapp_group',
                 'provider_message_id' => '2A20028071DA23E04188',
                 'chat_external_id' => '120363499999999999-group',
@@ -273,6 +280,18 @@ it('does not route group media from a blacklisted participant lid and sends nega
         ->where('direction', MessageDirection::Outbound)
         ->orderBy('id')
         ->get();
+
+    /* expect($feedback->where('feedback_kind', 'reply')->first()?->resolution_json)->toMatchArray([
+        'mode' => 'ai',
+        'source' => 'vlm',
+        'reply_text' => 'Momento de risadas e lembrancas! ðŸ“±ðŸŽ‰',
+    ]); */
+
+    /* expect($feedback->where('feedback_kind', 'reply')->first()?->resolution_json)->toMatchArray([
+        'mode' => 'ai',
+        'source' => 'vlm',
+        'reply_text' => 'Momento de risadas e lembrancas! ðŸ“±ðŸŽ‰',
+    ]); */
 
     expect($outbound)->toHaveCount(2)
         ->and($outbound[0]->type->value)->toBe('reaction')
@@ -516,6 +535,72 @@ it('queues a detected reaction for eligible media using the chat id instead of t
         ->and($reaction->text_body)->toBe('⏳');
 });
 
+it('propagates the webhook trace id into inbound records and the media routing payload', function () {
+    Bus::fake([ProcessInboundMediaWebhookJob::class, SendWhatsAppMessageJob::class]);
+
+    $instance = WhatsAppInstance::factory()->connected()->create([
+        'external_instance_id' => 'INSTANCE-FIXTURE-TRACE',
+    ]);
+
+    $event = Event::factory()->create([
+        'organization_id' => $instance->organization_id,
+        'status' => EventStatus::Active->value,
+        'default_whatsapp_instance_id' => $instance->id,
+        'whatsapp_instance_mode' => 'shared',
+        'current_entitlements_json' => makeAutomationEntitlements(),
+    ]);
+
+    enableAutomationEventModule($event);
+
+    EventChannel::query()->create([
+        'event_id' => $event->id,
+        'channel_type' => ChannelType::WhatsAppGroup->value,
+        'provider' => 'zapi',
+        'external_id' => 'GRUPOAUTO',
+        'label' => 'WhatsApp grupos',
+        'status' => 'active',
+        'config_json' => [
+            'group_bind_code' => 'GRUPOAUTO',
+            'groups' => [
+                [
+                    'group_external_id' => '120363499999999999-group',
+                    'group_name' => 'Grupo Fixture Evento',
+                    'is_active' => true,
+                    'auto_feedback_enabled' => true,
+                ],
+            ],
+        ],
+    ]);
+
+    WhatsAppGroupBinding::query()->create([
+        'organization_id' => $event->organization_id,
+        'event_id' => $event->id,
+        'instance_id' => $instance->id,
+        'group_external_id' => '120363499999999999-group',
+        'group_name' => 'Grupo Fixture Evento',
+        'binding_type' => GroupBindingType::EventGallery->value,
+        'is_active' => true,
+        'metadata_json' => [],
+    ]);
+
+    $response = $this
+        ->withHeaders(['X-Trace-Id' => 'trace-whatsapp-inbound-001'])
+        ->postJson(
+            "/api/v1/webhooks/whatsapp/zapi/{$instance->external_instance_id}/inbound",
+            loadZApiAutomationFixture('group-image-with-caption'),
+        );
+
+    $response->assertOk()
+        ->assertHeader('X-Trace-Id', 'trace-whatsapp-inbound-001')
+        ->assertJson(['status' => 'received']);
+
+    expect(WhatsAppInboundEvent::query()->latest('id')->value('trace_id'))->toBe('trace-whatsapp-inbound-001');
+
+    Bus::assertDispatched(ProcessInboundMediaWebhookJob::class, function (ProcessInboundMediaWebhookJob $job) {
+        return data_get($job->payload, '_event_context.trace_id') === 'trace-whatsapp-inbound-001';
+    });
+});
+
 it('sends a single published feedback reaction when the media becomes published', function () {
     Bus::fake([SendWhatsAppMessageJob::class]);
 
@@ -645,6 +730,121 @@ it('sends rejected feedback after publication without colliding with the publish
         ->and($feedback->where('feedback_phase', 'rejected')->first()?->event_media_id)->toBe($eventMedia->id);
 });
 
+it('sends only the ai published reply after vlm completes for media already published', function () {
+    Bus::fake([SendWhatsAppMessageJob::class]);
+
+    app()->bind(VisualReasoningProviderInterface::class, fn () => new class implements VisualReasoningProviderInterface
+    {
+        public function evaluate(EventMedia $media, EventMediaIntelligenceSetting $settings): VisualReasoningEvaluationResult
+        {
+            return VisualReasoningEvaluationResult::approve(
+                reason: 'Imagem compativel com o evento.',
+                shortCaption: 'Legenda sugerida pela IA.',
+                replyText: 'Momento de risadas e lembrancas! 📱🎉',
+                tags: ['festa'],
+                rawResponse: ['provider' => 'fake-vlm'],
+                providerKey: 'fake-vlm',
+                providerVersion: 'test-v1',
+                modelKey: 'fake-vlm-model',
+                modelSnapshot: 'fake-vlm-model@1',
+                promptVersion: $settings->prompt_version,
+                responseSchemaVersion: $settings->response_schema_version,
+                modeApplied: $settings->mode,
+                tokensInput: 77,
+                tokensOutput: 18,
+            );
+        }
+    });
+
+    $instance = WhatsAppInstance::factory()->connected()->create([
+        'external_instance_id' => 'INSTANCE-FIXTURE-001',
+    ]);
+
+    $event = Event::factory()->create([
+        'organization_id' => $instance->organization_id,
+        'status' => EventStatus::Active->value,
+        'default_whatsapp_instance_id' => $instance->id,
+        'whatsapp_instance_mode' => 'shared',
+        'moderation_mode' => 'manual',
+        'current_entitlements_json' => makeAutomationEntitlements(),
+    ]);
+
+    enableAutomationEventModule($event);
+
+    EventMediaIntelligenceSetting::factory()->create([
+        'event_id' => $event->id,
+        'enabled' => true,
+        'mode' => 'enrich_only',
+        'reply_text_enabled' => true,
+    ]);
+
+    $channel = EventChannel::query()->create([
+        'event_id' => $event->id,
+        'channel_type' => ChannelType::WhatsAppGroup->value,
+        'provider' => 'zapi',
+        'external_id' => 'GRUPOAUTO',
+        'label' => 'WhatsApp grupos',
+        'status' => 'active',
+        'config_json' => [
+            'group_bind_code' => 'GRUPOAUTO',
+            'groups' => [
+                [
+                    'group_external_id' => '120363499999999999-group',
+                    'group_name' => 'Grupo Fixture Evento',
+                    'is_active' => true,
+                    'auto_feedback_enabled' => true,
+                ],
+            ],
+        ],
+    ]);
+
+    [$inboundMessage, $eventMedia] = createInboundMediaWithEventContext($event, $channel);
+
+    $eventMedia->forceFill([
+        'publication_status' => PublicationStatus::Published->value,
+        'moderation_status' => ModerationStatus::Approved->value,
+        'vlm_status' => 'queued',
+    ])->save();
+
+    EventMediaVariant::query()->create([
+        'event_media_id' => $eventMedia->id,
+        'variant_key' => 'fast_preview',
+        'disk' => 'public',
+        'path' => "events/{$event->id}/variants/{$eventMedia->id}/fast_preview.webp",
+        'mime_type' => 'image/webp',
+        'width' => 512,
+        'height' => 512,
+        'size_bytes' => 2048,
+    ]);
+
+    app(SendFeedbackOnMediaPublished::class)->handle(MediaPublished::fromMedia($eventMedia));
+    app(EvaluateMediaPromptJob::class, ['eventMediaId' => $eventMedia->id])->handle();
+
+    $feedback = WhatsAppMessageFeedback::query()->orderBy('id')->get();
+    $outbound = WhatsAppMessage::query()->where('direction', MessageDirection::Outbound)->orderBy('id')->get();
+    $publishedReplyFeedback = $feedback->where('feedback_kind', 'reply')->first();
+
+    /* expect($publishedReplyFeedback?->resolution_json)->toMatchArray([
+        'mode' => 'ai',
+        'source' => 'vlm',
+        'reply_text' => 'Momento de risadas e lembrancas! ðŸ“±ðŸŽ‰',
+    ]); */
+
+    expect(data_get($publishedReplyFeedback?->resolution_json, 'mode'))->toBe('ai')
+        ->and(data_get($publishedReplyFeedback?->resolution_json, 'source'))->toBe('vlm')
+        ->and(data_get($publishedReplyFeedback?->resolution_json, 'reply_text'))->toBe($publishedReplyFeedback?->reply_text)
+        ->and($publishedReplyFeedback?->trace_id)->toBe('trace-whatsapp-feedback-001');
+
+    expect($feedback)->toHaveCount(2)
+        ->and($feedback->where('feedback_phase', 'published')->pluck('feedback_kind')->all())->toBe(['reaction', 'reply'])
+        ->and($feedback->where('feedback_kind', 'reply')->first()?->reply_text)->toBe('Momento de risadas e lembrancas! 📱🎉');
+
+    expect($outbound)->toHaveCount(2)
+        ->and($outbound[0]->type->value)->toBe('reaction')
+        ->and($outbound[1]->type->value)->toBe('text')
+        ->and($outbound[1]->text_body)->toBe('Momento de risadas e lembrancas! 📱🎉');
+});
+
 it('sends a single rejected feedback bundle with reaction plus threaded reply when the media is rejected', function () {
     Bus::fake([SendWhatsAppMessageJob::class]);
 
@@ -703,7 +903,7 @@ it('sends a single rejected feedback bundle with reaction plus threaded reply wh
         ->and($outbound[1]->type->value)->toBe('text')
         ->and($outbound[1]->recipient_phone)->toBe('120363499999999999-group')
         ->and($outbound[1]->reply_to_provider_message_id)->toBe('2A20028071DA23E04188')
-        ->and(data_get($outbound[1]->payload_json, 'privateAnswer'))->toBeTrue()
+        ->and(data_get($outbound[1]->payload_json, 'privateAnswer'))->toBeFalse()
         ->and($outbound[1]->text_body)->toContain('diretrizes do evento');
 
     expect($feedback)->toHaveCount(2)

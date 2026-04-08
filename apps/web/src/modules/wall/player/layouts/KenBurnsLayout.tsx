@@ -57,6 +57,18 @@ export function KenBurnsLayout({
           </div>
         )}
       </div>
+
+      {/* Caption overlay — gradient bottom with large cinematic text */}
+      {(media.sender_name || media.caption) ? (
+        <div className="kb-caption-overlay">
+          {media.sender_name ? (
+            <div className="kb-sender-name">{media.sender_name}</div>
+          ) : null}
+          {media.caption ? (
+            <div className="kb-caption-text">{media.caption}</div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

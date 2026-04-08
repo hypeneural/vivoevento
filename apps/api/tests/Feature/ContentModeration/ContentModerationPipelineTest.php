@@ -142,6 +142,7 @@ it('skips provider execution when the event is not in ai moderation mode', funct
 
 it('rejects media in ai moderation mode when safety returns block', function () {
     Queue::fake();
+    Storage::fake('public');
     Http::fake([
         'https://api.openai.com/v1/moderations' => Http::response([
             'id' => 'modr_block',
@@ -172,6 +173,11 @@ it('rejects media in ai moderation mode when safety returns block', function () 
         'provider_key' => 'openai',
         'enabled' => true,
     ]);
+
+    Storage::disk('public')->put(
+        'events/' . $event->id . '/originals/block.jpg',
+        base64_decode('/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxAQEBAQEBAVFRUVFRUVFRUVFRUVFRUVFRUWFhUVFRUYHSggGBolHRUVITEhJSkrLi4uFx8zODMsNygtLisBCgoKDg0OGhAQGi0lHyUtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLf/AABEIAAEAAQMBIgACEQEDEQH/xAAXAAADAQAAAAAAAAAAAAAAAAAAAQID/8QAFhABAQEAAAAAAAAAAAAAAAAAAAEC/9oADAMBAAIQAxAAAAHfT//EABkQAAMAAwAAAAAAAAAAAAAAAAABAgMRIf/aAAgBAQABBQKk3b//xAAVEQEBAAAAAAAAAAAAAAAAAAABAP/aAAgBAwEBPwGn/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwCf/8QAGhAAAQUBAAAAAAAAAAAAAAAAAAERITFBUf/aAAgBAQAGPwKJ6r//xAAZEAEBAQEBAQAAAAAAAAAAAAABEQAhMWH/2gAIAQEAAT8hLG0t4Lk2QZ//2gAMAwEAAgADAAAAED//xAAVEQEBAAAAAAAAAAAAAAAAAAABEP/aAAgBAwEBPxBv/8QAFBEBAAAAAAAAAAAAAAAAAAAAEP/aAAgBAgEBPxA//8QAGhABAQADAQEAAAAAAAAAAAAAAREAITFBYf/aAAgBAQABPxA5DKK9nJyJp1rK9qf/2Q==')
+    );
 
     $media = EventMedia::factory()->create([
         'event_id' => $event->id,

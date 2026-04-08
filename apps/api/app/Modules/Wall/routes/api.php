@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Wall\Http\Controllers\EventWallAdController;
 use App\Modules\Wall\Http\Controllers\EventWallController;
 use App\Modules\Wall\Http\Controllers\PublicWallController;
 use Illuminate\Support\Facades\Route;
@@ -51,6 +52,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Options (enums for admin forms)
     Route::get('wall/options', [EventWallController::class, 'options']);
+
+    // Wall Ads CRUD
+    Route::get('events/{event}/wall/ads', [EventWallAdController::class, 'index'])
+        ->whereNumber('event');
+    Route::post('events/{event}/wall/ads', [EventWallAdController::class, 'store'])
+        ->whereNumber('event');
+    Route::delete('events/{event}/wall/ads/{ad}', [EventWallAdController::class, 'destroy'])
+        ->whereNumber('event')->whereNumber('ad');
+    Route::patch('events/{event}/wall/ads/reorder', [EventWallAdController::class, 'reorder'])
+        ->whereNumber('event');
 });
 
 // ─── Public (wall player — no auth, access via wall_code) ─────────────

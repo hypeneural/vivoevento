@@ -8,6 +8,7 @@ use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Services\MediaAssetUrlService;
 use App\Shared\Exceptions\ProviderMisconfiguredException;
 use App\Shared\Support\AssetUrlService;
+use App\Shared\Support\ExternalImageUrlPolicy;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -200,6 +201,7 @@ class OpenAiContentModerationSmokeService
             app(\Illuminate\Http\Client\Factory::class),
             $this->dataUrlOnlyAssetService(),
             app(\App\Modules\ContentModeration\Support\ContentSafetyThresholdEvaluator::class),
+            app(ExternalImageUrlPolicy::class),
         );
 
         $startedAt = microtime(true);

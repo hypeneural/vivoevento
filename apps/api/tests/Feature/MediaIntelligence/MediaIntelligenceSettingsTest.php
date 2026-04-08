@@ -16,7 +16,11 @@ it('returns default media intelligence settings for an event when none were pers
     $response->assertJsonPath('data.enabled', false)
         ->assertJsonPath('data.provider_key', 'vllm')
         ->assertJsonPath('data.mode', 'enrich_only')
-        ->assertJsonPath('data.require_json_output', true);
+        ->assertJsonPath('data.require_json_output', true)
+        ->assertJsonPath('data.reply_text_mode', 'disabled')
+        ->assertJsonPath('data.reply_text_enabled', false)
+        ->assertJsonPath('data.reply_fixed_templates', [])
+        ->assertJsonPath('data.reply_prompt_override', null);
 });
 
 it('updates media intelligence settings for an event', function () {
@@ -38,6 +42,8 @@ it('updates media intelligence settings for an event', function () {
         'timeout_ms' => 9000,
         'fallback_mode' => 'review',
         'require_json_output' => true,
+        'reply_text_mode' => 'ai',
+        'reply_prompt_override' => 'Responda com uma frase curtinha e emoji coerente com a imagem.',
     ]);
 
     $this->assertApiSuccess($response);
@@ -46,7 +52,10 @@ it('updates media intelligence settings for an event', function () {
         ->assertJsonPath('data.model_key', 'Qwen/Qwen2.5-VL-7B-Instruct')
         ->assertJsonPath('data.mode', 'gate')
         ->assertJsonPath('data.prompt_version', 'graduation-v2')
-        ->assertJsonPath('data.timeout_ms', 9000);
+        ->assertJsonPath('data.timeout_ms', 9000)
+        ->assertJsonPath('data.reply_text_mode', 'ai')
+        ->assertJsonPath('data.reply_text_enabled', true)
+        ->assertJsonPath('data.reply_prompt_override', 'Responda com uma frase curtinha e emoji coerente com a imagem.');
 
     $this->assertDatabaseHas('event_media_intelligence_settings', [
         'event_id' => $event->id,
@@ -57,7 +66,43 @@ it('updates media intelligence settings for an event', function () {
         'prompt_version' => 'graduation-v2',
         'fallback_mode' => 'review',
         'require_json_output' => true,
+        'reply_text_mode' => 'ai',
+        'reply_text_enabled' => true,
     ]);
+});
+
+it('updates media intelligence settings with fixed random replies for an event', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    $response = $this->apiPatch("/events/{$event->id}/media-intelligence/settings", [
+        'enabled' => true,
+        'provider_key' => 'vllm',
+        'model_key' => 'Qwen/Qwen2.5-VL-7B-Instruct',
+        'mode' => 'enrich_only',
+        'prompt_version' => 'foundation-v1',
+        'approval_prompt' => 'Avalie se a foto combina com o evento.',
+        'caption_style_prompt' => 'Legenda curta e positiva.',
+        'response_schema_version' => 'foundation-v1',
+        'timeout_ms' => 9000,
+        'fallback_mode' => 'review',
+        'require_json_output' => true,
+        'reply_text_mode' => 'fixed_random',
+        'reply_fixed_templates' => [
+            'Memorias que fazem o coracao sorrir! 🎉📸',
+            'Momento de risadas e lembrancas! 📱🎉',
+        ],
+        'reply_prompt_override' => null,
+    ]);
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.reply_text_mode', 'fixed_random')
+        ->assertJsonPath('data.reply_text_enabled', true)
+        ->assertJsonPath('data.reply_fixed_templates.0', 'Memorias que fazem o coracao sorrir! 🎉📸')
+        ->assertJsonPath('data.reply_fixed_templates.1', 'Momento de risadas e lembrancas! 📱🎉');
 });
 
 it('accepts openrouter as the media intelligence provider', function () {
@@ -79,6 +124,8 @@ it('accepts openrouter as the media intelligence provider', function () {
         'timeout_ms' => 9000,
         'fallback_mode' => 'review',
         'require_json_output' => true,
+        'reply_text_enabled' => false,
+        'reply_prompt_override' => null,
     ]);
 
     $this->assertApiSuccess($response);
@@ -105,6 +152,8 @@ it('rejects non-pinned OpenRouter router aliases in saved settings', function ()
         'timeout_ms' => 9000,
         'fallback_mode' => 'review',
         'require_json_output' => true,
+        'reply_text_enabled' => false,
+        'reply_prompt_override' => null,
     ]);
 
     $this->assertApiValidationError($response, ['model_key']);
@@ -129,6 +178,8 @@ it('rejects non-homologated fixed OpenRouter models in saved settings', function
         'timeout_ms' => 9000,
         'fallback_mode' => 'review',
         'require_json_output' => true,
+        'reply_text_enabled' => false,
+        'reply_prompt_override' => null,
     ]);
 
     $this->assertApiValidationError($response, ['model_key']);
@@ -153,6 +204,8 @@ it('validates that gate mode cannot use skip fallback', function () {
         'timeout_ms' => 9000,
         'fallback_mode' => 'skip',
         'require_json_output' => true,
+        'reply_text_enabled' => false,
+        'reply_prompt_override' => null,
     ]);
 
     $this->assertApiValidationError($response, ['fallback_mode']);
@@ -177,6 +230,8 @@ it('forbids updating media intelligence settings without permission in the event
         'timeout_ms' => 9000,
         'fallback_mode' => 'review',
         'require_json_output' => true,
+        'reply_text_enabled' => false,
+        'reply_prompt_override' => null,
     ]);
 
     $this->assertApiForbidden($response);

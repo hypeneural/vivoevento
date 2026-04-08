@@ -51,6 +51,7 @@ it('maps a structured vllm response into the domain dto', function () {
                             'review' => false,
                             'reason' => 'Imagem compatível com o contexto do casamento.',
                             'short_caption' => 'Entrada emocionante dos noivos.',
+                            'reply_text' => '🎓✨ Momentos que ficam para a vida! Vamos celebrar! 🎉📸',
                             'tags' => ['casamento', 'pista', 'noivos'],
                         ], JSON_THROW_ON_ERROR),
                     ],
@@ -68,6 +69,7 @@ it('maps a structured vllm response into the domain dto', function () {
     expect($result->decision->value)->toBe('approve')
         ->and($result->vlmStatus())->toBe('completed')
         ->and($result->shortCaption)->toBe('Entrada emocionante dos noivos.')
+        ->and($result->replyText)->toBe('🎓✨ Momentos que ficam para a vida! Vamos celebrar! 🎉📸')
         ->and($result->tags)->toBe(['casamento', 'pista', 'noivos'])
         ->and($result->providerKey)->toBe('vllm')
         ->and($result->modelKey)->toBe('Qwen/Qwen2.5-VL-3B-Instruct')

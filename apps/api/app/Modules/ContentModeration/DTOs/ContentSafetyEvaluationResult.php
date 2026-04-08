@@ -10,6 +10,7 @@ final class ContentSafetyEvaluationResult
      * @param array<string, float|int|string|bool|null> $categoryScores
      * @param array<int, string> $reasonCodes
      * @param array<string, mixed> $rawResponse
+     * @param array<string, mixed> $requestPayload
      */
     public function __construct(
         public readonly ContentSafetyDecision $decision,
@@ -22,6 +23,7 @@ final class ContentSafetyEvaluationResult
         public readonly array $normalizedProvider = [],
         public readonly array $reasonCodes = [],
         public readonly array $rawResponse = [],
+        public readonly array $requestPayload = [],
         public readonly ?string $providerKey = null,
         public readonly ?string $providerVersion = null,
         public readonly ?string $modelKey = null,
@@ -33,6 +35,7 @@ final class ContentSafetyEvaluationResult
      * @param array<string, float|int|string|bool|null> $categoryScores
      * @param array<int, string> $reasonCodes
      * @param array<string, mixed> $rawResponse
+     * @param array<string, mixed> $requestPayload
      */
     public static function pass(
         array $categoryScores = [],
@@ -42,6 +45,7 @@ final class ContentSafetyEvaluationResult
         array $normalizedProvider = [],
         array $reasonCodes = [],
         array $rawResponse = [],
+        array $requestPayload = [],
         ?string $providerKey = null,
         ?string $providerVersion = null,
         ?string $modelKey = null,
@@ -59,6 +63,7 @@ final class ContentSafetyEvaluationResult
             normalizedProvider: $normalizedProvider,
             reasonCodes: $reasonCodes,
             rawResponse: $rawResponse,
+            requestPayload: $requestPayload,
             providerKey: $providerKey,
             providerVersion: $providerVersion,
             modelKey: $modelKey,
@@ -71,6 +76,7 @@ final class ContentSafetyEvaluationResult
      * @param array<string, float|int|string|bool|null> $categoryScores
      * @param array<int, string> $reasonCodes
      * @param array<string, mixed> $rawResponse
+     * @param array<string, mixed> $requestPayload
      */
     public static function review(
         array $categoryScores = [],
@@ -80,6 +86,7 @@ final class ContentSafetyEvaluationResult
         array $normalizedProvider = [],
         array $reasonCodes = [],
         array $rawResponse = [],
+        array $requestPayload = [],
         ?string $providerKey = null,
         ?string $providerVersion = null,
         ?string $modelKey = null,
@@ -97,6 +104,7 @@ final class ContentSafetyEvaluationResult
             normalizedProvider: $normalizedProvider,
             reasonCodes: $reasonCodes,
             rawResponse: $rawResponse,
+            requestPayload: $requestPayload,
             providerKey: $providerKey,
             providerVersion: $providerVersion,
             modelKey: $modelKey,
@@ -109,6 +117,7 @@ final class ContentSafetyEvaluationResult
      * @param array<string, float|int|string|bool|null> $categoryScores
      * @param array<int, string> $reasonCodes
      * @param array<string, mixed> $rawResponse
+     * @param array<string, mixed> $requestPayload
      */
     public static function block(
         array $categoryScores = [],
@@ -118,6 +127,7 @@ final class ContentSafetyEvaluationResult
         array $normalizedProvider = [],
         array $reasonCodes = [],
         array $rawResponse = [],
+        array $requestPayload = [],
         ?string $providerKey = null,
         ?string $providerVersion = null,
         ?string $modelKey = null,
@@ -135,6 +145,7 @@ final class ContentSafetyEvaluationResult
             normalizedProvider: $normalizedProvider,
             reasonCodes: $reasonCodes,
             rawResponse: $rawResponse,
+            requestPayload: $requestPayload,
             providerKey: $providerKey,
             providerVersion: $providerVersion,
             modelKey: $modelKey,
@@ -188,6 +199,7 @@ final class ContentSafetyEvaluationResult
             'normalized_provider_json' => $this->normalizedProvider,
             'reason_codes_json' => $this->reasonCodes,
             'raw_response_json' => $this->rawResponse,
+            'request_payload_json' => $this->requestPayload,
         ];
     }
 

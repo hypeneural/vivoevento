@@ -59,11 +59,11 @@ export function SpotlightLayout({ media }: { media: WallRuntimeItem }) {
             WebkitBackdropFilter: 'blur(10px)',
           }}
         >
-          <span className="text-[clamp(0.9rem,1.6vw,1.4rem)] font-semibold text-white/90">
+          <span className="text-[clamp(1.1rem,2.5vw,2.4rem)] font-bold text-white/90" style={{ textShadow: '0 2px 12px rgba(0,0,0,0.4)' }}>
             {media.sender_name}
           </span>
           {media.caption ? (
-            <span className="max-w-[40vw] truncate text-[clamp(0.7rem,1.2vw,1rem)] text-white/60">
+            <span className="max-w-[40vw] truncate text-[clamp(0.85rem,1.4vw,1.4rem)] text-white/60">
               {media.caption}
             </span>
           ) : null}

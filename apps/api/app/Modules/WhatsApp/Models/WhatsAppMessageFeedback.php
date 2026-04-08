@@ -20,6 +20,7 @@ class WhatsAppMessageFeedback extends Model
     protected $fillable = [
         'event_id',
         'instance_id',
+        'trace_id',
         'inbound_message_id',
         'event_media_id',
         'outbound_message_id',
@@ -31,12 +32,14 @@ class WhatsAppMessageFeedback extends Model
         'status',
         'reaction_emoji',
         'reply_text',
+        'resolution_json',
         'error_message',
         'attempted_at',
         'completed_at',
     ];
 
     protected $casts = [
+        'resolution_json' => 'array',
         'attempted_at' => 'datetime',
         'completed_at' => 'datetime',
     ];

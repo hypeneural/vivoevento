@@ -16,6 +16,7 @@ class WhatsAppInboundEvent extends Model
     protected $fillable = [
         'instance_id',
         'provider_key',
+        'trace_id',
         'external_event_id',
         'provider_message_id',
         'event_type',

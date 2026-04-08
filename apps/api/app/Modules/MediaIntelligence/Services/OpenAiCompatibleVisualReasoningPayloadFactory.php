@@ -10,6 +10,7 @@ class OpenAiCompatibleVisualReasoningPayloadFactory
     public function __construct(
         private readonly VisualReasoningResponseSchemaFactory $schemas,
         private readonly OpenAiCompatibleMultimodalPayloadNormalizer $normalizer,
+        private readonly MediaReplyTextPromptResolver $replyPrompts,
     ) {}
 
     /**
@@ -22,13 +23,8 @@ class OpenAiCompatibleVisualReasoningPayloadFactory
         string $imageUrl,
         array $config,
     ): array {
-        $userInstructions = implode("\n\n", array_filter([
-            trim((string) $settings->approval_prompt),
-            $media->event?->title ? 'Contexto adicional do evento: ' . $media->event->title : null,
-            $media->caption ? 'Legenda original enviada: ' . $media->caption : null,
-            $media->inboundMessage?->body_text ? 'Texto associado ao envio: ' . $media->inboundMessage->body_text : null,
-            trim((string) $settings->caption_style_prompt),
-        ]));
+        $replyTextPrompt = $this->promptContext($media, $settings);
+        $userInstructions = $this->userInstructions($media, $settings, $replyTextPrompt);
 
         $payload = [
             'model' => (string) ($settings->model_key ?: ($config['model'] ?? '')),
@@ -71,5 +67,33 @@ class OpenAiCompatibleVisualReasoningPayloadFactory
         }
 
         return $this->normalizer->normalize($payload);
+    }
+
+    /**
+     * @return array{template:string, variables:array<string, string>, resolved:string}|null
+     */
+    public function promptContext(
+        EventMedia $media,
+        EventMediaIntelligenceSetting $settings,
+    ): ?array {
+        return $this->replyPrompts->promptContext($settings, $media->event?->title);
+    }
+
+    /**
+     * @param array{template:string, variables:array<string, string>, resolved:string}|null $replyTextPrompt
+     */
+    private function userInstructions(
+        EventMedia $media,
+        EventMediaIntelligenceSetting $settings,
+        ?array $replyTextPrompt,
+    ): string {
+        return implode("\n\n", array_filter([
+            trim((string) $settings->approval_prompt),
+            $media->event?->title ? 'Contexto adicional do evento: ' . $media->event->title : null,
+            $media->caption ? 'Legenda original enviada: ' . $media->caption : null,
+            $media->inboundMessage?->body_text ? 'Texto associado ao envio: ' . $media->inboundMessage->body_text : null,
+            trim((string) $settings->caption_style_prompt),
+            $replyTextPrompt ? 'Instrucao adicional para resposta automatica baseada na imagem: ' . $replyTextPrompt['resolved'] : null,
+        ]));
     }
 }

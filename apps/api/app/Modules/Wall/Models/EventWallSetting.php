@@ -39,6 +39,9 @@ class EventWallSetting extends Model
         'event_phase',
         'selection_policy',
         'accepted_orientation',
+        'ad_mode',
+        'ad_frequency',
+        'ad_interval_minutes',
         'show_qr',
         'show_branding',
         'show_neon',
@@ -68,6 +71,8 @@ class EventWallSetting extends Model
         'show_neon' => 'boolean',
         'show_sender_credit' => 'boolean',
         'show_side_thumbnails' => 'boolean',
+        'ad_frequency' => 'integer',
+        'ad_interval_minutes' => 'integer',
         'expires_at' => 'datetime',
     ];
 
@@ -117,6 +122,16 @@ class EventWallSetting extends Model
     public function diagnosticSummary(): HasOne
     {
         return $this->hasOne(WallDiagnosticSummary::class, 'event_wall_setting_id');
+    }
+
+    public function ads(): HasMany
+    {
+        return $this->hasMany(EventWallAd::class, 'event_wall_setting_id');
+    }
+
+    public function activeAds(): HasMany
+    {
+        return $this->ads()->where('is_active', true)->orderBy('position');
     }
 
     public function isPlayable(): bool

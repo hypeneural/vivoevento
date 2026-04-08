@@ -12,7 +12,7 @@ class ChannelWebhookLog extends Model
 
     protected $fillable = [
         'event_channel_id', 'provider', 'provider_update_id', 'message_id', 'detected_type',
-        'routing_status', 'payload_json', 'error_message', 'inbound_message_id',
+        'trace_id', 'routing_status', 'payload_json', 'error_message', 'inbound_message_id',
     ];
 
     protected $casts = [

@@ -47,6 +47,9 @@ class UpdateWallSettingsRequest extends FormRequest
             'show_sender_credit' => ['sometimes', 'boolean'],
             'show_side_thumbnails' => ['sometimes', 'boolean'],
             'accepted_orientation' => ['sometimes', Rule::enum(WallAcceptedOrientation::class)],
+            'ad_mode' => ['sometimes', 'string', Rule::in(['disabled', 'by_photos', 'by_minutes'])],
+            'ad_frequency' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'ad_interval_minutes' => ['sometimes', 'integer', 'min:1', 'max:60'],
             'instructions_text' => ['sometimes', 'nullable', 'string', 'max:500'],
             'expires_at' => ['sometimes', 'nullable', 'date'],
         ];

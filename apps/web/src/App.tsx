@@ -20,6 +20,7 @@ import { Loader2 } from 'lucide-react';
 // ─── Lazy-loaded Pages (code splitting) ────────────────────
 
 const LoginPage = lazy(routeImports.login);
+const AiMediaRepliesPage = lazy(routeImports.aiMediaReplies);
 const ProfilePage = lazy(routeImports.profile);
 const DashboardPage = lazy(routeImports.dashboard);
 const EventsListPage = lazy(routeImports.eventsList);
@@ -120,6 +121,14 @@ function ProtectedRoutes() {
           <Route path="profile" element={<ProfilePage />} />
 
           {/* Business */}
+          <Route
+            path="ia/respostas-de-midia"
+            element={(
+              <ModuleGuard moduleKey="settings" requiredPermissions={['settings.manage']}>
+                <AiMediaRepliesPage />
+              </ModuleGuard>
+            )}
+          />
           <Route
             path="partners"
             element={(

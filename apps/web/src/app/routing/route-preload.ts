@@ -2,6 +2,7 @@ type RouteLoader = () => Promise<unknown>;
 
 export const routeImports = {
   login: () => import('@/modules/auth/LoginPage'),
+  aiMediaReplies: () => import('@/modules/ai/MediaAutomaticRepliesPage'),
   profile: () => import('@/modules/auth/ProfilePage'),
   dashboard: () => import('@/modules/dashboard/DashboardPage'),
   eventsList: () => import('@/modules/events/EventsListPage'),
@@ -46,6 +47,10 @@ const adminPreloadMatchers: Array<{ pattern: RegExp; loaders: RouteLoader[] }> =
       routeImports.eventDetail,
       routeImports.eventEdit,
     ],
+  },
+  {
+    pattern: /^\/ia(?:\/|$)/,
+    loaders: [routeImports.aiMediaReplies],
   },
   {
     pattern: /^\/(?:settings\/whatsapp|whatsapp)(?:\/|$)/,

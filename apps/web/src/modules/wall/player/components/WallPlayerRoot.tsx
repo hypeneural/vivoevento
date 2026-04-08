@@ -15,8 +15,10 @@
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { useWallPlayer } from '../hooks/useWallPlayer';
 import { usePerformanceMode } from '../hooks/usePerformanceMode';
+import { useAdEngine } from '../hooks/useAdEngine';
 import { resolveRenderableLayout, shouldRenderFloatingCaption } from '../engine/layoutStrategy';
 import { WALL_CAPTION_PANEL, WALL_TEXT_PRIMARY } from '../design/tokens';
+import AdOverlay from './AdOverlay';
 import BrandingOverlay from './BrandingOverlay';
 import ConnectionOverlay from './ConnectionOverlay';
 import ExpiredScreen from './ExpiredScreen';
@@ -54,10 +56,21 @@ export function WallPlayerRoot({ code }: { code: string }) {
     errorMessage,
     connectionStatus,
     lastSyncAt,
+    ads,
   } = useWallPlayer(code);
 
   const { reducedEffects, modeLabel } = usePerformanceMode();
   const { visible: toastVisible, message: toastMessage } = useNewPhotoToast();
+
+  // Ad engine — sits alongside the main engine
+  const adEngine = useAdEngine({
+    mode: state.settings?.ad_mode ?? 'disabled',
+    frequency: state.settings?.ad_frequency ?? 5,
+    intervalMinutes: state.settings?.ad_interval_minutes ?? 3,
+    ads,
+    currentItemId: state.currentItemId,
+    isPlaying: state.status === 'playing',
+  });
 
   const activeLayout = currentItem && state.settings
     ? resolveRenderableLayout(state.settings.layout, currentItem)
@@ -140,7 +153,15 @@ export function WallPlayerRoot({ code }: { code: string }) {
         />
       ) : currentItem && state.settings ? (
         <>
-          <LayoutRenderer media={currentItem} settings={state.settings} reducedMotion={reducedEffects} />
+          {adEngine.currentAd ? (
+            <AdOverlay
+              ad={adEngine.currentAd}
+              onFinished={adEngine.onAdFinished}
+              reducedMotion={reducedEffects}
+            />
+          ) : (
+            <LayoutRenderer media={currentItem} settings={state.settings} reducedMotion={reducedEffects} allItems={state.items} />
+          )}
           <FloatingCaption
             layout={activeLayout ?? 'fullscreen'}
             text={currentItem.caption}

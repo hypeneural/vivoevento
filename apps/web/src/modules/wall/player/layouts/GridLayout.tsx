@@ -61,11 +61,17 @@ function GridCell({ item }: { item: WallRuntimeItem | null }) {
             background: 'linear-gradient(transparent, rgba(0,0,0,0.75))',
           }}
         >
-          <p className="truncate text-sm font-semibold text-white">
+          <p
+            className="truncate font-semibold text-white"
+            style={{ fontSize: 'clamp(0.8rem, 1.1vw, 1.1rem)' }}
+          >
             {item.sender_name}
           </p>
           {item.caption ? (
-            <p className="mt-0.5 truncate text-xs text-white/60">
+            <p
+              className="mt-0.5 truncate text-white/60"
+              style={{ fontSize: 'clamp(0.65rem, 0.85vw, 0.9rem)' }}
+            >
               {item.caption}
             </p>
           ) : null}

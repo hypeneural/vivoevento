@@ -28,8 +28,9 @@ function MosaicCell({
   if (!item) {
     return (
       <div
-        className="overflow-hidden rounded-2xl"
+        className="overflow-hidden"
         style={{
+          borderRadius: 'clamp(8px, 1vw, 16px)',
           background: 'rgba(255,255,255,0.03)',
           border: '1px dashed rgba(255,255,255,0.08)',
           gridRow: isPrimary ? '1 / 3' : undefined,
@@ -40,8 +41,8 @@ function MosaicCell({
 
   return (
     <div
-      className="relative overflow-hidden rounded-2xl"
-      style={{ gridRow: isPrimary ? '1 / 3' : undefined }}
+      className="relative overflow-hidden"
+      style={{ borderRadius: 'clamp(8px, 1vw, 16px)', gridRow: isPrimary ? '1 / 3' : undefined }}
     >
       <AnimatePresence mode="wait">
         <motion.div

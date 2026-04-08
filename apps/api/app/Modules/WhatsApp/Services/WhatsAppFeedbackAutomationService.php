@@ -52,7 +52,28 @@ class WhatsAppFeedbackAutomationService
         ?InboundMessage $inboundMessage = null,
         ?EventMedia $eventMedia = null,
     ): ?WhatsAppMessageFeedback {
-        return $this->sendReaction(
+        return $this->sendPublishedFeedback(
+            event: $event,
+            instance: $instance,
+            context: $context,
+            inboundMessage: $inboundMessage,
+            eventMedia: $eventMedia,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    public function sendPublishedFeedback(
+        Event $event,
+        WhatsAppInstance $instance,
+        array $context,
+        ?InboundMessage $inboundMessage = null,
+        ?EventMedia $eventMedia = null,
+        ?string $replyText = null,
+        ?array $resolution = null,
+    ): ?WhatsAppMessageFeedback {
+        $reaction = $this->sendReaction(
             event: $event,
             instance: $instance,
             context: $context,
@@ -60,7 +81,25 @@ class WhatsAppFeedbackAutomationService
             emoji: self::PUBLISHED_REACTION,
             inboundMessage: $inboundMessage,
             eventMedia: $eventMedia,
+            resolution: $resolution,
         );
+
+        $replyText = trim((string) $replyText);
+
+        if ($replyText !== '') {
+            $this->sendReply(
+                event: $event,
+                instance: $instance,
+                context: $context,
+                phase: 'published',
+                message: $replyText,
+                inboundMessage: $inboundMessage,
+                eventMedia: $eventMedia,
+                resolution: $resolution,
+            );
+        }
+
+        return $reaction;
     }
 
     /**
@@ -110,6 +149,7 @@ class WhatsAppFeedbackAutomationService
         string $emoji,
         ?InboundMessage $inboundMessage = null,
         ?EventMedia $eventMedia = null,
+        ?array $resolution = null,
     ): ?WhatsAppMessageFeedback {
         if (! $this->isFeedbackEligible($event, $context)) {
             return null;
@@ -123,6 +163,7 @@ class WhatsAppFeedbackAutomationService
             phase: $phase,
             inboundMessage: $inboundMessage,
             eventMedia: $eventMedia,
+            resolution: $resolution,
         );
 
         if ($feedback === null) {
@@ -172,6 +213,7 @@ class WhatsAppFeedbackAutomationService
         string $message,
         ?InboundMessage $inboundMessage = null,
         ?EventMedia $eventMedia = null,
+        ?array $resolution = null,
     ): ?WhatsAppMessageFeedback {
         if (! $this->isFeedbackEligible($event, $context)) {
             return null;
@@ -185,6 +227,7 @@ class WhatsAppFeedbackAutomationService
             phase: $phase,
             inboundMessage: $inboundMessage,
             eventMedia: $eventMedia,
+            resolution: $resolution,
         );
 
         if ($feedback === null) {
@@ -198,7 +241,7 @@ class WhatsAppFeedbackAutomationService
                     phone: (string) data_get($context, 'chat_external_id'),
                     message: $message,
                     messageId: (string) data_get($context, 'provider_message_id'),
-                    privateAnswer: data_get($context, 'intake_source') === 'whatsapp_group',
+                    privateAnswer: false,
                 ),
             );
 
@@ -235,11 +278,13 @@ class WhatsAppFeedbackAutomationService
         string $phase,
         ?InboundMessage $inboundMessage = null,
         ?EventMedia $eventMedia = null,
+        ?array $resolution = null,
     ): ?WhatsAppMessageFeedback {
         try {
             return WhatsAppMessageFeedback::query()->create([
                 'event_id' => $event->id,
                 'instance_id' => $instance->id,
+                'trace_id' => data_get($context, 'trace_id'),
                 'inbound_message_id' => $inboundMessage?->id,
                 'event_media_id' => $eventMedia?->id,
                 'inbound_provider_message_id' => (string) data_get($context, 'provider_message_id'),
@@ -248,6 +293,7 @@ class WhatsAppFeedbackAutomationService
                 'feedback_kind' => $kind,
                 'feedback_phase' => $phase,
                 'status' => 'pending',
+                'resolution_json' => $resolution,
             ]);
         } catch (QueryException $exception) {
             if (! $this->isUniqueFeedbackException($exception)) {

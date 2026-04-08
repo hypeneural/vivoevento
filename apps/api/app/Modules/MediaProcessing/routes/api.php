@@ -14,6 +14,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('media/feed', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'moderationFeed']);
     Route::get('events/{event}/media', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'index']);
     Route::get('media/{eventMedia}', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'show']);
+    Route::get('media/{eventMedia}/ia-debug', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'aiDebug']);
     Route::post('media/bulk/approve', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'bulkApprove']);
     Route::post('media/bulk/reject', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'bulkReject']);
     Route::patch('media/bulk/favorite', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'bulkUpdateFeatured']);

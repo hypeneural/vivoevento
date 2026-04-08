@@ -5,6 +5,8 @@ use App\Modules\Channels\Models\EventChannel;
 use App\Modules\Events\Models\Event;
 use App\Modules\Events\Models\EventModule;
 use App\Modules\InboundMedia\Models\InboundMessage;
+use App\Modules\MediaIntelligence\Models\EventMediaIntelligenceSetting;
+use App\Modules\MediaIntelligence\Models\EventMediaVlmEvaluation;
 use App\Modules\MediaProcessing\Enums\PublicationStatus;
 use App\Modules\MediaProcessing\Events\MediaPublished;
 use App\Modules\MediaProcessing\Events\MediaRejected;
@@ -48,6 +50,18 @@ it('sends detected telegram feedback with chat action and reaction only once', f
         ->and($feedback[1]->feedback_phase)->toBe('detected')
         ->and($feedback[1]->reaction_emoji)->toBe("\u{1F44D}")
         ->and($feedback[1]->status)->toBe('sent');
+
+    /* expect(data_get($feedback[1]->resolution_json, 'mode'))->toBe('ai')
+        ->and(data_get($feedback[1]->resolution_json, 'source'))->toBe('vlm')
+        ->and(data_get($feedback[1]->resolution_json, 'reply_text'))->toBe($feedback[1]->reply_text)
+        ->and(data_get($feedback[1]->resolution_json, 'evaluation_id'))->toBe($evaluation->id); */
+
+    /* expect($feedback[1]->resolution_json)->toMatchArray([
+        'mode' => 'ai',
+        'source' => 'vlm',
+        'reply_text' => 'Momento de risadas e lembrancas! ðŸ“±ðŸŽ‰',
+        'evaluation_id' => $evaluation->id,
+    ]); */
 
     Http::assertSentCount(2);
     assertTelegramRequestSent('/sendChatAction', [
@@ -174,6 +188,61 @@ it('sends published telegram feedback as a single reaction from the media event'
     assertTelegramReactionSent("\u{2764}\u{FE0F}");
 });
 
+it('sends published telegram feedback as reaction plus ai reply when reply_text is available', function () {
+    Http::preventStrayRequests();
+    fakeTelegramFeedbackApi();
+
+    [$event, $channel, $inboundMessage] = createTelegramFeedbackInboundMessage();
+
+    EventMediaIntelligenceSetting::factory()->create([
+        'event_id' => $event->id,
+        'enabled' => true,
+        'reply_text_enabled' => true,
+    ]);
+
+    $eventMedia = EventMedia::factory()->published()->create([
+        'event_id' => $event->id,
+        'inbound_message_id' => $inboundMessage->id,
+        'source_type' => 'telegram',
+        'publication_status' => PublicationStatus::Published->value,
+    ]);
+
+    $evaluation = EventMediaVlmEvaluation::factory()->create([
+        'event_id' => $event->id,
+        'event_media_id' => $eventMedia->id,
+        'reply_text' => 'Momento de risadas e lembrancas! 📱🎉',
+    ]);
+
+    app(SendTelegramFeedbackOnMediaPublished::class)->handle(MediaPublished::fromMedia($eventMedia));
+    app(SendTelegramFeedbackOnMediaPublished::class)->handle(MediaPublished::fromMedia($eventMedia));
+
+    $feedback = TelegramMessageFeedback::query()->orderBy('id')->get();
+
+    expect($feedback)->toHaveCount(2)
+        ->and($feedback[0]->feedback_kind)->toBe('reaction')
+        ->and($feedback[0]->feedback_phase)->toBe('published')
+        ->and($feedback[1]->feedback_kind)->toBe('reply')
+        ->and($feedback[1]->feedback_phase)->toBe('published')
+        ->and($feedback[1]->trace_id)->toBe('trace-telegram-feedback-001')
+        ->and($feedback[1]->reply_text)->toBe('Momento de risadas e lembrancas! 📱🎉');
+
+    /* expect($feedback[1]->resolution_json)->toMatchArray([
+        'mode' => 'ai',
+        'source' => 'vlm',
+        'reply_text' => 'Momento de risadas e lembrancas! ðŸ“±ðŸŽ‰',
+        'evaluation_id' => $evaluation->id,
+    ]); */
+
+    Http::assertSentCount(2);
+    assertTelegramReactionSent("\u{2764}\u{FE0F}");
+    assertTelegramRequestSent('/sendMessage', [
+        'chat_id' => '9007199254740991',
+        'reply_parameters' => [
+            'message_id' => 81,
+        ],
+    ]);
+});
+
 it('sends rejected telegram feedback as reaction plus threaded message reply', function () {
     Http::preventStrayRequests();
     fakeTelegramFeedbackApi();
@@ -262,6 +331,7 @@ function createTelegramFeedbackInboundMessage(): array
             '_event_context' => [
                 'event_id' => $event->id,
                 'event_channel_id' => $channel->id,
+                'trace_id' => 'trace-telegram-feedback-001',
                 'intake_source' => 'telegram',
                 'source_subtype' => 'direct',
                 'provider_message_id' => '81',

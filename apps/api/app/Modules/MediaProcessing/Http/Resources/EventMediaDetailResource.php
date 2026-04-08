@@ -93,6 +93,7 @@ class EventMediaDetailResource extends JsonResource
                     'provider_category_input_types' => $this->latestSafetyEvaluation->provider_category_input_types_json ?? [],
                     'normalized_provider' => $this->latestSafetyEvaluation->normalized_provider_json ?? [],
                     'reason_codes' => $this->latestSafetyEvaluation->reason_codes_json ?? [],
+                    'request_payload' => $this->latestSafetyEvaluation->request_payload_json ?? [],
                     'completed_at' => $this->latestSafetyEvaluation->completed_at?->toIso8601String(),
                 ] : null),
                 'latest_vlm_evaluation' => $this->whenLoaded('latestVlmEvaluation', fn () => $this->latestVlmEvaluation ? [
@@ -108,7 +109,10 @@ class EventMediaDetailResource extends JsonResource
                     'review_required' => (bool) $this->latestVlmEvaluation->review_required,
                     'reason' => $this->latestVlmEvaluation->reason,
                     'short_caption' => $this->latestVlmEvaluation->short_caption,
+                    'reply_text' => $this->latestVlmEvaluation->reply_text,
                     'tags' => $this->latestVlmEvaluation->tags_json ?? [],
+                    'request_payload' => $this->latestVlmEvaluation->request_payload_json ?? [],
+                    'prompt_context' => $this->latestVlmEvaluation->prompt_context_json ?? [],
                     'tokens_input' => $this->latestVlmEvaluation->tokens_input,
                     'tokens_output' => $this->latestVlmEvaluation->tokens_output,
                     'completed_at' => $this->latestVlmEvaluation->completed_at?->toIso8601String(),

@@ -9,6 +9,7 @@ use App\Modules\ContentModeration\Support\ContentSafetyThresholdEvaluator;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Services\MediaAssetUrlService;
 use App\Shared\Exceptions\ProviderMisconfiguredException;
+use App\Shared\Support\ExternalImageUrlPolicy;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
@@ -20,6 +21,7 @@ class OpenAiContentModerationProvider implements ContentModerationProviderInterf
         private readonly HttpFactory $http,
         private readonly MediaAssetUrlService $assetUrls,
         private readonly ContentSafetyThresholdEvaluator $thresholds,
+        private readonly ExternalImageUrlPolicy $imageUrlPolicy,
     ) {}
 
     public function evaluate(
@@ -76,10 +78,12 @@ class OpenAiContentModerationProvider implements ContentModerationProviderInterf
             ]);
         }
 
-        $response = $request->post('/moderations', [
+        $requestPayload = [
             'model' => (string) ($config['model'] ?? 'omni-moderation-latest'),
             'input' => $input,
-        ]);
+        ];
+
+        $response = $request->post('/moderations', $requestPayload);
 
         $response->throw();
 
@@ -133,6 +137,7 @@ class OpenAiContentModerationProvider implements ContentModerationProviderInterf
                 'input_source_ref' => $imageInput['source_ref'] ?? null,
                 'input_mime_type' => $imageInput['mime_type'] ?? null,
             ],
+            'requestPayload' => $requestPayload,
             'providerKey' => 'openai',
             'providerVersion' => (string) ($config['provider_version'] ?? 'openai-http-v1'),
             'modelKey' => (string) ($config['model'] ?? 'omni-moderation-latest'),
@@ -187,7 +192,7 @@ class OpenAiContentModerationProvider implements ContentModerationProviderInterf
     {
         $imageUrl = $this->assetUrls->preview($media);
 
-        if (is_string($imageUrl) && $imageUrl !== '') {
+        if ($this->imageUrlPolicy->isProviderReachable($imageUrl)) {
             return [
                 'url' => $imageUrl,
                 'path_used' => 'image_url',

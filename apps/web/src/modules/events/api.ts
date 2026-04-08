@@ -74,6 +74,10 @@ export interface UpdateEventMediaIntelligenceSettingsPayload {
   timeout_ms: number;
   fallback_mode: 'review' | 'skip';
   require_json_output: boolean;
+  reply_text_mode: 'disabled' | 'ai' | 'fixed_random';
+  reply_prompt_override?: string | null;
+  reply_fixed_templates?: string[];
+  reply_prompt_preset_id?: number | null;
 }
 
 export interface UpdateEventFaceSearchSettingsPayload {

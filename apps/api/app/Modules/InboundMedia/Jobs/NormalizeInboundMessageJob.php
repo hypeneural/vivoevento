@@ -35,6 +35,9 @@ class NormalizeInboundMessageJob implements ShouldQueue
 
         $payload = is_array($webhookLog->payload_json) ? $webhookLog->payload_json : [];
         $context = data_get($payload, '_event_context');
+        $traceId = is_string(data_get($context, 'trace_id'))
+            ? trim((string) data_get($context, 'trace_id'))
+            : trim((string) ($webhookLog->trace_id ?? ''));
 
         if (! is_array($context) || ! filled(data_get($context, 'event_id')) || ! filled(data_get($context, 'event_channel_id'))) {
             $webhookLog->update([
@@ -72,6 +75,7 @@ class NormalizeInboundMessageJob implements ShouldQueue
                 [
                     'event_id' => data_get($context, 'event_id'),
                     'event_channel_id' => data_get($context, 'event_channel_id'),
+                    'trace_id' => $traceId !== '' ? $traceId : null,
                     'message_type' => data_get($payload, 'message_type') ?? $this->detectType($payload),
                     'chat_external_id' => $chatExternalId,
                     'sender_external_id' => data_get($context, 'sender_external_id') ?? data_get($context, 'sender_lid') ?? data_get($context, 'sender_phone'),
@@ -104,7 +108,12 @@ class NormalizeInboundMessageJob implements ShouldQueue
             }
         }
 
+        if ($traceId !== '' && blank($inboundMessage->trace_id)) {
+            $inboundMessage->update(['trace_id' => $traceId]);
+        }
+
         $webhookLog->update([
+            'trace_id' => $traceId !== '' ? $traceId : null,
             'routing_status' => 'normalized',
             'inbound_message_id' => $inboundMessage->id,
         ]);

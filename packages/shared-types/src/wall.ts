@@ -7,6 +7,7 @@ export const WALL_EVENT_NAMES = {
   expired: 'wall.expired',
   diagnosticsUpdated: 'wall.diagnostics.updated',
   playerCommand: 'wall.player.command',
+  adsUpdated: 'wall.ads.updated',
 } as const;
 
 export type WallMediaType = 'image' | 'video';
@@ -17,6 +18,7 @@ export type WallPublicStatus = WallLifecycleStatus | 'disabled';
 export type WallSelectionMode = 'balanced' | 'live' | 'inclusive' | 'editorial' | 'custom';
 export type WallEventPhase = 'reception' | 'flow' | 'party' | 'closing';
 export type WallAcceptedOrientation = 'all' | 'landscape' | 'portrait';
+export type WallAdMode = 'disabled' | 'by_photos' | 'by_minutes';
 export type WallPersistentStorage =
   | 'none'
   | 'localstorage'
@@ -71,7 +73,18 @@ export interface WallSettings {
   show_sender_credit: boolean;
   show_side_thumbnails: boolean;
   accepted_orientation: WallAcceptedOrientation;
+  ad_mode: WallAdMode;
+  ad_frequency: number;
+  ad_interval_minutes: number;
   instructions_text?: string | null;
+}
+
+export interface WallAdItem {
+  id: number;
+  url: string;
+  media_type: 'image' | 'video';
+  duration_seconds: number;
+  position: number;
 }
 
 export interface WallSelectionPolicy {
@@ -220,6 +233,7 @@ export interface WallBootData {
   event: WallEventSummary;
   files: WallMediaItem[];
   settings: WallSettings;
+  ads: WallAdItem[];
 }
 
 export interface WallMediaDeletedPayload {

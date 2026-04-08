@@ -24,6 +24,11 @@ class EventMediaIntelligenceSettingFactory extends Factory
             'timeout_ms' => 12000,
             'fallback_mode' => 'review',
             'require_json_output' => true,
+            'reply_text_enabled' => false,
+            'reply_text_mode' => 'disabled',
+            'reply_prompt_override' => null,
+            'reply_fixed_templates_json' => [],
+            'reply_prompt_preset_id' => null,
         ];
     }
 

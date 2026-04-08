@@ -2,6 +2,7 @@
 
 namespace App\Modules\MediaIntelligence\Models;
 
+use App\Modules\MediaIntelligence\Enums\MediaReplyTextMode;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -33,7 +34,22 @@ class EventMediaIntelligenceSetting extends Model
             'timeout_ms' => 12000,
             'fallback_mode' => 'review',
             'require_json_output' => true,
+            'reply_text_enabled' => false,
+            'reply_text_mode' => MediaReplyTextMode::Disabled->value,
+            'reply_prompt_override' => null,
+            'reply_fixed_templates_json' => [],
+            'reply_prompt_preset_id' => null,
         ];
+    }
+
+    public static function normalizeReplyTextMode(?string $mode, ?bool $legacyEnabled = null): string
+    {
+        return match ($mode) {
+            MediaReplyTextMode::Ai->value => MediaReplyTextMode::Ai->value,
+            MediaReplyTextMode::FixedRandom->value => MediaReplyTextMode::FixedRandom->value,
+            MediaReplyTextMode::Disabled->value => MediaReplyTextMode::Disabled->value,
+            default => MediaReplyTextMode::fromLegacy($legacyEnabled)->value,
+        };
     }
 
     public static function defaultApprovalPrompt(): string
@@ -59,13 +75,48 @@ class EventMediaIntelligenceSetting extends Model
         'timeout_ms',
         'fallback_mode',
         'require_json_output',
+        'reply_text_enabled',
+        'reply_text_mode',
+        'reply_prompt_override',
+        'reply_fixed_templates_json',
+        'reply_prompt_preset_id',
     ];
 
     protected $casts = [
         'enabled' => 'boolean',
         'timeout_ms' => 'integer',
         'require_json_output' => 'boolean',
+        'reply_text_enabled' => 'boolean',
+        'reply_fixed_templates_json' => 'array',
+        'reply_prompt_preset_id' => 'integer',
     ];
+
+    public function automaticReplyEnabled(): bool
+    {
+        return $this->resolvedReplyTextMode() !== MediaReplyTextMode::Disabled->value;
+    }
+
+    public function usesAiAutomaticReply(): bool
+    {
+        return $this->resolvedReplyTextMode() === MediaReplyTextMode::Ai->value;
+    }
+
+    public function usesFixedAutomaticReply(): bool
+    {
+        return $this->resolvedReplyTextMode() === MediaReplyTextMode::FixedRandom->value;
+    }
+
+    public function resolvedReplyTextMode(): string
+    {
+        $mode = is_string($this->reply_text_mode ?? null) ? $this->reply_text_mode : null;
+        $legacyEnabled = (bool) ($this->reply_text_enabled ?? false);
+
+        if ($legacyEnabled && $mode === MediaReplyTextMode::Disabled->value) {
+            return MediaReplyTextMode::Ai->value;
+        }
+
+        return self::normalizeReplyTextMode($mode, $legacyEnabled);
+    }
 
     protected static function newFactory(): \Database\Factories\EventMediaIntelligenceSettingFactory
     {
@@ -75,5 +126,10 @@ class EventMediaIntelligenceSetting extends Model
     public function event(): BelongsTo
     {
         return $this->belongsTo(\App\Modules\Events\Models\Event::class);
+    }
+
+    public function replyPromptPreset(): BelongsTo
+    {
+        return $this->belongsTo(MediaReplyPromptPreset::class, 'reply_prompt_preset_id');
     }
 }

@@ -15,6 +15,9 @@ export const fallbackOptions: ApiWallOptionsResponse = {
     { value: 'kenburns', label: 'Ken Burns' },
     { value: 'spotlight', label: 'Holofote' },
     { value: 'gallery', label: 'Galeria de arte' },
+    { value: 'carousel', label: 'Carrossel' },
+    { value: 'mosaic', label: 'Mosaico' },
+    { value: 'grid', label: 'Grade' },
   ],
   transitions: [
     { value: 'fade', label: 'Suave' },

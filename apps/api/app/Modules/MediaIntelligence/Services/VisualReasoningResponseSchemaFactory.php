@@ -13,7 +13,7 @@ class VisualReasoningResponseSchemaFactory
             'foundation-v1' => [
                 'type' => 'object',
                 'additionalProperties' => false,
-                'required' => ['decision', 'review', 'reason', 'short_caption', 'tags'],
+                'required' => ['decision', 'review', 'reason', 'short_caption', 'reply_text', 'tags'],
                 'properties' => [
                     'decision' => [
                         'type' => 'string',
@@ -27,6 +27,10 @@ class VisualReasoningResponseSchemaFactory
                     ],
                     'short_caption' => [
                         'type' => 'string',
+                    ],
+                    'reply_text' => [
+                        'type' => 'string',
+                        'maxLength' => 160,
                     ],
                     'tags' => [
                         'type' => 'array',

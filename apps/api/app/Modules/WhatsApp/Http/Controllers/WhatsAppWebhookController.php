@@ -22,7 +22,10 @@ class WhatsAppWebhookController extends BaseController
      */
     public function inbound(Request $request, string $provider, string $instanceKey): JsonResponse
     {
-        ProcessInboundWebhookJob::dispatch($provider, $instanceKey, $request->all());
+        ProcessInboundWebhookJob::dispatch($provider, $instanceKey, array_merge(
+            $request->all(),
+            ['_trace_id' => (string) $request->attributes->get('trace_id', '')],
+        ));
 
         return response()->json(['status' => 'received'], 200);
     }
@@ -34,7 +37,10 @@ class WhatsAppWebhookController extends BaseController
     {
         ProcessInboundWebhookJob::dispatch($provider, $instanceKey, array_merge(
             $request->all(),
-            ['_webhook_type' => 'status']
+            [
+                '_webhook_type' => 'status',
+                '_trace_id' => (string) $request->attributes->get('trace_id', ''),
+            ]
         ));
 
         return response()->json(['status' => 'received'], 200);
@@ -47,7 +53,10 @@ class WhatsAppWebhookController extends BaseController
     {
         ProcessInboundWebhookJob::dispatch($provider, $instanceKey, array_merge(
             $request->all(),
-            ['_webhook_type' => 'delivery']
+            [
+                '_webhook_type' => 'delivery',
+                '_trace_id' => (string) $request->attributes->get('trace_id', ''),
+            ]
         ));
 
         return response()->json(['status' => 'received'], 200);

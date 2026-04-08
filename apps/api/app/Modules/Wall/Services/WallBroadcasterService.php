@@ -133,6 +133,18 @@ class WallBroadcasterService
         ));
     }
 
+    public function broadcastAdsUpdated(EventWallSetting $settings): void
+    {
+        if (! $settings->wall_code || ! $settings->isAvailable()) {
+            return;
+        }
+
+        event(new \App\Modules\Wall\Events\WallAdsUpdated(
+            $settings->wall_code,
+            ['ads' => $this->payloads->ads($settings)],
+        ));
+    }
+
     private function resolveSettings(int $eventId): ?EventWallSetting
     {
         return EventWallSetting::query()

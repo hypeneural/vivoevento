@@ -73,8 +73,27 @@ class WallPayloadFactory
             'show_sender_credit' => (bool) $settings->show_sender_credit,
             'show_side_thumbnails' => (bool) ($settings->show_side_thumbnails ?? true),
             'accepted_orientation' => $settings->accepted_orientation?->value ?? 'all',
+            'ad_mode' => $settings->ad_mode ?? 'disabled',
+            'ad_frequency' => (int) ($settings->ad_frequency ?? 5),
+            'ad_interval_minutes' => (int) ($settings->ad_interval_minutes ?? 3),
             'instructions_text' => $settings->instructions_text,
         ];
+    }
+
+    /**
+     * Build the ads payload for the boot response.
+     */
+    public function ads(EventWallSetting $settings): array
+    {
+        $ads = $settings->activeAds()->get();
+
+        return $ads->map(fn ($ad) => [
+            'id' => $ad->id,
+            'url' => $this->assets->toPublicUrl($ad->file_path),
+            'media_type' => $ad->media_type,
+            'duration_seconds' => (int) $ad->duration_seconds,
+            'position' => (int) $ad->position,
+        ])->all();
     }
 
     public function status(EventWallSetting $settings, ?string $reason = null): array

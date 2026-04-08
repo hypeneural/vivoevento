@@ -7,6 +7,7 @@ use App\Modules\MediaIntelligence\Models\EventMediaIntelligenceSetting;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Services\MediaAssetUrlService;
 use App\Shared\Exceptions\ProviderMisconfiguredException;
+use App\Shared\Support\ExternalImageUrlPolicy;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Arr;
@@ -20,6 +21,7 @@ abstract class AbstractOpenAiCompatibleVisualReasoningProvider implements Visual
         private readonly HttpFactory $http,
         private readonly MediaAssetUrlService $assetUrls,
         private readonly OpenAiCompatibleVisualReasoningPayloadFactory $payloads,
+        private readonly ExternalImageUrlPolicy $imageUrlPolicy,
     ) {}
 
     public function evaluate(
@@ -28,9 +30,11 @@ abstract class AbstractOpenAiCompatibleVisualReasoningProvider implements Visual
     ): VisualReasoningEvaluationResult {
         $config = (array) config('media_intelligence.providers.' . $this->providerKey(), []);
         $imageInput = $this->buildImageInput($media);
+        $requestPayload = $this->payloads->build($media, $settings, $imageInput['url'], $config);
+        $promptContext = $this->payloads->promptContext($media, $settings);
 
         $response = $this->request($settings, $config)
-            ->post('chat/completions', $this->payloads->build($media, $settings, $imageInput['url'], $config));
+            ->post('chat/completions', $requestPayload);
 
         $response->throw();
 
@@ -50,11 +54,13 @@ abstract class AbstractOpenAiCompatibleVisualReasoningProvider implements Visual
         $decision = $this->normalizeDecision($decoded['decision'] ?? null, (bool) ($decoded['review'] ?? false));
         $reason = $this->normalizeNullableString($decoded['reason'] ?? null);
         $shortCaption = $this->normalizeNullableString($decoded['short_caption'] ?? null);
+        $replyText = $this->normalizeNullableString($decoded['reply_text'] ?? null);
         $tags = $this->normalizeTags($decoded['tags'] ?? []);
 
         $common = [
             'reason' => $reason,
             'shortCaption' => $shortCaption,
+            'replyText' => $replyText,
             'tags' => $tags,
             'rawResponse' => [
                 'id' => $payload['id'] ?? null,
@@ -65,6 +71,8 @@ abstract class AbstractOpenAiCompatibleVisualReasoningProvider implements Visual
                 'input_source_ref' => $imageInput['source_ref'] ?? null,
                 'input_mime_type' => $imageInput['mime_type'] ?? null,
             ],
+            'requestPayload' => $requestPayload,
+            'promptContext' => $promptContext,
             'providerKey' => $this->providerKey(),
             'providerVersion' => (string) ($config['provider_version'] ?? ($this->providerKey() . '-openai-v1')),
             'modelKey' => (string) ($settings->model_key ?: ($config['model'] ?? '')),
@@ -123,7 +131,7 @@ abstract class AbstractOpenAiCompatibleVisualReasoningProvider implements Visual
     {
         $imageUrl = $this->assetUrls->preview($media);
 
-        if (is_string($imageUrl) && $imageUrl !== '') {
+        if ($this->imageUrlPolicy->isProviderReachable($imageUrl)) {
             return [
                 'url' => $imageUrl,
                 'path_used' => 'image_url',

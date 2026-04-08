@@ -12,6 +12,9 @@ enum WallLayout: string
     case KenBurns = 'kenburns';
     case Spotlight = 'spotlight';
     case Gallery = 'gallery';
+    case Carousel = 'carousel';
+    case Mosaic = 'mosaic';
+    case Grid = 'grid';
 
     public function label(): string
     {
@@ -24,6 +27,9 @@ enum WallLayout: string
             self::KenBurns => 'Ken Burns',
             self::Spotlight => 'Holofote',
             self::Gallery => 'Galeria de arte',
+            self::Carousel => 'Carrossel',
+            self::Mosaic => 'Mosaico',
+            self::Grid => 'Grade',
         };
     }
 }

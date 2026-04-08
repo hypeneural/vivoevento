@@ -27,6 +27,12 @@ class UpsertEventMediaIntelligenceSettingsRequest extends FormRequest
             'timeout_ms' => ['required', 'integer', 'min:1000', 'max:30000'],
             'fallback_mode' => ['required', 'string', 'in:review,skip'],
             'require_json_output' => ['required', 'boolean'],
+            'reply_text_enabled' => ['sometimes', 'boolean'],
+            'reply_text_mode' => ['nullable', 'string', 'in:disabled,ai,fixed_random'],
+            'reply_prompt_override' => ['nullable', 'string', 'max:5000'],
+            'reply_fixed_templates' => ['nullable', 'array', 'max:20'],
+            'reply_fixed_templates.*' => ['string', 'max:500'],
+            'reply_prompt_preset_id' => ['nullable', 'integer', 'exists:ai_media_reply_prompt_presets,id'],
         ];
     }
 

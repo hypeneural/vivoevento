@@ -24,12 +24,23 @@ class RunOpenAiContentModerationSmokeCommand extends Command
                 entryId: $this->option('entry-id') ? (string) $this->option('entry-id') : null,
             );
         } catch (Throwable $exception) {
+            $report = [
+                'provider' => 'openai',
+                'request_outcome' => 'failed',
+                'manifest' => (string) $this->option('manifest'),
+                'entry_id' => $this->option('entry-id') ? (string) $this->option('entry-id') : null,
+                'error_class' => $exception::class,
+                'error_message' => $exception->getMessage(),
+            ];
+            $path = $this->storeReport($report, 'failed');
+
             $this->error($exception->getMessage());
+            $this->info("Report saved to {$path}");
 
             return self::FAILURE;
         }
 
-        $path = $this->storeReport($report);
+        $path = $this->storeReport($report, 'real');
 
         $this->line(json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         $this->newLine();
@@ -41,15 +52,16 @@ class RunOpenAiContentModerationSmokeCommand extends Command
     /**
      * @param array<string, mixed> $report
      */
-    private function storeReport(array $report): string
+    private function storeReport(array $report, string $suffix): string
     {
         $directory = (string) ($this->option('report-dir') ?: storage_path('app/content-moderation-smoke'));
 
         File::ensureDirectoryExists($directory);
 
         $filename = sprintf(
-            '%s-openai-real-run.json',
+            '%s-openai-%s-run.json',
             now()->format('Ymd-His'),
+            $suffix,
         );
 
         $path = $directory . DIRECTORY_SEPARATOR . $filename;

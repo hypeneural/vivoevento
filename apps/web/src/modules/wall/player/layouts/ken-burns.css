@@ -71,7 +71,7 @@
 
 @keyframes kb-zoom-out {
   from {
-    transform: scale(1.35) translate(3%, 2%);
+    transform: scale(1.35) translate(-3%, 2%);
   }
   to {
     transform: scale(1) translate(0, 0);
@@ -142,4 +142,14 @@
   line-height: 1.06;
   color: #fff;
   text-shadow: 0 2px 18px rgba(0, 0, 0, 0.42);
+}
+
+.kb-caption-text {
+  font-size: clamp(0.85rem, 1.8vw, 1.6rem);
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.75);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  margin-top: 0.4em;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.3);
 }

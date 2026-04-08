@@ -42,4 +42,28 @@ describe('AppSidebar', () => {
 
     expect(screen.getByRole('link', { name: /parceiros/i })).toBeInTheDocument();
   });
+
+  it('shows the IA navigation item when the session can manage settings', () => {
+    useAuthMock.mockReturnValue({
+      meUser: {
+        name: 'Admin Plataforma',
+        avatar_url: null,
+        role: {
+          key: 'platform-admin',
+          name: 'Platform Admin',
+        },
+      },
+      can: (permission: string) => permission === 'settings.manage',
+      canAccessModule: (moduleKey: string) => moduleKey === 'settings',
+      logout: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter>
+        <AppSidebar collapsed={false} onToggle={vi.fn()} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('link', { name: /^ia$/i })).toBeInTheDocument();
+  });
 });

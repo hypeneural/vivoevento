@@ -21,6 +21,11 @@ export function PolaroidLayout({ media }: { media: WallRuntimeItem }) {
               <p className="max-w-3xl text-[clamp(1.4rem,2.8vw,2.8rem)] font-semibold leading-tight">
                 {media.caption}
               </p>
+            ) : null}
+            {media.sender_name ? (
+              <p className="mt-2 text-[clamp(0.75rem,1vw,0.95rem)] uppercase tracking-[0.28em] text-neutral-500">
+                {media.sender_name}
+              </p>
             ) : (
               <p className="mt-1 text-[clamp(0.88rem,1vw,1.05rem)] uppercase tracking-[0.28em] text-neutral-500">
                 Evento Vivo

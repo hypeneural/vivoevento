@@ -25,9 +25,18 @@ class EventMediaVlmEvaluationFactory extends Factory
             'review_required' => false,
             'reason' => 'Conteudo compativel com o evento.',
             'short_caption' => 'Memorias do evento.',
+            'reply_text' => 'Memorias que fazem o coracao sorrir! 🎉📸',
             'tags_json' => ['celebracao', 'retrato'],
             'raw_response_json' => [
                 'provider' => 'vllm',
+            ],
+            'request_payload_json' => [
+                'model' => 'Qwen/Qwen2.5-VL-3B-Instruct',
+            ],
+            'prompt_context_json' => [
+                'template' => 'Use {nome_do_evento}.',
+                'variables' => ['nome_do_evento' => 'Evento Teste'],
+                'resolved' => 'Use Evento Teste.',
             ],
             'tokens_input' => 120,
             'tokens_output' => 42,

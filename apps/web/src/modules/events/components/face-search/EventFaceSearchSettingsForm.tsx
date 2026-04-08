@@ -39,6 +39,15 @@ const faceSearchSettingsSchema = z.object({
   allow_public_selfie_search: z.boolean(),
   selfie_retention_hours: z.string().regex(/^\d+$/, 'Informe um numero inteiro valido.'),
 }).superRefine((value, ctx) => {
+  const minFaceSize = Number(value.min_face_size_px);
+  if (!Number.isNaN(minFaceSize) && (minFaceSize < 16 || minFaceSize > 1024)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['min_face_size_px'],
+      message: 'Use um valor entre 16 e 1024 px.',
+    });
+  }
+
   if (value.allow_public_selfie_search && !value.enabled) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -285,6 +294,9 @@ export function EventFaceSearchSettingsForm({
                     <FormControl>
                       <Input {...field} inputMode="numeric" disabled={disabled || isPending} />
                     </FormControl>
+                    <FormDescription>
+                      Default homologado atual: `24 px`. Abaixo disso o recall melhora, mas o ruído tende a subir.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

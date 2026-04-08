@@ -30,10 +30,16 @@
     border-radius: 20px;
     padding: 0.95rem;
     color: $c-white-80;
+    
+    span {
+      line-height: 1.5;
+    }
   }
 
   svg {
     color: $c-accent-green;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
   }
 }
 
@@ -85,6 +91,7 @@
     margin-top: 0.35rem;
     font-size: 1.08rem;
     letter-spacing: -0.03em;
+    color: $c-white;
   }
 }
 
@@ -242,6 +249,7 @@
   border: 1px solid rgba($c-accent, 0.2);
   color: $c-accent;
   font-weight: 800;
+  font-size: 0.85rem;
 }
 
 .resultsPanel {
@@ -254,13 +262,13 @@
   display: flex;
   justify-content: space-between;
   gap: 0.75rem;
-  color: $c-white-48;
+  color: $c-white-64;
   font-size: 0.8rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 
   strong {
-    color: $c-white-80;
+    color: $c-white;
     font-size: 0.82rem;
   }
 }
@@ -308,7 +316,7 @@
   display: grid;
   gap: 0.2rem;
   padding: 1rem;
-  background: linear-gradient(180deg, transparent, rgba(5, 9, 19, 0.88));
+  background: linear-gradient(180deg, transparent, rgba(5, 9, 19, 0.92));
 
   strong {
     color: $c-accent;
@@ -316,8 +324,9 @@
   }
 
   span {
-    color: $c-white-64;
+    color: $c-white-80;
     font-size: 0.85rem;
+    line-height: 1.4;
   }
 }
 

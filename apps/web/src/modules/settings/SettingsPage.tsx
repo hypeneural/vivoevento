@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { WHATSAPP_SETTINGS_PATH } from '@/modules/whatsapp/paths';
 import { formatRoleLabel } from '@/shared/auth/labels';
@@ -72,6 +73,7 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
 
   const isSuperAdmin = user?.role.key === 'super-admin';
+  const canManageAiSettings = user?.role.key === 'super-admin' || user?.role.key === 'platform-admin';
   const currentRoleLabel = formatRoleLabel(user?.role.key, user?.role.name);
   const canManageSettings = can('settings.manage');
   const canManageBranding = can('branding.manage');
@@ -99,6 +101,7 @@ export default function SettingsPage() {
     push_notifications: user?.preferences?.push_notifications ?? false,
     compact_mode: user?.preferences?.compact_mode ?? false,
   });
+  const [replyTextPrompt, setReplyTextPrompt] = useState('');
   const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [inviteForm, setInviteForm] = useState<InviteCurrentOrganizationTeamMemberPayload>(DEFAULT_INVITE_FORM);
@@ -135,6 +138,16 @@ export default function SettingsPage() {
     queryFn: () => settingsService.listCurrentOrganizationTeam(),
     enabled: canManageTeam && !!organization?.id,
   });
+
+  const mediaIntelligenceGlobalSettingsQuery = useQuery({
+    queryKey: ['settings', 'media-intelligence-global-settings'],
+    queryFn: () => settingsService.getMediaIntelligenceGlobalSettings(),
+    enabled: canManageAiSettings,
+  });
+
+  useEffect(() => {
+    setReplyTextPrompt(mediaIntelligenceGlobalSettingsQuery.data?.reply_text_prompt ?? '');
+  }, [mediaIntelligenceGlobalSettingsQuery.data?.reply_text_prompt]);
 
   const organizationMutation = useMutation({
     mutationFn: (payload: { name: string; slug: string; custom_domain: string }) => settingsService.updateCurrentOrganization(payload),
@@ -248,6 +261,25 @@ export default function SettingsPage() {
     },
   });
 
+  const mediaIntelligenceGlobalSettingsMutation = useMutation({
+    mutationFn: (payload: { reply_text_prompt: string }) =>
+      settingsService.updateMediaIntelligenceGlobalSettings(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['settings', 'media-intelligence-global-settings'] });
+      toast({
+        title: 'Instrucao padrao atualizada',
+        description: 'A configuracao global de respostas automaticas foi salva.',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Falha ao salvar instrucao padrao',
+        description: 'Nao foi possivel persistir a configuracao global de respostas automaticas.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const teamMembers = teamQuery.data?.data ?? [];
 
   const handleSaveOrganization = () => {
@@ -290,6 +322,12 @@ export default function SettingsPage() {
       email_notifications: preferencesForm.email_notifications,
       push_notifications: preferencesForm.push_notifications,
       compact_mode: preferencesForm.compact_mode,
+    });
+  };
+
+  const saveMediaIntelligenceGlobalSettings = () => {
+    mediaIntelligenceGlobalSettingsMutation.mutate({
+      reply_text_prompt: replyTextPrompt.trim(),
     });
   };
 
@@ -539,6 +577,67 @@ export default function SettingsPage() {
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+          </TabsContent>
+        ) : null}
+
+        {canManageAiSettings ? (
+          <TabsContent value="ai" className="mt-6">
+            <div className="glass max-w-3xl space-y-4 rounded-xl p-6">
+              <div className="space-y-1">
+                <h3 className="font-semibold">Prompt global de reply_text</h3>
+                <p className="text-sm text-muted-foreground">
+                  Este prompt e usado como padrao para respostas curtas da midia aprovada quando o evento habilita
+                  `reply_text` e nao define um override proprio.
+                </p>
+              </div>
+
+              {mediaIntelligenceGlobalSettingsQuery.isLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Carregando prompt global de IA...
+                </div>
+              ) : mediaIntelligenceGlobalSettingsQuery.isError ? (
+                <div className="rounded-lg border border-destructive/30 p-4 text-sm text-destructive">
+                  Nao foi possivel carregar o prompt global de reply_text.
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="media-intelligence-reply-text-prompt">Prompt global</Label>
+                    <Textarea
+                      id="media-intelligence-reply-text-prompt"
+                      value={replyTextPrompt}
+                      onChange={(event) => setReplyTextPrompt(event.target.value)}
+                      rows={8}
+                      disabled={!canManageSettings || mediaIntelligenceGlobalSettingsMutation.isPending}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Regra recomendada: frase curta, emoji coerente com a cena, sem hashtags, sem inventar contexto e
+                      com uso opcional do nome do evento.
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-border/50 bg-muted/20 p-4 text-sm text-muted-foreground">
+                    <p className="font-medium text-foreground">Exemplos esperados</p>
+                    <p className="mt-2">Momento de risadas e lembrancas! 📱🎉</p>
+                    <p className="mt-1">🎓✨ Momentos que ficam para a vida! Vamos celebrar! 🎉📸</p>
+                    <p className="mt-1">Memorias que fazem o coracao sorrir! 🎉📸</p>
+                    <p className="mt-1">Paz, amor e um sorriso! ✌️😊</p>
+                    <p className="mt-1">Coelhinho charmoso para alegrar a festa! 🐰✨</p>
+                  </div>
+
+                  <Button
+                    onClick={saveMediaIntelligenceGlobalSettings}
+                    disabled={!canManageSettings || mediaIntelligenceGlobalSettingsMutation.isPending}
+                  >
+                    {mediaIntelligenceGlobalSettingsMutation.isPending
+                      ? <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      : <Save className="mr-1 h-4 w-4" />}
+                    Salvar prompt de IA
+                  </Button>
+                </>
               )}
             </div>
           </TabsContent>

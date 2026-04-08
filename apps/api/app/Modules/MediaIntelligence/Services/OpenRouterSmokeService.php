@@ -8,6 +8,7 @@ use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Services\MediaAssetUrlService;
 use App\Shared\Exceptions\ProviderMisconfiguredException;
 use App\Shared\Support\AssetUrlService;
+use App\Shared\Support\ExternalImageUrlPolicy;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\File;
@@ -232,6 +233,7 @@ class OpenRouterSmokeService
             $this->http,
             $this->dataUrlOnlyAssetService(),
             $this->payloads,
+            app(ExternalImageUrlPolicy::class),
         );
 
         $startedAt = microtime(true);

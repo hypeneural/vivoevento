@@ -25,6 +25,7 @@ class EventMediaIntelligenceSettingsController extends BaseController
             ['event_id' => $event->id],
             EventMediaIntelligenceSetting::defaultAttributes(),
         );
+        $settings->loadMissing('replyPromptPreset');
 
         return $this->success(new EventMediaIntelligenceSettingResource($settings));
     }
@@ -52,6 +53,6 @@ class EventMediaIntelligenceSettingsController extends BaseController
             ])
             ->log('Configuracao de media intelligence atualizada');
 
-        return $this->success(new EventMediaIntelligenceSettingResource($settings->refresh()));
+        return $this->success(new EventMediaIntelligenceSettingResource($settings->refresh()->loadMissing('replyPromptPreset')));
     }
 }

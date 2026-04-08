@@ -10,7 +10,7 @@ import {
   writeWallHeartbeatMeta,
 } from '../heartbeat-storage';
 import { resolveWallCacheEnabled } from '../runtime-capabilities';
-import type { WallConnectionStatus, WallPlayerCommandPayload, WallRuntimeItem } from '../types';
+import type { WallAdItem, WallConnectionStatus, WallPlayerCommandPayload, WallRuntimeItem } from '../types';
 import { useWallEngine } from './useWallEngine';
 import { useWallRealtime } from './useWallRealtime';
 
@@ -38,6 +38,7 @@ export function useWallPlayer(code: string) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(() => readWallHeartbeatMeta(code)?.lastSyncAt ?? null);
   const [syncVersion, setSyncVersion] = useState(0);
+  const [ads, setAds] = useState<WallAdItem[]>([]);
 
   const engineRef = useRef(engine);
   useEffect(() => {
@@ -63,6 +64,11 @@ export function useWallPlayer(code: string) {
     try {
       const snapshot = await getWallBoot(code);
       engineRef.current.applySnapshot(snapshot);
+
+      // Apply ads from boot payload
+      if (snapshot.ads) {
+        setAds(snapshot.ads);
+      }
 
       const syncedAt = new Date().toISOString();
       setLastSyncAt(syncedAt);
@@ -164,6 +170,9 @@ export function useWallPlayer(code: string) {
     onPlayerCommand: (payload) => {
       void handlePlayerCommand(payload);
     },
+    onAdsUpdated: (payload) => {
+      setAds(payload.ads);
+    },
   });
 
   const connectionStatusRef = useRef<WallConnectionStatus>(connectionStatus);
@@ -249,6 +258,7 @@ export function useWallPlayer(code: string) {
     isSyncing,
     connectionStatus,
     lastSyncAt,
+    ads,
     resync: sync,
   };
 }

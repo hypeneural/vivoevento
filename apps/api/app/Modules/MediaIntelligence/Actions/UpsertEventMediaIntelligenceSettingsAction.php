@@ -13,6 +13,10 @@ class UpsertEventMediaIntelligenceSettingsAction
     public function execute(Event $event, array $payload): EventMediaIntelligenceSetting
     {
         $defaults = EventMediaIntelligenceSetting::defaultAttributes();
+        $replyTextMode = EventMediaIntelligenceSetting::normalizeReplyTextMode(
+            isset($payload['reply_text_mode']) ? (string) $payload['reply_text_mode'] : null,
+            array_key_exists('reply_text_enabled', $payload) ? (bool) $payload['reply_text_enabled'] : null,
+        );
 
         return EventMediaIntelligenceSetting::query()->updateOrCreate(
             [
@@ -30,7 +34,28 @@ class UpsertEventMediaIntelligenceSettingsAction
                 'timeout_ms' => (int) ($payload['timeout_ms'] ?? $defaults['timeout_ms']),
                 'fallback_mode' => (string) ($payload['fallback_mode'] ?? $defaults['fallback_mode']),
                 'require_json_output' => (bool) ($payload['require_json_output'] ?? $defaults['require_json_output']),
+                'reply_text_enabled' => $replyTextMode !== 'disabled',
+                'reply_text_mode' => $replyTextMode,
+                'reply_prompt_override' => $payload['reply_prompt_override'] ?? $defaults['reply_prompt_override'],
+                'reply_fixed_templates_json' => $this->sanitizeTemplates($payload['reply_fixed_templates'] ?? $defaults['reply_fixed_templates_json']),
+                'reply_prompt_preset_id' => $payload['reply_prompt_preset_id'] ?? $defaults['reply_prompt_preset_id'],
             ],
         );
+    }
+
+    /**
+     * @param mixed $templates
+     * @return array<int, string>
+     */
+    private function sanitizeTemplates(mixed $templates): array
+    {
+        if (! is_array($templates)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            static fn (mixed $item): ?string => is_string($item) && trim($item) !== '' ? trim($item) : null,
+            $templates,
+        )));
     }
 }

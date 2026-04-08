@@ -1,0 +1,96 @@
+/* QR Flip Card — 3D flip animation */
+
+.qr-flip-card {
+  perspective: 800px;
+  width: clamp(60px, 10vmin, 120px);
+  height: clamp(60px, 10vmin, 120px);
+  cursor: pointer;
+  transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1),
+    height 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.qr-flip-card--flipped {
+  width: clamp(200px, 28vmin, 280px);
+  height: clamp(200px, 28vmin, 280px);
+}
+
+.qr-flip-card__inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.qr-flip-card--flipped .qr-flip-card__inner {
+  transform: rotateY(180deg);
+}
+
+/* ─── Faces ─────────────────────────────── */
+.qr-flip-card__front,
+.qr-flip-card__back {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* Front — Logo */
+.qr-flip-card__front {
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.qr-flip-card__logo {
+  width: 80%;
+  height: 80%;
+  object-fit: contain;
+  opacity: 0.7;
+}
+
+.qr-flip-card__placeholder {
+  width: 50%;
+  height: 50%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Back — QR */
+.qr-flip-card__back {
+  transform: rotateY(180deg);
+  background: #fff;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.3),
+    0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.qr-flip-card__qr {
+  width: 75%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.qr-flip-card__text {
+  font-size: clamp(0.55rem, 1.2vmin, 0.8rem);
+  color: #333;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* ─── Reduce motion ─────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .qr-flip-card,
+  .qr-flip-card__inner {
+    transition: none;
+  }
+}

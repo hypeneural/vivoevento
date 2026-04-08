@@ -64,6 +64,10 @@ export interface EventMediaIntelligenceSettings {
   timeout_ms: number;
   fallback_mode: 'review' | 'skip' | string;
   require_json_output: boolean;
+  reply_text_mode: 'disabled' | 'ai' | 'fixed_random' | string;
+  reply_text_enabled: boolean;
+  reply_prompt_override: string | null;
+  reply_fixed_templates: string[];
   created_at: string | null;
   updated_at: string | null;
 }

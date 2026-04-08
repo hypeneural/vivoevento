@@ -51,11 +51,13 @@ class ProcessInboundWebhookJob implements ShouldQueue
         $instance = WhatsAppInstance::where('provider_key', $this->providerKey)
             ->where('external_instance_id', $this->instanceKey)
             ->first();
+        $traceId = $this->resolveTraceId();
 
         if (! $instance) {
             Log::channel('whatsapp')->warning('Inbound webhook for unknown instance', [
                 'provider' => $this->providerKey,
                 'instance_key' => $this->instanceKey,
+                'trace_id' => $traceId,
             ]);
             return;
         }
@@ -64,6 +66,7 @@ class ProcessInboundWebhookJob implements ShouldQueue
         $inboundEvent = WhatsAppInboundEvent::create([
             'instance_id' => $instance->id,
             'provider_key' => $this->providerKey,
+            'trace_id' => $traceId,
             'provider_message_id' => $this->payload['messageId'] ?? $this->payload['ids'][0] ?? null,
             'event_type' => $this->detectEventType(),
             'payload_json' => $this->payload,
@@ -85,6 +88,7 @@ class ProcessInboundWebhookJob implements ShouldQueue
             Log::channel('whatsapp')->error('Failed to process inbound webhook', [
                 'inbound_event_id' => $inboundEvent->id,
                 'instance_id' => $instance->id,
+                'trace_id' => $traceId,
                 'error' => $e->getMessage(),
             ]);
 
@@ -207,6 +211,7 @@ class ProcessInboundWebhookJob implements ShouldQueue
         if ($messages->isEmpty()) {
             Log::channel('whatsapp')->info('Outbound delivery callback ignored because no message matched', [
                 'instance_id' => $instance->id,
+                'trace_id' => $this->resolveTraceId(),
                 'message_ids' => $messageIds,
                 'provider_status' => $status,
             ]);
@@ -284,6 +289,13 @@ class ProcessInboundWebhookJob implements ShouldQueue
         }
 
         $inboundEvent->markProcessed();
+    }
+
+    private function resolveTraceId(): ?string
+    {
+        $traceId = trim((string) ($this->payload['_trace_id'] ?? ''));
+
+        return $traceId !== '' ? $traceId : null;
     }
 
     private function ignoreCallback(WhatsAppInboundEvent $inboundEvent): void

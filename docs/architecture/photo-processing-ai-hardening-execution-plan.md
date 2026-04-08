@@ -58,7 +58,11 @@ Este plano existe para responder 6 perguntas de execucao:
 - [x] `H4-T1` provider opcional `openrouter` implementado em backend/frontend com TDD.
 - [x] `H4-T2` politica de roteamento do `OpenRouter` fechada com catalogo local homologado e smoke real.
 - [x] `H4-T3` ownership de caption caracterizado com TDD e auditabilidade no detalhe da midia.
-- [ ] `Aprovacao completa da fase` ainda depende de ampliacao do dataset curado e das frentes fora de `FaceSearch`.
+- [x] `ReplyText` global e por evento persistidos em banco com TDD.
+- [x] `ReplyText` persistido no historico VLM e entregue no feedback de midia publicada com TDD.
+- [x] `H5-T2 OpenAI` smoke real bem-sucedido executado em `POST /v1/moderations` com `data_url`, relatorio salvo e integracao validada.
+- [x] `UI de reply_text no painel` implementada para prompt global em `Settings` e override por evento em `MediaIntelligence`.
+- [ ] `Aprovacao completa da fase` ainda depende da ampliacao do dataset curado do `FaceSearch` e da homologacao de prompts reais de `reply_text` em ambiente operacional.
 
 Ultima rodada executada:
 
@@ -95,10 +99,17 @@ Ultima rodada executada:
 - `OpenRouterModelPolicyTest`
 - `OpenRouterVisualReasoningProviderTest`
 - `MediaIntelligenceSettingsTest`
+- `MediaIntelligenceGlobalSettingsTest`
 - `UpsertEventMediaIntelligenceSettingsActionTest`
+- `OpenAiCompatibleVisualReasoningPayloadFactoryTest`
 - `RunOpenRouterSmokeCommandTest`
+- `RunOpenAiContentModerationSmokeCommandTest`
 - `EventMediaIntelligenceSettingsForm.test.tsx`
+- `SettingsPage.test.tsx`
+- `TelegramFeedbackAutomationTest`
+- `WhatsAppEventAutomationTest`
 - `media-intelligence:smoke-openrouter --entry-id=vipsocial-person-a-01`
+- `content-moderation:smoke-openai --entry-id=vipsocial-person-a-01`
 - `face-search:smoke-compreface --dry-run`
 - `face-search:smoke-compreface`
 - `face-search:benchmark --smoke-report=...`
@@ -135,7 +146,7 @@ Para evitar escopo difuso, esta fase nao inclui:
 1. substituir `PostgreSQL + pgvector` por `Qdrant`;
 2. trocar `ContentModeration` para `OpenRouter`;
 3. mover `FaceSearch` para `InsightFace/ArcFace` como trilha principal ja no MVP;
-4. plugar `reply_text` transacional em WhatsApp/Telegram;
+4. expandir `reply_text` transacional para fluxos alem da midia aprovada em WhatsApp/Telegram;
 5. redesenhar o pipeline historico que ja esta validado em `photo-processing-ai-execution-plan.md`.
 
 ---
@@ -1292,7 +1303,88 @@ Status de execucao:
   - `caption_source_hint=human` quando a legenda persistida difere da sugestao do VLM
 - conclusao operacional:
   - a fase fecha `caption` como enrichment auditavel;
-  - `reply_text` transacional continua fora do escopo e separado de `caption`.
+  - `reply_text` segue trilha propria e separada de `caption`.
+
+### H4-T4 - ReplyText aprovado com prompt global + override por evento
+
+Objetivo:
+
+permitir que midias aprovadas recebam uma resposta curta, contextual e com emoji baseada na foto, sem acoplar isso ao campo `caption`.
+
+Decisao de produto:
+
+1. `caption` continua enrichment publico da midia;
+2. `reply_text` vira saida transacional separada;
+3. `reply_text` so roda quando:
+   - `event_media_intelligence_settings.reply_text_enabled=true`;
+   - existir prompt efetivo resolvido;
+   - a avaliacao VLM retornar `reply_text`;
+   - a midia ja estiver publicada ou for publicada depois da avaliacao.
+
+Persistencia em banco:
+
+1. prompt universal:
+   - `media_intelligence_global_settings.reply_text_prompt`
+2. override por evento:
+   - `event_media_intelligence_settings.reply_text_enabled`
+   - `event_media_intelligence_settings.reply_prompt_override`
+3. resposta gerada:
+   - `event_media_vlm_evaluations.reply_text`
+
+Prioridade de prompt:
+
+1. `reply_prompt_override` do evento
+2. `reply_text_prompt` global
+
+Comportamento operacional:
+
+1. `OpenAiCompatibleVisualReasoningPayloadFactory` injeta no prompt as instrucoes efetivas de `reply_text` apenas quando o evento habilita a feature;
+2. `VisualReasoningResponseSchemaFactory` aceita `reply_text` como propriedade do contrato JSON;
+3. `EvaluateMediaPromptAction` persiste `reply_text` no historico VLM;
+4. `SendFeedbackOnMediaPublished` e `SendTelegramFeedbackOnMediaPublished` enviam:
+   - reacao sempre;
+   - `reply_text` apenas quando a ultima avaliacao VLM ja o tiver produzido;
+5. `EvaluateMediaPromptJob` tambem tenta enviar o `reply_text` quando a midia ja estava publicada antes do VLM terminar, evitando depender da ordem `publish -> VLM`.
+
+Status de execucao:
+
+- `MediaIntelligenceGlobalSetting` criado como singleton operacional para prompt universal;
+- endpoints autenticados adicionados:
+  - `GET /api/v1/media-intelligence/global-settings`
+  - `PATCH /api/v1/media-intelligence/global-settings`
+- `MediaIntelligenceGlobalSettingsTest` cobre:
+  - default global
+  - update global
+  - autorizacao restrita a `super-admin|platform-admin`
+- `MediaIntelligenceSettingsTest` e `UpsertEventMediaIntelligenceSettingsActionTest` agora cobrem:
+  - `reply_text_enabled`
+  - `reply_prompt_override`
+- `OpenAiCompatibleVisualReasoningPayloadFactoryTest` cobre:
+  - uso do prompt global
+  - precedencia do override do evento
+- `MediaIntelligencePipelineTest` agora garante que `reply_text` entra em `event_media_vlm_evaluations`
+- `EventMediaDetailResource` expoe `latest_vlm_evaluation.reply_text`
+- `TelegramFeedbackAutomationTest` cobre o caminho sincrono:
+  - midia publicada + `reply_text` existente => reacao + reply
+- `WhatsAppEventAutomationTest` cobre o caminho assincrono:
+  - midia publicada primeiro
+  - `reply_text` chega depois via `EvaluateMediaPromptJob`
+  - so o reply faltante e enviado, sem duplicar a reacao
+- `SettingsPage.test.tsx` cobre a edicao do prompt global no painel para `platform-admin`
+- `EventMediaIntelligenceSettingsForm.test.tsx` cobre:
+  - `reply_text_enabled`
+  - limpeza de `reply_prompt_override` para `null`
+  - preservacao do payload completo no submit
+- `SettingsPage` agora expoe a aba `IA` para `super-admin|platform-admin`, com o prompt global auditavel e editavel
+- `EventMediaIntelligenceSettingsForm` agora expoe:
+  - chave de habilitacao do `reply_text`
+  - `reply_prompt_override` do evento
+  - hint explicito de heranca do prompt global
+
+Conclusao operacional:
+
+- `reply_text` aprovado deixou de ser backlog e passou a integrar a fase atual;
+- `caption` e `reply_text` agora tem contratos separados e auditaveis.
 
 ---
 
@@ -1373,6 +1465,20 @@ Precondicao operacional:
 
 Status de execucao:
 
+- comando `php artisan content-moderation:smoke-openai` implementado com TDD;
+- smoke command da OpenAI salva relatorio tanto em sucesso quanto em falha;
+- o smoke real da OpenAI foi reexecutado com sucesso em `2026-04-07` contra `tests/Fixtures/AI/local/vipsocial.manifest.json`, forçando `data_url`;
+- o smoke real da OpenAI confirmou:
+  - `POST /v1/moderations` funcionando com `omni-moderation-latest`
+  - `path_used=data_url`
+  - `fallback_triggered=true`
+  - `decision=pass`
+  - `provider_flagged=false`
+  - `latency_ms=3942`
+  - `provider_response_model=omni-moderation-latest`
+- relatorio de sucesso salvo em:
+  - `C:\laragon\www\eventovivo\apps\api\storage\app\content-moderation-smoke\20260407-232634-openai-real-run.json`
+- o smoke real da OpenAI foi executado em `2026-04-07` contra `tests/Fixtures/AI/local/vipsocial.manifest.json`, forçando `data_url`;
 - comando `php artisan face-search:smoke-compreface` implementado;
 - `dry-run` real executado com sucesso contra `tests/Fixtures/AI/local/vipsocial.manifest.json`;
 - stack Docker local do `CompreFace` foi subida em `http://127.0.0.1:8002`;
@@ -1404,6 +1510,12 @@ Status de execucao:
     - `structured_outputs`
 - relatorio salvo em:
   - `C:\laragon\www\eventovivo\apps\api\storage\app\media-intelligence-smoke\20260407-215035-openrouter-real-run.json`
+
+Leitura operacional da OpenAI:
+
+- a integracao do app com `POST /v1/moderations` ficou provada por testes automatizados e por smoke real bem-sucedido;
+- o caminho de fallback `image_url -> data_url` tambem ficou provado em execucao real;
+- a frente de `ContentModeration` deixa de ter bloqueio externo nesta fase.
 
 Artefatos obrigatorios de cada smoke:
 
@@ -1792,7 +1904,7 @@ Esta fase so pode ser considerada pronta quando:
 11. existe benchmark reproduzivel com hit rate e p95;
 12. as metas minimas de aprovacao desta fase foram atingidas;
 13. `MediaIntelligence` continua opcional e assincrono;
-14. smoke tests reais locais existem para OpenAI, OpenRouter e CompreFace;
+14. comandos e relatorios de smoke existem para OpenAI, OpenRouter e CompreFace;
 15. nenhuma chave real foi comitada em arquivo versionado.
 
 ---
@@ -1808,11 +1920,22 @@ Com o estado atual desta branch, a ordem util de continuidade e:
 5. reexecutar `php artisan face-search:benchmark --smoke-report=...` apos cada ampliacao material do dataset
 6. repetir `php artisan media-intelligence:smoke-openrouter --entry-id=...` sempre que um novo modelo for candidato a homologacao
 7. ampliar o catalogo local do `OpenRouter` apenas depois de smoke real e compatibilidade confirmada
-8. manter `caption` como enrichment auditavel e avaliar `reply_text` apenas como backlog separado de produto
+8. consolidar a calibracao de `reply_text` em homologacao com prompts globais e overrides de evento reais
+9. decidir se a UI global de `reply_text` deve permanecer em `Settings` ou ganhar uma tela dedicada de IA no painel
+10. ampliar o dataset curado de `FaceSearch` quando o acervo adicional estiver pronto
 
 Isso responde primeiro:
 
 - consolidacao do baseline facial agora que a integracao e a calibracao inicial ficaram homologadas;
 - ampliacao de cobertura do dataset antes de abrir novas frentes semanticas;
 - throughput real agora ja medido, mas ainda dependente de lote maior para virar baseline de homologacao;
-- camada semantica agora ja tem contrato comum, provider `openrouter`, smoke real homologado e ownership de caption fechado nesta fase.
+- camada semantica agora ja tem contrato comum, provider `openrouter`, smoke real homologado, ownership de caption fechado e `reply_text` aprovado operacionalmente separado de `caption`;
+- `ContentModeration` ja teve smoke real bem-sucedido na OpenAI e deixou de ser o bloqueio externo da fase.
+
+Para a homologacao operacional em evento real com WhatsApp grupo/DM, moderacao por IA, `reply_text` em thread, logs ampliados e checklist de execucao, seguir a doc dedicada:
+
+- `docs/architecture/whatsapp-ai-media-reply-real-validation-execution-plan.md`
+
+Para a evolucao da area dedicada de IA, presets, teste do prompt com ate `3` imagens, historico de testes e write set de front/backend/banco dessa frente, seguir tambem:
+
+- `docs/architecture/ia-respostas-automaticas-de-midia-execution-plan.md`

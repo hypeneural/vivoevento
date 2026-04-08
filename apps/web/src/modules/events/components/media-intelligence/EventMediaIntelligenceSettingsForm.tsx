@@ -25,6 +25,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import type { ApiEventDetail, ApiEventMediaIntelligenceSettings } from '@/lib/api-types';
+import type { MediaReplyPromptPreset } from '@/modules/ai/types';
 import type { UpdateEventMediaIntelligenceSettingsPayload } from '../../api';
 
 const mediaIntelligenceSettingsSchema = z.object({
@@ -39,6 +40,10 @@ const mediaIntelligenceSettingsSchema = z.object({
   timeout_ms: z.string().regex(/^\d+$/, 'Informe um inteiro em milissegundos.'),
   fallback_mode: z.enum(['review', 'skip']),
   require_json_output: z.boolean(),
+  reply_text_mode: z.enum(['disabled', 'ai', 'fixed_random']),
+  reply_prompt_override: z.string().trim().max(5000, 'Use ate 5000 caracteres.'),
+  reply_fixed_templates_text: z.string().max(10000, 'Use ate 10000 caracteres.'),
+  reply_prompt_preset_id: z.string(),
 }).superRefine((value, ctx) => {
   if (value.mode === 'gate' && value.fallback_mode !== 'review') {
     ctx.addIssue({
@@ -50,6 +55,17 @@ const mediaIntelligenceSettingsSchema = z.object({
 });
 
 type MediaIntelligenceSettingsFormValues = z.infer<typeof mediaIntelligenceSettingsSchema>;
+
+function templatesToTextarea(templates: string[]): string {
+  return templates.join('\n');
+}
+
+function textareaToTemplates(value: string): string[] {
+  return value
+    .split(/\r?\n/u)
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+}
 
 function buildFormValues(settings: ApiEventMediaIntelligenceSettings): MediaIntelligenceSettingsFormValues {
   return {
@@ -68,6 +84,14 @@ function buildFormValues(settings: ApiEventMediaIntelligenceSettings): MediaInte
     timeout_ms: String(settings.timeout_ms ?? 12000),
     fallback_mode: settings.fallback_mode === 'skip' ? 'skip' : 'review',
     require_json_output: settings.require_json_output,
+    reply_text_mode: settings.reply_text_mode === 'fixed_random'
+      ? 'fixed_random'
+      : settings.reply_text_mode === 'disabled'
+        ? 'disabled'
+        : 'ai',
+    reply_prompt_override: settings.reply_prompt_override ?? '',
+    reply_fixed_templates_text: templatesToTextarea(settings.reply_fixed_templates ?? []),
+    reply_prompt_preset_id: settings.reply_prompt_preset_id ? String(settings.reply_prompt_preset_id) : 'none',
   };
 }
 
@@ -84,12 +108,21 @@ function toPayload(values: MediaIntelligenceSettingsFormValues): UpdateEventMedi
     timeout_ms: Number(values.timeout_ms),
     fallback_mode: values.fallback_mode,
     require_json_output: values.require_json_output,
+    reply_text_mode: values.reply_text_mode,
+    reply_prompt_override: values.reply_text_mode === 'ai' ? values.reply_prompt_override || null : null,
+    reply_fixed_templates: values.reply_text_mode === 'fixed_random'
+      ? textareaToTemplates(values.reply_fixed_templates_text)
+      : [],
+    reply_prompt_preset_id: values.reply_text_mode === 'ai' && values.reply_prompt_preset_id !== 'none'
+      ? Number(values.reply_prompt_preset_id)
+      : null,
   };
 }
 
 interface EventMediaIntelligenceSettingsFormProps {
   settings: ApiEventMediaIntelligenceSettings;
   eventModerationMode: ApiEventDetail['moderation_mode'];
+  presets?: MediaReplyPromptPreset[];
   isPending?: boolean;
   disabled?: boolean;
   onSubmit: (payload: UpdateEventMediaIntelligenceSettingsPayload) => void | Promise<void>;
@@ -98,6 +131,7 @@ interface EventMediaIntelligenceSettingsFormProps {
 export function EventMediaIntelligenceSettingsForm({
   settings,
   eventModerationMode,
+  presets = [],
   isPending = false,
   disabled = false,
   onSubmit,
@@ -112,6 +146,7 @@ export function EventMediaIntelligenceSettingsForm({
   }, [form, settings]);
 
   const submit = form.handleSubmit((values) => onSubmit(toPayload(values)));
+  const automaticReplyMode = form.watch('reply_text_mode');
 
   return (
     <Form {...form}>
@@ -183,13 +218,58 @@ export function EventMediaIntelligenceSettingsForm({
           />
         </div>
 
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="reply_text_mode"
+            render={({ field }) => (
+              <FormItem className="rounded-2xl border border-slate-200 p-4">
+                <div className="space-y-3">
+                  <div>
+                    <FormLabel>Tipo de resposta automatica</FormLabel>
+                    <FormDescription>
+                      Escolha se a midia aprovada nao responde, responde por IA ou usa um texto fixo aleatorio.
+                    </FormDescription>
+                  </div>
+                  <Select value={field.value} onValueChange={field.onChange} disabled={disabled || isPending}>
+                    <FormControl>
+                      <SelectTrigger aria-label="Tipo de resposta automatica">
+                        <SelectValue placeholder="Selecione o tipo de resposta" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="disabled">Sem resposta automatica</SelectItem>
+                      <SelectItem value="ai">Resposta automatica por IA</SelectItem>
+                      <SelectItem value="fixed_random">Texto fixo aleatorio</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">Contrato da resposta automatica</p>
+            <p className="mt-1">
+              A resposta deve ser curta, em portugues do Brasil, com 1 ou 2 emojis coerentes com a cena e sem inventar contexto visual.
+            </p>
+            <p className="mt-1">
+              Quando o texto de instrucao do evento estiver vazio, o sistema usa a instrucao padrao configurada na area de IA.
+            </p>
+            <p className="mt-1">
+              No modo de texto fixo, o evento pode sobrescrever a lista padrao com um texto por linha.
+            </p>
+          </div>
+        </div>
+
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <FormField
             control={form.control}
             name="provider_key"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Provider</FormLabel>
+                <FormLabel>Provedor</FormLabel>
                 <Select value={field.value} onValueChange={field.onChange} disabled={disabled || isPending}>
                   <FormControl>
                     <SelectTrigger>
@@ -220,12 +300,12 @@ export function EventMediaIntelligenceSettingsForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="enrich_only">Enrich only</SelectItem>
-                    <SelectItem value="gate">Gate</SelectItem>
+                    <SelectItem value="enrich_only">Apenas enriquecer</SelectItem>
+                    <SelectItem value="gate">Bloquear</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormDescription>
-                  `gate` so deve ser usado quando o produto aceitar VLM como bloqueante.
+                  O modo de bloqueio so deve ser usado quando o produto aceitar VLM como decisao bloqueante.
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -348,6 +428,85 @@ export function EventMediaIntelligenceSettingsForm({
             )}
           />
         </div>
+
+        {automaticReplyMode === 'ai' ? (
+          <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name="reply_prompt_preset_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Preset do evento</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange} disabled={disabled || isPending}>
+                    <FormControl>
+                      <SelectTrigger aria-label="Preset do evento">
+                        <SelectValue placeholder="Selecione um preset opcional" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">Sem preset</SelectItem>
+                      {presets.map((preset) => (
+                        <SelectItem key={preset.id} value={String(preset.id)}>
+                          {preset.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    O preset adiciona um estilo base para a resposta automatica antes do texto de instrucao do evento.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="reply_prompt_override"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Texto de instrucao do evento</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      {...field}
+                      rows={6}
+                      disabled={disabled || isPending}
+                      placeholder="Gere uma resposta bem curta, calorosa e baseada no que aparece na foto. Use 1 ou 2 emojis coerentes com a cena. Se {nome_do_evento} ajudar naturalmente, voce pode usar esse contexto. Se estiver incerto, retorne vazio."
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Instrucao opcional. Quando vazio, o evento herda a instrucao padrao configurada na area de IA.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        ) : null}
+
+        {automaticReplyMode === 'fixed_random' ? (
+          <FormField
+            control={form.control}
+            name="reply_fixed_templates_text"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Textos fixos do evento</FormLabel>
+                <FormControl>
+                  <Textarea
+                    {...field}
+                    rows={6}
+                    disabled={disabled || isPending}
+                    placeholder={'Memorias que fazem o coracao sorrir!\nMomento de risadas e lembrancas!'}
+                  />
+                </FormControl>
+                <FormDescription>
+                  Um texto por linha. Quando vazio, o evento usa os textos fixos padrao da area de IA.
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        ) : null}
 
         <div className="flex justify-end">
           <Button type="submit" disabled={disabled || isPending}>

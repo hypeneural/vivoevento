@@ -9,15 +9,18 @@ import {
   Gamepad2,
   Images,
   type LucideIcon,
+  MessageSquare,
   MonitorPlay,
   ScanFace,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
 import styles from "./HeroExperience.module.scss";
-import { eventImages, heroMetrics } from "@/data/landing";
+import { eventImages, heroVariations } from "@/data/landing";
 import { siteConfig } from "@/config/site";
 import { useSmoothScroll } from "@/hooks/useSmoothScroll";
+import { usePersonaContent } from "@/hooks/usePersonaContent";
+import TrustSignals from "./TrustSignals";
 
 gsap.registerPlugin(useGSAP);
 
@@ -148,6 +151,12 @@ export default function HeroExperience() {
   const scanLineRef = useRef<HTMLSpanElement | null>(null);
   const { scrollToId } = useSmoothScroll();
 
+  // Get persona-specific content
+  const heroContent = usePersonaContent(
+    heroVariations,
+    heroVariations.social // fallback to social persona
+  );
+
   const activeOutputItem = outputItems.find((item) => item.id === activeOutput) ?? outputItems[0];
   const ActiveOutputIcon = activeOutputItem.icon;
   const qrCells = useMemo(() => qrPattern.map((filled, index) => ({ filled: Boolean(filled), index })), []);
@@ -256,61 +265,74 @@ export default function HeroExperience() {
   };
 
   return (
-    <section className={styles.hero} ref={scope}>
+    <section className={styles.hero} ref={scope} aria-labelledby="hero-title">
       <div className="container">
         <div className={styles.grid}>
           <div className={styles.copyColumn}>
             <span className="eyebrow" data-hero-reveal>
-              <Sparkles size={14} />
-              Plataforma premium de experiencias ao vivo
+              <Sparkles size={14} aria-hidden="true" />
+              {heroContent.eyebrow}
             </span>
 
-            <h1 className={styles.title} data-hero-reveal>
-              <span className={styles.titleLead}>Uma foto.</span>
-              <span className={styles.titleAccent}>Vira galeria, jogos,</span>
-              <span className={styles.titleAccent}>telao e IA.</span>
+            <h1 id="hero-title" className={styles.title} data-hero-reveal>
+              <span className={styles.titleLead}>{heroContent.headline.lead}</span>
+              {heroContent.headline.accent.map((line, index) => (
+                <span key={index} className={styles.titleAccent}>
+                  {line}
+                </span>
+              ))}
             </h1>
 
             <p className={styles.lead} data-hero-reveal>
-              Receba por QR Code, aprove com IA e transforme o mesmo envio em galeria dinamica,
-              jogos interativos, telao ao vivo e busca facial em segundos.
+              {heroContent.subheadline}
             </p>
 
-            <div className={styles.flowSummary} data-hero-reveal>
-              <div className={styles.summaryStep}>
-                <span>1</span>
-                <strong>Convidado envia</strong>
-                <small>QR + web, sem app</small>
-              </div>
-              <div className={styles.summaryConnector} aria-hidden="true" />
-              <div className={styles.summaryStep}>
-                <span>2</span>
-                <strong>IA decide</strong>
-                <small>aprova, bloqueia e indexa</small>
-              </div>
-              <div className={styles.summaryConnector} aria-hidden="true" />
-              <div className={styles.summaryStep}>
-                <span>3</span>
-                <strong>Publica experiencia</strong>
-                <small>galeria, jogos, telao e match</small>
-              </div>
+            <div className={styles.flowSummary} data-hero-reveal role="list" aria-label="Fluxo de funcionamento">
+              {heroContent.flowSteps.map((step, index) => (
+                <>
+                  <div key={step.number} className={styles.summaryStep} role="listitem">
+                    <span aria-label={`Passo ${step.number}`}>{step.number}</span>
+                    <strong>{step.title}</strong>
+                    <small>{step.detail}</small>
+                  </div>
+                  {index < heroContent.flowSteps.length - 1 && (
+                    <div key={`connector-${index}`} className={styles.summaryConnector} aria-hidden="true" />
+                  )}
+                </>
+              ))}
             </div>
 
             <div className={styles.actions} data-hero-reveal>
-              <a className="button" data-variant="primary" href={siteConfig.primaryCtaUrl} target="_blank" rel="noreferrer">
-                <CalendarDays size={18} />
-                Agendar demonstracao
+              <a 
+                className="button" 
+                data-variant="primary" 
+                href={siteConfig.primaryCtaUrl} 
+                target="_blank" 
+                rel="noreferrer"
+                aria-label="Agendar demonstração da plataforma"
+              >
+                <CalendarDays size={18} aria-hidden="true" />
+                {heroContent.ctas.primary.text}
               </a>
 
-              <button type="button" className={styles.textAction} onClick={(event) => handleInternalJump(event, "como-funciona")}>
+              <button 
+                type="button" 
+                className={styles.textAction} 
+                onClick={(event) => handleInternalJump(event, "como-funciona")}
+                aria-label="Ver como funciona a plataforma"
+              >
                 Ver como funciona
-                <ArrowRight size={17} />
+                <ArrowRight size={17} aria-hidden="true" />
               </button>
             </div>
 
-            <div className={styles.metricRow} data-hero-reveal>
-              {heroMetrics.map((metric) => (
-                <div key={metric.value} className={styles.metricCard}>
+            <div data-hero-reveal>
+              <TrustSignals signals={heroContent.trustSignals} />
+            </div>
+
+            <div className={styles.metricRow} data-hero-reveal role="list" aria-label="Métricas da plataforma">
+              {heroContent.metrics.map((metric) => (
+                <div key={metric.value} className={styles.metricCard} role="listitem">
                   <strong>{metric.value}</strong>
                   <span>{metric.label}</span>
                 </div>
@@ -323,6 +345,8 @@ export default function HeroExperience() {
             className={styles.stageShell}
             onPointerMove={handleStagePointerMove}
             onPointerLeave={resetStagePerspective}
+            role="region"
+            aria-label="Demonstração interativa do fluxo da plataforma"
           >
             <div className={styles.stageHeader} data-stage-card>
               <div>
@@ -330,35 +354,35 @@ export default function HeroExperience() {
                 <strong>Do envio a publicacao no mesmo fluxo</strong>
               </div>
 
-              <span className={styles.stageStatus}>
-                <span className={styles.statusDot} />
+              <span className={styles.stageStatus} role="status" aria-live="polite">
+                <span className={styles.statusDot} aria-hidden="true" />
                 27 envios ativos agora
               </span>
             </div>
 
-            <div className={styles.stageFlow} data-stage-card>
-              <div className={styles.flowNode} data-active="true">
+            <div className={styles.stageFlow} data-stage-card role="list" aria-label="Etapas do fluxo">
+              <div className={styles.flowNode} data-active="true" role="listitem">
                 <span>Entrada</span>
                 <strong>QR + selfie</strong>
               </div>
-              <div className={styles.flowNode} data-active="true">
+              <div className={styles.flowNode} data-active="true" role="listitem">
                 <span>Motor</span>
                 <strong>IA + operacao</strong>
               </div>
-              <div className={styles.flowNode} data-active="true">
+              <div className={styles.flowNode} data-active="true" role="listitem">
                 <span>Saidas</span>
                 <strong>Galeria, jogos, telao, match</strong>
               </div>
             </div>
 
             <div className={styles.stageGrid}>
-              <article className={styles.captureCard} data-stage-card>
+              <article className={styles.captureCard} data-stage-card aria-labelledby="capture-title">
                 <header>
                   <span className={styles.cardTag}>
-                    <Sparkles size={15} />
+                    <Sparkles size={15} aria-hidden="true" />
                     Convidado entra
                   </span>
-                  <strong>Escaneia, envia e entra sem app.</strong>
+                  <strong id="capture-title">Escaneia, envia e entra sem app.</strong>
                 </header>
 
                 <div className={styles.captureSurface}>
@@ -366,72 +390,76 @@ export default function HeroExperience() {
 
                   <div className={styles.captureOverlay}>
                     <div className={styles.qrPanel}>
-                      <div className={styles.qrCode}>
+                      <div className={styles.qrCode} role="img" aria-label="QR Code de exemplo">
                         {qrCells.map((cell) => (
-                          <span key={cell.index} data-filled={cell.filled} />
+                          <span key={cell.index} data-filled={cell.filled} aria-hidden="true" />
                         ))}
                       </div>
                       <p>Escaneie e envie</p>
                     </div>
 
-                    <span className={styles.uploadBadge}>foto recebida em 3s</span>
+                    <span className={styles.uploadBadge} role="status">foto recebida em 3s</span>
                   </div>
                 </div>
               </article>
 
-              <article className={styles.engineCard} data-stage-card>
+              <article className={styles.engineCard} data-stage-card aria-labelledby="engine-title">
                 <header>
                   <span className={styles.cardTag}>
-                    <Bot size={15} />
+                    <Bot size={15} aria-hidden="true" />
                     IA em operacao
                   </span>
-                  <strong>O fluxo decide antes de publicar.</strong>
+                  <strong id="engine-title">O fluxo decide antes de publicar.</strong>
                 </header>
 
                 <div className={styles.enginePanel}>
                   <div className={styles.engineMedia}>
                     <img src={eventImages.faceSelfie.src} alt={eventImages.faceSelfie.alt} />
                     <span ref={scanLineRef} className={styles.scanLine} aria-hidden="true" />
-                    <span className={styles.scanBadge}>moderando agora</span>
+                    <span className={styles.scanBadge} role="status">moderando agora</span>
                   </div>
 
-                  <div className={styles.engineLanes}>
-                    <span className={styles.engineApproved}>
-                      <ShieldCheck size={14} />
+                  <div className={styles.engineLanes} role="list" aria-label="Resultados da moderação">
+                    <span className={styles.engineApproved} role="listitem">
+                      <ShieldCheck size={14} aria-hidden="true" />
                       Aprovado para galeria e telao
                     </span>
-                    <span className={styles.engineReview}>
-                      <Bot size={14} />
+                    <span className={styles.engineReview} role="listitem">
+                      <Bot size={14} aria-hidden="true" />
                       Revisao assistida quando necessario
                     </span>
-                    <span className={styles.engineFace}>
-                      <ScanFace size={14} />
+                    <span className={styles.engineFace} role="listitem">
+                      <ScanFace size={14} aria-hidden="true" />
                       Face indexada para match depois
                     </span>
                   </div>
                 </div>
               </article>
 
-              <article className={styles.outputCard} data-stage-card>
+              <article className={styles.outputCard} data-stage-card aria-labelledby="output-title">
                 <header>
                   <span className={styles.cardTag}>
-                    <ActiveOutputIcon size={15} />
+                    <ActiveOutputIcon size={15} aria-hidden="true" />
                     Resultado vivo
                   </span>
-                  <strong>{activeOutputItem.title}</strong>
+                  <strong id="output-title">{activeOutputItem.title}</strong>
                 </header>
 
-                <div className={styles.outputTabs}>
+                <div className={styles.outputTabs} role="tablist" aria-label="Módulos de saída">
                   {outputItems.map((item) => (
                     <button
                       key={item.id}
                       type="button"
+                      role="tab"
+                      aria-selected={activeOutput === item.id}
+                      aria-controls={`output-panel-${item.id}`}
+                      id={`output-tab-${item.id}`}
                       className={activeOutput === item.id ? styles.activeTab : ""}
                       onClick={() => setActiveOutput(item.id)}
                       onMouseEnter={() => setActiveOutput(item.id)}
                       onFocus={() => setActiveOutput(item.id)}
                     >
-                      <item.icon size={14} />
+                      <item.icon size={14} aria-hidden="true" />
                       {item.label}
                     </button>
                   ))}
@@ -440,6 +468,9 @@ export default function HeroExperience() {
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={activeOutput}
+                    id={`output-panel-${activeOutput}`}
+                    role="tabpanel"
+                    aria-labelledby={`output-tab-${activeOutput}`}
                     className={styles.outputSurface}
                     initial={reduceMotion ? false : { opacity: 0, y: 18 }}
                     animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}

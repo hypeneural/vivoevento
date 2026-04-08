@@ -79,11 +79,26 @@ it('runs the openai content moderation smoke command and stores a report', funct
 });
 
 it('fails cleanly when the openai content moderation api key is not configured', function () {
+    $reportDir = storage_path('app/testing/content-moderation-smoke/reports-' . uniqid());
+    File::ensureDirectoryExists($reportDir);
+
     config()->set('content_moderation.providers.openai.api_key', null);
 
-    $this->artisan('content-moderation:smoke-openai')
+    $this->artisan('content-moderation:smoke-openai', [
+        '--report-dir' => $reportDir,
+    ])
         ->expectsOutputToContain('OPENAI_API_KEY is not configured for content moderation smoke.')
         ->assertFailed();
+
+    $reportFiles = File::files($reportDir);
+
+    expect($reportFiles)->toHaveCount(1);
+
+    $report = json_decode((string) File::get($reportFiles[0]->getPathname()), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($report['provider'])->toBe('openai')
+        ->and($report['request_outcome'])->toBe('failed')
+        ->and($report['error_message'])->toBe('OPENAI_API_KEY is not configured for content moderation smoke.');
 });
 
 /**

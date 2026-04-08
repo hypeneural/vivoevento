@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import { WALL_EVENT_NAMES } from '@eventovivo/shared-types/wall';
 import { createWallPusher, disconnectWallPusher } from '../pusher';
 import type {
+  WallAdItem,
   WallConnectionStatus,
   WallExpiredPayload,
   WallMediaItem,
@@ -27,6 +28,7 @@ interface UseWallRealtimeOptions {
   onStatusChanged: (payload: WallStatusChangedPayload) => void;
   onExpired: (payload: WallExpiredPayload) => void;
   onPlayerCommand: (payload: WallPlayerCommandPayload) => void;
+  onAdsUpdated?: (payload: { ads: WallAdItem[] }) => void;
 }
 
 function mapConnectionState(current: string, hasConnectedOnce: boolean): WallConnectionStatus {
@@ -58,6 +60,7 @@ export function useWallRealtime({
   onStatusChanged,
   onExpired,
   onPlayerCommand,
+  onAdsUpdated,
 }: UseWallRealtimeOptions) {
   const [connectionStatus, setConnectionStatus] = useState<WallConnectionStatus>('idle');
 
@@ -70,6 +73,7 @@ export function useWallRealtime({
     onStatusChanged,
     onExpired,
     onPlayerCommand,
+    onAdsUpdated,
   });
 
   useEffect(() => {
@@ -81,6 +85,7 @@ export function useWallRealtime({
       onStatusChanged,
       onExpired,
       onPlayerCommand,
+      onAdsUpdated,
     };
   });
 
@@ -139,6 +144,10 @@ export function useWallRealtime({
 
     channel.bind(WALL_EVENT_NAMES.playerCommand, (data: WallPlayerCommandPayload) => {
       callbacksRef.current.onPlayerCommand(data);
+    });
+
+    channel.bind(WALL_EVENT_NAMES.adsUpdated, (data: { ads: WallAdItem[] }) => {
+      callbacksRef.current.onAdsUpdated?.(data);
     });
 
     return () => {
