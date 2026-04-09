@@ -8,6 +8,7 @@ use App\Modules\MediaProcessing\Enums\MediaProcessingStatus;
 use App\Modules\MediaProcessing\Enums\PublicationStatus;
 use App\Modules\MediaProcessing\Enums\ModerationStatus;
 use App\Modules\MediaProcessing\Models\EventMedia;
+use App\Modules\MediaProcessing\Services\MediaToolingStatusService;
 use App\Modules\MediaProcessing\Services\ModerationBroadcasterService;
 use App\Modules\MediaProcessing\Services\RemoteInboundMediaDownloaderService;
 use App\Modules\MediaProcessing\Services\VideoMetadataExtractorService;
@@ -60,7 +61,8 @@ class DownloadInboundMediaJob implements ShouldQueue
         $body = $download['body'];
         $mimeType = $download['mime_type'] ?? 'application/octet-stream';
         $mediaType = $this->mediaTypeFor($inboundMessage->message_type, $mimeType);
-        $usesImagePipeline = $this->usesImagePipeline($mediaType);
+        $usesVariantPipeline = $this->usesVariantPipeline($mediaType);
+        $usesVideoVariants = $this->usesVideoVariants($mediaType);
 
         $extension = $this->extensionFor($mimeType, $inboundMessage->message_type);
         $filename = "{$inboundMessage->message_id}.{$extension}";
@@ -112,14 +114,14 @@ class DownloadInboundMediaJob implements ShouldQueue
             'client_filename' => $download['client_filename'] ?? $filename,
             'mime_type' => $mimeType,
             'size_bytes' => strlen($body),
-            'processing_status' => $usesImagePipeline
+            'processing_status' => $usesVariantPipeline
                 ? MediaProcessingStatus::Downloaded->value
                 : MediaProcessingStatus::Processed->value,
             'moderation_status' => ModerationStatus::Pending->value,
             'publication_status' => PublicationStatus::Draft->value,
-            'safety_status' => $usesImagePipeline ? 'queued' : 'skipped',
+            'safety_status' => $mediaType === 'image' ? 'queued' : 'skipped',
             'face_index_status' => $this->shouldQueueFaceIndex($mediaType, $inboundMessage) ? 'queued' : 'skipped',
-            'vlm_status' => $usesImagePipeline ? 'queued' : 'skipped',
+            'vlm_status' => $mediaType === 'image' ? 'queued' : 'skipped',
             'pipeline_version' => 'media_ai_foundation_v1',
             ...$videoMetadata,
         ]);
@@ -137,7 +139,7 @@ class DownloadInboundMediaJob implements ShouldQueue
             $eventMedia->fresh(['event', 'variants', 'inboundMessage']),
         );
 
-        if ($usesImagePipeline) {
+        if ($usesVariantPipeline) {
             GenerateMediaVariantsJob::dispatch($eventMedia->id);
 
             return;
@@ -170,9 +172,18 @@ class DownloadInboundMediaJob implements ShouldQueue
         };
     }
 
-    private function usesImagePipeline(string $mediaType): bool
+    private function usesVariantPipeline(string $mediaType): bool
     {
-        return $mediaType === 'image';
+        return $mediaType === 'image' || $this->usesVideoVariants($mediaType);
+    }
+
+    private function usesVideoVariants(string $mediaType): bool
+    {
+        if ($mediaType !== 'video') {
+            return false;
+        }
+
+        return (bool) (app(MediaToolingStatusService::class)->payload()['ready'] ?? false);
     }
 
     private function hasDownloadSource(InboundMessage $inboundMessage): bool

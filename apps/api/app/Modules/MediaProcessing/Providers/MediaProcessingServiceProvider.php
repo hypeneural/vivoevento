@@ -2,6 +2,7 @@
 
 namespace App\Modules\MediaProcessing\Providers;
 
+use App\Modules\MediaProcessing\Console\BackfillWallVideoVariantsCommand;
 use App\Modules\MediaProcessing\Events\MediaDeleted;
 use App\Modules\MediaProcessing\Listeners\QueueCleanupDeletedMediaArtifactsOnMediaDeleted;
 use Illuminate\Support\Facades\Event;
@@ -10,7 +11,12 @@ use Illuminate\Support\ServiceProvider;
 
 class MediaProcessingServiceProvider extends ServiceProvider
 {
-    public function register(): void {}
+    public function register(): void
+    {
+        $this->commands([
+            BackfillWallVideoVariantsCommand::class,
+        ]);
+    }
 
     public function boot(): void
     {

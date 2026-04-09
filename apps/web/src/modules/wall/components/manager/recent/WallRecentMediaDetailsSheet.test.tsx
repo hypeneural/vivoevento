@@ -23,6 +23,20 @@ const recentItem = {
   isVideo: true,
   durationSeconds: 34,
   videoPolicyLabel: 'Video longo com politica especial',
+  videoAdmission: {
+    state: 'eligible_with_fallback' as const,
+    reasons: ['variant_missing', 'poster_missing'],
+    has_minimum_metadata: true,
+    supported_format: true,
+    preferred_variant_available: false,
+    preferred_variant_key: null,
+    poster_available: false,
+    poster_variant_key: null,
+    asset_source: 'original' as const,
+    duration_limit_seconds: 30,
+  },
+  servedVariantKey: null,
+  previewVariantKey: null,
   isReplay: false,
 };
 
@@ -51,6 +65,10 @@ describe('WallRecentMediaDetailsSheet', () => {
     expect(screen.getByText(/Carla/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Video 34s/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Video longo com politica especial/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Elegivel com fallback/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Variante otimizada de wall ainda indisponivel/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Poster de seguranca ainda indisponivel/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Arquivo original/i)).toBeInTheDocument();
   });
 
   it('usa drawer no mobile', async () => {

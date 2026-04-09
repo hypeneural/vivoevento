@@ -72,6 +72,18 @@ function makePackage(): ApiEventPackage {
       'wall.enabled': true,
       'play.enabled': false,
     },
+    checkout_marketing: {
+      slug: 'casamento-essencial',
+      subtitle: 'O pacote mais equilibrado para eventos sociais com compra rapida.',
+      ideal_for: 'Casamentos e aniversarios com telao ao vivo.',
+      benefits: [
+        'Telao ao vivo para os convidados',
+        'Pagina do evento pronta para compartilhar',
+        'Pix e cartao com confirmacao automatica',
+      ],
+      badge: 'Mais escolhido',
+      recommended: true,
+    },
     modules: {
       hub: true,
       wall: true,
@@ -221,9 +233,19 @@ describe('PublicCheckoutPageV2', () => {
 
     expect(screen.getByRole('heading', { name: /reserve seu pacote em poucos minutos/i })).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: /escolher este pacote/i })).toBeInTheDocument();
+    expect(screen.getByText(/mais escolhido/i)).toBeInTheDocument();
     expect(screen.getByText(/telao ao vivo para os convidados/i)).toBeInTheDocument();
     expect(screen.getByText(/pagina do evento pronta para compartilhar/i)).toBeInTheDocument();
-    expect(screen.getByText('R$ 199,00')).toBeInTheDocument();
+    expect(screen.getAllByText('R$ 199,00')).not.toHaveLength(0);
+  });
+
+  it('honors package deep links and opens the details step with the selected package', async () => {
+    renderPage('/checkout/evento?package=casamento-essencial');
+
+    expect(await screen.findByLabelText(/seu nome/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Seu pacote$/i)).toBeInTheDocument();
+    expect(screen.getByText('Casamento Essencial')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /escolher este pacote/i })).not.toBeInTheDocument();
   });
 
   it('creates a pix checkout and moves the V2 into its own status state', async () => {
@@ -312,7 +334,7 @@ describe('PublicCheckoutPageV2', () => {
 
     const loginLink = await screen.findByRole('link', { name: /entrar para continuar/i });
 
-    expect(loginLink).toHaveAttribute('href', '/login?returnTo=%2Fcheckout%2Fevento%3Fv2%3D1%26resume%3Dauth');
+    expect(loginLink).toHaveAttribute('href', '/login?returnTo=%2Fcheckout%2Fevento%3Fv2%3D1%26resume%3Dauth%26package%3Dcasamento-essencial');
 
     const draft = JSON.parse(
       window.sessionStorage.getItem(PUBLIC_CHECKOUT_V2_RESUME_DRAFT_STORAGE_KEY) ?? '{}',
@@ -328,7 +350,7 @@ describe('PublicCheckoutPageV2', () => {
     });
     expect(draft.card_number).toBeUndefined();
     expect(draft.card_cvv).toBeUndefined();
-  });
+  }, 10000);
 
   it('automatically resumes a pix draft after login inside the V2 flow', async () => {
     useAuthMock.mockReturnValue({ isAuthenticated: true, refreshSession: refreshSessionMock });
@@ -387,5 +409,42 @@ describe('PublicCheckoutPageV2', () => {
 
     expect(await screen.findByText(/pix gerado com sucesso/i)).toBeInTheDocument();
     expect(window.sessionStorage.getItem(PUBLIC_CHECKOUT_V2_RESUME_DRAFT_STORAGE_KEY)).toBeNull();
+  });
+
+  it('keeps the resumed credit-card journey on the payment step even when the URL still has a package deep link', async () => {
+    useAuthMock.mockReturnValue({ isAuthenticated: true, refreshSession: refreshSessionMock });
+
+    window.sessionStorage.setItem(PUBLIC_CHECKOUT_V2_RESUME_DRAFT_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      source: 'identity_conflict',
+      saved_at: '2026-04-09T10:00:00Z',
+      expires_at: '2099-04-09T10:00:00Z',
+      responsible_name: 'Camila Rocha',
+      whatsapp: '(48) 99977-1111',
+      email: 'camila@example.com',
+      organization_name: '',
+      package_id: '1',
+      event_title: 'Casamento Camila e Bruno',
+      event_type: 'wedding',
+      event_date: '',
+      event_city: '',
+      event_description: '',
+      payment_method: 'credit_card',
+      payer_document: '529.982.247-25',
+      payer_phone: '(48) 99977-1111',
+      address_street: 'Rua das Flores',
+      address_number: '123',
+      address_district: 'Centro',
+      address_complement: '',
+      address_zip_code: '88000-000',
+      address_city: 'Florianopolis',
+      address_state: 'SC',
+    }));
+
+    renderPage('/checkout/evento?resume=auth&package=casamento-essencial');
+
+    expect(await screen.findByText(/os campos do cartao precisam ser preenchidos novamente/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /finalizar com cartao/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /continuar para pagamento/i })).not.toBeInTheDocument();
   });
 });

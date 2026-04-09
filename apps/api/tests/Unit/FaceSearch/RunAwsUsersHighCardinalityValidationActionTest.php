@@ -34,8 +34,10 @@ it('runs high-cardinality users validation and aggregates objective match, fallb
 
     $probePathA = $probeDirectory . DIRECTORY_SEPARATOR . 'probe-a.jpg';
     $probePathB = $probeDirectory . DIRECTORY_SEPARATOR . 'probe-b.jpg';
-    copy(UploadedFile::fake()->image('probe-a.jpg', 320, 320)->size(180)->getPathname(), $probePathA);
-    copy(UploadedFile::fake()->image('probe-b.jpg', 320, 320)->size(180)->getPathname(), $probePathB);
+    $probeFileA = UploadedFile::fake()->image('probe-a.jpg', 320, 320)->size(180);
+    $probeFileB = UploadedFile::fake()->image('probe-b.jpg', 320, 320)->size(180);
+    copy($probeFileA->getPathname(), $probePathA);
+    copy($probeFileB->getPathname(), $probePathB);
 
     $healthCheck = m::mock(RunEventFaceSearchHealthCheckAction::class);
     $healthCheck->shouldReceive('execute')
@@ -206,7 +208,7 @@ it('runs high-cardinality users validation and aggregates objective match, fallb
         ->and($result['metrics']['fallback_rate'])->toBe(0.0)
         ->and($result['metrics']['top_1_match_rate'])->toBe(1.0)
         ->and($result['metrics']['top_k_match_rate'])->toBe(1.0)
-        ->and($result['metrics']['p95_response_duration_ms'])->toBe(560)
+        ->and($result['metrics']['p95_response_duration_ms'])->toBe(410)
         ->and($result['criteria_evaluation']['passed'])->toBeTrue()
         ->and($result['queries'][0]['evaluation']['top_1_match'])->toBeTrue()
         ->and($result['queries'][1]['evaluation']['top_k_match'])->toBeTrue();

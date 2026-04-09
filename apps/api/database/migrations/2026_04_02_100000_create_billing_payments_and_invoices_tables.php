@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('billing_order_id')->constrained('billing_orders')->cascadeOnDelete();
+            $table->foreignId('billing_order_id')->nullable()->constrained('billing_orders')->nullOnDelete();
             $table->string('status', 30)->default('pending');
             $table->integer('amount_cents');
             $table->string('currency', 10)->default('BRL');

@@ -5,6 +5,7 @@ namespace App\Modules\Wall\Services;
 use App\Modules\Events\Models\Event;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Services\MediaAssetUrlService;
+use App\Modules\Wall\Models\EventWallSetting;
 use App\Modules\Wall\Queries\BuildWallInsightsQuery;
 use App\Modules\Wall\Support\WallSourceNormalizer;
 use App\Modules\Wall\Support\WallVideoPolicyLabelResolver;
@@ -18,14 +19,19 @@ class WallInsightsService
     public function __construct(
         private readonly BuildWallInsightsQuery $query,
         private readonly MediaAssetUrlService $mediaAssets,
+        private readonly WallVideoAdmissionService $videoAdmission,
     ) {}
 
     public function buildInsightsPayload(Event $event, int $recentLimit = 10): array
     {
+        $settings = $event->relationLoaded('wallSettings')
+            ? $event->getRelation('wallSettings')
+            : $event->wallSettings()->first();
+
         return [
             'topContributor' => $this->topContributor($this->query->contributorMedia($event)),
             'totals' => $this->query->totals($event),
-            'recentItems' => $this->recentItems($this->query->recentItems($event, $recentLimit)),
+            'recentItems' => $this->recentItems($this->query->recentItems($event, $recentLimit), $settings),
             'sourceMix' => $this->sourceMix($this->query->sourceMix($event)),
             'lastCaptureAt' => $this->query->lastCaptureAt($event),
         ];
@@ -79,29 +85,42 @@ class WallInsightsService
             ->first();
     }
 
-    private function recentItems(Collection $mediaItems): array
+    private function recentItems(Collection $mediaItems, ?EventWallSetting $settings): array
     {
         return $mediaItems
-            ->map(fn (EventMedia $mediaItem) => [
-                'id' => (string) $mediaItem->id,
-                'previewUrl' => $mediaItem->media_type === 'video'
-                    ? $this->mediaAssets->poster($mediaItem)
-                    : $this->mediaAssets->thumbnail($mediaItem),
-                'senderName' => $this->displayName($mediaItem),
-                'senderKey' => $this->senderKey($mediaItem),
-                'source' => WallSourceNormalizer::normalize($mediaItem->source_type),
-                'createdAt' => $mediaItem->created_at?->toIso8601String(),
-                'approvedAt' => $this->enumValue($mediaItem->moderation_status) === 'approved'
-                    ? $mediaItem->updated_at?->toIso8601String()
-                    : null,
-                'displayedAt' => null,
-                'status' => $this->recentStatus($mediaItem),
-                'isFeatured' => (bool) $mediaItem->is_featured,
-                'isVideo' => $mediaItem->media_type === 'video',
-                'durationSeconds' => $mediaItem->duration_seconds,
-                'videoPolicyLabel' => WallVideoPolicyLabelResolver::fromMedia($mediaItem),
-                'isReplay' => false,
-            ])
+            ->map(function (EventMedia $mediaItem) use ($settings): array {
+                $isVideo = $mediaItem->media_type === 'video';
+                $preferredVariant = $settings?->resolvedVideoPreferredVariant();
+                $videoAdmission = $isVideo ? $this->videoAdmission->inspect($mediaItem, $settings) : null;
+
+                return [
+                    'id' => (string) $mediaItem->id,
+                    'previewUrl' => $isVideo
+                        ? $this->mediaAssets->poster($mediaItem)
+                        : $this->mediaAssets->thumbnail($mediaItem),
+                    'senderName' => $this->displayName($mediaItem),
+                    'senderKey' => $this->senderKey($mediaItem),
+                    'source' => WallSourceNormalizer::normalize($mediaItem->source_type),
+                    'createdAt' => $mediaItem->created_at?->toIso8601String(),
+                    'approvedAt' => $this->enumValue($mediaItem->moderation_status) === 'approved'
+                        ? $mediaItem->updated_at?->toIso8601String()
+                        : null,
+                    'displayedAt' => null,
+                    'status' => $this->recentStatus($mediaItem),
+                    'isFeatured' => (bool) $mediaItem->is_featured,
+                    'isVideo' => $isVideo,
+                    'durationSeconds' => $mediaItem->duration_seconds,
+                    'videoPolicyLabel' => WallVideoPolicyLabelResolver::fromMedia($mediaItem, $videoAdmission),
+                    'videoAdmission' => $videoAdmission,
+                    'servedVariantKey' => $isVideo
+                        ? $this->mediaAssets->wallVariantKey($mediaItem, $preferredVariant)
+                        : null,
+                    'previewVariantKey' => $isVideo
+                        ? $this->mediaAssets->posterVariantKey($mediaItem)
+                        : null,
+                    'isReplay' => false,
+                ];
+            })
             ->values()
             ->all();
     }

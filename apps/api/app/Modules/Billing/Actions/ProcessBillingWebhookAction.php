@@ -18,6 +18,7 @@ class ProcessBillingWebhookAction
         private readonly FailBillingOrderAction $failBillingOrder,
         private readonly RefundBillingOrderAction $refundBillingOrder,
         private readonly CancelBillingOrderAction $cancelBillingOrder,
+        private readonly ProjectRecurringBillingStateAction $projectRecurringBillingState,
     ) {}
 
     public function execute(string $provider, array $payload, array $headers = []): array
@@ -60,6 +61,10 @@ class ProcessBillingWebhookAction
 
         try {
             $result = DB::transaction(function () use ($normalized, $order) {
+                if ($this->isRecurringEventType($normalized['event_type'] ?? null)) {
+                    return $this->projectRecurringBillingState->execute($normalized, $order);
+                }
+
                 return match ($normalized['event_type']) {
                     'payment.paid' => $this->handlePaid($order, $normalized),
                     'payment.failed' => $this->handleFailed($order, $normalized),
@@ -76,6 +81,10 @@ class ProcessBillingWebhookAction
                 'status' => ($result['action'] ?? null) === 'ignored' ? 'ignored' : 'processed',
                 'billing_order_id' => $order?->id,
                 'gateway_order_id' => $normalized['gateway_order_id'] ?? $gatewayEvent->gateway_order_id,
+                'gateway_subscription_id' => $normalized['gateway_subscription_id'] ?? $gatewayEvent->gateway_subscription_id,
+                'gateway_invoice_id' => $normalized['gateway_invoice_id'] ?? $gatewayEvent->gateway_invoice_id,
+                'gateway_cycle_id' => $normalized['gateway_cycle_id'] ?? $gatewayEvent->gateway_cycle_id,
+                'gateway_customer_id' => $normalized['gateway_customer_id'] ?? $gatewayEvent->gateway_customer_id,
                 'gateway_charge_id' => $normalized['gateway_charge_id'] ?? $gatewayEvent->gateway_charge_id,
                 'gateway_transaction_id' => $normalized['gateway_transaction_id'] ?? $gatewayEvent->gateway_transaction_id,
                 'occurred_at' => $normalized['occurred_at'] ?? $gatewayEvent->occurred_at,
@@ -93,6 +102,10 @@ class ProcessBillingWebhookAction
                 'status' => 'failed',
                 'billing_order_id' => $order?->id,
                 'gateway_order_id' => $normalized['gateway_order_id'] ?? $gatewayEvent->gateway_order_id,
+                'gateway_subscription_id' => $normalized['gateway_subscription_id'] ?? $gatewayEvent->gateway_subscription_id,
+                'gateway_invoice_id' => $normalized['gateway_invoice_id'] ?? $gatewayEvent->gateway_invoice_id,
+                'gateway_cycle_id' => $normalized['gateway_cycle_id'] ?? $gatewayEvent->gateway_cycle_id,
+                'gateway_customer_id' => $normalized['gateway_customer_id'] ?? $gatewayEvent->gateway_customer_id,
                 'gateway_charge_id' => $normalized['gateway_charge_id'] ?? $gatewayEvent->gateway_charge_id,
                 'gateway_transaction_id' => $normalized['gateway_transaction_id'] ?? $gatewayEvent->gateway_transaction_id,
                 'result_json' => [
@@ -295,13 +308,23 @@ class ProcessBillingWebhookAction
             'id' => $gatewayEvent->id,
             'provider_key' => $gatewayEvent->provider_key,
             'event_key' => $gatewayEvent->event_key,
+            'hook_id' => $gatewayEvent->hook_id,
             'event_type' => $gatewayEvent->event_type,
             'status' => $gatewayEvent->status,
             'billing_order_id' => $gatewayEvent->billing_order_id,
             'gateway_order_id' => $gatewayEvent->gateway_order_id,
+            'gateway_subscription_id' => $gatewayEvent->gateway_subscription_id,
+            'gateway_invoice_id' => $gatewayEvent->gateway_invoice_id,
+            'gateway_cycle_id' => $gatewayEvent->gateway_cycle_id,
+            'gateway_customer_id' => $gatewayEvent->gateway_customer_id,
             'gateway_charge_id' => $gatewayEvent->gateway_charge_id,
             'gateway_transaction_id' => $gatewayEvent->gateway_transaction_id,
             'processed_at' => $gatewayEvent->processed_at?->toISOString(),
         ];
+    }
+
+    private function isRecurringEventType(?string $eventType): bool
+    {
+        return Str::startsWith((string) $eventType, ['subscription.', 'invoice.', 'charge.']);
     }
 }

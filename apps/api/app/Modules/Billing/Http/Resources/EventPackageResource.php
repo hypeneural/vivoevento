@@ -2,6 +2,7 @@
 
 namespace App\Modules\Billing\Http\Resources;
 
+use App\Modules\Billing\Services\EventPackageCheckoutMarketingService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -13,6 +14,7 @@ class EventPackageResource extends JsonResource
             ->mapWithKeys(fn ($feature) => [$feature->feature_key => $feature->feature_value])
             ->all();
         $featureMap = $this->nestFeatureMap($flatFeatureMap);
+        $checkoutMarketing = app(EventPackageCheckoutMarketingService::class)->build($this->resource, $flatFeatureMap);
 
         $defaultPrice = $this->prices->firstWhere('is_default', true) ?? $this->prices->first();
 
@@ -46,6 +48,7 @@ class EventPackageResource extends JsonResource
                 'feature_value' => $feature->feature_value,
             ])->values()->all(),
             'feature_map' => $featureMap,
+            'checkout_marketing' => $checkoutMarketing,
             'modules' => [
                 'hub' => $this->toBoolean($flatFeatureMap['hub.enabled'] ?? $flatFeatureMap['hub'] ?? true),
                 'wall' => $this->toBoolean($flatFeatureMap['wall.enabled'] ?? false),

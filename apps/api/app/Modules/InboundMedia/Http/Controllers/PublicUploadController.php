@@ -6,6 +6,7 @@ use App\Modules\Analytics\Services\AnalyticsTracker;
 use App\Modules\Events\Models\Event;
 use App\Modules\MediaProcessing\Jobs\GenerateMediaVariantsJob;
 use App\Modules\MediaProcessing\Models\EventMedia;
+use App\Modules\MediaProcessing\Services\MediaToolingStatusService;
 use App\Modules\MediaProcessing\Services\ModerationBroadcasterService;
 use App\Modules\MediaProcessing\Services\VideoMetadataExtractorService;
 use App\Modules\Wall\Models\EventWallSetting;
@@ -365,11 +366,11 @@ class PublicUploadController extends BaseController
     {
         $settings = $this->resolveWallSettings($event);
 
-        if ($settings) {
-            return $settings->resolvedVideoEnabled();
+        if (! $settings?->resolvedVideoEnabled()) {
+            return false;
         }
 
-        return (bool) config('media_processing.public_upload.video_enabled', true);
+        return $this->videoPipelineReady();
     }
 
     private function publicUploadVideoMaxDurationSeconds(Event $event): int
@@ -381,6 +382,11 @@ class PublicUploadController extends BaseController
         }
 
         return max(1, (int) config('media_processing.public_upload.video_max_duration_seconds', 30));
+    }
+
+    private function videoPipelineReady(): bool
+    {
+        return (bool) (app(MediaToolingStatusService::class)->payload()['ready'] ?? false);
     }
 
     private function publicAssetUrl(?string $path): ?string

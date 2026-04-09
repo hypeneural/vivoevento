@@ -16,7 +16,11 @@ import type {
 import { HelpTooltip } from '../../WallManagerHelp';
 import { WallManagerSection } from '../../WallManagerSection';
 import { WALL_INSIGHTS_COPY, formatWallRecentStatusLabel } from '../../../wall-copy';
-import { getWallMediaSemanticMeta, getWallSourceMeta } from '../../../wall-source-meta';
+import {
+  getWallMediaSemanticMeta,
+  getWallSourceMeta,
+  getWallVideoAdmissionMeta,
+} from '../../../wall-source-meta';
 import { formatWallRelativeTime } from '../../../wall-view-models';
 import { WallAdvanceClock } from './WallAdvanceClock';
 import { WallDraftPreviewCard } from './WallDraftPreviewCard';
@@ -92,6 +96,9 @@ export function WallHeroStage({
         videoPolicyLabel: liveSnapshot.currentItem.videoPolicyLabel,
       })
     : null;
+  const currentSnapshotAdmissionMeta = liveSnapshot?.currentItem?.videoAdmission
+    ? getWallVideoAdmissionMeta(liveSnapshot.currentItem.videoAdmission)
+    : null;
   const nextSnapshotSourceMeta = liveSnapshot?.nextItem
     ? getWallSourceMeta(liveSnapshot.nextItem.source)
     : null;
@@ -101,6 +108,9 @@ export function WallHeroStage({
         durationSeconds: liveSnapshot.nextItem.durationSeconds,
         videoPolicyLabel: liveSnapshot.nextItem.videoPolicyLabel,
       })
+    : null;
+  const nextSnapshotAdmissionMeta = liveSnapshot?.nextItem?.videoAdmission
+    ? getWallVideoAdmissionMeta(liveSnapshot.nextItem.videoAdmission)
     : null;
   const activeLiveSenderName = activeLiveItem?.senderName || 'Convidado';
   const activeLiveCaption = activeLiveItem && 'caption' in activeLiveItem ? activeLiveItem.caption ?? null : null;
@@ -317,6 +327,7 @@ export function WallHeroStage({
                       currentSnapshotSourceMeta?.label,
                       currentSnapshotMediaMeta?.isVideo ? currentSnapshotMediaMeta.detailLabel : null,
                       currentSnapshotMediaMeta?.isVideo ? currentSnapshotMediaMeta.operationalLabel : null,
+                      currentSnapshotAdmissionMeta?.stateLabel,
                       liveSnapshot.currentItem.caption,
                       formatWallRelativeTime(liveSnapshot.currentItem.createdAt, 'Agora'),
                     ].filter(Boolean).join(' - ')}
@@ -338,6 +349,7 @@ export function WallHeroStage({
                       nextSnapshotSourceMeta?.label,
                       nextSnapshotMediaMeta?.isVideo ? nextSnapshotMediaMeta.detailLabel : null,
                       nextSnapshotMediaMeta?.isVideo ? nextSnapshotMediaMeta.operationalLabel : null,
+                      nextSnapshotAdmissionMeta?.stateLabel,
                       liveSnapshot.nextItem.caption,
                       liveSnapshot.nextItem.layoutHint ? `Layout ${formatLayoutHintLabel(liveSnapshot.nextItem.layoutHint)}` : null,
                     ].filter(Boolean).join(' - ')}

@@ -53,6 +53,8 @@ it('returns only active public event packages and sorts them by sort order', fun
     $this->assertApiSuccess($response);
     expect($response->json('data'))->toHaveCount(2);
     expect(array_column($response->json('data'), 'code'))->toBe(['essential-event', 'premium-event']);
+    expect($response->json('data.0.checkout_marketing.slug'))->toBe('essential-event');
+    expect($response->json('data.0.checkout_marketing.benefits'))->not->toBeEmpty();
 });
 
 it('filters public event packages by target audience including shared packages', function () {
@@ -145,6 +147,21 @@ it('returns the event package detail with prices and feature map', function () {
         'feature_key' => 'media.max_photos',
         'feature_value' => '800',
     ]);
+    EventPackageFeature::factory()->create([
+        'event_package_id' => $package->id,
+        'feature_key' => 'checkout.badge',
+        'feature_value' => 'Mais escolhido',
+    ]);
+    EventPackageFeature::factory()->create([
+        'event_package_id' => $package->id,
+        'feature_key' => 'checkout.recommended',
+        'feature_value' => 'true',
+    ]);
+    EventPackageFeature::factory()->create([
+        'event_package_id' => $package->id,
+        'feature_key' => 'checkout.benefit_1',
+        'feature_value' => 'Telao ao vivo para os convidados',
+    ]);
 
     $response = $this->apiGet("/event-packages/{$package->id}");
 
@@ -154,4 +171,7 @@ it('returns the event package detail with prices and feature map', function () {
     expect($response->json('data.feature_map.play.enabled'))->toBe('true');
     expect($response->json('data.modules.play'))->toBeTrue();
     expect($response->json('data.limits.max_photos'))->toBe(800);
+    expect($response->json('data.checkout_marketing.badge'))->toBe('Mais escolhido');
+    expect($response->json('data.checkout_marketing.recommended'))->toBeTrue();
+    expect($response->json('data.checkout_marketing.benefits'))->toBe(['Telao ao vivo para os convidados']);
 });

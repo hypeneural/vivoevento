@@ -290,6 +290,9 @@ export interface WallSimulationPreviewItem {
   is_video?: boolean;
   duration_seconds?: number | null;
   video_policy_label?: string | null;
+  video_admission?: WallVideoAdmission | null;
+  served_variant_key?: string | null;
+  preview_variant_key?: string | null;
   is_replay: boolean;
   created_at?: string | null;
 }

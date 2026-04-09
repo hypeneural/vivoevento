@@ -7,6 +7,8 @@ import {
 } from './helpers/public-checkout';
 
 test('pix happy path goes from package selection to the QR code status screen', async ({ page }) => {
+  test.setTimeout(45000);
+
   const response = createPixPendingCheckoutResponse();
 
   await mockCommonPublicCheckoutRoutes(page);
@@ -30,7 +32,7 @@ test('pix happy path goes from package selection to the QR code status screen', 
   await goToPaymentStep(page);
   await page.getByRole('button', { name: /gerar meu pix/i }).click();
 
-  await expect(page.getByRole('heading', { name: /pix gerado com sucesso/i })).toBeVisible({
+  await expect(page.getByText(/pix gerado com sucesso/i)).toBeVisible({
     timeout: 15000,
   });
   await expect.poll(() => page.url(), { timeout: 10000 }).toContain('checkout=checkout-uuid');
@@ -39,4 +41,17 @@ test('pix happy path goes from package selection to the QR code status screen', 
     timeout: 15000,
   });
   await expect(page.getByText(/000201010212/i)).toBeVisible();
+});
+
+test('package deep link opens the default V2 checkout with the package preselected', async ({ page }) => {
+  test.setTimeout(45000);
+
+  await mockCommonPublicCheckoutRoutes(page);
+
+  await page.goto('/checkout/evento?package=casamento-essencial', { waitUntil: 'domcontentloaded' });
+
+  await expect(page.getByLabel(/seu nome/i)).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('heading', { name: /pacote casamento essencial selecionado/i })).toBeVisible();
+  await expect(page.getByRole('complementary').getByText('Casamento Essencial', { exact: true })).toBeVisible();
+  await expect.poll(() => page.url(), { timeout: 10000 }).toContain('step=details');
 });

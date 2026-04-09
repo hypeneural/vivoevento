@@ -4,7 +4,11 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { ApiWallSimulationPreviewItem, ApiWallSimulationResponse } from '@/lib/api-types';
 
-import { getWallMediaSemanticMeta, getWallSourceMeta } from '../../../wall-source-meta';
+import {
+  getWallMediaSemanticMeta,
+  getWallSourceMeta,
+  getWallVideoAdmissionMeta,
+} from '../../../wall-source-meta';
 
 interface WallUpcomingTimelineProps {
   selectionSummary: string;
@@ -133,6 +137,7 @@ export function WallUpcomingTimeline({
                     durationSeconds: slide.duration_seconds,
                     videoPolicyLabel: slide.video_policy_label,
                   });
+                  const admissionMeta = slide.video_admission ? getWallVideoAdmissionMeta(slide.video_admission) : null;
 
                   return (
                     <div key={`${slide.position}-${slide.item_id}`} className="relative min-w-[240px] max-w-[240px] flex-none sm:min-w-[272px] sm:max-w-[272px]">
@@ -148,6 +153,11 @@ export function WallUpcomingTimeline({
                           {mediaMeta.isVideo ? (
                             <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium ${mediaMeta.chipClassName}`}>
                               {mediaMeta.badgeLabel}
+                            </span>
+                          ) : null}
+                          {admissionMeta ? (
+                            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium ${admissionMeta.chipClassName}`}>
+                              {admissionMeta.stateLabel}
                             </span>
                           ) : null}
                         </div>
@@ -184,6 +194,11 @@ export function WallUpcomingTimeline({
                                 {mediaMeta.operationalLabel}
                               </p>
                             ) : null}
+                            {admissionMeta ? (
+                              <p className="text-xs leading-relaxed text-muted-foreground">
+                                {admissionMeta.summaryLabel}
+                              </p>
+                            ) : null}
                           </div>
 
                           <div className="flex flex-wrap gap-2">
@@ -200,6 +215,11 @@ export function WallUpcomingTimeline({
                             {slide.is_featured ? (
                               <span className="inline-flex rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
                                 Destaque
+                              </span>
+                            ) : null}
+                            {slide.served_variant_key ? (
+                              <span className="inline-flex rounded-full border border-border/60 bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                                Playback {slide.served_variant_key}
                               </span>
                             ) : null}
                           </div>

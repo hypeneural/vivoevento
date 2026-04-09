@@ -5,7 +5,11 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { useIsMobile } from '@/hooks/use-mobile';
 
 import { formatWallRecentStatusLabel } from '@/modules/wall/wall-copy';
-import { getWallMediaSemanticMeta, getWallSourceMeta } from '@/modules/wall/wall-source-meta';
+import {
+  getWallMediaSemanticMeta,
+  getWallSourceMeta,
+  getWallVideoAdmissionMeta,
+} from '@/modules/wall/wall-source-meta';
 import { formatWallRelativeTime } from '@/modules/wall/wall-view-models';
 
 interface WallRecentMediaDetailsSheetProps {
@@ -49,6 +53,7 @@ function RecentMediaDetailsBody({ item }: { item: ApiWallInsightsRecentItem | nu
         videoPolicyLabel: item.videoPolicyLabel,
       })
     : null;
+  const videoAdmissionMeta = item?.videoAdmission ? getWallVideoAdmissionMeta(item.videoAdmission) : null;
 
   return (
     <div className="mt-4 space-y-4">
@@ -80,6 +85,11 @@ function RecentMediaDetailsBody({ item }: { item: ApiWallInsightsRecentItem | nu
             {mediaMeta.detailLabel}
           </span>
         ) : null}
+        {videoAdmissionMeta ? (
+          <span className={`inline-flex rounded-full border px-2.5 py-1 font-medium ${videoAdmissionMeta.chipClassName}`}>
+            {videoAdmissionMeta.stateLabel}
+          </span>
+        ) : null}
         {item?.isFeatured ? (
           <span className="inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 font-medium text-amber-700">
             Destaque
@@ -91,6 +101,25 @@ function RecentMediaDetailsBody({ item }: { item: ApiWallInsightsRecentItem | nu
           </span>
         ) : null}
       </div>
+
+      {videoAdmissionMeta ? (
+        <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Video Decision Inspector</p>
+          <p className="mt-2 text-sm font-medium text-foreground">{videoAdmissionMeta.summaryLabel}</p>
+          {videoAdmissionMeta.reasonLabels.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              {videoAdmissionMeta.reasonLabels.map((reason) => (
+                <span
+                  key={reason}
+                  className="inline-flex rounded-full border border-border/60 bg-background px-2.5 py-1 text-foreground/80"
+                >
+                  {reason}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <DetailRow label="Remetente" value={item?.senderName || 'Convidado'} />
@@ -123,6 +152,18 @@ function RecentMediaDetailsBody({ item }: { item: ApiWallInsightsRecentItem | nu
             label="Playback no telao"
             value={mediaMeta.operationalLabel}
           />
+        ) : null}
+        {videoAdmissionMeta ? (
+          <DetailRow label="Decisao do backend" value={videoAdmissionMeta.stateLabel} />
+        ) : null}
+        {videoAdmissionMeta ? (
+          <DetailRow label="Fonte do playback" value={videoAdmissionMeta.assetSourceLabel} />
+        ) : null}
+        {videoAdmissionMeta ? (
+          <DetailRow label="Variante escolhida" value={videoAdmissionMeta.preferredVariantLabel} />
+        ) : null}
+        {videoAdmissionMeta ? (
+          <DetailRow label="Poster" value={videoAdmissionMeta.previewVariantLabel} />
         ) : null}
       </div>
     </div>

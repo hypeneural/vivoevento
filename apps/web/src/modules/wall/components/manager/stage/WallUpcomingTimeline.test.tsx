@@ -51,6 +51,20 @@ describe('WallUpcomingTimeline', () => {
             is_video: true,
             duration_seconds: 18,
             video_policy_label: 'Video com duracao diferenciada',
+            video_admission: {
+              state: 'eligible_with_fallback',
+              reasons: ['variant_missing'],
+              has_minimum_metadata: true,
+              supported_format: true,
+              preferred_variant_available: false,
+              preferred_variant_key: null,
+              poster_available: true,
+              poster_variant_key: 'wall_video_poster',
+              asset_source: 'original',
+              duration_limit_seconds: 30,
+            },
+            served_variant_key: 'original',
+            preview_variant_key: 'wall_video_poster',
             duplicate_cluster_key: null,
             is_featured: false,
             is_replay: true,
@@ -72,6 +86,8 @@ describe('WallUpcomingTimeline', () => {
     expect(screen.getByText(/^WhatsApp$/i)).toBeInTheDocument();
     expect(screen.getByText(/Video 18s/i)).toBeInTheDocument();
     expect(screen.getByText(/Video com duracao diferenciada/i)).toBeInTheDocument();
+    expect(screen.getByText(/Elegivel com fallback/i)).toBeInTheDocument();
+    expect(screen.getByText(/Playback original/i)).toBeInTheDocument();
     expect(screen.getByText(/Entrada principal/i)).toBeInTheDocument();
     expect(screen.getByText(/Layout Cinematografico/i)).toBeInTheDocument();
     expect(screen.getByText(/Reprise/i)).toBeInTheDocument();

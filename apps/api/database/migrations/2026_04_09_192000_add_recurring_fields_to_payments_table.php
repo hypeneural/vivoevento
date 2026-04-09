@@ -19,7 +19,6 @@ return new class extends Migration
 
             $table->index(['subscription_id', 'status'], 'payments_subscription_status_idx');
             $table->index(['invoice_id', 'status'], 'payments_invoice_status_idx');
-            $table->index(['gateway_provider', 'gateway_charge_id'], 'payments_gateway_charge_idx');
         });
     }
 
@@ -28,7 +27,6 @@ return new class extends Migration
         Schema::table('payments', function (Blueprint $table) {
             $table->dropIndex('payments_subscription_status_idx');
             $table->dropIndex('payments_invoice_status_idx');
-            $table->dropIndex('payments_gateway_charge_idx');
             $table->dropConstrainedForeignId('subscription_id');
             $table->dropConstrainedForeignId('invoice_id');
             $table->dropColumn([

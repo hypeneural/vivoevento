@@ -409,6 +409,9 @@ it('simulates the next wall slides using the real event queue and draft settings
         ->assertJsonPath('data.sequence_preview.1.is_video', true)
         ->assertJsonPath('data.sequence_preview.1.duration_seconds', 18)
         ->assertJsonPath('data.sequence_preview.1.video_policy_label', 'Video com duracao diferenciada')
+        ->assertJsonPath('data.sequence_preview.1.video_admission.state', 'eligible')
+        ->assertJsonPath('data.sequence_preview.1.served_variant_key', 'wall_video_720p')
+        ->assertJsonPath('data.sequence_preview.1.preview_variant_key', 'wall_video_poster')
         ->assertJsonPath('data.sequence_preview.2.sender_name', 'Ana');
 });
 

@@ -30,7 +30,7 @@ import {
   resolveCheckoutSelectedPackage,
 } from './mappers/checkoutResponseAdapters';
 import { buildCheckoutStatusViewModel } from './mappers/checkoutStatusViewModel';
-import { mapPackageToCommercialCard } from './mappers/packageCommercialCopy';
+import { findCommercialPackageBySelectionKey, mapPackageToCommercialCard } from './mappers/packageCommercialCopy';
 import { checkoutV2Schema, initialCheckoutV2Values, type CheckoutV2FormValues } from './support/checkoutFormSchema';
 import {
   buildCheckoutPayload,
@@ -74,6 +74,7 @@ export function PublicCheckoutPageV2() {
   const [resumeAutoSubmitted, setResumeAutoSubmitted] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const checkoutUuid = searchParams.get('checkout');
+  const packageQuery = searchParams.get('package');
   const resumeMode = searchParams.get('resume');
 
   const form = useForm<CheckoutV2FormValues>({
@@ -103,6 +104,10 @@ export function PublicCheckoutPageV2() {
     [packagesQuery.data],
   );
   const formSelectedPackage = commercialPackages.find((pkg) => String(pkg.id) === packageId) ?? null;
+  const loginResumePath = useMemo(
+    () => buildV2LoginResumePath(formSelectedPackage?.deepLinkKey ?? packageQuery),
+    [formSelectedPackage?.deepLinkKey, packageQuery],
+  );
 
   const identityPrecheck = useCheckoutIdentityPrecheck({
     whatsapp: whatsapp ?? '',
@@ -146,8 +151,41 @@ export function PublicCheckoutPageV2() {
 
   function handleSelectPackage(pkg: (typeof commercialPackages)[number]) {
     form.setValue('package_id', String(pkg.id), { shouldDirty: true, shouldValidate: true });
-    wizard.goToStep('details');
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('package', pkg.deepLinkKey);
+    nextParams.set('v2', '1');
+    nextParams.set('step', 'details');
+
+    startTransition(() => setSearchParams(nextParams, { replace: true }));
   }
+
+  useEffect(() => {
+    if (commercialPackages.length === 0) {
+      return;
+    }
+
+    const deepLinkedPackage = findCommercialPackageBySelectionKey(commercialPackages, packageQuery);
+    if (!deepLinkedPackage) {
+      return;
+    }
+
+    if (String(deepLinkedPackage.id) !== packageId) {
+      form.setValue('package_id', String(deepLinkedPackage.id), {
+        shouldDirty: false,
+        shouldTouch: false,
+        shouldValidate: false,
+      });
+    }
+
+    if (
+      deepLinkedPackage
+      && !searchParams.get('step')
+      && !checkoutUuid
+      && resumeMode !== PUBLIC_CHECKOUT_V2_AUTH_RESUME_VALUE
+    ) {
+      wizard.goToStep('details');
+    }
+  }, [checkoutUuid, commercialPackages, form, packageId, packageQuery, resumeMode, searchParams, wizard]);
 
   async function handleContinueToPayment() {
     const values = form.getValues();
@@ -268,7 +306,7 @@ export function PublicCheckoutPageV2() {
           writeDraft(values);
           setIdentityConflict({
             message: conflictMessage,
-            loginPath: buildV2LoginResumePath(),
+            loginPath: buildV2LoginResumePath(formSelectedPackage?.deepLinkKey ?? packageQuery),
           });
           setSubmitError(null);
           return;
@@ -396,7 +434,7 @@ export function PublicCheckoutPageV2() {
         identityState={identityPrecheck.identityAssist}
         isCheckingIdentity={identityPrecheck.isChecking}
         onContinue={() => void handleContinueToPayment()}
-        loginHref={buildV2LoginResumePath()}
+        loginHref={loginResumePath}
       />
     ),
     payment: wizard.currentStep === 'status'

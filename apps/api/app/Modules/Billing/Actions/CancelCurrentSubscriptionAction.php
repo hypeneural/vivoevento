@@ -3,6 +3,7 @@
 namespace App\Modules\Billing\Actions;
 
 use App\Modules\Billing\Models\Subscription;
+use App\Modules\Billing\Services\BillingSubscriptionGatewayInterface;
 use App\Modules\Organizations\Models\Organization;
 use App\Modules\Users\Models\User;
 use Illuminate\Support\Carbon;
@@ -11,6 +12,10 @@ use Illuminate\Validation\ValidationException;
 
 class CancelCurrentSubscriptionAction
 {
+    public function __construct(
+        private readonly BillingSubscriptionGatewayInterface $subscriptionGateway,
+    ) {}
+
     public function execute(
         Organization $organization,
         ?User $actor = null,
@@ -43,6 +48,18 @@ class CancelCurrentSubscriptionAction
             }
 
             $canceledAt = now();
+            $gatewayCancellation = null;
+
+            if (
+                $effective === 'immediately'
+                && $subscription->gateway_provider === $this->subscriptionGateway->providerKey()
+                && filled($subscription->gateway_subscription_id)
+            ) {
+                $gatewayCancellation = $this->subscriptionGateway->cancelSubscription($subscription, [
+                    'cancel_pending_invoices' => true,
+                ]);
+            }
+
             $endsAt = $effective === 'immediately'
                 ? $canceledAt->copy()
                 : $this->resolvePeriodEnd($subscription, $canceledAt);
@@ -52,6 +69,11 @@ class CancelCurrentSubscriptionAction
                 'canceled_at' => $subscription->canceled_at ?? $canceledAt,
                 'ends_at' => $endsAt,
                 'renews_at' => $effective === 'immediately' ? null : $subscription->renews_at,
+                'gateway_status_reason' => $effective === 'immediately'
+                    ? (string) ($gatewayCancellation['gateway_status'] ?? 'canceled')
+                    : $subscription->gateway_status_reason,
+                'contract_status' => 'canceled',
+                'access_status' => $effective === 'immediately' ? 'disabled' : ($subscription->access_status ?? 'enabled'),
             ])->save();
 
             activity()
@@ -64,6 +86,9 @@ class CancelCurrentSubscriptionAction
                     'previous_status' => $subscription->getOriginal('status'),
                     'effective_status' => 'canceled',
                     'ends_at' => $subscription->ends_at?->toISOString(),
+                    'gateway_subscription_id' => $subscription->gateway_subscription_id,
+                    'gateway_provider' => $subscription->gateway_provider,
+                    'gateway_cancellation' => $gatewayCancellation['gateway_response'] ?? null,
                 ])
                 ->log('Assinatura da conta cancelada');
 

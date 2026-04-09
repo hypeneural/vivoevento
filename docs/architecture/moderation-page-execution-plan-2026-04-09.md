@@ -28,11 +28,20 @@ Itens concluidos nesta rodada:
 - [x] adicionar dedupe por `updated_at` no merge do feed, da fila `incomingItems` e do patch otimista;
 - [x] ampliar a cobertura com `ModerationMediaSurface.test.tsx`, `feed-utils.test.ts`, `MediaAssetUrlServiceTest.php`, `ModerationMediaTest.php` e `EventMediaListTest.php`.
 
+## Status da terceira entrega
+
+Itens concluidos nesta rodada:
+
+- [x] criar `moderation_thumb` e `moderation_preview` no pipeline de variants da midia;
+- [x] expor `moderation_thumbnail_url`, `moderation_thumbnail_source`, `moderation_preview_url` e `moderation_preview_source` no payload operacional;
+- [x] impedir fallback para original no feed da moderacao, mantendo fallback visual controlado no frontend;
+- [x] ligar `ModerationMediaSurface` ao perfil dedicado da moderacao e ao preview ampliado;
+- [x] migrar o shell para data router com `createBrowserRouter`, `RouterProvider` e `ScrollRestoration`;
+- [x] adicionar chave estavel de scroll restoration para `/moderation`;
+- [x] corrigir o bloqueio de indice duplicado na migration `2026_04_09_192000_add_recurring_fields_to_payments_table.php` para destravar a suite.
+
 Itens ainda pendentes deste plano:
 
-- [ ] implementar scroll restoration no router;
-- [ ] criar `moderation_thumb` e `moderation_preview`;
-- [ ] impedir fallback para original no feed;
 - [ ] revisar indices e busca textual com medicao real.
 
 Este plano responde 9 perguntas:
@@ -62,11 +71,13 @@ Este plano responde 9 perguntas:
 - `apps/web/src/modules/moderation/services/moderation.service.ts`
 - `apps/web/src/lib/api.ts`
 - `apps/web/src/App.tsx`
+- `apps/web/src/app/routing/scroll-restoration.ts`
 - `apps/api/tests/Feature/MediaProcessing/ModerationFeedCharacterizationTest.php`
 - `apps/api/tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php`
 - `apps/api/tests/Unit/Modules/MediaProcessing/MediaAssetUrlServiceTest.php`
 - `apps/web/src/lib/api.realtime.test.ts`
 - `apps/web/src/app/routing/router-architecture.test.ts`
+- `apps/web/src/app/routing/scroll-restoration.test.ts`
 - `apps/web/src/modules/moderation/feed-utils.test.ts`
 - `apps/web/src/modules/moderation/components/ModerationReviewPanel.test.tsx`
 - `apps/web/src/modules/moderation/components/ModerationMediaSurface.test.tsx`
@@ -117,6 +128,17 @@ Backend:
 - `cd apps/api && php artisan test tests/Feature/MediaProcessing/ModerationFeedCharacterizationTest.php tests/Feature/MediaProcessing/ModerationMediaTest.php tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php tests/Unit/Modules/MediaProcessing/MediaAssetUrlServiceTest.php tests/Feature/MediaProcessing/EventMediaListTest.php`
   - `23 testes`
   - `335 assertions`
+  - `PASS`
+- `cd apps/api && php artisan test tests/Feature/MediaProcessing/ModerationFeedCharacterizationTest.php tests/Feature/MediaProcessing/ModerationMediaTest.php tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php tests/Unit/Modules/MediaProcessing/MediaAssetUrlServiceTest.php tests/Feature/MediaProcessing/EventMediaListTest.php tests/Feature/MediaProcessing/MediaPipelineJobsTest.php`
+  - `35 testes`
+  - `426 assertions`
+  - `PASS`
+
+Frontend:
+
+- `cd apps/web && npm.cmd run test -- src/lib/api.realtime.test.ts src/modules/moderation/services/moderation.service.test.ts src/modules/moderation/feed-utils.test.ts src/modules/moderation/components/ModerationReviewPanel.test.tsx src/modules/moderation/components/ModerationMediaSurface.test.tsx src/app/routing/router-architecture.test.ts src/app/routing/scroll-restoration.test.ts`
+  - `7 arquivos`
+  - `19 testes`
   - `PASS`
 
 ### Leituras oficiais validadas
@@ -268,18 +290,19 @@ Conclusao:
 - isso e fragil para uma `InfiniteQuery` altamente mutavel;
 - `stats` devem virar query separada e barata.
 
-### 7. O app ainda usa `BrowserRouter`, sem `ScrollRestoration`
+### 7. O app agora usa data router com `ScrollRestoration`
 
-O teste de caracterizacao confirmou:
+O teste de caracterizacao atualizado confirmou:
 
-- o shell ainda usa `BrowserRouter`;
-- nao existe `RouterProvider`;
-- nao existe `ScrollRestoration`.
+- o shell passou para `createBrowserRouter`;
+- o app agora usa `RouterProvider`;
+- `ScrollRestoration` foi ligado no shell;
+- `/moderation` ganhou `getKey` estavel por pathname + filtros criticos conhecidos da rota.
 
 Conclusao:
 
-- scroll restoration nao esta resolvido hoje;
-- esse problema precisa entrar como trabalho explicito de router, nao como expectativa implicita do cache da query.
+- scroll restoration deixou de ser uma aposta implicita no cache da query;
+- a fundacao oficial do router ja esta pronta para os proximos refinamentos.
 
 ### 8. O broadcaster da moderacao ainda nao usa `toOthers()`
 

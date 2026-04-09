@@ -34,7 +34,7 @@ Stack efetivamente usada pela rota `/moderation` e pelos fluxos correlatos:
 
 - TanStack Query para feed cursorizado, detalhe e mutations;
 - React Router para a rota e filtros por query string;
-- `BrowserRouter` classico, sem data router e sem `ScrollRestoration` configurado no shell;
+- data router com `createBrowserRouter`, `RouterProvider` e `ScrollRestoration` configurado no shell;
 - Framer Motion para entradas/transicoes do painel;
 - lucide-react para iconografia operacional;
 - Pusher JS + Laravel Reverb para realtime;
@@ -918,44 +918,47 @@ Impacto:
 - o operador revisa o poster, nao o ativo real;
 - a UX da moderacao de video fica incompleta.
 
-### P14. Painel lateral de moderacao usa source inconsistente para video
+### P14. Resolvido nesta entrega: painel lateral e preview ampliado agora usam source consistente para video
 
-O `ModerationReviewPanel` detecta video, mas escolhe `thumbnail_url ?? preview_url` como source base.
+Estado atual:
 
-Impacto:
-
-- quando existe poster, o componente pode montar um `<video>` com URL de imagem;
-- o comportamento depende demais do asset disponivel;
-- a surface de review de video ainda nao esta tecnicamente fechada.
-
-### P15. Scroll restoration ainda nao esta tratado no nivel do router
-
-O app hoje usa `BrowserRouter`.
-
-Logo:
-
-- nao existe `ScrollRestoration` configurado no shell;
-- nao existe `getKey` customizado por filtros criticos;
-- nao existe `preventScrollReset` estrategico para mudancas internas de query string.
+- `ModerationReviewPanel` passou a renderizar video com `preview_url` real;
+- `thumbnail_url` fica restrita ao papel de `poster`;
+- o dialog ampliado da moderacao reaproveita a mesma `ModerationMediaSurface`, entao video e fallback visual seguem o mesmo contrato do card e do painel.
 
 Impacto:
 
-- o cache do TanStack ajuda, mas nao fecha scroll restoration sozinho;
-- voltar para a fila pode continuar parecendo um reset parcial da tela.
+- a revisao de video deixa de depender de URL de imagem montada como `<video>`;
+- a superficie de preview fica tecnicamente fechada para a fase atual.
 
-### P16. Transporte realtime ainda nao evita eco entre mutation e broadcast
+### P15. Resolvido nesta entrega: scroll restoration entrou no nivel do router
 
-Validacao atual:
+Estado atual:
 
-- o client HTTP nao injeta `X-Socket-ID`;
-- `ModerationBroadcasterService` dispara `event(new ...)`;
-- nao existe uso explicito de `broadcast(...)->toOthers()` nesta trilha.
+- o app passou para `createBrowserRouter` + `RouterProvider`;
+- o shell registra `ScrollRestoration`;
+- a restauracao da fila de moderacao usa `getKey` estavel por pathname + filtros criticos conhecidos da rota.
 
 Impacto:
 
-- o mesmo item continua sujeito a eco entre mutation local e broadcast;
-- o frontend fica obrigado a compensar mais coisa na marra;
-- isso aumenta reorder e churn desnecessario.
+- voltar para `/moderation` deixa de depender apenas do cache da query;
+- a base oficial de scroll restoration ja esta pronta para os proximos refinamentos de UX.
+
+Observacao remanescente:
+
+- `preventScrollReset` continua desnecessario enquanto os filtros principais da pagina ainda viverem em estado local, nao em navegacao orientada por query string.
+
+### P16. Resolvido nesta entrega: transporte realtime agora evita eco entre mutation e broadcast
+
+Estado atual:
+
+- o client HTTP injeta `X-Socket-ID` quando houver socket ativo;
+- a trilha de broadcast da moderacao usa `broadcast(...)->toOthers()`.
+
+Impacto:
+
+- o mesmo item deixa de sofrer eco basico entre mutation local e broadcast;
+- o frontend fica com menos churn estrutural para compensar.
 
 ### P17. Galeria publica ainda nao reproduz video
 
@@ -1075,7 +1078,9 @@ Para reduzir duvidas na documentacao, esta rodada adicionou cobertura especifica
 - `apps/web/src/lib/api.realtime.test.ts`
   - valida que `api.ts` encaminha `AbortSignal` e injeta `X-Socket-ID` quando o socket estiver ativo;
 - `apps/web/src/app/routing/router-architecture.test.ts`
-  - valida que o shell ainda usa `BrowserRouter` e nao configurou `ScrollRestoration`;
+  - valida que o shell agora usa data router com `RouterProvider` e `ScrollRestoration`;
+- `apps/web/src/app/routing/scroll-restoration.test.ts`
+  - valida a chave estavel de restauracao de scroll para `/moderation`;
 - `apps/web/src/modules/wall/player/engine/selectors.test.ts`
   - valida que `is_featured` influencia a escolha do proximo item do telao;
 - `apps/api/tests/Feature/Gallery/PublicGalleryAvailabilityTest.php`
@@ -1354,8 +1359,9 @@ Status consolidado ate esta entrega:
 - [x] expor `thumbnail_source`, `preview_source` e `updated_at` no payload operacional;
 - [x] adicionar surface compartilhada com `loading/error/fallback` para card e painel lateral;
 - [x] deduplicar patch de feed/realtime por `updated_at`;
-- [ ] criar `moderation_thumb` e `moderation_preview`;
-- [ ] impedir fallback para original no feed;
+- [x] criar `moderation_thumb` e `moderation_preview`;
+- [x] impedir fallback para original no feed da moderacao com fields dedicados;
+- [x] tratar scroll restoration no router com data router + `ScrollRestoration`;
 - [ ] adicionar indice composto para ordenacao do feed;
 - [ ] revisar busca textual do feed;
 - [ ] prefetch do proximo detalhe;

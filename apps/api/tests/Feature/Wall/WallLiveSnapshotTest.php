@@ -209,7 +209,10 @@ it('normalizes source and exposes video semantics for the current snapshot item'
         ->assertJsonPath('data.currentItem.source', 'upload')
         ->assertJsonPath('data.currentItem.isVideo', true)
         ->assertJsonPath('data.currentItem.durationSeconds', 12)
-        ->assertJsonPath('data.currentItem.videoPolicyLabel', 'Video curto');
+        ->assertJsonPath('data.currentItem.videoPolicyLabel', 'Video curto')
+        ->assertJsonPath('data.currentItem.videoAdmission.state', 'eligible')
+        ->assertJsonPath('data.currentItem.servedVariantKey', 'wall_video_720p')
+        ->assertJsonPath('data.currentItem.previewVariantKey', 'wall_video_poster');
 
     expect($response->json('data.currentItem.previewUrl'))
         ->toContain("events/{$event->id}/variants/{$media->id}/wall_video_poster.webp");
@@ -600,7 +603,10 @@ it('returns nextItem when the current wall item matches the first predicted item
         ->assertJsonPath('data.nextItem.layoutHint', 'split')
         ->assertJsonPath('data.nextItem.isVideo', true)
         ->assertJsonPath('data.nextItem.durationSeconds', 18)
-        ->assertJsonPath('data.nextItem.videoPolicyLabel', 'Video com duracao diferenciada');
+        ->assertJsonPath('data.nextItem.videoPolicyLabel', 'Video com duracao diferenciada')
+        ->assertJsonPath('data.nextItem.videoAdmission.state', 'eligible')
+        ->assertJsonPath('data.nextItem.servedVariantKey', 'wall_video_720p')
+        ->assertJsonPath('data.nextItem.previewVariantKey', 'wall_video_poster');
 });
 
 it('returns nextItem as null when the backend cannot assert the next media with confidence', function () {

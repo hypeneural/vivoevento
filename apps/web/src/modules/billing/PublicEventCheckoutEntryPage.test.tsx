@@ -4,10 +4,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import PublicEventCheckoutEntryPage from './PublicEventCheckoutEntryPage';
 
-vi.mock('./PublicEventCheckoutPage', () => ({
-  default: () => <div>legacy-checkout-page</div>,
-}));
-
 vi.mock('./public-checkout/PublicCheckoutPageV2', () => ({
   PublicCheckoutPageV2: () => <div>checkout-v2-page</div>,
 }));
@@ -23,17 +19,21 @@ function renderPage(initialEntry: string) {
 }
 
 describe('PublicEventCheckoutEntryPage', () => {
-  it('keeps the legacy checkout as default', () => {
+  it('uses the V2 checkout as the default public experience', () => {
     renderPage('/checkout/evento');
 
-    expect(screen.getByText('legacy-checkout-page')).toBeInTheDocument();
-    expect(screen.queryByText('checkout-v2-page')).not.toBeInTheDocument();
+    expect(screen.getByText('checkout-v2-page')).toBeInTheDocument();
   });
 
-  it('activates the V2 checkout only when v2=1 is present', () => {
+  it('still supports the explicit V2 flag for older links', () => {
     renderPage('/checkout/evento?v2=1');
 
     expect(screen.getByText('checkout-v2-page')).toBeInTheDocument();
-    expect(screen.queryByText('legacy-checkout-page')).not.toBeInTheDocument();
+  });
+
+  it('ignores legacy=1 and keeps the V2 checkout active', () => {
+    renderPage('/checkout/evento?legacy=1');
+
+    expect(screen.getByText('checkout-v2-page')).toBeInTheDocument();
   });
 });

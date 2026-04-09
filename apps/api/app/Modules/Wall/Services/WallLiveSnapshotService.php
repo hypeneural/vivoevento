@@ -94,6 +94,9 @@ class WallLiveSnapshotService
             'isVideo' => ($mediaPayload['type'] ?? 'image') === 'video',
             'durationSeconds' => $mediaPayload['duration_seconds'] ?? null,
             'videoPolicyLabel' => WallVideoPolicyLabelResolver::fromPayload($mediaPayload),
+            'videoAdmission' => $mediaPayload['video_admission'] ?? null,
+            'servedVariantKey' => $mediaPayload['served_variant_key'] ?? null,
+            'previewVariantKey' => $mediaPayload['preview_variant_key'] ?? null,
             'createdAt' => $mediaPayload['created_at'] ?? null,
         ];
     }
@@ -126,6 +129,9 @@ class WallLiveSnapshotService
             'isVideo' => (bool) ($nextPredictedItem['is_video'] ?? false),
             'durationSeconds' => $nextPredictedItem['duration_seconds'] ?? null,
             'videoPolicyLabel' => $nextPredictedItem['video_policy_label'] ?? null,
+            'videoAdmission' => $nextPredictedItem['video_admission'] ?? null,
+            'servedVariantKey' => $nextPredictedItem['served_variant_key'] ?? null,
+            'previewVariantKey' => $nextPredictedItem['preview_variant_key'] ?? null,
             'createdAt' => $nextPredictedItem['created_at'] ?? null,
         ];
     }

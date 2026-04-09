@@ -10,7 +10,37 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
+function fakeVideoToolingReady(): array
+{
+    $ffmpegPath = tempnam(sys_get_temp_dir(), 'ffmpeg_');
+    $ffprobePath = tempnam(sys_get_temp_dir(), 'ffprobe_');
+
+    config()->set('media_processing.ffmpeg_binary', $ffmpegPath);
+    config()->set('media_processing.ffprobe_binary', $ffprobePath);
+
+    return [$ffmpegPath, $ffprobePath];
+}
+
+function cleanupVideoTooling(array $paths): void
+{
+    foreach ($paths as $path) {
+        @unlink($path);
+    }
+}
+
+function enableWallVideoForPublicUpload(Event $event, array $overrides = []): void
+{
+    EventWallSetting::factory()->live()->create(array_merge([
+        'event_id' => $event->id,
+        'video_enabled' => true,
+        'video_max_seconds' => 30,
+        'video_preferred_variant' => 'wall_video_720p',
+    ], $overrides));
+}
+
 it('returns the public upload payload for an active live event', function () {
+    $tooling = fakeVideoToolingReady();
+
     $event = Event::factory()->active()->create([
         'title' => 'Festival da Familia',
     ]);
@@ -20,6 +50,7 @@ it('returns the public upload payload for an active live event', function () {
         'module_key' => 'live',
         'is_enabled' => true,
     ]);
+    enableWallVideoForPublicUpload($event);
 
     $response = $this->apiGet("/public/events/{$event->upload_slug}/upload");
 
@@ -33,9 +64,13 @@ it('returns the public upload payload for an active live event', function () {
     $response->assertJsonPath('data.upload.video_max_duration_seconds', 30);
     $response->assertJsonPath('data.upload.accept_hint', 'image/*,video/mp4,video/quicktime');
     expect($response->json('data.links.upload_url'))->toContain('/upload/' . $event->upload_slug);
+
+    cleanupVideoTooling($tooling);
 });
 
 it('returns moderation guidance for each supported event mode in the upload payload', function (string $mode, string $expectedInstruction) {
+    $tooling = fakeVideoToolingReady();
+
     $event = Event::factory()->active()->create([
         'title' => 'Festival da Familia',
         'moderation_mode' => $mode,
@@ -46,12 +81,15 @@ it('returns moderation guidance for each supported event mode in the upload payl
         'module_key' => 'live',
         'is_enabled' => true,
     ]);
+    enableWallVideoForPublicUpload($event);
 
     $response = $this->apiGet("/public/events/{$event->upload_slug}/upload");
 
     $this->assertApiSuccess($response);
     $response->assertJsonPath('data.upload.moderation_mode', $mode);
     $response->assertJsonPath('data.upload.instructions', $expectedInstruction);
+
+    cleanupVideoTooling($tooling);
 })->with([
     ['none', 'As fotos e os videos curtos de ate 30s entram no ar automaticamente apos o processamento base.'],
     ['manual', 'As fotos e os videos curtos de ate 30s passam por moderacao manual antes de aparecer no evento.'],
@@ -116,6 +154,7 @@ it('accepts multiple public image uploads for an active live event', function ()
 it('accepts a single public video upload for an active live event', function () {
     Storage::fake('public');
     Queue::fake();
+    $tooling = fakeVideoToolingReady();
     Process::fake([
         '*' => Process::result(json_encode([
             'streams' => [
@@ -147,6 +186,7 @@ it('accepts a single public video upload for an active live event', function () 
         'module_key' => 'live',
         'is_enabled' => true,
     ]);
+    enableWallVideoForPublicUpload($event);
 
     $mp4Header = "\x00\x00\x00\x18\x66\x74\x79\x70\x69\x73\x6F\x6D\x00\x00\x02\x00\x69\x73\x6F\x6D\x69\x73\x6F\x32";
     $tmpPath = tempnam(sys_get_temp_dir(), 'public_mp4_');
@@ -188,14 +228,19 @@ it('accepts a single public video upload for an active live event', function () 
 
     Queue::assertPushed(GenerateMediaVariantsJob::class, 1);
     Queue::assertPushed(GenerateMediaVariantsJob::class, fn (GenerateMediaVariantsJob $job) => $job->queue === 'media-variants');
-    Process::assertRanTimes(fn ($process, $result) => $process->command[0] === 'ffprobe' && $result->successful(), times: 1);
+    Process::assertRanTimes(
+        fn ($process, $result) => $process->command[0] === config('media_processing.ffprobe_binary') && $result->successful(),
+        times: 1,
+    );
 
     @unlink($tmpPath);
+    cleanupVideoTooling($tooling);
 });
 
 it('rejects public video uploads that exceed the configured duration limit', function () {
     Storage::fake('public');
     Queue::fake();
+    $tooling = fakeVideoToolingReady();
     Process::fake([
         '*' => Process::result(json_encode([
             'streams' => [
@@ -223,6 +268,7 @@ it('rejects public video uploads that exceed the configured duration limit', fun
         'module_key' => 'live',
         'is_enabled' => true,
     ]);
+    enableWallVideoForPublicUpload($event);
 
     $tmpPath = tempnam(sys_get_temp_dir(), 'public_long_mp4_');
     file_put_contents($tmpPath, "\x00\x00\x00\x18\x66\x74\x79\x70\x69\x73\x6F\x6D" . str_repeat("\x00", 1024));
@@ -244,6 +290,7 @@ it('rejects public video uploads that exceed the configured duration limit', fun
     Queue::assertNothingPushed();
 
     @unlink($tmpPath);
+    cleanupVideoTooling($tooling);
 });
 
 it('rejects public video uploads when video support is disabled by policy', function () {
@@ -284,6 +331,30 @@ it('rejects public video uploads when video support is disabled by policy', func
     Queue::assertNothingPushed();
 
     @unlink($tmpPath);
+});
+
+it('hides public video support when the wall policy allows video but ffmpeg tooling is unavailable', function () {
+    $event = Event::factory()->active()->create([
+        'moderation_mode' => 'manual',
+    ]);
+
+    EventModule::create([
+        'event_id' => $event->id,
+        'module_key' => 'live',
+        'is_enabled' => true,
+    ]);
+    enableWallVideoForPublicUpload($event);
+
+    config()->set('media_processing.ffmpeg_binary', 'C:\\missing\\ffmpeg.exe');
+    config()->set('media_processing.ffprobe_binary', 'C:\\missing\\ffprobe.exe');
+
+    $response = $this->apiGet("/public/events/{$event->upload_slug}/upload");
+
+    $this->assertApiSuccess($response);
+    $response
+        ->assertJsonPath('data.upload.accepts_video', false)
+        ->assertJsonPath('data.upload.accept_hint', 'image/*')
+        ->assertJsonPath('data.upload.instructions', 'As fotos enviadas passam por moderacao manual antes de aparecer no evento.');
 });
 
 it('marks uploaded media with queued face indexing when face search is enabled', function () {
@@ -347,5 +418,5 @@ it('shows a closed state and rejects uploads when the event is not available', f
     );
 
     $uploadResponse->assertStatus(422);
-    $uploadResponse->assertJsonPath('message', 'O envio de fotos e videos esta temporariamente indisponivel.');
+    $uploadResponse->assertJsonPath('message', 'O envio de imagens esta temporariamente indisponivel.');
 });

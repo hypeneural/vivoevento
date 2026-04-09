@@ -70,20 +70,22 @@ Este plano existe para responder 7 perguntas de execucao:
 - [x] soak curto executado nos eventos `346`, `347` e `348` promovidos para `aws_primary_local_fallback`.
 - [x] validacao funcional de produto documentada para toggle por evento, reindex do acervo legado e latencia real observada apos envio da selfie.
 - [x] primeiro corte de user vectors AWS implementado com readiness gate, `CreateUser`, `AssociateFaces`, `SearchUsersByImage` e fallback seguro para `faces`.
+- [x] comando operacional `face-search:validate-aws-users-high-cardinality` implementado com criterio objetivo de latencia, fallback, resolucao de `users` e taxa de match.
+- [ ] ainda falta rodar esse comando em um evento real com massa na faixa de `2000` users prontos; o inventario local de `2026-04-09` ainda nao trouxe candidato acima de `4` registros AWS pesquisaveis e `0` `user_id` distintos.
 
 Ultima bateria executada:
 
 - comando:
   - `php artisan test tests/Feature/Events/CreateEventTest.php tests/Feature/FaceSearch tests/Unit/FaceSearch`
 - resultado:
-  - `153 passed`
+  - `156 passed`
   - `7 skipped`
-  - `1103 assertions`
+  - `1140 assertions`
 - leitura:
   - a rodada final incluiu o `CRUD` de `Events` para validar persistencia do toggle base de `FaceSearch` no create/update do evento;
-  - a trilha `H1 + H2 + H3 + H4 + H5 + H6 + H7-T1 + H7-T2` continuou estavel depois da promocao controlada, do novo comando de soak curto e do backfill automatico na ativacao AWS;
+  - a trilha `H1 + H2 + H3 + H4 + H5 + H6 + H7-T1 + H7-T2` continuou estavel depois da entrada da validacao operacional de alta cardinalidade para `users`;
   - os `7 skipped` continuam sendo apenas os contratos TDD AWS em modo opt-in;
-  - a regressao ampla do modulo permaneceu totalmente verde nesta rodada, incluindo user vectors, `SearchUsersByImage`, backfill legado automatico e os comandos operacionais de promocao, rollback e soak.
+  - a regressao ampla do modulo permaneceu totalmente verde nesta rodada, incluindo user vectors, `SearchUsersByImage`, backfill legado automatico e o novo comando `face-search:validate-aws-users-high-cardinality`.
 
 Bateria frontend executada:
 
@@ -771,7 +773,7 @@ Bateria executada para conclusao de `H7-T1`:
 - o MVP usa `Image.Bytes` como caminho padrao.
 - `S3Object` fica como excecao operacional, nao como dependencia estrutural.
 - o MVP usa `IndexFaces + SearchFacesByImage`.
-- `CreateUser + AssociateFaces + SearchUsersByImage` ficam para fase 2.
+- o primeiro corte de `CreateUser + AssociateFaces + SearchUsersByImage` ja entrou em `H6`, ainda dependendo apenas de validacao operacional de alta cardinalidade antes do rollout amplo.
 - a busca por selfie continua sincronica no request HTTP na fase 1.
 - `search_threshold` local nao sera reaberto nesta trilha.
 - `min_face_size_px=24` local nao sera reaberto nesta trilha.
@@ -798,11 +800,12 @@ Entram na fase 1:
 - persistencia de `UnindexedFaces`;
 - `healthCheck` por backend;
 - classificacao de erro alinhada ao padrao atual do repositorio.
+- readiness gate para `users`;
+- `CreateUser + AssociateFaces + SearchUsersByImage` com fallback seguro para `faces`;
+- backfill automatico do acervo legado quando o lane AWS e ativado pela primeira vez.
 
 Nao entram na fase 1:
 
-- `SearchUsersByImage`;
-- consolidacao automatica de user vectors;
 - UI de merge/split de clusters;
 - busca por todas as faces de uma foto de grupo;
 - dependencia obrigatoria de `S3`;
@@ -830,10 +833,12 @@ O que vamos usar:
   - `IndexFaces`
 - busca MVP:
   - `SearchFacesByImage`
-- fase 2:
+- `H6` ja entregue:
   - `CreateUser`
   - `AssociateFaces`
   - `SearchUsersByImage`
+- ainda pendente:
+  - validacao operacional de alta cardinalidade para liberar rollout amplo de `users`
 
 Logica central:
 
@@ -841,7 +846,7 @@ Logica central:
 2. se o evento usar backend AWS, provisiona ou reusa collection do evento;
 3. na indexacao, gera derivado JPEG local, tenta `Bytes`, chama `IndexFaces`, persiste faces indexadas e nao indexadas;
 4. na selfie, faz preflight local barato antes de gastar request AWS;
-5. se a selfie passar no preflight, chama `SearchFacesByImage`;
+5. se a selfie passar no preflight, chama `SearchUsersByImage` quando `aws_search_mode=users` e existirem user vectors prontos; caso contrario, cai de forma segura para `SearchFacesByImage`;
 6. se houver erro retryable ou politica de fallback, usa backend local;
 7. em paralelo, manter opcao de shadow mode para medir recall, latencia e custo.
 
@@ -1487,7 +1492,8 @@ Status atual:
   - `search_mode_requested`
   - `search_mode_resolved`
   - `search_mode_fallback_reason`
-- [ ] ainda falta um soak real dedicado de alta cardinalidade para validar esse modo em evento grande antes de liberar rollout amplo.
+- [x] validacao operacional ganhou um comando dedicado para `users` com relatorio estruturado e thresholds objetivos.
+- [ ] ainda falta rodar esse comando em um evento real na faixa de `2000` users prontos antes de liberar rollout amplo.
 
 Objetivo:
 
@@ -1508,6 +1514,60 @@ Testes obrigatorios:
 Definicao de pronto:
 
 - evento pode optar por `users` sem quebrar o fluxo para quem ainda esta em `faces`.
+
+### H6-T4. Validacao operacional de alta cardinalidade para `users`
+
+Status atual:
+
+- [x] comando `face-search:validate-aws-users-high-cardinality` criado.
+- [x] a rodada agora mede por relatorio:
+  - `ready_user_count`
+  - `users_mode_resolution_rate`
+  - `fallback_rate`
+  - `top_1_match_rate`
+  - `top_k_match_rate`
+  - `avg_response_duration_ms`
+  - `p95_response_duration_ms`
+- [x] `AwsUserHighCardinalityProbeBuilder` agora deriva probes a partir de clusters `ready` como ground truth positivo do proprio evento.
+- [x] thresholds de aprovacao ficaram explicitos no comando:
+  - `min_ready_users`
+  - `target_ready_users`
+  - `max_fallback_rate`
+  - `min_users_mode_resolution_rate`
+  - `min_top1_match_rate`
+  - `min_topk_match_rate`
+  - `max_p95_latency_ms`
+- [ ] inventario local de `2026-04-09` ainda nao trouxe um candidato real de alta cardinalidade:
+  - evento `330`: `4` registros AWS pesquisaveis, `0` `user_id` distintos
+  - evento `346`: `4` registros AWS pesquisaveis, `0` `user_id` distintos
+  - evento `348`: `4` registros AWS pesquisaveis, `0` `user_id` distintos
+- [ ] a rodada real com acervo na faixa de `2000` users continua pendente de ambiente com massa suficiente.
+
+Objetivo:
+
+- fechar a liberacao de `users` com criterio operacional objetivo, nao por impressao visual.
+
+Subtarefas:
+
+- selecionar evento com massa suficiente de user vectors prontos;
+- rodar o comando com thresholds explicitos;
+- capturar latencia, fallback, resolucao real de `users` e match rate;
+- guardar report versionado antes de declarar o lane AWS como `100%`.
+
+Testes obrigatorios:
+
+- `AwsUserHighCardinalityProbeBuilderTest`
+- `RunAwsUsersHighCardinalityValidationActionTest`
+- `RunAwsUsersHighCardinalityValidationCommandTest`
+
+Definicao de pronto:
+
+- existe pelo menos um report real de evento grande mostrando:
+  - `users_mode_resolution_rate` dentro do threshold acordado;
+  - `fallback_rate` dentro do threshold acordado;
+  - `top_1_match_rate` e `top_k_match_rate` dentro do threshold acordado;
+  - `p95_response_duration_ms` dentro do threshold acordado;
+  - `target_ready_users` atendido quando o produto exigir validacao na faixa de `2000` pessoas.
 
 ---
 
@@ -2082,11 +2142,13 @@ Leitura:
 
 ## Proximo Passo Recomendado
 
-Com `H1`, `H2`, `H3`, `H4`, `H5`, `H6`, `H7-T1` e o soak curto de `H7-T2` concluido, o proximo bloco deve ser:
+Com `H1`, `H2`, `H3`, `H4`, `H5`, `H6`, `H7-T1`, `H7-T2` e o novo comando de validacao operacional de `users` concluido, o proximo bloco deve ser:
 
-1. rodar uma janela curta de observacao operacional do modo `users` em eventos estaveis com AWS:
-   - acompanhando `face_search_queries`, `search_mode_resolved`, fallback, latencia e `healthCheck`
+1. selecionar um evento real com massa suficiente para a rodada grande:
+   - idealmente com `target_ready_users` na faixa de `2000`
+   - e com `aws_search_mode=users` ja ativo
+2. rodar `face-search:validate-aws-users-high-cardinality` com thresholds explicitos:
+   - acompanhando `users_mode_resolution_rate`, fallback, latencia, `top_1_match_rate` e `top_k_match_rate`
    - mantendo `reindex`, `reconcile` e o rollback reverso do report `20260409-142612-face-search-aws-fallback-rollout.json` prontos
-2. executar uma validacao real dedicada para evento grande, com acervo na faixa de `2000` pessoas pesquisaveis, antes de declarar a trilha AWS como `100%` pronta;
-3. se essa observacao continuar limpa, consolidar o rollout do modo `users` como opcao operacional segura por evento;
+3. se o report real passar, consolidar o rollout do modo `users` como opcao operacional segura por evento;
 4. no fechamento de UX do rollout, simplificar o CRUD base do evento com o CTA direto `Ativar Reconhecimento Facial`, mantendo o card avancado de `FaceSearch` para backend, thresholds e operacao.

@@ -43,11 +43,12 @@ Conclusao pratica:
 - o backend atual ja sustenta bem uma primeira versao em etapas
 - boa parte da melhoria pode ser feita so no frontend
 - a etapa 2 nao deve ser "cadastro ou login" para todo mundo; ela deve ser "seus dados"
-- o pre-check silencioso de identidade ja foi implementado no backend e ja esta plugado na V2 opt-in
-- a V2 ja tem wizard, pagamento real e estado proprio de acompanhamento em `/checkout/evento?v2=1`
+- o pre-check silencioso de identidade ja foi implementado no backend e ja esta plugado na V2 publica
+- a V2 ja tem wizard, pagamento real e estado proprio de acompanhamento e agora e o fluxo padrao em `/checkout/evento`
 - o payload semantico do backend ja entrou no contrato publico
 - `checkoutResponseAdapters.ts`, hardening mobile/storage e suite E2E ja entraram no codigo
-- o principal gap que sobra agora e transformar a V2 em default com deep link por pacote e metadados comerciais nativos
+- deep link por pacote e metadados comerciais nativos do catalogo ja entraram
+- a rota publica agora fixa a V2 e nao expoe mais rollback por `legacy=1`
 
 ## Validacao Complementar De `2026-04-09`
 
@@ -100,7 +101,7 @@ Ja entrou no codigo:
 
 - `POST /api/v1/public/checkout-identity/check`
 - `PublicEventCheckoutEntryPage`
-- V2 opt-in em `/checkout/evento?v2=1`
+- V2 na propria rota `/checkout/evento`
 - wizard com `step` na URL
 - etapa 1 comercial de pacote
 - etapa 2 `Seus dados` com extras colapsados
@@ -118,12 +119,22 @@ Ja entrou no codigo:
 - `apps/web/e2e/public-checkout-card.spec.ts`
 - `apps/web/e2e/public-checkout-mobile.spec.ts`
 - `apps/web/e2e/public-checkout-status-resume.spec.ts`
+- `checkout_marketing` no payload de pacote
+- `EventPackageCheckoutMarketingService` no backend
+- deep link por `?package=<slug|code|id>`
+- V2 como default em `/checkout/evento`
+- remocao do escape hatch `legacy=1` da entry route publica em `2026-04-09`
 
-Ainda nao entrou na V2:
+Validacao real adicional:
 
-- deep link por pacote
-- metadados comerciais nativos do pacote
-- decisao final de rollout para substituir o fluxo antigo com mais seguranca
+- `php artisan billing:pagarme:homologate --scenario=pix-cancel --poll-attempts=1 --poll-sleep-ms=500` executado com sucesso em `2026-04-09`
+- a conta local ainda tem chaves de homologacao configuradas
+- a conta da Pagar.me continua listando hooks para `https://webhooks-local.eventovivo.com.br/api/v1/webhooks/billing/pagarme`
+
+Observacao complementar:
+
+- o fluxo legado ainda existe no repositorio para caracterizacao e regressao isolada
+- ele nao e mais roteado pela entrada publica do checkout
 
 ## Escopo Da Analise
 
@@ -975,9 +986,7 @@ O pre-check de identidade ja foi resolvido.
 
 Se quisermos uma experiencia comercial mais forte, ainda falta:
 
-- pacote com metadados de marketing
-- deep link por pacote
-- rollout progressivo da V2 como experiencia padrao
+- decidir se o metadata comercial continua em `feature_key` ou ganha schema proprio
 
 ## Recomendacao De Implementacao
 
@@ -1016,11 +1025,13 @@ Resultado esperado:
 Status local:
 
 - majoritariamente concluida
-- hero, shell, wizard, etapa 1, etapa 2, etapa 3 e acompanhamento ja estao em `/checkout/evento?v2=1`
+- hero, shell, wizard, etapa 1, etapa 2, etapa 3 e acompanhamento ja estao em `/checkout/evento`
 - a V2 ja cobre o contrato real de Pix, cartao, retomada de Pix apos login e status pos-submit
 - o backend semantico ja cobre labels, descricao, proximo passo e expiracao no contrato publico
 - a V2 ja tem `checkoutResponseAdapters.ts`, footer mobile, `sessionStorage` first para draft seguro e bateria E2E verde
-- ainda falta deep link por pacote, metadados comerciais de pacote e rollout para virar padrao
+- o catalogo ja entrega `checkout_marketing`
+- o deep link por pacote ja funciona por `?package=<slug|code|id>`
+- a V2 ja virou padrao e a entry route publica deixou de aceitar rollback por `legacy=1`
 
 ### Fase 3 - Backend semantico e comercializacao
 
@@ -1066,11 +1077,10 @@ O melhor proximo passo e:
 
 Atualizacao de execucao:
 
-- os itens `1`, `2`, `3`, `4` e `5` ja estao implementados na V2 opt-in
-- o bloco critico que resta agora passou a ser:
-  - deep link por pacote
-  - metadados comerciais do catalogo
-  - rollout seguro da V2 sobre o checkout antigo
+- os itens `1`, `2`, `3`, `4` e `5` ja estao implementados na V2 padrao
+- o bloco que resta agora ficou menor:
+  - decidir quando apagar o codigo legado que nao e mais roteado
+  - decidir se o metadata comercial merece schema dedicado no backend
 
 Em resumo:
 

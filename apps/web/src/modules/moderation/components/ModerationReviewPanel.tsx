@@ -13,7 +13,7 @@ import { ChannelBadge, MediaStatusBadge } from '@/shared/components/StatusBadges
 import type { ModerationMediaAction } from './ModerationMediaCard';
 import { MediaActionButton } from './ModerationMediaCard';
 import { ModerationMediaSurface, resolveModerationSurfaceAsset } from './ModerationMediaSurface';
-import { formatDateTime, getAspectRatio, getOrientationLabel, isVideoAsset } from '../utils';
+import { formatDateTime, getAspectRatio, getOrientationLabel } from '../utils';
 
 interface ModerationReviewPanelProps {
   media: ApiEventMediaItem | ApiEventMediaDetail | null;
@@ -73,7 +73,6 @@ export function ModerationReviewPanel({
   const canApprove = media.status !== 'approved' && media.status !== 'published';
   const canReject = media.status !== 'rejected';
   const surfaceAsset = resolveModerationSurfaceAsset(media, 'preview');
-  const showsVideoPreview = isVideoAsset(media, media.preview_url);
   const aiEvaluations = hasAiEvaluations(media)
     ? {
         safety: media.latest_safety_evaluation ?? null,

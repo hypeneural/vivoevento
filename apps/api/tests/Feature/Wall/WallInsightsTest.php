@@ -481,3 +481,56 @@ it('isolates displayed totals per event wall', function () {
     $firstResponse->assertJsonPath('data.totals.displayed', 1);
     $secondResponse->assertJsonPath('data.totals.displayed', 0);
 });
+
+it('exposes backend video admission and chosen variants for recent wall items', function () {
+    [$user, $organization] = $this->actingAsManager();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+    ]);
+    enableWallModuleForInsights($event);
+
+    EventWallSetting::factory()->live()->create([
+        'event_id' => $event->id,
+        'video_preferred_variant' => 'original',
+    ]);
+
+    $message = InboundMessage::query()->create([
+        'event_id' => $event->id,
+        'provider' => 'upload',
+        'message_id' => 'msg-insights-video-decision',
+        'message_type' => 'video',
+        'sender_name' => 'Equipe Upload',
+        'status' => 'received',
+        'received_at' => now()->subMinute(),
+    ]);
+
+    $media = EventMedia::factory()->published()->create([
+        'event_id' => $event->id,
+        'inbound_message_id' => $message->id,
+        'media_type' => 'video',
+        'mime_type' => 'video/mp4',
+        'source_type' => 'public_upload',
+        'source_label' => 'Upload',
+        'width' => 1080,
+        'height' => 1920,
+        'duration_seconds' => 18,
+        'video_codec' => 'h264',
+        'container' => 'mp4',
+        'published_at' => now()->subSeconds(20),
+    ]);
+
+    $response = $this->apiGet("/events/{$event->id}/wall/insights");
+
+    $this->assertApiSuccess($response);
+
+    $response
+        ->assertJsonPath('data.recentItems.0.id', (string) $media->id)
+        ->assertJsonPath('data.recentItems.0.isVideo', true)
+        ->assertJsonPath('data.recentItems.0.videoAdmission.state', 'eligible_with_fallback')
+        ->assertJsonPath('data.recentItems.0.videoAdmission.reasons.0', 'poster_missing')
+        ->assertJsonPath('data.recentItems.0.videoAdmission.asset_source', 'original')
+        ->assertJsonPath('data.recentItems.0.videoAdmission.preferred_variant_key', 'original')
+        ->assertJsonPath('data.recentItems.0.servedVariantKey', null)
+        ->assertJsonPath('data.recentItems.0.previewVariantKey', null);
+});

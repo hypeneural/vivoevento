@@ -3,6 +3,7 @@
 namespace App\Modules\Billing\Services;
 
 use App\Modules\Billing\Models\BillingOrder;
+use App\Modules\Billing\Models\Subscription;
 use App\Modules\Plans\Models\Plan;
 use App\Modules\Plans\Models\PlanPrice;
 
@@ -52,6 +53,19 @@ class ManualSubscriptionGatewayService implements BillingSubscriptionGatewayInte
             'gateway_response' => [
                 'id' => "manual-subscription-{$order->uuid}",
                 'status' => 'active',
+            ],
+        ];
+    }
+
+    public function cancelSubscription(Subscription $subscription, array $context = []): array
+    {
+        return [
+            'provider_key' => $this->providerKey(),
+            'gateway_subscription_id' => $subscription->gateway_subscription_id,
+            'gateway_status' => 'canceled',
+            'gateway_response' => [
+                'id' => $subscription->gateway_subscription_id,
+                'status' => 'canceled',
             ],
         ];
     }

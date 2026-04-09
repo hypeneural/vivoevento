@@ -443,6 +443,78 @@ it('can cancel the current subscription immediately and drop subscription-covere
     expect($event->current_entitlements_json['modules']['play'] ?? null)->toBeFalse();
 });
 
+it('cancels the current pagarme subscription immediately and syncs DELETE /subscriptions/{id} before closing local access', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    config()->set('billing.gateways.subscription', 'pagarme');
+    config()->set('services.pagarme', [
+        'base_url' => 'https://api.pagar.me/core/v5/',
+        'secret_key' => 'sk_test_7611662845434f72bdb0986b69d54ce1',
+        'public_key' => 'pk_test_jGWvy7PhpBukl396',
+        'timeout' => 15,
+        'connect_timeout' => 5,
+        'retry_times' => 1,
+        'retry_sleep_ms' => 0,
+    ]);
+
+    Http::preventStrayRequests();
+
+    Http::fake([
+        'https://api.pagar.me/core/v5/subscriptions/sub_cancel_123' => Http::response([
+            'id' => 'sub_cancel_123',
+            'status' => 'canceled',
+        ], 200),
+    ]);
+
+    $plan = Plan::create([
+        'code' => 'pro-parceiro',
+        'name' => 'Pro Parceiro',
+        'audience' => 'b2b',
+        'status' => 'active',
+    ]);
+
+    $subscription = Subscription::create([
+        'organization_id' => $organization->id,
+        'plan_id' => $plan->id,
+        'status' => 'active',
+        'billing_cycle' => 'monthly',
+        'payment_method' => 'credit_card',
+        'starts_at' => now()->subDays(5),
+        'renews_at' => now()->addMonth(),
+        'gateway_provider' => 'pagarme',
+        'gateway_customer_id' => 'cus_cancel_123',
+        'gateway_subscription_id' => 'sub_cancel_123',
+        'contract_status' => 'active',
+        'billing_status' => 'paid',
+        'access_status' => 'enabled',
+    ]);
+
+    $response = $this->apiPost('/billing/subscription/cancel', [
+        'effective' => 'immediately',
+        'reason' => 'Encerramento imediato sincronizado com o gateway.',
+    ]);
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.message', 'Assinatura da conta cancelada com efeito imediato.');
+    $response->assertJsonPath('data.cancel_effective', 'immediately');
+    $response->assertJsonPath('data.subscription.id', $subscription->id);
+    $response->assertJsonPath('data.subscription.status', 'canceled');
+    $response->assertJsonPath('data.subscription.access_status', 'disabled');
+
+    $subscription->refresh();
+
+    expect($subscription->status)->toBe('canceled')
+        ->and($subscription->contract_status)->toBe('canceled')
+        ->and($subscription->access_status)->toBe('disabled')
+        ->and($subscription->renews_at)->toBeNull()
+        ->and($subscription->canceled_at)->not()->toBeNull();
+
+    Http::assertSent(function (HttpRequest $request) {
+        return $request->method() === 'DELETE'
+            && $request->url() === 'https://api.pagar.me/core/v5/subscriptions/sub_cancel_123';
+    });
+});
+
 it('validates cancellation when the organization has no subscription', function () {
     [$user, $organization] = $this->actingAsOwner();
 

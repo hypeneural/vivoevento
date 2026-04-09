@@ -62,6 +62,17 @@ class PagarmeStatusMapper
         };
     }
 
+    public function toInvoiceStatus(?string $status): string
+    {
+        return match (strtolower((string) $status)) {
+            'paid' => 'paid',
+            'failed' => 'failed',
+            'canceled', 'cancelled' => 'canceled',
+            'refunded', 'partial_canceled', 'partially_refunded' => 'refunded',
+            default => 'open',
+        };
+    }
+
     public function toRecurringBillingStatus(?string $invoiceStatus = null, ?string $chargeStatus = null): string
     {
         $invoiceStatus = strtolower((string) $invoiceStatus);

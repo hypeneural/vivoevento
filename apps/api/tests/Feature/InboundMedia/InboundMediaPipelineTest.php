@@ -17,6 +17,24 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
+function fakeInboundVideoToolingReady(): array
+{
+    $ffmpegPath = tempnam(sys_get_temp_dir(), 'ffmpeg_');
+    $ffprobePath = tempnam(sys_get_temp_dir(), 'ffprobe_');
+
+    config()->set('media_processing.ffmpeg_binary', $ffmpegPath);
+    config()->set('media_processing.ffprobe_binary', $ffprobePath);
+
+    return [$ffmpegPath, $ffprobePath];
+}
+
+function cleanupInboundVideoTooling(array $paths): void
+{
+    foreach ($paths as $path) {
+        @unlink($path);
+    }
+}
+
 function loadInboundMediaFixture(string $name, array $overrides = []): array
 {
     $payload = json_decode(
@@ -167,7 +185,7 @@ it('normalizes video payloads without confusing scalar photo metadata with media
     Bus::assertDispatched(DownloadInboundMediaJob::class, fn (DownloadInboundMediaJob $job) => $job->inboundMessageId === $inboundMessage->id);
 });
 
-it('downloads inbound video as video media and skips image-only stages', function () {
+it('downloads inbound video as video media and falls back to legacy moderation when video tooling is unavailable', function () {
     Storage::fake('public');
     Queue::fake([GenerateMediaVariantsJob::class, RunModerationJob::class]);
     Process::fake();
@@ -264,6 +282,96 @@ it('downloads inbound video as video media and skips image-only stages', functio
     Queue::assertNotPushed(GenerateMediaVariantsJob::class);
     Queue::assertPushed(RunModerationJob::class, fn (RunModerationJob $job) => $job->eventMediaId === $eventMedia->id);
     Process::assertNothingRan();
+});
+
+it('queues wall video variants for inbound video when ffmpeg tooling is ready', function () {
+    Storage::fake('public');
+    Queue::fake([GenerateMediaVariantsJob::class, RunModerationJob::class]);
+    $tooling = fakeInboundVideoToolingReady();
+    Process::fake();
+
+    Http::fake([
+        'https://cdn.fixture.test/*' => Http::response(
+            'ftypisommp42-video-binary',
+            200,
+            ['Content-Type' => 'video/mp4'],
+        ),
+    ]);
+
+    $event = Event::factory()->active()->create([
+        'moderation_mode' => 'ai',
+    ]);
+
+    $channel = EventChannel::query()->create([
+        'event_id' => $event->id,
+        'channel_type' => 'whatsapp_direct',
+        'provider' => 'zapi',
+        'external_id' => 'FOTOS',
+        'label' => 'WhatsApp direto',
+        'status' => 'active',
+        'config_json' => [],
+    ]);
+
+    $inboundMessage = InboundMessage::query()->create([
+        'event_id' => $event->id,
+        'event_channel_id' => $channel->id,
+        'provider' => 'zapi',
+        'message_id' => '2A2A-VIDEO-003',
+        'message_type' => 'video',
+        'sender_phone' => '554899900000',
+        'sender_name' => 'Participante Video',
+        'body_text' => 'Video privado alinhado',
+        'media_url' => 'https://cdn.fixture.test/zapi/private-video-ready.mp4',
+        'normalized_payload_json' => [
+            'video' => [
+                'videoUrl' => 'https://cdn.fixture.test/zapi/private-video-ready.mp4',
+                'mimeType' => 'video/mp4',
+            ],
+            'media' => [
+                'width' => 1080,
+                'height' => 1920,
+                'duration' => 23,
+                'has_audio' => true,
+                'video_codec' => 'h264',
+                'audio_codec' => 'aac',
+                'bitrate' => 680000,
+                'container' => 'mp4',
+            ],
+            '_event_context' => [
+                'event_id' => $event->id,
+                'event_channel_id' => $channel->id,
+                'intake_source' => 'whatsapp_direct',
+            ],
+        ],
+        'status' => 'normalized',
+        'received_at' => now(),
+    ]);
+
+    ChannelWebhookLog::query()->create([
+        'event_channel_id' => $channel->id,
+        'provider' => 'zapi',
+        'provider_update_id' => null,
+        'message_id' => '2A2A-VIDEO-003',
+        'detected_type' => 'video',
+        'routing_status' => 'normalized',
+        'payload_json' => [],
+        'inbound_message_id' => $inboundMessage->id,
+    ]);
+
+    app(DownloadInboundMediaJob::class, ['inboundMessageId' => $inboundMessage->id])->handle();
+
+    $eventMedia = EventMedia::query()->sole();
+
+    expect($eventMedia->media_type)->toBe('video')
+        ->and($eventMedia->processing_status)->toBe(MediaProcessingStatus::Downloaded)
+        ->and($eventMedia->safety_status)->toBe('skipped')
+        ->and($eventMedia->vlm_status)->toBe('skipped');
+
+    Queue::assertPushed(GenerateMediaVariantsJob::class, fn (GenerateMediaVariantsJob $job) => $job->eventMediaId === $eventMedia->id);
+    Queue::assertNotPushed(RunModerationJob::class);
+    Process::assertNothingRan();
+
+    cleanupInboundVideoTooling($tooling);
 });
 
 it('captures inbound audio on the event without creating gallery media', function () {

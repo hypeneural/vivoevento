@@ -20,12 +20,18 @@ class RecordBillingGatewayWebhookAction
 
         $event->fill([
             'event_type' => $normalizedWebhook['event_type'],
+            'hook_id' => $normalizedWebhook['hook_id'] ?? null,
             'billing_order_id' => $this->resolveBillingOrderId($normalizedWebhook),
             'gateway_order_id' => $normalizedWebhook['gateway_order_id'] ?? null,
+            'gateway_subscription_id' => $normalizedWebhook['gateway_subscription_id'] ?? null,
+            'gateway_invoice_id' => $normalizedWebhook['gateway_invoice_id'] ?? null,
+            'gateway_cycle_id' => $normalizedWebhook['gateway_cycle_id'] ?? null,
+            'gateway_customer_id' => $normalizedWebhook['gateway_customer_id'] ?? null,
             'gateway_charge_id' => $normalizedWebhook['gateway_charge_id'] ?? null,
             'gateway_transaction_id' => $normalizedWebhook['gateway_transaction_id'] ?? null,
             'occurred_at' => $normalizedWebhook['occurred_at'] ?? null,
             'headers_json' => $normalizedWebhook['headers'] ?? [],
+            'payload_hash' => $this->makePayloadHash($normalizedWebhook['payload'] ?? []),
             'payload_json' => $normalizedWebhook['payload'] ?? [],
         ]);
 
@@ -58,5 +64,10 @@ class RecordBillingGatewayWebhookAction
         }
 
         return null;
+    }
+
+    private function makePayloadHash(array $payload): string
+    {
+        return hash('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
     }
 }

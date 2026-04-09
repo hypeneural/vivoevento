@@ -783,6 +783,14 @@ export interface ApiEventPackage {
   prices: ApiEventPackagePrice[];
   features: ApiEventPackageFeature[];
   feature_map: Record<string, unknown>;
+  checkout_marketing?: {
+    slug: string;
+    subtitle: string;
+    ideal_for: string;
+    benefits: string[];
+    badge: string | null;
+    recommended: boolean;
+  } | null;
   modules: {
     hub: boolean;
     wall: boolean;
@@ -1505,6 +1513,20 @@ export type ApiWallVideoResumeMode = 'resume_if_same_item' | 'restart_from_zero'
 export type ApiWallVideoAudioPolicy = 'muted';
 export type ApiWallVideoMultiLayoutPolicy = 'disallow' | 'one' | 'all';
 export type ApiWallVideoPreferredVariant = 'wall_video_720p' | 'wall_video_1080p' | 'original';
+export type ApiWallVideoAdmissionState = 'eligible' | 'eligible_with_fallback' | 'blocked';
+
+export interface ApiWallVideoAdmission {
+  state: ApiWallVideoAdmissionState;
+  reasons: string[];
+  has_minimum_metadata: boolean;
+  supported_format: boolean;
+  preferred_variant_available: boolean;
+  preferred_variant_key?: string | null;
+  poster_available: boolean;
+  poster_variant_key?: string | null;
+  asset_source: 'wall_variant' | 'original';
+  duration_limit_seconds: number;
+}
 
 export interface ApiWallAdItem {
   id: number;
@@ -1681,6 +1703,9 @@ export interface ApiWallSimulationPreviewItem {
   is_video?: boolean;
   duration_seconds?: number | null;
   video_policy_label?: string | null;
+  video_admission?: ApiWallVideoAdmission | null;
+  served_variant_key?: string | null;
+  preview_variant_key?: string | null;
   is_replay: boolean;
   created_at?: string | null;
 }
@@ -1784,6 +1809,9 @@ export interface ApiWallInsightsRecentItem {
   isVideo?: boolean;
   durationSeconds?: number | null;
   videoPolicyLabel?: string | null;
+  videoAdmission?: ApiWallVideoAdmission | null;
+  servedVariantKey?: string | null;
+  previewVariantKey?: string | null;
   isReplay?: boolean;
 }
 
@@ -1832,6 +1860,9 @@ export interface ApiWallLiveSnapshotItem {
   isVideo?: boolean;
   durationSeconds?: number | null;
   videoPolicyLabel?: string | null;
+  videoAdmission?: ApiWallVideoAdmission | null;
+  servedVariantKey?: string | null;
+  previewVariantKey?: string | null;
   createdAt?: string | null;
 }
 

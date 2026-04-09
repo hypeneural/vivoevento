@@ -30,10 +30,14 @@ export function PackageCard({
             <CardTitle className="text-xl text-slate-950">{pkg.name}</CardTitle>
             <CardDescription className="text-sm leading-6 text-slate-600">{pkg.subtitle}</CardDescription>
           </div>
-          {pkg.recommended ? (
-            <Badge className="rounded-full bg-amber-500 text-white hover:bg-amber-500">
+          {pkg.badgeLabel ? (
+            <Badge className={cn(
+              'rounded-full text-white',
+              pkg.recommended ? 'bg-amber-500 hover:bg-amber-500' : 'bg-slate-900 hover:bg-slate-900',
+            )}
+            >
               <Sparkles className="mr-1 h-3.5 w-3.5" />
-              Mais escolhido
+              {pkg.badgeLabel}
             </Badge>
           ) : null}
         </div>

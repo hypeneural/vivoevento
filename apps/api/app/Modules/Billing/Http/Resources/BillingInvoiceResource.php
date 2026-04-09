@@ -11,10 +11,21 @@ class BillingInvoiceResource extends JsonResource
     {
         $snapshot = (array) ($this->snapshot_json ?? []);
         $order = $this->whenLoaded('order');
-        $payment = $this->whenLoaded('order', fn () => $this->order?->payments?->first());
+        $payment = $this->relationLoaded('payments')
+            ? $this->payments->sortByDesc('id')->first()
+            : null;
+
+        if (! $payment && $this->relationLoaded('order')) {
+            $payment = $this->order?->payments?->sortByDesc('id')->first();
+        }
 
         return [
             'id' => $this->id,
+            'subscription_id' => $this->subscription_id,
+            'subscription_cycle_id' => $this->subscription_cycle_id,
+            'gateway_invoice_id' => $this->gateway_invoice_id,
+            'gateway_charge_id' => $this->gateway_charge_id,
+            'gateway_status' => $this->gateway_status,
             'invoice_number' => $this->invoice_number,
             'status' => $this->status?->value,
             'amount_cents' => $this->amount_cents,
@@ -22,6 +33,8 @@ class BillingInvoiceResource extends JsonResource
             'issued_at' => $this->issued_at?->toISOString(),
             'due_at' => $this->due_at?->toISOString(),
             'paid_at' => $this->paid_at?->toISOString(),
+            'period_start_at' => $this->period_start_at?->toISOString(),
+            'period_end_at' => $this->period_end_at?->toISOString(),
             'order' => $order ? [
                 'id' => $this->order->id,
                 'uuid' => $this->order->uuid,
@@ -33,7 +46,13 @@ class BillingInvoiceResource extends JsonResource
                 'title' => $this->order->event->title,
             ] : ($snapshot['event'] ?? null),
             'package' => $snapshot['package'] ?? null,
-            'plan' => $snapshot['plan'] ?? null,
+            'plan' => $this->subscription?->plan ? [
+                'id' => $this->subscription->plan->id,
+                'code' => $this->subscription->plan->code,
+                'name' => $this->subscription->plan->name,
+                'audience' => $this->subscription->plan->audience,
+                'description' => $this->subscription->plan->description,
+            ] : ($snapshot['plan'] ?? null),
             'payment' => $payment ? [
                 'id' => $payment->id,
                 'status' => $payment->status?->value,
@@ -41,6 +60,8 @@ class BillingInvoiceResource extends JsonResource
                 'currency' => $payment->currency,
                 'gateway_provider' => $payment->gateway_provider,
                 'gateway_payment_id' => $payment->gateway_payment_id,
+                'gateway_invoice_id' => $payment->gateway_invoice_id,
+                'gateway_charge_status' => $payment->gateway_charge_status,
                 'paid_at' => $payment->paid_at?->toISOString(),
             ] : ($snapshot['payment'] ?? null),
             'snapshot' => $snapshot,

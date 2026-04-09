@@ -78,6 +78,18 @@ describe('WallHeroStage', () => {
               isVideo: true,
               durationSeconds: 18,
               videoPolicyLabel: 'Video com duracao diferenciada',
+              videoAdmission: {
+                state: 'eligible',
+                reasons: [],
+                has_minimum_metadata: true,
+                supported_format: true,
+                preferred_variant_available: true,
+                preferred_variant_key: 'wall_video_720p',
+                poster_available: true,
+                poster_variant_key: 'wall_video_poster',
+                asset_source: 'wall_variant',
+                duration_limit_seconds: 30,
+              },
               createdAt: '2026-04-09T04:19:40Z',
             },
             nextItem: {
@@ -92,6 +104,18 @@ describe('WallHeroStage', () => {
               isVideo: true,
               durationSeconds: 34,
               videoPolicyLabel: 'Video longo com politica especial',
+              videoAdmission: {
+                state: 'eligible_with_fallback',
+                reasons: ['variant_missing'],
+                has_minimum_metadata: true,
+                supported_format: true,
+                preferred_variant_available: false,
+                preferred_variant_key: null,
+                poster_available: true,
+                poster_variant_key: 'wall_video_poster',
+                asset_source: 'original',
+                duration_limit_seconds: 30,
+              },
               createdAt: '2026-04-09T04:19:20Z',
             },
             advancedAt: '2026-04-09T04:19:52Z',
@@ -123,6 +147,7 @@ describe('WallHeroStage', () => {
     expect(screen.getAllByText(/Video 34s/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Video com duracao diferenciada/i)).toBeInTheDocument();
     expect(screen.getByText(/Video longo com politica especial/i)).toBeInTheDocument();
+    expect(screen.getByText(/WhatsApp - Video 34s - Video longo com politica especial - Elegivel com fallback/i)).toBeInTheDocument();
   });
 
   it('mantem contexto operacional quando o player ainda nao confirmou item atual e proximo', () => {

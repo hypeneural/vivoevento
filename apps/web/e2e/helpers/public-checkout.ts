@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test';
 
-export const PUBLIC_CHECKOUT_V2_PATH = '/checkout/evento?v2=1';
+export const PUBLIC_CHECKOUT_V2_PATH = '/checkout/evento';
 
 export function createEventPackage() {
   return {
@@ -25,6 +25,18 @@ export function createEventPackage() {
       'hub.enabled': true,
       'wall.enabled': true,
       'play.enabled': false,
+    },
+    checkout_marketing: {
+      slug: 'casamento-essencial',
+      subtitle: 'O pacote mais equilibrado para eventos sociais com compra rapida.',
+      ideal_for: 'Casamentos e aniversarios com telao ao vivo.',
+      benefits: [
+        'Telao ao vivo para os convidados',
+        'Pagina do evento pronta para compartilhar',
+        'Pix e cartao com confirmacao automatica',
+      ],
+      badge: 'Mais escolhido',
+      recommended: true,
     },
     modules: {
       hub: true,

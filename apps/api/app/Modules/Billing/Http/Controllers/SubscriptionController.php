@@ -74,8 +74,12 @@ class SubscriptionController extends BaseController
             ->with([
                 'order.event:id,title',
                 'order.payments',
+                'payments',
+                'subscription.plan:id,code,name,audience,description',
+                'subscriptionCycle',
             ])
-            ->latest()
+            ->orderByDesc('issued_at')
+            ->orderByDesc('id')
             ->paginate(20);
 
         return $this->paginated(BillingInvoiceResource::collection($invoices));
@@ -176,13 +180,22 @@ class SubscriptionController extends BaseController
             'plan_name' => $subscription->plan?->name,
             'billing_cycle' => $subscription->billing_cycle,
             'status' => $subscription->status,
+            'contract_status' => $subscription->contract_status,
+            'billing_status' => $subscription->billing_status,
+            'access_status' => $subscription->access_status,
+            'payment_method' => $subscription->payment_method,
             'starts_at' => $subscription->starts_at?->toISOString(),
             'trial_ends_at' => $subscription->trial_ends_at?->toISOString(),
+            'current_period_started_at' => $subscription->current_period_started_at?->toISOString(),
+            'current_period_ends_at' => $subscription->current_period_ends_at?->toISOString(),
             'renews_at' => $subscription->renews_at?->toISOString(),
+            'next_billing_at' => $subscription->next_billing_at?->toISOString(),
             'ends_at' => $subscription->ends_at?->toISOString(),
             'canceled_at' => $subscription->canceled_at?->toISOString(),
             'cancel_at_period_end' => $cancelAtPeriodEnd,
             'cancellation_effective_at' => $cancelAtPeriodEnd ? $subscription->ends_at?->toISOString() : $subscription->canceled_at?->toISOString(),
+            'gateway_provider' => $subscription->gateway_provider,
+            'gateway_subscription_id' => $subscription->gateway_subscription_id,
             'features' => $subscription->plan?->features?->pluck('feature_value', 'feature_key')->all() ?? [],
         ];
     }

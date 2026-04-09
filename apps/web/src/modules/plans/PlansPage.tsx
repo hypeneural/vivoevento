@@ -45,6 +45,7 @@ import { EmptyState } from '@/shared/components/EmptyState';
 import { PageHeader } from '@/shared/components/PageHeader';
 
 import { plansService } from './api';
+import { RecurringPlanCheckoutDialog } from './components/RecurringPlanCheckoutDialog';
 
 const PLAN_FEATURE_LABELS: Record<string, (value: string | null) => string | null> = {
   'events.max_active': (value) => value ? `Ate ${value} eventos ativos` : null,
@@ -56,6 +57,10 @@ const PLAN_FEATURE_LABELS: Record<string, (value: string | null) => string | nul
 };
 
 type BillingTab = 'plans' | 'subscription' | 'billing';
+type CheckoutDialogState = {
+  plan: ApiPlan;
+  price: ApiPlanPrice;
+} | null;
 
 function formatMoney(amountCents: number, currency = 'BRL') {
   return new Intl.NumberFormat('pt-BR', {
@@ -691,10 +696,11 @@ function SubscriptionPanel({
 export default function PlansPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { meOrganization, can } = useAuth();
+  const { meOrganization, meUser, can } = useAuth();
   const [activeTab, setActiveTab] = useState<BillingTab>('plans');
   const [pendingCheckout, setPendingCheckout] = useState<ApiBillingCheckoutResponse | null>(null);
   const [selectedCycles, setSelectedCycles] = useState<Record<number, string>>({});
+  const [checkoutDialog, setCheckoutDialog] = useState<CheckoutDialogState>(null);
 
   const canManageBilling = can('billing.manage');
   const canPurchaseBilling = can('billing.purchase') || canManageBilling;
@@ -805,6 +811,10 @@ export default function PlansPage() {
     ]);
   };
 
+  const openCheckoutDialog = (plan: ApiPlan, price: ApiPlanPrice) => {
+    setCheckoutDialog({ plan, price });
+  };
+
   if (!canViewBilling) {
     return (
       <EmptyState
@@ -882,6 +892,22 @@ export default function PlansPage() {
           onOpenSubscription={() => setActiveTab('subscription')}
         />
       ) : null}
+
+      <RecurringPlanCheckoutDialog
+        open={Boolean(checkoutDialog)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCheckoutDialog(null);
+          }
+        }}
+        plan={checkoutDialog?.plan ?? null}
+        price={checkoutDialog?.price ?? null}
+        organizationName={organizationName}
+        userName={meUser?.name ?? null}
+        userEmail={meUser?.email ?? null}
+        isSubmitting={checkoutMutation.isPending}
+        onSubmit={(payload) => checkoutMutation.mutateAsync(payload)}
+      />
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as BillingTab)}>
         <TabsList className="bg-muted/50">
@@ -1010,10 +1036,7 @@ export default function PlansPage() {
                           return;
                         }
 
-                        checkoutMutation.mutate({
-                          plan_id: plan.id,
-                          billing_cycle: selectedPrice.billing_cycle === 'yearly' ? 'yearly' : 'monthly',
-                        });
+                        openCheckoutDialog(plan, selectedPrice);
                       }}
                     >
                       {checkoutMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

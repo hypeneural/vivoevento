@@ -416,7 +416,7 @@ Leitura pratica:
 | Decisao | Foto vs video | Detectado pelo pipeline | Visivel em simulacao; politica granular ainda nao first-class |
 | Decisao | Caption existe / nao existe | Dado existe | Visivel em simulacao; branch configuravel ainda nao first-class |
 | Saida | Reacao de aprovado/publicado | Implementado | Visivel; parcialmente editavel |
-| Saida | Reply textual de rejeicao | Parcial, mais global/entitlement | Visivel; editable so se policy evoluir |
+| Saida | Reply textual de rejeicao | Parcial, mais global/entitlement | Visivel; editavel so se policy evoluir |
 | Saida | Reply por IA/fixo-random | Implementado apos publish | Editavel |
 | Saida | Publicar na galeria | Implementado | No de leitura / ligado ao pipeline |
 | Saida | Disponibilizar no telao | Implementado via `Wall` consumindo `published` | Visivel; dependente de modulo wall, nao branch livre |

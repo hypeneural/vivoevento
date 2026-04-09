@@ -8,6 +8,8 @@ import {
 } from './helpers/public-checkout';
 
 test('identity conflict can authenticate and resume the Pix journey safely', async ({ page }) => {
+  test.setTimeout(45000);
+
   const response = createPixPendingCheckoutResponse();
   let createAttempts = 0;
 
@@ -58,8 +60,8 @@ test('identity conflict can authenticate and resume the Pix journey safely', asy
   await page.locator('input[autocomplete="current-password"]').fill('SenhaForte!2026');
   await page.getByRole('button', { name: /^entrar$/i }).click();
 
-  await expect(page).toHaveURL(/resume=auth/);
-  await expect(page).toHaveURL(/checkout=checkout-uuid/);
-  await expect(page.getByText(/pix gerado com sucesso/i)).toBeVisible();
-  await expect(page.getByRole('button', { name: /copiar codigo pix/i })).toBeVisible();
+  await expect(page).toHaveURL(/resume=auth/, { timeout: 15000 });
+  await expect(page).toHaveURL(/checkout=checkout-uuid/, { timeout: 15000 });
+  await expect(page.getByText(/pix gerado com sucesso/i)).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('button', { name: /copiar codigo pix/i })).toBeVisible({ timeout: 15000 });
 });

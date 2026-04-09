@@ -242,8 +242,17 @@ export function buildCheckoutPayload(values: CheckoutV2FormValues, cardToken?: s
   };
 }
 
-export function buildV2LoginResumePath() {
-  return `/login?returnTo=${encodeURIComponent(`/checkout/evento?v2=1&resume=${PUBLIC_CHECKOUT_V2_AUTH_RESUME_VALUE}`)}`;
+export function buildV2LoginResumePath(packageKey?: string | null) {
+  const nextParams = new URLSearchParams({
+    v2: '1',
+    resume: PUBLIC_CHECKOUT_V2_AUTH_RESUME_VALUE,
+  });
+
+  if (packageKey?.trim()) {
+    nextParams.set('package', packageKey.trim());
+  }
+
+  return `/login?returnTo=${encodeURIComponent(`/checkout/evento?${nextParams.toString()}`)}`;
 }
 
 export function buildResumeDraft(values: CheckoutV2FormValues): CheckoutResumeDraft {

@@ -27,6 +27,11 @@ class EventPackagesSeeder extends Seeder
                 'media.retention_days' => '30',
                 'media.max_photos' => '150',
                 'gallery.watermark' => 'false',
+                'checkout.subtitle' => 'Compra rapida para eventos que querem comecar sem complicacao.',
+                'checkout.ideal_for' => 'Cha revelacao, aniversario e eventos menores que querem uma jornada simples.',
+                'checkout.benefit_1' => 'Galeria do evento pronta para compartilhar',
+                'checkout.benefit_2' => 'Contratacao em poucos minutos',
+                'checkout.benefit_3' => 'Pix e cartao com confirmacao automatica',
             ],
         );
 
@@ -44,6 +49,13 @@ class EventPackagesSeeder extends Seeder
                 'media.retention_days' => '90',
                 'media.max_photos' => '400',
                 'gallery.watermark' => 'false',
+                'checkout.subtitle' => 'O pacote mais equilibrado para eventos sociais com compra rapida.',
+                'checkout.ideal_for' => 'Casamentos, aniversarios e eventos que querem telao ao vivo sem exagero.',
+                'checkout.badge' => 'Mais escolhido',
+                'checkout.recommended' => 'true',
+                'checkout.benefit_1' => 'Telao ao vivo para os convidados',
+                'checkout.benefit_2' => 'Pagina do evento pronta para compartilhar',
+                'checkout.benefit_3' => 'Mais capacidade para registrar o evento',
             ],
         );
 
@@ -62,6 +74,12 @@ class EventPackagesSeeder extends Seeder
                 'media.max_photos' => '800',
                 'gallery.watermark' => 'false',
                 'white_label.enabled' => 'true',
+                'checkout.subtitle' => 'Experiencia completa para quem quer mais impacto e interacao.',
+                'checkout.ideal_for' => 'Eventos premium que querem telao, hub e experiencias interativas no mesmo pacote.',
+                'checkout.badge' => 'Experiencia completa',
+                'checkout.benefit_1' => 'Telao ao vivo com maior capacidade',
+                'checkout.benefit_2' => 'Experiencias interativas para engajar os convidados',
+                'checkout.benefit_3' => 'Memorias disponiveis por mais tempo',
             ],
         );
     }

@@ -4,6 +4,7 @@ namespace App\Modules\Billing\Services\Pagarme;
 
 use App\Modules\Billing\Models\BillingOrder;
 use App\Modules\Billing\Models\BillingProfile;
+use App\Modules\Billing\Models\Subscription;
 use App\Modules\Billing\Services\BillingSubscriptionGatewayInterface;
 use App\Modules\Plans\Models\Plan;
 use App\Modules\Plans\Models\PlanPrice;
@@ -148,6 +149,30 @@ class PagarmeSubscriptionGatewayService implements BillingSubscriptionGatewayInt
             'current_period_ends_at' => $currentPeriodEndsAt,
             'gateway_response' => $response,
             'billing_profile' => $billingProfile->fresh(),
+        ];
+    }
+
+    public function cancelSubscription(Subscription $subscription, array $context = []): array
+    {
+        if (! filled($subscription->gateway_subscription_id)) {
+            throw ValidationException::withMessages([
+                'subscription' => ['Nao foi possivel cancelar no provider sem gateway_subscription_id.'],
+            ]);
+        }
+
+        $payload = [];
+
+        if (array_key_exists('cancel_pending_invoices', $context)) {
+            $payload['cancel_pending_invoices'] = (bool) $context['cancel_pending_invoices'];
+        }
+
+        $response = $this->client->cancelSubscription((string) $subscription->gateway_subscription_id, $payload);
+
+        return [
+            'provider_key' => $this->providerKey(),
+            'gateway_subscription_id' => (string) $subscription->gateway_subscription_id,
+            'gateway_status' => strtolower((string) ($response['status'] ?? 'canceled')),
+            'gateway_response' => $response,
         ];
     }
 

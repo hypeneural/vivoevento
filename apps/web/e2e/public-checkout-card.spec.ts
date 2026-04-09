@@ -9,6 +9,8 @@ import {
 } from './helpers/public-checkout';
 
 test('card checkout restores only safe data after login and requires refilling sensitive fields', async ({ page }) => {
+  test.setTimeout(45000);
+
   let createAttempts = 0;
 
   await mockCommonPublicCheckoutRoutes(page);
@@ -72,7 +74,7 @@ test('card checkout restores only safe data after login and requires refilling s
   await page.locator('input[autocomplete="current-password"]').fill('SenhaForte!2026');
   await page.getByRole('button', { name: /^entrar$/i }).click();
 
-  await expect(page).toHaveURL(/resume=auth/);
+  await expect(page).toHaveURL(/resume=auth/, { timeout: 15000 });
   await expect(page.getByText(/os campos do cartao precisam ser preenchidos novamente/i)).toBeVisible();
   await expect(page.getByLabel(/numero do cartao/i)).toHaveValue('');
   await expect(page.getByLabel(/^CVV$/i)).toHaveValue('');

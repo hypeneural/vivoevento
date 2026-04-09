@@ -92,6 +92,27 @@ Resultado:
 - mobile footer, drawer secundario, resume draft endurecido e polling seguem validados localmente
 - os riscos de botao voltar, refresh com `checkout.uuid` e retomada apos login passaram no navegador real
 
+### Validacao complementar da rodada final
+
+Backend:
+
+- `php artisan test --filter=EventPackageCheckoutMarketingServiceTest`
+- `php artisan test --filter=EventPackageCatalogTest`
+- `php artisan billing:pagarme:homologate --scenario=pix-cancel --poll-attempts=1 --poll-sleep-ms=500`
+
+Frontend:
+
+- `npm run test -- src/modules/billing/public-checkout src/modules/billing/PublicEventCheckoutEntryPage.test.tsx src/modules/billing/PublicEventCheckoutPage.test.tsx src/modules/billing/services/public-event-packages.service.test.ts src/modules/plans/PlansPage.test.tsx`
+- `npm run type-check`
+- `npx playwright test`
+
+Validacao operacional:
+
+- a conta local continua com chaves de homologacao da Pagar.me configuradas
+- o comando de homologacao real executou com sucesso em `2026-04-09`
+- a conta da Pagar.me continua com hooks apontando para `https://webhooks-local.eventovivo.com.br/api/v1/webhooks/billing/pagarme`
+- o endpoint externo respondeu `401` sem credencial e mudou de comportamento com o `Basic Auth` configurado localmente, confirmando a trilha de protecao
+
 ## Status De Execucao Em `2026-04-09`
 
 ### Concluido nesta rodada
@@ -109,7 +130,7 @@ Resultado:
   - `IdentityAssistInline`
   - tipos de API para o pre-check
 
-- Fase 2 base entregue em modo opt-in:
+- Fase 2 base entregue e promovida para a rota publica:
   - `PublicEventCheckoutEntryPage`
   - `PublicCheckoutPageV2`
   - `PublicCheckoutShell`
@@ -127,7 +148,7 @@ Resultado:
   - `TrustSignalsCard`
   - `packageCommercialCopy`
 
-- Fase 5 e Fase 6 frontend entregues em modo opt-in:
+- Fase 5 e Fase 6 frontend entregues na rota publica:
   - `PaymentMethodTabs`
   - `PixPaymentPanel`
   - `CreditCardPaymentPanel`
@@ -157,11 +178,22 @@ Resultado:
   - `public-checkout-card.spec.ts`
   - `public-checkout-mobile.spec.ts`
   - `public-checkout-status-resume.spec.ts`
+  - deep link por pacote coberto em E2E
 
-- switch seguro de rollout entregue:
-  - `/checkout/evento` continua no fluxo legado por padrao
-  - `/checkout/evento?v2=1` ativa a nova V2
-  - a rota publica agora passa pelo entry page, preservando rollback rapido
+- Fase 9 entregue localmente:
+  - `EventPackageCheckoutMarketingService`
+  - `checkout_marketing` no catalogo publico e autenticado de pacotes
+  - `packageCommercialCopy` agora consumindo metadata nativa do backend
+  - deep link por `?package=<slug|code|id>`
+  - `PublicEventCheckoutEntryPage` promovendo a V2 como fluxo padrao
+  - regressao de `resume=auth + package=...` coberta
+  - janela curta de observacao encerrada em `2026-04-09` sem regressao detectada na bateria automatizada e na homologacao real
+
+- switch final de rollout entregue:
+  - `/checkout/evento` agora abre a V2 por padrao
+  - `/checkout/evento?v2=1` continua funcionando para links antigos
+  - a rota publica continua passando pelo entry page para manter decisao centralizada
+  - `legacy=1` deixou de desviar para a tela antiga
 
 - bateria automatizada da fase verde
 - regressao legada do checkout verde em execucao isolada
@@ -189,16 +221,12 @@ Ja esta implementado:
 
 Ainda segue pendente:
 
-- deep link por pacote
-- metadados comerciais nativos por pacote
-- estrategia de rollout para substituir o fluxo antigo com mais seguranca
+- eventual historico autenticado de pedidos avulsos pendentes
 
 ### Proximo passo recomendado
 
-- depois da Fase 8, a sequencia pragmatica fica:
-  - deep link por pacote
-  - metadados comerciais nativos de pacote
-  - rollout progressivo da V2 sobre o checkout antigo
+- decidir se o catalogo comercial vai continuar dirigido por `feature_key` ou se merece schema dedicado no futuro
+- decidir quando remover fisicamente `PublicEventCheckoutPage.tsx`, que agora ficou apenas como referencia/regressao isolada
 
 ## Validacao Do Toolkit De UI
 
@@ -715,8 +743,8 @@ Objetivo:
    - `checkoutResponseAdapters.ts`
    - `checkoutStatusViewModel.ts`
 
-7. manter a pagina antiga como fallback temporario, se necessario
-   - preferencialmente com feature flag ou switch simples de rota para rollback rapido
+7. manter a pagina antiga como referencia temporaria, se necessario
+   - essa etapa foi encerrada em `2026-04-09`, quando a entry route deixou de aceitar rollback por query string
 
 ### TDD obrigatorio
 

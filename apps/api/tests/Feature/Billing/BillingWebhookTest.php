@@ -10,6 +10,7 @@ use App\Modules\Billing\Models\BillingGatewayEvent;
 use App\Modules\Billing\Models\BillingOrder;
 use App\Modules\Billing\Models\BillingOrderNotification;
 use App\Modules\Billing\Models\EventPackage;
+use App\Modules\Billing\Models\Subscription;
 use App\Modules\Events\Models\Event;
 use App\Modules\Plans\Models\Plan;
 use App\Modules\WhatsApp\Jobs\SendWhatsAppMessageJob;
@@ -165,6 +166,141 @@ it('rejects a pagarme webhook when basic auth credentials are invalid', function
 
     $this->assertApiUnauthorized($response);
     $this->assertDatabaseCount('billing_gateway_events', 0);
+});
+
+it('accepts a recurring pagarme invoice webhook, stores recurring identifiers and queues async processing', function () {
+    config()->set('services.pagarme.webhook_basic_auth_user', 'eventovivos');
+    config()->set('services.pagarme.webhook_basic_auth_password', '!@#159!@#Mudar');
+
+    Queue::fake();
+
+    [$user, $organization] = $this->actingAsOwner();
+
+    $plan = Plan::create([
+        'code' => 'recurring-webhook-pro',
+        'name' => 'Recurring Webhook Pro',
+        'audience' => 'b2b',
+        'status' => 'active',
+    ]);
+
+    $subscription = Subscription::create([
+        'organization_id' => $organization->id,
+        'plan_id' => $plan->id,
+        'status' => 'active',
+        'billing_cycle' => 'monthly',
+        'payment_method' => 'credit_card',
+        'gateway_provider' => 'pagarme',
+        'gateway_customer_id' => 'cus_recurring_123',
+        'gateway_plan_id' => 'plan_recurring_123',
+        'gateway_subscription_id' => 'sub_recurring_123',
+        'contract_status' => 'active',
+        'billing_status' => 'pending',
+        'access_status' => 'enabled',
+    ]);
+
+    $response = $this->apiPost('/webhooks/billing/pagarme', pagarmeRecurringInvoiceCreatedWebhookPayload($subscription), pagarmeWebhookHeaders());
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.accepted', true);
+    $response->assertJsonPath('data.duplicate', false);
+    $response->assertJsonPath('data.queued', true);
+    $response->assertJsonPath('data.gateway_event.event_type', 'invoice.created');
+    $response->assertJsonPath('data.gateway_event.gateway_subscription_id', 'sub_recurring_123');
+    $response->assertJsonPath('data.gateway_event.gateway_invoice_id', 'inv_recurring_123');
+    $response->assertJsonPath('data.gateway_event.gateway_cycle_id', 'cy_recurring_123');
+
+    $this->assertDatabaseHas('billing_gateway_events', [
+        'provider_key' => 'pagarme',
+        'event_key' => 'evt_recurring_invoice_created_123',
+        'event_type' => 'invoice.created',
+        'gateway_subscription_id' => 'sub_recurring_123',
+        'gateway_invoice_id' => 'inv_recurring_123',
+        'gateway_cycle_id' => 'cy_recurring_123',
+        'gateway_customer_id' => null,
+    ]);
+
+    Queue::assertPushedOn('billing', ProcessBillingWebhookJob::class);
+});
+
+it('processes a queued pagarme recurring chargeback event and disables the local subscription', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $plan = Plan::create([
+        'code' => 'recurring-chargeback-pro',
+        'name' => 'Recurring Chargeback Pro',
+        'audience' => 'b2b',
+        'status' => 'active',
+    ]);
+
+    $subscription = Subscription::create([
+        'organization_id' => $organization->id,
+        'plan_id' => $plan->id,
+        'status' => 'active',
+        'billing_cycle' => 'monthly',
+        'payment_method' => 'credit_card',
+        'gateway_provider' => 'pagarme',
+        'gateway_customer_id' => 'cus_chargeback_123',
+        'gateway_plan_id' => 'plan_chargeback_123',
+        'gateway_subscription_id' => 'sub_chargeback_123',
+        'contract_status' => 'active',
+        'billing_status' => 'paid',
+        'access_status' => 'enabled',
+        'starts_at' => now()->subDays(10),
+        'renews_at' => now()->addDays(20),
+    ]);
+
+    $gatewayEvent = BillingGatewayEvent::create([
+        'provider_key' => 'pagarme',
+        'event_key' => 'evt_recurring_chargeback_123',
+        'event_type' => 'charge.chargedback',
+        'status' => 'pending',
+        'gateway_subscription_id' => 'sub_chargeback_123',
+        'gateway_invoice_id' => 'inv_chargeback_123',
+        'gateway_cycle_id' => 'cy_chargeback_123',
+        'gateway_charge_id' => 'ch_chargeback_123',
+        'payload_json' => pagarmeRecurringChargebackWebhookPayload($subscription),
+        'headers_json' => [],
+        'occurred_at' => now(),
+    ]);
+
+    $result = app(ProcessBillingWebhookAction::class)->executeRecorded($gatewayEvent->fresh());
+
+    expect($result['duplicate'])->toBeFalse();
+    expect(data_get($result, 'result.action'))->toBe('charge_projected');
+
+    $subscription->refresh();
+
+    expect($subscription->status)->toBe('canceled')
+        ->and($subscription->contract_status)->toBe('canceled')
+        ->and($subscription->billing_status)->toBe('chargedback')
+        ->and($subscription->access_status)->toBe('disabled');
+
+    $this->assertDatabaseHas('subscription_cycles', [
+        'subscription_id' => $subscription->id,
+        'gateway_cycle_id' => 'cy_chargeback_123',
+    ]);
+
+    $this->assertDatabaseHas('invoices', [
+        'subscription_id' => $subscription->id,
+        'gateway_invoice_id' => 'inv_chargeback_123',
+        'status' => 'failed',
+        'gateway_charge_id' => 'ch_chargeback_123',
+    ]);
+
+    $this->assertDatabaseHas('payments', [
+        'subscription_id' => $subscription->id,
+        'gateway_charge_id' => 'ch_chargeback_123',
+        'status' => 'chargedback',
+        'gateway_charge_status' => 'chargedback',
+    ]);
+
+    $this->assertDatabaseHas('billing_gateway_events', [
+        'id' => $gatewayEvent->id,
+        'status' => 'processed',
+        'gateway_subscription_id' => 'sub_chargeback_123',
+        'gateway_invoice_id' => 'inv_chargeback_123',
+        'gateway_cycle_id' => 'cy_chargeback_123',
+    ]);
 });
 
 it('processes a manual subscription payment webhook idempotently', function () {
@@ -874,6 +1010,81 @@ function pagarmeChargeRefundedWebhookPayload(BillingOrder $order, array $overrid
             ],
             'metadata' => [
                 'billing_order_uuid' => $order->uuid,
+            ],
+        ],
+    ];
+}
+
+function pagarmeRecurringInvoiceCreatedWebhookPayload(Subscription $subscription, array $overrides = []): array
+{
+    $invoiceId = $overrides['invoice_id'] ?? 'inv_recurring_123';
+    $cycleId = $overrides['cycle_id'] ?? 'cy_recurring_123';
+    $eventKey = $overrides['event_key'] ?? 'evt_recurring_invoice_created_123';
+
+    return [
+        'id' => $eventKey,
+        'type' => 'invoice.created',
+        'created_at' => now()->toISOString(),
+        'data' => [
+            'id' => $invoiceId,
+            'status' => 'pending',
+            'amount' => 19900,
+            'currency' => 'BRL',
+            'subscription' => [
+                'id' => $subscription->gateway_subscription_id,
+            ],
+            'cycle' => [
+                'id' => $cycleId,
+                'status' => 'billed',
+                'billing_at' => now()->addDays(2)->toISOString(),
+                'start_at' => now()->startOfDay()->toISOString(),
+                'end_at' => now()->addMonth()->startOfDay()->toISOString(),
+            ],
+        ],
+    ];
+}
+
+function pagarmeRecurringChargebackWebhookPayload(Subscription $subscription, array $overrides = []): array
+{
+    $invoiceId = $overrides['invoice_id'] ?? 'inv_chargeback_123';
+    $cycleId = $overrides['cycle_id'] ?? 'cy_chargeback_123';
+    $chargeId = $overrides['charge_id'] ?? 'ch_chargeback_123';
+    $eventKey = $overrides['event_key'] ?? 'evt_recurring_chargeback_123';
+
+    return [
+        'id' => $eventKey,
+        'type' => 'charge.chargedback',
+        'created_at' => now()->toISOString(),
+        'data' => [
+            'id' => $chargeId,
+            'status' => 'chargedback',
+            'amount' => 19900,
+            'currency' => 'BRL',
+            'payment_method' => 'credit_card',
+            'subscription' => [
+                'id' => $subscription->gateway_subscription_id,
+                'status' => 'canceled',
+            ],
+            'invoice' => [
+                'id' => $invoiceId,
+                'status' => 'failed',
+                'amount' => 19900,
+                'currency' => 'BRL',
+                'cycle' => [
+                    'id' => $cycleId,
+                    'status' => 'billed',
+                    'billing_at' => now()->toISOString(),
+                    'start_at' => now()->subMonth()->startOfDay()->toISOString(),
+                    'end_at' => now()->startOfDay()->toISOString(),
+                ],
+            ],
+            'last_transaction' => [
+                'id' => 'tx_'.$chargeId,
+                'status' => 'chargedback',
+                'card' => [
+                    'brand' => 'visa',
+                    'last_four_digits' => '1111',
+                ],
             ],
         ],
     ];
