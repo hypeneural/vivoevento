@@ -3,9 +3,10 @@
 namespace App\Modules\FaceSearch\Actions;
 
 use App\Modules\Events\Models\Event;
-use App\Modules\FaceSearch\DTOs\FaceQualityAssessmentData;
+use App\Modules\FaceSearch\Enums\FaceSearchQueryStatus;
 use App\Modules\FaceSearch\Models\EventFaceSearchRequest;
 use App\Modules\FaceSearch\Models\EventFaceSearchSetting;
+use App\Modules\FaceSearch\Models\FaceSearchQuery;
 use App\Modules\FaceSearch\Queries\CollapseFaceSearchMatchesQuery;
 use App\Modules\FaceSearch\Services\FaceSearchRouter;
 use App\Modules\FaceSearch\Services\SelfiePreflightService;
@@ -84,6 +85,8 @@ class SearchFacesBySelfieAction
             'expires_at' => now()->addHours(max(1, (int) ($settings->selfie_retention_hours ?: 24))),
         ]);
 
+        $query = null;
+
         try {
             $binary = (string) file_get_contents($selfie->getRealPath());
 
@@ -121,16 +124,36 @@ class SearchFacesBySelfieAction
                 ]);
             }
 
+            $backend = $this->router->backendForSettings($settings);
+            $query = FaceSearchQuery::query()->create([
+                'event_id' => $event->id,
+                'event_face_search_request_id' => $request->id,
+                'backend_key' => $backend->key(),
+                'fallback_backend_key' => $settings->fallback_backend_key,
+                'routing_policy' => $settings->routing_policy,
+                'status' => FaceSearchQueryStatus::Running,
+                'query_media_path' => $this->queryMediaPath($selfie, $selfieStorageStrategy),
+                'query_face_bbox_json' => [
+                    'x' => $face->boundingBox->x,
+                    'y' => $face->boundingBox->y,
+                    'width' => $face->boundingBox->width,
+                    'height' => $face->boundingBox->height,
+                ],
+                'result_count' => 0,
+                'started_at' => now(),
+            ]);
+
             $candidateLimit = min(200, max(1, (int) $settings->top_k) * 4);
+            $execution = $backend->searchBySelfie(
+                event: $event,
+                settings: $settings,
+                probeMedia: $probeMedia,
+                binary: $binary,
+                face: $face,
+                topK: $candidateLimit,
+            );
             $collapsedMatches = $this->collapseMatches->execute(
-                $this->router->searchBySelfie(
-                    event: $event,
-                    settings: $settings,
-                    probeMedia: $probeMedia,
-                    binary: $binary,
-                    face: $face,
-                    topK: $candidateLimit,
-                ),
+                $execution['matches'] ?? [],
             );
 
             $results = $this->resolveMediaResults(
@@ -140,6 +163,15 @@ class SearchFacesBySelfieAction
                 includePending: $includePending,
                 topK: max(1, (int) $settings->top_k),
             );
+
+            $query?->forceFill([
+                'status' => FaceSearchQueryStatus::Completed,
+                'result_count' => count($results),
+                'provider_payload_json' => $execution['provider_payload_json'] ?? null,
+                'finished_at' => now(),
+                'error_code' => null,
+                'error_message' => null,
+            ])->save();
 
             $request->forceFill([
                 'status' => 'completed',
@@ -158,18 +190,41 @@ class SearchFacesBySelfieAction
                 'results' => $results,
             ];
         } catch (ValidationException $exception) {
+            $query?->forceFill([
+                'status' => FaceSearchQueryStatus::Failed,
+                'result_count' => 0,
+                'error_code' => 'validation_failed',
+                'error_message' => collect($exception->errors())->flatten()->first(),
+                'finished_at' => now(),
+            ])->save();
+
             $request->forceFill([
                 'status' => 'failed',
             ])->save();
 
             throw $exception;
         } catch (Throwable $exception) {
+            $query?->forceFill([
+                'status' => FaceSearchQueryStatus::Failed,
+                'result_count' => 0,
+                'error_code' => class_basename($exception),
+                'error_message' => $exception->getMessage(),
+                'finished_at' => now(),
+            ])->save();
+
             $request->forceFill([
                 'status' => 'failed',
             ])->save();
 
             throw $exception;
         }
+    }
+
+    private function queryMediaPath(UploadedFile $selfie, string $storageStrategy): string
+    {
+        $name = $selfie->getClientOriginalName() ?: $selfie->getFilename() ?: 'selfie-upload';
+
+        return sprintf('%s://%s', $storageStrategy !== '' ? $storageStrategy : 'memory_only', $name);
     }
 
     /**

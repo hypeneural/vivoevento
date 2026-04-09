@@ -92,6 +92,23 @@ export interface UpdateEventFaceSearchSettingsPayload {
   top_k: number;
   allow_public_selfie_search: boolean;
   selfie_retention_hours: number;
+  recognition_enabled: boolean;
+  search_backend_key: 'local_pgvector' | 'aws_rekognition' | 'luxand_managed';
+  fallback_backend_key: 'local_pgvector' | 'aws_rekognition' | 'luxand_managed' | null;
+  routing_policy: 'local_only' | 'aws_primary_local_fallback' | 'aws_primary_local_shadow' | 'local_primary_aws_on_error';
+  shadow_mode_percentage: number;
+  aws_region: string;
+  aws_search_mode: 'faces' | 'users';
+  aws_index_quality_filter: 'AUTO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'NONE';
+  aws_search_faces_quality_filter: 'AUTO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'NONE';
+  aws_search_users_quality_filter: 'AUTO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'NONE';
+  aws_search_face_match_threshold: number;
+  aws_search_user_match_threshold: number;
+  aws_associate_user_match_threshold: number;
+  aws_max_faces_per_image: number;
+  aws_index_profile_key: string;
+  aws_detection_attributes_json: string[];
+  delete_remote_vectors_on_event_close: boolean;
 }
 
 export function listEvents(filters: EventListFilters) {

@@ -232,6 +232,9 @@ it('simulates the next wall slides using the real event queue and draft settings
         'event_id' => $event->id,
         'inbound_message_id' => $messageC->id,
         'source_type' => 'telegram',
+        'caption' => 'Entrada principal no palco',
+        'width' => 1920,
+        'height' => 1080,
         'published_at' => now(),
     ]);
 
@@ -273,6 +276,8 @@ it('simulates the next wall slides using the real event queue and draft settings
         ->assertJsonPath('data.summary.active_senders', 3)
         ->assertJsonPath('data.sequence_preview.0.sender_name', 'Carla')
         ->assertJsonPath('data.sequence_preview.0.source_type', 'telegram')
+        ->assertJsonPath('data.sequence_preview.0.caption', 'Entrada principal no palco')
+        ->assertJsonPath('data.sequence_preview.0.layout_hint', 'cinematic')
         ->assertJsonPath('data.sequence_preview.0.preview_url', rtrim((string) config('app.url'), '/')."/storage/events/{$event->id}/variants/{$carlaPublished->id}/thumb.webp")
         ->assertJsonPath('data.sequence_preview.1.sender_name', 'Bruno')
         ->assertJsonPath('data.sequence_preview.2.sender_name', 'Ana');

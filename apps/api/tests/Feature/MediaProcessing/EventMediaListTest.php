@@ -233,10 +233,19 @@ it('shows the latest safety and vlm evaluations in the media detail payload', fu
         'event_media_id' => $media->id,
         'decision' => 'approve',
         'reason' => 'Imagem compativel com o evento.',
+        'reason_code' => 'context.match.event',
+        'matched_policies_json' => ['preset:homologacao_livre'],
+        'matched_exceptions_json' => ['camera_fotografica'],
+        'input_scope_used' => 'image_only',
+        'input_types_considered_json' => ['image'],
+        'confidence_band' => 'high',
+        'publish_eligibility' => 'auto_publish',
         'short_caption' => 'Entrada especial na festa.',
         'reply_text' => 'Memorias que fazem o coracao sorrir! 🎉📸',
         'tags_json' => ['festa', 'retrato'],
         'request_payload_json' => ['model' => 'openai/gpt-4.1-mini'],
+        'policy_snapshot_json' => ['contextual_policy_preset_key' => 'homologacao_livre'],
+        'policy_sources_json' => ['allow_alcohol' => 'preset'],
         'prompt_context_json' => [
             'template' => 'Use {nome_do_evento} quando fizer sentido.',
             'variables' => ['nome_do_evento' => $event->title],
@@ -259,11 +268,20 @@ it('shows the latest safety and vlm evaluations in the media detail payload', fu
         ->assertJsonPath('data.latest_vlm_evaluation.id', $latestVlm->id)
         ->assertJsonPath('data.latest_vlm_evaluation.decision', 'approve')
         ->assertJsonPath('data.latest_vlm_evaluation.reason', 'Imagem compativel com o evento.')
+        ->assertJsonPath('data.latest_vlm_evaluation.reason_code', 'context.match.event')
+        ->assertJsonPath('data.latest_vlm_evaluation.matched_policies.0', 'preset:homologacao_livre')
+        ->assertJsonPath('data.latest_vlm_evaluation.matched_exceptions.0', 'camera_fotografica')
+        ->assertJsonPath('data.latest_vlm_evaluation.input_scope_used', 'image_only')
+        ->assertJsonPath('data.latest_vlm_evaluation.input_types_considered.0', 'image')
+        ->assertJsonPath('data.latest_vlm_evaluation.confidence_band', 'high')
+        ->assertJsonPath('data.latest_vlm_evaluation.publish_eligibility', 'auto_publish')
         ->assertJsonPath('data.latest_vlm_evaluation.short_caption', 'Entrada especial na festa.')
         ->assertJsonPath('data.latest_vlm_evaluation.reply_text', 'Memorias que fazem o coracao sorrir! 🎉📸')
         ->assertJsonPath('data.latest_vlm_evaluation.tags.0', 'festa')
         ->assertJsonPath('data.latest_vlm_evaluation.request_payload.model', 'openai/gpt-4.1-mini')
-        ->assertJsonPath('data.latest_vlm_evaluation.prompt_context.variables.nome_do_evento', $event->title);
+        ->assertJsonPath('data.latest_vlm_evaluation.prompt_context.variables.nome_do_evento', $event->title)
+        ->assertJsonPath('data.latest_vlm_evaluation.policy_snapshot.contextual_policy_preset_key', 'homologacao_livre')
+        ->assertJsonPath('data.latest_vlm_evaluation.policy_sources.allow_alcohol', 'preset');
 });
 
 it('shows an aggregated ai debug payload with trace ids, provider logs and channel feedback logs', function () {

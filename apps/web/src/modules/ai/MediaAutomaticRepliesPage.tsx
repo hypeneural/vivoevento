@@ -24,8 +24,10 @@ import { PageHeader } from '@/shared/components/PageHeader';
 
 import { aiMediaRepliesService } from './api';
 import type {
+  ContentModerationGlobalSettings,
   MediaReplyEventHistoryItem,
   MediaReplyEventOption,
+  MediaIntelligenceGlobalSettings,
   MediaReplyPromptCategory,
   MediaReplyPromptPreset,
   MediaReplyPromptTestRun,
@@ -42,6 +44,158 @@ function textareaToTemplates(value: string): string[] {
     .split(/\r?\n/u)
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
+}
+
+function listToTextarea(items: string[]): string {
+  return items.join('\n');
+}
+
+function textareaToList(value: string): string[] {
+  return value
+    .split(/\r?\n/u)
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+}
+
+function scopeLabel(value: string | null | undefined): string {
+  switch (value) {
+    case 'image_only':
+      return 'Somente imagem';
+    case 'image_and_text_context':
+      return 'Imagem + texto';
+    default:
+      return value || 'Nao definido';
+  }
+}
+
+function normalizedTextContextModeLabel(value: string | null | undefined): string {
+  switch (value) {
+    case 'none':
+      return 'Sem texto';
+    case 'body_only':
+      return 'Somente corpo';
+    case 'caption_only':
+      return 'Somente caption';
+    case 'body_plus_caption':
+      return 'Corpo + caption';
+    case 'operator_summary':
+      return 'Resumo do operador';
+    default:
+      return value || 'Nao definido';
+  }
+}
+
+function publishEligibilityLabel(value: string | null | undefined): string {
+  switch (value) {
+    case 'auto_publish':
+      return 'Publicar automaticamente';
+    case 'review_only':
+      return 'Revisao manual';
+    case 'reject':
+      return 'Rejeitar';
+    default:
+      return value || 'Nao definido';
+  }
+}
+
+function runStatusBadgeVariant(value: string | null | undefined): 'default' | 'secondary' | 'destructive' | 'outline' {
+  switch (value) {
+    case 'success':
+      return 'default';
+    case 'partial':
+      return 'secondary';
+    case 'failed':
+      return 'destructive';
+    default:
+      return 'outline';
+  }
+}
+
+function runStatusLabel(value: string | null | undefined): string {
+  switch (value) {
+    case 'success':
+      return 'Sucesso';
+    case 'partial':
+      return 'Parcial';
+    case 'failed':
+      return 'Falha';
+    default:
+      return value || 'Nao informado';
+  }
+}
+
+function policySourceLabel(value: string | null | undefined): string {
+  switch (value) {
+    case 'event_setting':
+      return 'Evento';
+    case 'global_setting':
+      return 'Global';
+    case 'preset':
+      return 'Preset';
+    case 'runtime_override':
+      return 'Laboratorio';
+    case 'provider_runtime':
+      return 'Provider';
+    case 'default_config':
+      return 'Default';
+    default:
+      return value || 'Nao definido';
+  }
+}
+
+function effectiveStateLabel(value: string | null | undefined): string {
+  switch (value) {
+    case 'published':
+      return 'Publicado';
+    case 'approved':
+      return 'Aprovado';
+    case 'pending_moderation':
+      return 'Em moderacao';
+    case 'rejected':
+      return 'Rejeitado';
+    case 'hidden':
+      return 'Oculto';
+    case 'processing':
+      return 'Processando';
+    case 'received':
+      return 'Recebido';
+    case 'error':
+      return 'Erro';
+    default:
+      return value || 'Nao informado';
+  }
+}
+
+function policyInheritanceLabel(value: string | null | undefined): string {
+  switch (value) {
+    case 'event_override':
+      return 'Personalizado no evento';
+    case 'global':
+      return 'Herdando do global';
+    case 'preset':
+      return 'Somente preset';
+    case 'runtime_fallback':
+      return 'Fallback operacional';
+    default:
+      return 'Origem nao identificada';
+  }
+}
+
+function effectiveStateBadgeVariant(value: string | null | undefined): 'default' | 'secondary' | 'destructive' | 'outline' {
+  switch (value) {
+    case 'published':
+    case 'approved':
+      return 'default';
+    case 'rejected':
+    case 'error':
+      return 'destructive';
+    case 'pending_moderation':
+    case 'processing':
+    case 'received':
+      return 'secondary';
+    default:
+      return 'outline';
+  }
 }
 
 function emptyPresetForm(): SaveMediaReplyPromptPresetPayload {
@@ -77,6 +231,38 @@ export default function MediaAutomaticRepliesPage() {
   const [aiReplyLimitEnabled, setAiReplyLimitEnabled] = useState(false);
   const [aiReplyLimitMaxMessages, setAiReplyLimitMaxMessages] = useState('10');
   const [aiReplyLimitWindowMinutes, setAiReplyLimitWindowMinutes] = useState('10');
+  const [contextEnabled, setContextEnabled] = useState(false);
+  const [contextProviderKey, setContextProviderKey] = useState<'vllm' | 'openrouter' | 'noop'>('vllm');
+  const [contextModelKey, setContextModelKey] = useState('');
+  const [contextMode, setContextMode] = useState<'enrich_only' | 'gate'>('enrich_only');
+  const [contextScope, setContextScope] = useState<'image_only' | 'image_and_text_context'>('image_and_text_context');
+  const [replyScope, setReplyScope] = useState<'image_only' | 'image_and_text_context'>('image_and_text_context');
+  const [normalizedTextContextMode, setNormalizedTextContextMode] = useState<'none' | 'body_only' | 'caption_only' | 'body_plus_caption' | 'operator_summary'>('body_plus_caption');
+  const [contextRequireJsonOutput, setContextRequireJsonOutput] = useState(true);
+  const [contextPromptVersion, setContextPromptVersion] = useState('contextual-v2');
+  const [contextResponseSchemaVersion, setContextResponseSchemaVersion] = useState('contextual-v2');
+  const [contextTimeoutMs, setContextTimeoutMs] = useState('12000');
+  const [contextFallbackMode, setContextFallbackMode] = useState<'review' | 'skip'>('review');
+  const [contextPresetKey, setContextPresetKey] = useState('homologacao_livre');
+  const [allowAlcohol, setAllowAlcohol] = useState(true);
+  const [allowTobacco, setAllowTobacco] = useState(true);
+  const [requiredPeopleContext, setRequiredPeopleContext] = useState<'optional' | 'required'>('optional');
+  const [blockedTermsText, setBlockedTermsText] = useState('');
+  const [allowedExceptionsText, setAllowedExceptionsText] = useState('');
+  const [freeformInstruction, setFreeformInstruction] = useState('');
+  const [safetyEnabled, setSafetyEnabled] = useState(false);
+  const [safetyProviderKey, setSafetyProviderKey] = useState<'openai' | 'noop'>('openai');
+  const [safetyMode, setSafetyMode] = useState<'enforced' | 'observe_only'>('enforced');
+  const [safetyThresholdVersion, setSafetyThresholdVersion] = useState('foundation-v1');
+  const [safetyFallbackMode, setSafetyFallbackMode] = useState<'review' | 'block'>('review');
+  const [safetyScope, setSafetyScope] = useState<'image_only' | 'image_and_text_context'>('image_and_text_context');
+  const [safetyNormalizedTextContextMode, setSafetyNormalizedTextContextMode] = useState<'none' | 'body_only' | 'caption_only' | 'body_plus_caption' | 'operator_summary'>('body_plus_caption');
+  const [safetyReviewNudity, setSafetyReviewNudity] = useState('0.65');
+  const [safetyReviewViolence, setSafetyReviewViolence] = useState('0.65');
+  const [safetyReviewSelfHarm, setSafetyReviewSelfHarm] = useState('0.65');
+  const [safetyBlockNudity, setSafetyBlockNudity] = useState('0.90');
+  const [safetyBlockViolence, setSafetyBlockViolence] = useState('0.90');
+  const [safetyBlockSelfHarm, setSafetyBlockSelfHarm] = useState('0.90');
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [categoryForm, setCategoryForm] = useState<SaveMediaReplyPromptCategoryPayload>(emptyCategoryForm());
@@ -90,6 +276,10 @@ export default function MediaAutomaticRepliesPage() {
   const [testModelKey, setTestModelKey] = useState('openai/gpt-4.1-mini');
   const [testPresetId, setTestPresetId] = useState<string>('none');
   const [testPromptTemplate, setTestPromptTemplate] = useState('');
+  const [testObjectiveSafetyScopeOverride, setTestObjectiveSafetyScopeOverride] = useState<'inherit' | 'image_only' | 'image_and_text_context'>('inherit');
+  const [testContextScopeOverride, setTestContextScopeOverride] = useState<'inherit' | 'image_only' | 'image_and_text_context'>('inherit');
+  const [testReplyScopeOverride, setTestReplyScopeOverride] = useState<'inherit' | 'image_only' | 'image_and_text_context'>('inherit');
+  const [testNormalizedTextContextModeOverride, setTestNormalizedTextContextModeOverride] = useState<'inherit' | 'none' | 'body_only' | 'caption_only' | 'body_plus_caption' | 'operator_summary'>('inherit');
   const [testFiles, setTestFiles] = useState<File[]>([]);
   const [latestTestRun, setLatestTestRun] = useState<MediaReplyPromptTestRun | null>(null);
 
@@ -110,6 +300,11 @@ export default function MediaAutomaticRepliesPage() {
   const configurationQuery = useQuery({
     queryKey: ['ia', 'respostas-de-midia', 'configuracao'],
     queryFn: () => aiMediaRepliesService.getConfiguration(),
+    enabled: canManageGlobalAi,
+  });
+  const safetyConfigurationQuery = useQuery({
+    queryKey: ['ia', 'moderacao-de-midia', 'safety-global'],
+    queryFn: () => aiMediaRepliesService.getSafetyConfiguration(),
     enabled: canManageGlobalAi,
   });
   const categoriesQuery = useQuery({
@@ -177,13 +372,85 @@ export default function MediaAutomaticRepliesPage() {
     setAiReplyLimitEnabled(configurationQuery.data?.reply_ai_rate_limit_enabled ?? false);
     setAiReplyLimitMaxMessages(String(configurationQuery.data?.reply_ai_rate_limit_max_messages ?? 10));
     setAiReplyLimitWindowMinutes(String(configurationQuery.data?.reply_ai_rate_limit_window_minutes ?? 10));
+    setContextEnabled(configurationQuery.data?.enabled ?? false);
+    setContextProviderKey(configurationQuery.data?.provider_key === 'noop'
+      ? 'noop'
+      : configurationQuery.data?.provider_key === 'openrouter'
+        ? 'openrouter'
+        : 'vllm');
+    setContextModelKey(configurationQuery.data?.model_key ?? '');
+    setContextMode(configurationQuery.data?.mode === 'gate' ? 'gate' : 'enrich_only');
+    setContextScope(configurationQuery.data?.context_scope === 'image_only' ? 'image_only' : 'image_and_text_context');
+    setReplyScope(configurationQuery.data?.reply_scope === 'image_only' ? 'image_only' : 'image_and_text_context');
+    setNormalizedTextContextMode((configurationQuery.data?.normalized_text_context_mode as typeof normalizedTextContextMode) ?? 'body_plus_caption');
+    setContextRequireJsonOutput(configurationQuery.data?.require_json_output ?? true);
+    setContextPromptVersion(configurationQuery.data?.prompt_version ?? 'contextual-v2');
+    setContextResponseSchemaVersion(configurationQuery.data?.response_schema_version ?? 'contextual-v2');
+    setContextTimeoutMs(String(configurationQuery.data?.timeout_ms ?? 12000));
+    setContextFallbackMode(configurationQuery.data?.fallback_mode === 'skip' ? 'skip' : 'review');
+    setContextPresetKey(configurationQuery.data?.contextual_policy_preset_key ?? 'homologacao_livre');
+    setAllowAlcohol(configurationQuery.data?.allow_alcohol ?? true);
+    setAllowTobacco(configurationQuery.data?.allow_tobacco ?? true);
+    setRequiredPeopleContext(configurationQuery.data?.required_people_context === 'required' ? 'required' : 'optional');
+    setBlockedTermsText(listToTextarea(configurationQuery.data?.blocked_terms ?? []));
+    setAllowedExceptionsText(listToTextarea(configurationQuery.data?.allowed_exceptions ?? []));
+    setFreeformInstruction(configurationQuery.data?.freeform_instruction ?? '');
   }, [
+    configurationQuery.data?.allow_alcohol,
+    configurationQuery.data?.allow_tobacco,
+    configurationQuery.data?.allowed_exceptions,
+    configurationQuery.data?.blocked_terms,
+    configurationQuery.data?.context_scope,
+    configurationQuery.data?.contextual_policy_preset_key,
+    configurationQuery.data?.enabled,
+    configurationQuery.data?.fallback_mode,
+    configurationQuery.data?.freeform_instruction,
+    configurationQuery.data?.mode,
+    configurationQuery.data?.model_key,
+    configurationQuery.data?.normalized_text_context_mode,
+    configurationQuery.data?.prompt_version,
+    configurationQuery.data?.provider_key,
     configurationQuery.data?.reply_text_prompt,
     configurationQuery.data?.reply_text_fixed_templates,
     configurationQuery.data?.reply_prompt_preset_id,
     configurationQuery.data?.reply_ai_rate_limit_enabled,
     configurationQuery.data?.reply_ai_rate_limit_max_messages,
     configurationQuery.data?.reply_ai_rate_limit_window_minutes,
+    configurationQuery.data?.reply_scope,
+    configurationQuery.data?.require_json_output,
+    configurationQuery.data?.required_people_context,
+    configurationQuery.data?.response_schema_version,
+    configurationQuery.data?.timeout_ms,
+  ]);
+
+  useEffect(() => {
+    setSafetyEnabled(safetyConfigurationQuery.data?.enabled ?? false);
+    setSafetyProviderKey(safetyConfigurationQuery.data?.provider_key === 'noop' ? 'noop' : 'openai');
+    setSafetyMode(safetyConfigurationQuery.data?.mode === 'observe_only' ? 'observe_only' : 'enforced');
+    setSafetyThresholdVersion(safetyConfigurationQuery.data?.threshold_version ?? 'foundation-v1');
+    setSafetyFallbackMode(safetyConfigurationQuery.data?.fallback_mode === 'block' ? 'block' : 'review');
+    setSafetyScope(safetyConfigurationQuery.data?.analysis_scope === 'image_only' ? 'image_only' : 'image_and_text_context');
+    setSafetyNormalizedTextContextMode((safetyConfigurationQuery.data?.normalized_text_context_mode as typeof safetyNormalizedTextContextMode) ?? 'body_plus_caption');
+    setSafetyReviewNudity(String(safetyConfigurationQuery.data?.review_thresholds.nudity ?? 0.65));
+    setSafetyReviewViolence(String(safetyConfigurationQuery.data?.review_thresholds.violence ?? 0.65));
+    setSafetyReviewSelfHarm(String(safetyConfigurationQuery.data?.review_thresholds.self_harm ?? 0.65));
+    setSafetyBlockNudity(String(safetyConfigurationQuery.data?.hard_block_thresholds.nudity ?? 0.9));
+    setSafetyBlockViolence(String(safetyConfigurationQuery.data?.hard_block_thresholds.violence ?? 0.9));
+    setSafetyBlockSelfHarm(String(safetyConfigurationQuery.data?.hard_block_thresholds.self_harm ?? 0.9));
+  }, [
+    safetyConfigurationQuery.data?.analysis_scope,
+    safetyConfigurationQuery.data?.enabled,
+    safetyConfigurationQuery.data?.fallback_mode,
+    safetyConfigurationQuery.data?.hard_block_thresholds.nudity,
+    safetyConfigurationQuery.data?.hard_block_thresholds.self_harm,
+    safetyConfigurationQuery.data?.hard_block_thresholds.violence,
+    safetyConfigurationQuery.data?.mode,
+    safetyConfigurationQuery.data?.normalized_text_context_mode,
+    safetyConfigurationQuery.data?.provider_key,
+    safetyConfigurationQuery.data?.review_thresholds.nudity,
+    safetyConfigurationQuery.data?.review_thresholds.self_harm,
+    safetyConfigurationQuery.data?.review_thresholds.violence,
+    safetyConfigurationQuery.data?.threshold_version,
   ]);
 
   useEffect(() => {
@@ -277,6 +544,26 @@ export default function MediaAutomaticRepliesPage() {
 
   const updateConfigurationMutation = useMutation({
     mutationFn: () => aiMediaRepliesService.updateConfiguration({
+      enabled: contextEnabled,
+      provider_key: contextProviderKey,
+      model_key: contextModelKey.trim(),
+      mode: contextMode,
+      prompt_version: contextPromptVersion.trim() || null,
+      response_schema_version: contextResponseSchemaVersion.trim() || null,
+      timeout_ms: Number(contextTimeoutMs || '12000'),
+      fallback_mode: contextFallbackMode,
+      context_scope: contextScope,
+      reply_scope: replyScope,
+      normalized_text_context_mode: normalizedTextContextMode,
+      require_json_output: contextRequireJsonOutput,
+      contextual_policy_preset_key: contextPresetKey.trim() || null,
+      policy_version: 'contextual-policy-v1',
+      allow_alcohol: allowAlcohol,
+      allow_tobacco: allowTobacco,
+      required_people_context: requiredPeopleContext,
+      blocked_terms: textareaToList(blockedTermsText),
+      allowed_exceptions: textareaToList(allowedExceptionsText),
+      freeform_instruction: freeformInstruction.trim() || null,
       reply_text_prompt: standardInstruction.trim(),
       reply_text_fixed_templates: textareaToTemplates(standardFixedTemplates),
       reply_prompt_preset_id: standardPresetId !== 'none' ? Number(standardPresetId) : null,
@@ -295,6 +582,42 @@ export default function MediaAutomaticRepliesPage() {
       toast({
         title: 'Falha ao salvar configuracao',
         description: 'Nao foi possivel atualizar a configuracao da area de IA.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const updateSafetyConfigurationMutation = useMutation({
+    mutationFn: () => aiMediaRepliesService.updateSafetyConfiguration({
+      enabled: safetyEnabled,
+      provider_key: safetyProviderKey,
+      mode: safetyMode,
+      threshold_version: safetyThresholdVersion.trim() || null,
+      fallback_mode: safetyFallbackMode,
+      analysis_scope: safetyScope,
+      normalized_text_context_mode: safetyNormalizedTextContextMode,
+      hard_block_thresholds: {
+        nudity: Number(safetyBlockNudity || '0.9'),
+        violence: Number(safetyBlockViolence || '0.9'),
+        self_harm: Number(safetyBlockSelfHarm || '0.9'),
+      },
+      review_thresholds: {
+        nudity: Number(safetyReviewNudity || '0.65'),
+        violence: Number(safetyReviewViolence || '0.65'),
+        self_harm: Number(safetyReviewSelfHarm || '0.65'),
+      },
+    }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['ia', 'moderacao-de-midia', 'safety-global'] });
+      toast({
+        title: 'Safety objetiva atualizada',
+        description: 'A politica global de safety foi salva.',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Falha ao salvar safety objetiva',
+        description: 'Nao foi possivel atualizar a politica global de safety.',
         variant: 'destructive',
       });
     },
@@ -414,6 +737,18 @@ export default function MediaAutomaticRepliesPage() {
       model_key: testModelKey.trim(),
       prompt_template: testPromptTemplate.trim() || null,
       preset_id: testPresetId !== 'none' ? Number(testPresetId) : null,
+      objective_safety_scope_override: testObjectiveSafetyScopeOverride !== 'inherit'
+        ? testObjectiveSafetyScopeOverride
+        : null,
+      context_scope_override: testContextScopeOverride !== 'inherit'
+        ? testContextScopeOverride
+        : null,
+      reply_scope_override: testReplyScopeOverride !== 'inherit'
+        ? testReplyScopeOverride
+        : null,
+      normalized_text_context_mode_override: testNormalizedTextContextModeOverride !== 'inherit'
+        ? testNormalizedTextContextModeOverride
+        : null,
       images: testFiles,
     }),
     onSuccess: async (result) => {
@@ -448,6 +783,7 @@ export default function MediaAutomaticRepliesPage() {
     : historyDetailQuery.data ?? null;
   const activeRealHistoryDetail = realHistoryDetailQuery.data ?? null;
   const configurationLoading = canManageGlobalAi && configurationQuery.isLoading;
+  const safetyConfigurationLoading = canManageGlobalAi && safetyConfigurationQuery.isLoading;
   const historyFiltersSummary = useMemo(() => ({
     event_id: historyEventId.trim() !== '' ? Number(historyEventId) : null,
     provider_key: historyProviderKey,
@@ -469,25 +805,279 @@ export default function MediaAutomaticRepliesPage() {
   return (
     <motion.div initial={false} animate={{ opacity: 1 }} className="space-y-6">
       <PageHeader
-        title="IA"
-        description="Configure respostas automaticas de midia, teste instrucoes e acompanhe o historico tecnico."
+        title="Moderação de mídia"
+        description="Centralize safety objetiva, bloqueio contextual, laboratório e histórico técnico da IA em uma única área."
       />
 
-      <Tabs defaultValue="configuracao">
+      <Tabs defaultValue="visao-geral">
         <TabsList className="flex-wrap bg-muted/50">
-          <TabsTrigger value="configuracao">Configuracao</TabsTrigger>
-          <TabsTrigger value="teste">Teste do prompt</TabsTrigger>
-          <TabsTrigger value="catalogo">Catalogo</TabsTrigger>
+          <TabsTrigger value="visao-geral">Visão geral</TabsTrigger>
+          <TabsTrigger value="safety">Safety objetiva</TabsTrigger>
+          <TabsTrigger value="configuracao">Contexto do evento</TabsTrigger>
+          <TabsTrigger value="teste">Laboratório</TabsTrigger>
+          <TabsTrigger value="catalogo">Catálogo</TabsTrigger>
           <TabsTrigger value="historico">Historico</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="visao-geral" className="mt-6">
+          <div className="grid gap-6 xl:grid-cols-3">
+            <div className="glass space-y-3 rounded-xl p-6">
+              <div className="space-y-1">
+                <h3 className="font-semibold">Safety objetiva agora</h3>
+                <p className="text-sm text-muted-foreground">
+                  Gate objetivo por categoria nativa do provider, sem misturar regra contextual.
+                </p>
+              </div>
+              {safetyConfigurationLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Carregando safety...
+                </div>
+              ) : (
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <div>Estado: <span className="font-medium text-foreground">{safetyEnabled ? 'Ativo' : 'Desligado'}</span></div>
+                  <div>Modo: <span className="font-medium text-foreground">{safetyMode}</span></div>
+                  <div>Escopo: <span className="font-medium text-foreground">{scopeLabel(safetyScope)}</span></div>
+                  <div>Fallback: <span className="font-medium text-foreground">{safetyFallbackMode}</span></div>
+                </div>
+              )}
+            </div>
+
+            <div className="glass space-y-3 rounded-xl p-6">
+              <div className="space-y-1">
+                <h3 className="font-semibold">Bloqueio contextual agora</h3>
+                <p className="text-sm text-muted-foreground">
+                  Política estruturada do evento resolvida no backend antes do VLM.
+                </p>
+              </div>
+              {configurationLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Carregando contexto...
+                </div>
+              ) : (
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <div>Estado: <span className="font-medium text-foreground">{contextEnabled ? 'Ativo' : 'Desligado'}</span></div>
+                  <div>Modo: <span className="font-medium text-foreground">{contextMode}</span></div>
+                  <div>Escopo do gate: <span className="font-medium text-foreground">{scopeLabel(contextScope)}</span></div>
+                  <div>Escopo da resposta: <span className="font-medium text-foreground">{scopeLabel(replyScope)}</span></div>
+                  <div>Preset: <span className="font-medium text-foreground">{contextPresetKey || 'Nao definido'}</span></div>
+                </div>
+              )}
+            </div>
+
+            <div className="glass space-y-3 rounded-xl p-6">
+              <div className="space-y-1">
+                <h3 className="font-semibold">Política efetiva agora</h3>
+                <p className="text-sm text-muted-foreground">
+                  Resumo rápido para operação leiga, antes de abrir configuração avançada.
+                </p>
+              </div>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <div>Álcool: <span className="font-medium text-foreground">{allowAlcohol ? 'Permitido' : 'Bloqueado'}</span></div>
+                <div>Tabaco: <span className="font-medium text-foreground">{allowTobacco ? 'Permitido' : 'Bloqueado'}</span></div>
+                <div>Pessoas na imagem: <span className="font-medium text-foreground">{requiredPeopleContext === 'required' ? 'Obrigatórias' : 'Opcionais'}</span></div>
+                <div>Bloqueios adicionais: <span className="font-medium text-foreground">{textareaToList(blockedTermsText).length}</span></div>
+                <div>Exceções permitidas: <span className="font-medium text-foreground">{textareaToList(allowedExceptionsText).length}</span></div>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="safety" className="mt-6">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+            <div className="glass space-y-4 rounded-xl p-6">
+              <div className="space-y-1">
+                <h3 className="font-semibold">Safety objetiva global</h3>
+                <p className="text-sm text-muted-foreground">
+                  Essa camada usa categorias nativas do provider e define block ou review antes do gate contextual.
+                </p>
+              </div>
+
+              {!canManageGlobalAi ? (
+                <div className="rounded-lg border border-border/60 bg-muted/30 p-4 text-sm text-muted-foreground">
+                  Esta configuracao global esta disponivel apenas para super administradores e administradores da plataforma.
+                </div>
+              ) : safetyConfigurationLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Carregando safety objetiva...
+                </div>
+              ) : safetyConfigurationQuery.isError ? (
+                <div className="rounded-lg border border-destructive/30 p-4 text-sm text-destructive">
+                  Nao foi possivel carregar a politica global de safety.
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <Label htmlFor="safety-enabled">Safety ativa</Label>
+                          <p className="mt-1 text-xs text-muted-foreground">Liga a moderação objetiva por imagem ou imagem + texto.</p>
+                        </div>
+                        <Switch
+                          id="safety-enabled"
+                          checked={safetyEnabled}
+                          onCheckedChange={setSafetyEnabled}
+                          disabled={updateSafetyConfigurationMutation.isPending}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="safety-mode">Modo do gate</Label>
+                      <Select value={safetyMode} onValueChange={(value) => setSafetyMode(value as 'enforced' | 'observe_only')}>
+                        <SelectTrigger id="safety-mode" aria-label="Modo do gate de safety">
+                          <SelectValue placeholder="Selecione o modo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="enforced">Enforced</SelectItem>
+                          <SelectItem value="observe_only">Observe only</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="safety-provider">Provider</Label>
+                      <Select value={safetyProviderKey} onValueChange={(value) => setSafetyProviderKey(value as 'openai' | 'noop')}>
+                        <SelectTrigger id="safety-provider" aria-label="Provider de safety">
+                          <SelectValue placeholder="Selecione o provider" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="openai">OpenAI</SelectItem>
+                          <SelectItem value="noop">Noop</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="safety-fallback">Fallback</Label>
+                      <Select value={safetyFallbackMode} onValueChange={(value) => setSafetyFallbackMode(value as 'review' | 'block')}>
+                        <SelectTrigger id="safety-fallback" aria-label="Fallback de safety">
+                          <SelectValue placeholder="Selecione o fallback" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="review">Mandar para review</SelectItem>
+                          <SelectItem value="block">Bloquear por falha</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="safety-scope">Escopo</Label>
+                      <Select value={safetyScope} onValueChange={(value) => setSafetyScope(value as 'image_only' | 'image_and_text_context')}>
+                        <SelectTrigger id="safety-scope" aria-label="Escopo da safety">
+                          <SelectValue placeholder="Selecione o escopo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="image_only">Somente imagem</SelectItem>
+                          <SelectItem value="image_and_text_context">Imagem + texto</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="safety-threshold-version">Versao dos thresholds</Label>
+                      <Input
+                        id="safety-threshold-version"
+                        value={safetyThresholdVersion}
+                        onChange={(event) => setSafetyThresholdVersion(event.target.value)}
+                        disabled={updateSafetyConfigurationMutation.isPending}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="safety-normalized-text-context-mode">Modo do texto normalizado</Label>
+                    <Select
+                      value={safetyNormalizedTextContextMode}
+                      onValueChange={(value) => setSafetyNormalizedTextContextMode(value as 'none' | 'body_only' | 'caption_only' | 'body_plus_caption' | 'operator_summary')}
+                    >
+                      <SelectTrigger id="safety-normalized-text-context-mode" aria-label="Modo do texto normalizado da safety">
+                        <SelectValue placeholder="Selecione o modo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum texto</SelectItem>
+                        <SelectItem value="body_only">Somente body text</SelectItem>
+                        <SelectItem value="caption_only">Somente legenda</SelectItem>
+                        <SelectItem value="body_plus_caption">Body + legenda</SelectItem>
+                        <SelectItem value="operator_summary">Resumo do operador</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                      <div className="font-medium">Thresholds de review</div>
+                      <div className="mt-4 grid gap-4 md:grid-cols-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="safety-review-nudity">Nudez</Label>
+                          <Input id="safety-review-nudity" value={safetyReviewNudity} onChange={(event) => setSafetyReviewNudity(event.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="safety-review-violence">Violência</Label>
+                          <Input id="safety-review-violence" value={safetyReviewViolence} onChange={(event) => setSafetyReviewViolence(event.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="safety-review-self-harm">Autoagressão</Label>
+                          <Input id="safety-review-self-harm" value={safetyReviewSelfHarm} onChange={(event) => setSafetyReviewSelfHarm(event.target.value)} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                      <div className="font-medium">Thresholds de block</div>
+                      <div className="mt-4 grid gap-4 md:grid-cols-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="safety-block-nudity">Nudez</Label>
+                          <Input id="safety-block-nudity" value={safetyBlockNudity} onChange={(event) => setSafetyBlockNudity(event.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="safety-block-violence">Violência</Label>
+                          <Input id="safety-block-violence" value={safetyBlockViolence} onChange={(event) => setSafetyBlockViolence(event.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="safety-block-self-harm">Autoagressão</Label>
+                          <Input id="safety-block-self-harm" value={safetyBlockSelfHarm} onChange={(event) => setSafetyBlockSelfHarm(event.target.value)} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button type="button" onClick={() => updateSafetyConfigurationMutation.mutate()} disabled={updateSafetyConfigurationMutation.isPending}>
+                    {updateSafetyConfigurationMutation.isPending
+                      ? <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      : <Save className="mr-1 h-4 w-4" />}
+                    Salvar safety objetiva
+                  </Button>
+                </>
+              )}
+            </div>
+
+            <div className="glass rounded-xl p-6">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <h3 className="font-semibold">Leitura operacional</h3>
+              </div>
+              <div className="mt-4 space-y-3 text-sm text-muted-foreground">
+                <p>Safety objetiva decide por categorias nativas como nudez, violência e autoagressão.</p>
+                <p>Quando o modo estiver em <strong>observe_only</strong>, o resultado continua rastreado mas não derruba a publicação sozinho.</p>
+                <p>O escopo define se a moderação objetiva considera apenas a imagem ou também o texto normalizado associado ao envio.</p>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
 
         <TabsContent value="configuracao" className="mt-6">
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1.2fr)]">
             <div className="glass space-y-4 rounded-xl p-6">
               <div className="space-y-1">
-                <h3 className="font-semibold">Configuracao padrao</h3>
+                <h3 className="font-semibold">Contexto do evento e resposta</h3>
                 <p className="text-sm text-muted-foreground">
-                  Defina a instrucao padrao, o preset preferencial e os textos fixos usados quando um evento ativar resposta automatica.
+                  Defina a política estruturada do gate contextual e a resposta automática herdada pelos eventos.
                 </p>
               </div>
 
@@ -506,6 +1096,235 @@ export default function MediaAutomaticRepliesPage() {
                 </div>
               ) : (
                 <>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <Label htmlFor="context-enabled">Gate contextual ativo</Label>
+                          <p className="mt-1 text-xs text-muted-foreground">Liga a avaliação semântica da imagem antes da publicação.</p>
+                        </div>
+                        <Switch
+                          id="context-enabled"
+                          checked={contextEnabled}
+                          onCheckedChange={setContextEnabled}
+                          disabled={updateConfigurationMutation.isPending}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <Label htmlFor="context-require-json">JSON estruturado obrigatório</Label>
+                          <p className="mt-1 text-xs text-muted-foreground">Mantém o parser estável com schema estrito do domínio.</p>
+                        </div>
+                        <Switch
+                          id="context-require-json"
+                          checked={contextRequireJsonOutput}
+                          onCheckedChange={setContextRequireJsonOutput}
+                          disabled={updateConfigurationMutation.isPending}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="context-provider">Provider contextual</Label>
+                      <Select value={contextProviderKey} onValueChange={(value) => setContextProviderKey(value as 'vllm' | 'openrouter' | 'noop')}>
+                        <SelectTrigger id="context-provider" aria-label="Provider contextual">
+                          <SelectValue placeholder="Selecione o provider" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="vllm">vLLM</SelectItem>
+                          <SelectItem value="openrouter">OpenRouter</SelectItem>
+                          <SelectItem value="noop">Noop</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="context-mode">Modo do gate contextual</Label>
+                      <Select value={contextMode} onValueChange={(value) => setContextMode(value as 'enrich_only' | 'gate')}>
+                        <SelectTrigger id="context-mode" aria-label="Modo do gate contextual">
+                          <SelectValue placeholder="Selecione o modo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="enrich_only">Apenas enriquecer</SelectItem>
+                          <SelectItem value="gate">Bloquear</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="context-scope">Escopo do contexto</Label>
+                      <Select value={contextScope} onValueChange={(value) => setContextScope(value as 'image_only' | 'image_and_text_context')}>
+                        <SelectTrigger id="context-scope" aria-label="Escopo do contexto">
+                          <SelectValue placeholder="Selecione o escopo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="image_only">Somente imagem</SelectItem>
+                          <SelectItem value="image_and_text_context">Imagem + texto</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="reply-scope">Escopo da resposta</Label>
+                      <Select value={replyScope} onValueChange={(value) => setReplyScope(value as 'image_only' | 'image_and_text_context')}>
+                        <SelectTrigger id="reply-scope" aria-label="Escopo da resposta">
+                          <SelectValue placeholder="Selecione o escopo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="image_only">Somente imagem</SelectItem>
+                          <SelectItem value="image_and_text_context">Imagem + texto</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="context-model-key">Modelo</Label>
+                      <Input id="context-model-key" value={contextModelKey} onChange={(event) => setContextModelKey(event.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="context-prompt-version">Versao do prompt</Label>
+                      <Input id="context-prompt-version" value={contextPromptVersion} onChange={(event) => setContextPromptVersion(event.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="context-response-schema-version">Versao do schema</Label>
+                      <Input id="context-response-schema-version" value={contextResponseSchemaVersion} onChange={(event) => setContextResponseSchemaVersion(event.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="context-timeout-ms">Timeout (ms)</Label>
+                      <Input id="context-timeout-ms" value={contextTimeoutMs} onChange={(event) => setContextTimeoutMs(event.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="context-fallback-mode">Fallback contextual</Label>
+                      <Select value={contextFallbackMode} onValueChange={(value) => setContextFallbackMode(value as 'review' | 'skip')}>
+                        <SelectTrigger id="context-fallback-mode" aria-label="Fallback contextual">
+                          <SelectValue placeholder="Selecione o fallback" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="review">Mandar para review</SelectItem>
+                          <SelectItem value="skip">Ignorar enriquecimento</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="context-preset-key">Preset contextual</Label>
+                      <Select value={contextPresetKey} onValueChange={setContextPresetKey}>
+                        <SelectTrigger id="context-preset-key" aria-label="Preset contextual">
+                          <SelectValue placeholder="Selecione o preset" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="casamento_equilibrado">Casamento equilibrado</SelectItem>
+                          <SelectItem value="casamento_rigido">Casamento rígido</SelectItem>
+                          <SelectItem value="formatura">Formatura</SelectItem>
+                          <SelectItem value="corporativo_restrito">Corporativo restrito</SelectItem>
+                          <SelectItem value="aniversario_infantil">Aniversário infantil</SelectItem>
+                          <SelectItem value="homologacao_livre">Homologação livre</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="context-normalized-text-mode">Modo do texto normalizado</Label>
+                      <Select
+                        value={normalizedTextContextMode}
+                        onValueChange={(value) => setNormalizedTextContextMode(value as 'none' | 'body_only' | 'caption_only' | 'body_plus_caption' | 'operator_summary')}
+                      >
+                        <SelectTrigger id="context-normalized-text-mode" aria-label="Modo do texto normalizado do contexto">
+                          <SelectValue placeholder="Selecione o modo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Nenhum texto</SelectItem>
+                          <SelectItem value="body_only">Somente body text</SelectItem>
+                          <SelectItem value="caption_only">Somente legenda</SelectItem>
+                          <SelectItem value="body_plus_caption">Body + legenda</SelectItem>
+                          <SelectItem value="operator_summary">Resumo do operador</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <Label htmlFor="allow-alcohol">Permitir álcool</Label>
+                          <p className="mt-1 text-xs text-muted-foreground">Exceções continuam sendo respeitadas pelo gate.</p>
+                        </div>
+                        <Switch id="allow-alcohol" checked={allowAlcohol} onCheckedChange={setAllowAlcohol} />
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <Label htmlFor="allow-tobacco">Permitir cigarro</Label>
+                          <p className="mt-1 text-xs text-muted-foreground">Inclui cigarro, vape e tabaco no contexto do produto.</p>
+                        </div>
+                        <Switch id="allow-tobacco" checked={allowTobacco} onCheckedChange={setAllowTobacco} />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="required-people-context">Pessoas obrigatórias</Label>
+                      <Select value={requiredPeopleContext} onValueChange={(value) => setRequiredPeopleContext(value as 'optional' | 'required')}>
+                        <SelectTrigger id="required-people-context" aria-label="Presença de pessoas obrigatória">
+                          <SelectValue placeholder="Selecione a regra" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="optional">Opcional</SelectItem>
+                          <SelectItem value="required">Obrigatória</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="blocked-terms">Bloquear também</Label>
+                      <Textarea
+                        id="blocked-terms"
+                        value={blockedTermsText}
+                        onChange={(event) => setBlockedTermsText(event.target.value)}
+                        rows={6}
+                        placeholder={'mascaras\narmas cenicas'}
+                      />
+                      <p className="text-xs text-muted-foreground">Use um termo por linha para expandir o bloqueio contextual.</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="allowed-exceptions">Exceções permitidas</Label>
+                      <Textarea
+                        id="allowed-exceptions"
+                        value={allowedExceptionsText}
+                        onChange={(event) => setAllowedExceptionsText(event.target.value)}
+                        rows={6}
+                        placeholder={'brinde com espumante\ncamera fotografica'}
+                      />
+                      <p className="text-xs text-muted-foreground">Use uma exceção por linha para aliviar falsos positivos previsíveis.</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="freeform-instruction">Instrução complementar do operador</Label>
+                    <Textarea
+                      id="freeform-instruction"
+                      value={freeformInstruction}
+                      onChange={(event) => setFreeformInstruction(event.target.value)}
+                      rows={5}
+                      placeholder="Opcional. Serve para ajuste fino depois do preset e dos toggles estruturados."
+                    />
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="ia-preset-padrao">Preset padrao</Label>
                     <Select value={standardPresetId} onValueChange={setStandardPresetId}>
@@ -646,9 +1465,9 @@ export default function MediaAutomaticRepliesPage() {
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
             <div className="glass space-y-4 rounded-xl p-6">
               <div className="space-y-1">
-                <h3 className="font-semibold">Teste do prompt</h3>
+                <h3 className="font-semibold">Laboratorio de homologacao</h3>
                 <p className="text-sm text-muted-foreground">
-                  Envie ate 3 imagens para validar a resposta gerada, o prompt efetivo, o provider, o modelo e a latencia.
+                  Envie ate 3 imagens para validar safety, contexto, resposta automatica e elegibilidade final antes de promover a politica.
                 </p>
               </div>
 
@@ -717,6 +1536,79 @@ export default function MediaAutomaticRepliesPage() {
                 />
               </div>
 
+              <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                <div className="space-y-1">
+                  <div className="text-sm font-medium">Overrides controlados do laboratorio</div>
+                  <p className="text-xs text-muted-foreground">
+                    Estes ajustes valem apenas para o teste atual e nao alteram a politica produtiva.
+                  </p>
+                </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="teste-safety-scope-override">Scope de safety objetiva</Label>
+                    <Select value={testObjectiveSafetyScopeOverride} onValueChange={(value) => setTestObjectiveSafetyScopeOverride(value as typeof testObjectiveSafetyScopeOverride)}>
+                      <SelectTrigger id="teste-safety-scope-override" aria-label="Scope de safety objetiva do laboratorio">
+                        <SelectValue placeholder="Herdar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="inherit">Herdar</SelectItem>
+                        <SelectItem value="image_only">Somente imagem</SelectItem>
+                        <SelectItem value="image_and_text_context">Imagem + texto</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="teste-context-scope-override">Scope do gate contextual</Label>
+                    <Select value={testContextScopeOverride} onValueChange={(value) => setTestContextScopeOverride(value as typeof testContextScopeOverride)}>
+                      <SelectTrigger id="teste-context-scope-override" aria-label="Scope do gate contextual do laboratorio">
+                        <SelectValue placeholder="Herdar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="inherit">Herdar</SelectItem>
+                        <SelectItem value="image_only">Somente imagem</SelectItem>
+                        <SelectItem value="image_and_text_context">Imagem + texto</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="teste-reply-scope-override">Scope da resposta</Label>
+                    <Select value={testReplyScopeOverride} onValueChange={(value) => setTestReplyScopeOverride(value as typeof testReplyScopeOverride)}>
+                      <SelectTrigger id="teste-reply-scope-override" aria-label="Scope da resposta do laboratorio">
+                        <SelectValue placeholder="Herdar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="inherit">Herdar</SelectItem>
+                        <SelectItem value="image_only">Somente imagem</SelectItem>
+                        <SelectItem value="image_and_text_context">Imagem + texto</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="teste-text-context-override">Contexto textual normalizado</Label>
+                    <Select
+                      value={testNormalizedTextContextModeOverride}
+                      onValueChange={(value) => setTestNormalizedTextContextModeOverride(value as typeof testNormalizedTextContextModeOverride)}
+                    >
+                      <SelectTrigger id="teste-text-context-override" aria-label="Contexto textual normalizado do laboratorio">
+                        <SelectValue placeholder="Herdar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="inherit">Herdar</SelectItem>
+                        <SelectItem value="none">Sem texto</SelectItem>
+                        <SelectItem value="body_only">Somente corpo</SelectItem>
+                        <SelectItem value="caption_only">Somente caption</SelectItem>
+                        <SelectItem value="body_plus_caption">Corpo + caption</SelectItem>
+                        <SelectItem value="operator_summary">Resumo do operador</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="teste-imagens">Imagens do teste</Label>
                 <Input
@@ -741,48 +1633,171 @@ export default function MediaAutomaticRepliesPage() {
                 ) : null}
               </div>
 
-              <Button
-                type="button"
-                onClick={() => runPromptTestMutation.mutate()}
-                disabled={runPromptTestMutation.isPending || testFiles.length === 0}
-              >
-                {runPromptTestMutation.isPending
-                  ? <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                  : <TestTube2 className="mr-1 h-4 w-4" />}
-                Executar teste
-              </Button>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  type="button"
+                  onClick={() => runPromptTestMutation.mutate()}
+                  disabled={runPromptTestMutation.isPending || testFiles.length === 0}
+                >
+                  {runPromptTestMutation.isPending
+                    ? <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    : <TestTube2 className="mr-1 h-4 w-4" />}
+                  Executar teste
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => runPromptTestMutation.mutate()}
+                  disabled={runPromptTestMutation.isPending || latestTestRun === null || testFiles.length === 0}
+                >
+                  Repetir ultimo teste
+                </Button>
+              </div>
             </div>
 
             <div className="glass space-y-4 rounded-xl p-6">
               <div className="space-y-1">
-                <h3 className="font-semibold">Resultado do teste</h3>
+                <h3 className="font-semibold">Resultado do laboratorio</h3>
                 <p className="text-sm text-muted-foreground">
-                  A resposta aparece em tempo real, sem depender da fila produtiva.
+                  O resultado combina resposta automatica, safety, gate contextual e projecao final do estado da midia.
                 </p>
               </div>
 
               {runPromptTestMutation.isPending ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Gerando resposta da IA...
+                  Homologando a politica...
                 </div>
               ) : latestTestRun === null ? (
                 <div className="rounded-lg border border-dashed border-border/60 p-4 text-sm text-muted-foreground">
-                  Execute um teste para visualizar o prompt efetivo, a resposta gerada e os dados tecnicos.
+                  Execute um teste para visualizar a politica efetiva, o resultado lado a lado e os dados tecnicos.
                 </div>
               ) : (
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={latestTestRun.status === 'success' ? 'default' : 'destructive'}>
-                      {latestTestRun.status === 'success' ? 'Sucesso' : 'Falha'}
+                    <Badge variant={runStatusBadgeVariant(latestTestRun.status)}>
+                      {runStatusLabel(latestTestRun.status)}
                     </Badge>
                     <Badge variant="outline">{latestTestRun.provider_key}</Badge>
                     <Badge variant="outline">{latestTestRun.model_key}</Badge>
                   </div>
 
-                  <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
-                    <div className="text-sm font-medium">Resposta gerada</div>
-                    <div className="mt-2 text-sm text-foreground">{latestTestRun.response_text || 'Vazio'}</div>
+                  <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                    <div className="font-medium">Politica efetiva agora</div>
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      <div>
+                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Safety objetiva</div>
+                        <div className="mt-1 text-foreground">
+                          {scopeLabel((latestTestRun.policy_snapshot.safety?.analysis_scope as string | undefined) ?? null)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Origem: {policySourceLabel(latestTestRun.policy_sources.safety?.analysis_scope)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Gate contextual</div>
+                        <div className="mt-1 text-foreground">
+                          {scopeLabel((latestTestRun.policy_snapshot.context?.context_scope as string | undefined) ?? null)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Origem: {policySourceLabel(latestTestRun.policy_sources.context?.context_scope)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Scope da resposta</div>
+                        <div className="mt-1 text-foreground">
+                          {scopeLabel((latestTestRun.policy_snapshot.context?.reply_scope as string | undefined) ?? null)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Origem: {policySourceLabel(latestTestRun.policy_sources.context?.reply_scope)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Texto normalizado</div>
+                        <div className="mt-1 text-foreground">
+                          {normalizedTextContextModeLabel((latestTestRun.policy_snapshot.context?.normalized_text_context_mode as string | undefined)
+                            ?? (latestTestRun.policy_snapshot.safety?.normalized_text_context_mode as string | undefined)
+                            ?? null)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                      <div className="font-medium">Safety objetiva</div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <Badge variant={latestTestRun.final_summary.safety_is_blocking ? 'default' : 'outline'}>
+                          {latestTestRun.final_summary.safety_is_blocking ? 'Bloqueante' : 'Observacao'}
+                        </Badge>
+                        <span className="text-muted-foreground">
+                          {latestTestRun.safety_results[0]?.decision || 'Nao executado'}
+                        </span>
+                      </div>
+                      <div className="mt-2 space-y-1 text-muted-foreground">
+                        <div>Pass: {latestTestRun.final_summary.safety_counts?.pass ?? 0}</div>
+                        <div>Review: {latestTestRun.final_summary.safety_counts?.review ?? 0}</div>
+                        <div>Block: {latestTestRun.final_summary.safety_counts?.block ?? 0}</div>
+                        <div>Erro: {latestTestRun.final_summary.safety_counts?.error ?? 0}</div>
+                      </div>
+                      {latestTestRun.safety_results[0]?.error_message ? (
+                        <div className="mt-2 text-xs text-destructive">{latestTestRun.safety_results[0].error_message}</div>
+                      ) : null}
+                    </div>
+
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                      <div className="font-medium">Gate contextual</div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <Badge variant={latestTestRun.final_summary.context_is_blocking ? 'default' : 'outline'}>
+                          {latestTestRun.final_summary.context_is_blocking ? 'Bloqueante' : 'Enriquecimento'}
+                        </Badge>
+                        <span className="text-muted-foreground">
+                          {latestTestRun.contextual_results[0]?.decision || 'Nao executado'}
+                        </span>
+                      </div>
+                      <div className="mt-2 space-y-1 text-muted-foreground">
+                        <div>Approve: {latestTestRun.final_summary.context_counts?.approve ?? 0}</div>
+                        <div>Review: {latestTestRun.final_summary.context_counts?.review ?? 0}</div>
+                        <div>Reject: {latestTestRun.final_summary.context_counts?.reject ?? 0}</div>
+                        <div>Erro: {latestTestRun.final_summary.context_counts?.error ?? 0}</div>
+                      </div>
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        {latestTestRun.contextual_results[0]?.reason || 'Sem motivo informado'}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                      <div className="font-medium">Resposta automatica</div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <Badge variant={latestTestRun.final_summary.reply_status === 'success' ? 'default' : 'secondary'}>
+                          {latestTestRun.final_summary.reply_status === 'success' ? 'Disponivel' : 'Falhou'}
+                        </Badge>
+                        <span className="text-muted-foreground">
+                          {latestTestRun.response_text ? 'Texto gerado' : 'Sem texto'}
+                        </span>
+                      </div>
+                      <div className="mt-2 text-foreground">{latestTestRun.response_text || 'Vazio'}</div>
+                    </div>
+
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                      <div className="font-medium">Elegibilidade final</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <Badge variant={effectiveStateBadgeVariant(latestTestRun.final_summary.final_effective_state)}>
+                          {effectiveStateLabel(latestTestRun.final_summary.final_effective_state)}
+                        </Badge>
+                        <Badge variant="outline">
+                          {publishEligibilityLabel(latestTestRun.final_summary.final_publish_eligibility)}
+                        </Badge>
+                      </div>
+                      <div className="mt-2 text-muted-foreground">
+                        {latestTestRun.final_summary.human_reason || 'Sem resumo operacional.'}
+                      </div>
+                      <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                        <div>Camadas bloqueantes: {(latestTestRun.final_summary.blocking_layers ?? []).join(', ') || 'nenhuma'}</div>
+                        <div>Erros de avaliacao: {latestTestRun.final_summary.evaluation_errors_count ?? 0}</div>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
@@ -1450,17 +2465,41 @@ export default function MediaAutomaticRepliesPage() {
                       className={`w-full rounded-lg border p-3 text-left transition ${selectedRealHistoryId === item.id ? 'border-primary bg-primary/5' : 'border-border/60 bg-muted/20'}`}
                       onClick={() => setSelectedRealHistoryId(item.id)}
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="font-medium">{item.event_title || `Midia ${item.event_media_id}`}</span>
-                        <Badge variant={item.status === 'failed' ? 'destructive' : 'default'}>
-                          {item.status || 'sem status'}
-                        </Badge>
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {(item.sender_name || item.sender_phone || 'Remetente nao identificado')} - {item.provider_key || 'sem provedor'}
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {item.reply_text || item.short_caption || 'Sem texto gerado'}
+                      <div className="flex items-start gap-3">
+                        {item.preview_url ? (
+                          <img
+                            src={item.preview_url}
+                            alt={`Preview da midia ${item.id}`}
+                            className="h-14 w-14 rounded-md border border-border/60 object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-14 w-14 items-center justify-center rounded-md border border-dashed border-border/60 text-[11px] text-muted-foreground">
+                            Sem preview
+                          </div>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="truncate font-medium">{item.event_title || `Midia ${item.event_media_id}`}</span>
+                            <Badge variant={effectiveStateBadgeVariant(item.effective_media_state)}>
+                              {effectiveStateLabel(item.effective_media_state)}
+                            </Badge>
+                          </div>
+                          <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                            <span>{item.source_label || item.source_type || 'Origem nao informada'}</span>
+                            <span>{item.media_type || 'midia'}</span>
+                            <span>{item.policy_label || 'Sem politica nomeada'}</span>
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {(item.sender_name || item.sender_phone || 'Remetente nao identificado')} - {item.provider_key || 'sem provedor'}
+                          </div>
+                          <div className="mt-2 text-sm text-foreground/90">
+                            {item.human_reason || item.reason || item.reply_text || item.short_caption || 'Sem explicacao operacional.'}
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {item.text_context_summary || 'Sem resumo de contexto textual.'}
+                          </div>
+                        </div>
                       </div>
                     </button>
                   ))
@@ -1492,12 +2531,57 @@ export default function MediaAutomaticRepliesPage() {
               ) : (
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={activeRealHistoryDetail.status === 'failed' ? 'destructive' : 'default'}>
-                      {activeRealHistoryDetail.status || 'sem status'}
+                    <Badge variant={effectiveStateBadgeVariant(activeRealHistoryDetail.effective_media_state)}>
+                      {effectiveStateLabel(activeRealHistoryDetail.effective_media_state)}
+                    </Badge>
+                    <Badge variant={activeRealHistoryDetail.status === 'failed' ? 'destructive' : 'outline'}>
+                      Pipeline VLM: {activeRealHistoryDetail.status || 'sem status'}
                     </Badge>
                     {activeRealHistoryDetail.provider_key ? <Badge variant="outline">{activeRealHistoryDetail.provider_key}</Badge> : null}
                     {activeRealHistoryDetail.model_key ? <Badge variant="outline">{activeRealHistoryDetail.model_key}</Badge> : null}
                     {activeRealHistoryDetail.trace_id ? <Badge variant="outline">{activeRealHistoryDetail.trace_id}</Badge> : null}
+                    {activeRealHistoryDetail.policy_label ? <Badge variant="outline">{activeRealHistoryDetail.policy_label}</Badge> : null}
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                      <div className="font-medium">Miniatura</div>
+                      <div className="mt-3">
+                        {activeRealHistoryDetail.preview_url ? (
+                          <img
+                            src={activeRealHistoryDetail.preview_url}
+                            alt={`Preview da midia ${activeRealHistoryDetail.id}`}
+                            className="h-40 w-full rounded-lg border border-border/60 object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-border/60 text-muted-foreground">
+                            Sem preview
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                        <div className="font-medium">Leitura operacional</div>
+                        <div className="mt-2 space-y-1 text-muted-foreground">
+                          <div>Motivo humano: {activeRealHistoryDetail.human_reason || 'Nao informado'}</div>
+                          <div>Politica ativa: {activeRealHistoryDetail.policy_label || activeRealHistoryDetail.preset_name || 'Sem preset'}</div>
+                          <div>Heranca: {policyInheritanceLabel(activeRealHistoryDetail.policy_inheritance_mode)}</div>
+                          <div>Texto considerado: {activeRealHistoryDetail.text_context_summary || 'Nao informado'}</div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                        <div className="font-medium">Decisoes consolidadas</div>
+                        <div className="mt-2 space-y-1 text-muted-foreground">
+                          <div>Safety: {activeRealHistoryDetail.safety_decision || 'Nao informado'}</div>
+                          <div>Contexto: {activeRealHistoryDetail.context_decision || 'Nao informado'}</div>
+                          <div>Operador: {activeRealHistoryDetail.operator_decision || 'Nao informado'}</div>
+                          <div>Publicacao: {activeRealHistoryDetail.publication_decision || 'Nao informado'}</div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
@@ -1513,12 +2597,39 @@ export default function MediaAutomaticRepliesPage() {
                     </div>
 
                     <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
-                      <div className="font-medium">Preset e resposta</div>
+                      <div className="font-medium">Decisão e resposta</div>
                       <div className="mt-2 space-y-1 text-muted-foreground">
                         <div>Preset: {activeRealHistoryDetail.preset_name || 'Sem preset'}</div>
                         <div>Origem do preset: {activeRealHistoryDetail.prompt_preset_source || 'Nao informada'}</div>
                         <div>Origem da instrucao: {activeRealHistoryDetail.prompt_instruction_source || 'Nao informada'}</div>
+                        <div>Reason code: {activeRealHistoryDetail.reason_code || 'Nao informado'}</div>
+                        <div>Confianca: {activeRealHistoryDetail.confidence_band || 'Nao informada'}</div>
+                        <div>Elegibilidade: {activeRealHistoryDetail.publish_eligibility || 'Nao informada'}</div>
                         <div>Resposta: {activeRealHistoryDetail.reply_text || 'Sem resposta automatica'}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                      <div className="font-medium">Políticas que bateram</div>
+                      <div className="mt-2 space-y-1 text-muted-foreground">
+                        {activeRealHistoryDetail.matched_policies.length > 0
+                          ? activeRealHistoryDetail.matched_policies.map((policy) => (
+                            <div key={policy}>{policy}</div>
+                          ))
+                          : <div>Nenhuma política explícita registrada.</div>}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                      <div className="font-medium">Exceções consideradas</div>
+                      <div className="mt-2 space-y-1 text-muted-foreground">
+                        {activeRealHistoryDetail.matched_exceptions.length > 0
+                          ? activeRealHistoryDetail.matched_exceptions.map((policy) => (
+                            <div key={policy}>{policy}</div>
+                          ))
+                          : <div>Nenhuma exceção aplicada.</div>}
                       </div>
                     </div>
                   </div>

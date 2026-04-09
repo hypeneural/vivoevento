@@ -21,10 +21,8 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import type {
   ApiWallAdItem,
-  ApiWallDiagnosticsPlayer,
   ApiWallDiagnosticsSummary,
   ApiWallPlayerCommand,
-  ApiWallPersistentStorage,
   ApiWallSelectionPolicy,
   ApiWallSettings,
 } from '@/lib/api-types';
@@ -38,6 +36,7 @@ import { HelpTooltip } from '../components/WallManagerHelp';
 import { WallManagerSection } from '../components/WallManagerSection';
 import { WallAdsTab } from '../components/manager/inspector/WallAdsTab';
 import { WallAppearanceTab } from '../components/manager/inspector/WallAppearanceTab';
+import { WallPlayerRuntimeCard } from '../components/manager/diagnostics/WallPlayerRuntimeCard';
 import { WallCommandToolbar } from '../components/manager/layout/WallCommandToolbar';
 import { WallInspectorTabs } from '../components/manager/inspector/WallInspectorTabs';
 import { WallQueueTab } from '../components/manager/inspector/WallQueueTab';
@@ -68,6 +67,7 @@ import {
   type EventWallAction,
 } from '../api';
 import { useWallPollingFallback } from '../hooks/useWallPollingFallback';
+import { useWallLiveSnapshot } from '../hooks/useWallLiveSnapshot';
 import { useWallSelectedMedia } from '../hooks/useWallSelectedMedia';
 import { useWallTopInsights } from '../hooks/useWallTopInsights';
 import { realtimeLabel, useWallRealtimeSync } from '../hooks/useWallRealtimeSync';
@@ -210,6 +210,9 @@ export default function EventWallManagerPage() {
   const insightsQuery = useWallTopInsights(eventId, {
     refetchInterval: pollingFallback.insightsIntervalMs,
   });
+  const liveSnapshotQuery = useWallLiveSnapshot(eventId, {
+    refetchInterval: pollingFallback.liveSnapshotIntervalMs,
+  });
 
   useEffect(() => {
     if (settingsQuery.data?.settings) {
@@ -329,6 +332,7 @@ export default function EventWallManagerPage() {
   const diagnosticsPlayers = diagnosticsQuery.data?.players ?? [];
   const insights = insightsQuery.data ?? null;
   const insightsRecentItems = insights?.recentItems ?? [];
+  const liveSnapshot = liveSnapshotQuery.data ?? null;
   const simulationSummary = simulationQuery.data?.summary ?? null;
   const simulationPreview = simulationQuery.data?.sequence_preview ?? [];
   const simulationExplanation = simulationQuery.data?.explanation ?? [];
@@ -711,6 +715,7 @@ export default function EventWallManagerPage() {
             isPaused={isPaused}
             status={status}
             selectedMedia={selectedMedia}
+            liveSnapshot={liveSnapshot}
             eventTitle={event.title}
             eventSchedule={formatEventSchedule(event.starts_at, event.location_name)}
             wallCode={settings.wall_code}
@@ -814,7 +819,7 @@ export default function EventWallManagerPage() {
               {diagnosticsPlayers.length > 0 ? (
                 <div className="grid gap-3">
                   {diagnosticsPlayers.map((player) => (
-                    <PlayerRuntimeCard key={player.player_instance_id} player={player} />
+                    <WallPlayerRuntimeCard key={player.player_instance_id} player={player} />
                   ))}
                 </div>
               ) : (
@@ -958,76 +963,6 @@ function CompactMetricCard({
   );
 }
 
-function PlayerRuntimeCard({ player }: { player: ApiWallDiagnosticsPlayer }) {
-  return (
-    <div className={`rounded-2xl border p-4 ${playerCardClass(player.health_status)}`}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-sm font-semibold">Tela {shortPlayerId(player.player_instance_id)}</p>
-          <p className="text-xs text-muted-foreground">
-            Ultimo sinal {formatTimestampLabel(player.last_seen_at)}
-          </p>
-        </div>
-        <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-medium ${healthBadgeClass(player.health_status)}`}>
-          {formatPlayerHealthLabel(player.health_status)}
-        </span>
-      </div>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <RuntimeStat label="Exibicao" value={formatRuntimeStatus(player.runtime_status)} />
-        <RuntimeStat label="Conexao" value={formatConnectionStatus(player.connection_status)} />
-        <RuntimeStat label="Ultimo envio na tela" value={player.current_sender_key ?? 'Nenhum item agora'} />
-        <RuntimeStat
-          label="Fotos"
-          value={`R${player.ready_count} | L${player.loading_count} | E${player.error_count} | S${player.stale_count}`}
-        />
-        <RuntimeStat label="Uso do cache" value={formatPercentLabel(player.cache_hit_rate)} />
-        <RuntimeStat
-          label="Espaco local"
-          value={`${formatBytes(player.cache_usage_bytes)} / ${formatBytes(player.cache_quota_bytes)}`}
-        />
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-        <span className="rounded-full border border-border/60 bg-background px-3 py-1">
-          Cache {player.cache_enabled ? 'ativo' : 'desligado'}
-        </span>
-        <span className="rounded-full border border-border/60 bg-background px-3 py-1">
-          Armazenamento {formatPersistentStorage(player.persistent_storage)}
-        </span>
-        <span className="rounded-full border border-border/60 bg-background px-3 py-1">
-          Acertos {player.cache_hit_count} | Falhas {player.cache_miss_count} | Desatualizados {player.cache_stale_fallback_count}
-        </span>
-        {player.last_sync_at ? (
-          <span className="rounded-full border border-border/60 bg-background px-3 py-1">
-            Ultima atualizacao {formatTimestampLabel(player.last_sync_at)}
-          </span>
-        ) : null}
-        {player.last_fallback_reason ? (
-          <span className="rounded-full border border-border/60 bg-background px-3 py-1">
-            Motivo da troca {formatFallbackReason(player.last_fallback_reason)}
-          </span>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function RuntimeStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border/50 bg-background/70 p-3">
-      <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
-      <p className="mt-1 text-sm font-medium">{value}</p>
-    </div>
-  );
-}
-
-function shortPlayerId(playerInstanceId: string) {
-  return playerInstanceId.length <= 12
-    ? playerInstanceId
-    : `${playerInstanceId.slice(0, 8)}...${playerInstanceId.slice(-4)}`;
-}
-
 function formatPercentLabel(value?: number | null) {
   if (value == null) {
     return 'Sem dado';
@@ -1087,81 +1022,6 @@ function formatWallHealthLabel(value: ApiWallDiagnosticsSummary['health_status']
   }
 }
 
-function formatPlayerHealthLabel(value: ApiWallDiagnosticsPlayer['health_status']) {
-  if (value === 'healthy') return 'Saudavel';
-  if (value === 'degraded') return 'Com instabilidade';
-  return 'Sem conexao';
-}
-
-function formatRuntimeStatus(value?: string | null) {
-  switch (value) {
-    case 'booting':
-      return 'Iniciando';
-    case 'loading':
-      return 'Carregando';
-    case 'playing':
-      return 'Exibindo';
-    case 'paused':
-      return 'Pausado';
-    case 'error':
-      return 'Com erro';
-    case 'idle':
-      return 'Aguardando';
-    default:
-      return formatLooseLabel(value, 'Sem dado');
-  }
-}
-
-function formatConnectionStatus(value?: string | null) {
-  switch (value) {
-    case 'connected':
-      return 'Conectado';
-    case 'reconnecting':
-      return 'Reconectando';
-    case 'disconnected':
-      return 'Desconectado';
-    case 'offline':
-      return 'Offline';
-    default:
-      return formatLooseLabel(value, 'Sem dado');
-  }
-}
-
-function formatFallbackReason(value?: string | null) {
-  return formatLooseLabel(value, 'Sem detalhe');
-}
-
-function formatLooseLabel(value?: string | null, fallback = 'Sem dado') {
-  if (!value) {
-    return fallback;
-  }
-
-  const normalized = value.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
-
-  if (!normalized) {
-    return fallback;
-  }
-
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-}
-
-function formatPersistentStorage(value: ApiWallPersistentStorage) {
-  switch (value) {
-    case 'localstorage':
-      return 'Memoria do navegador';
-    case 'indexeddb':
-      return 'Banco local do navegador';
-    case 'cache_api':
-      return 'Cache do navegador';
-    case 'unavailable':
-      return 'Indisponivel';
-    case 'unknown':
-      return 'Desconhecida';
-    default:
-      return 'Nenhuma';
-  }
-}
-
 function healthTone(value: ApiWallDiagnosticsSummary['health_status']): 'default' | 'healthy' | 'degraded' | 'offline' | 'idle' {
   switch (value) {
     case 'healthy':
@@ -1189,27 +1049,5 @@ function metricToneClass(tone: 'default' | 'healthy' | 'degraded' | 'offline' | 
       return 'border-slate-500/30 bg-slate-500/5';
     default:
       return 'border-border/60 bg-background/70';
-  }
-}
-
-function playerCardClass(health: ApiWallDiagnosticsPlayer['health_status']) {
-  switch (health) {
-    case 'healthy':
-      return 'border-emerald-500/20 bg-emerald-500/5';
-    case 'degraded':
-      return 'border-amber-500/20 bg-amber-500/5';
-    default:
-      return 'border-rose-500/20 bg-rose-500/5';
-  }
-}
-
-function healthBadgeClass(health: ApiWallDiagnosticsPlayer['health_status']) {
-  switch (health) {
-    case 'healthy':
-      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700';
-    case 'degraded':
-      return 'border-amber-500/30 bg-amber-500/10 text-amber-700';
-    default:
-      return 'border-rose-500/30 bg-rose-500/10 text-rose-700';
   }
 }

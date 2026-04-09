@@ -68,11 +68,13 @@ describe('WallDraftPreviewCard', () => {
     );
 
     expect(screen.getByText(/Previa do rascunho/i)).toBeInTheDocument();
+    expect(screen.getByText(/mesmo renderer visual do player/i)).toBeInTheDocument();
     expect(screen.getByText(/Compartilhe seu momento/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Credito do remetente ativo/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/QR visivel/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Miniaturas laterais ativas/i)).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: /Previa principal da midia de Carla/i })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: /Proxima midia de Ana/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Canvas da previa do rascunho/i)).toBeInTheDocument();
+    expect(screen.getByText(/FOTO POR:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Envie sua foto/i)).toBeInTheDocument();
   });
 });

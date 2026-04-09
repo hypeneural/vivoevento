@@ -31,9 +31,23 @@ Este plano existe para responder 7 perguntas de execucao:
 - [x] validacao red da bateria TDD executada antes da implementacao.
 - [x] smoke real de conectividade AWS executado com credencial valida.
 - [x] SDK base `aws/aws-sdk-php` instalado no `apps/api` para smoke e futura integracao.
-- [ ] backend roteavel `aws_rekognition` ainda nao implementado.
-- [ ] persistencia de provider records AWS ainda nao implementada.
-- [ ] preflight de selfie ainda nao implementado.
+- [x] bloco de config `face_search.providers.aws_rekognition` implementado.
+- [x] `AwsRekognitionClientFactory` implementado e coberto por testes unitarios.
+- [x] `FaceSearchBackendInterface`, `LocalPgvectorFaceSearchBackend` e `FaceSearchRouter` implementados.
+- [x] `SelfiePreflightService` implementado e integrado na busca por selfie.
+- [x] `SearchFacesBySelfieAction` desacoplada de detector/embedder/vector store diretos.
+- [x] settings AWS por evento aceitos e expostos na API backend.
+- [x] `FaceSearchProviderRecord` criado como fundacao minima de modelo.
+- [x] bootstrap do pacote `aws/aws-sdk-php-laravel` concluido no app.
+- [x] persistencia de provider records AWS implementada no banco.
+- [x] persistencia de `face_search_queries` implementada.
+- [x] provisionamento de collection por evento implementado.
+- [x] campos AWS expostos no form frontend do painel.
+- [x] `healthCheck` real do backend AWS implementado.
+- [x] preprocessamento deterministico para `Image.Bytes` implementado.
+- [x] indexacao AWS via `IndexFaces` implementada com persistencia de `UnindexedFaces`.
+- [x] gating por evento/backend/searchable implementado no pipeline de indexacao.
+- [x] busca AWS via `SearchFacesByImage` implementada com auditoria em `face_search_queries`.
 - [ ] fallback/shadow mode AWS ainda nao implementado.
 - [ ] user vectors AWS ainda nao implementados.
 
@@ -42,12 +56,43 @@ Ultima bateria executada:
 - comando:
   - `php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch`
 - resultado:
-  - `76 passed`
-  - `5 skipped`
-  - `517 assertions`
+  - `98 passed`
+  - `7 skipped`
+  - `659 assertions`
 - leitura:
-  - o baseline atual do modulo esta estavel antes da entrada da trilha AWS;
-  - os `5 skipped` correspondem aos contratos TDD AWS em modo opt-in, sem impactar a suite padrao.
+  - a trilha `H1 + H2 + H3 + H4-T2` manteve a suite ampla de `FaceSearch` verde;
+  - os `7 skipped` continuam sendo apenas os contratos TDD AWS em modo opt-in.
+
+Bateria frontend executada:
+
+- comandos:
+  - `npm run type-check`
+  - `npx.cmd vitest run src/modules/events/components/face-search`
+- resultado:
+  - `type-check = PASS`
+  - `EventFaceSearchSettingsForm.test.tsx = 5 passed`
+- leitura:
+  - o painel agora aceita o contrato AWS por evento sem quebrar tipagem nem fluxo do form.
+
+Bateria dirigida executada para `H2-T3` e `H3`:
+
+- comando:
+  - `php artisan test tests/Unit/FaceSearch/AwsRekognitionHealthCheckTest.php tests/Unit/FaceSearch/AwsImagePreprocessorTest.php tests/Unit/FaceSearch/AwsRekognitionFaceSearchBackendTest.php tests/Feature/FaceSearch/FaceIndexingPipelineTest.php tests/Unit/FaceSearch/FaceSearchRouterTest.php`
+- resultado:
+  - `18 passed`
+  - `103 assertions`
+- leitura:
+  - `healthCheck`, `Image.Bytes`, `IndexFaces`, `UnindexedFaces` e roteamento de indexacao por backend ficaram cobertos por TDD antes da regressao ampla.
+
+Bateria de contratos opt-in reexecutada apos `H3`:
+
+- comando:
+  - `$env:RUN_FACE_SEARCH_AWS_TDD='1'; php artisan test tests/Unit/FaceSearch/FaceSearchAwsConfigContractTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryContractTest.php tests/Unit/FaceSearch/FaceSearchRouterContractTest.php tests/Unit/FaceSearch/SelfiePreflightServiceContractTest.php tests/Feature/FaceSearch/FaceSearchAwsSettingsContractTest.php tests/Unit/FaceSearch/SearchFacesBySelfieAwsArchitectureContractTest.php tests/Unit/FaceSearch/FaceSearchProviderRecordContractTest.php`
+- resultado:
+  - `7 passed`
+  - `42 assertions`
+- leitura:
+  - a fundacao de `H1/H2` continuou intacta depois da entrada de `healthCheck` e `IndexFaces`.
 
 Bateria TDD opt-in executada:
 
@@ -68,31 +113,70 @@ Lacunas objetivas confirmadas pelos testes TDD:
 - `SearchFacesBySelfieAction` ainda esta acoplada diretamente a detector, embedder e vector store locais;
 - falta `FaceSearchProviderRecord` como modelo de persistencia para estado remoto do provider.
 
-Verificacoes finais na stack atual:
+Atualizacao apos entrada em `H1` e conclusao de `H2-T1` / `H2-T2`:
 
-- `EventFaceSearchSetting` hoje so conhece campos locais:
-  - `provider_key`
-  - `embedding_model_key`
-  - `vector_store_key`
-  - `search_strategy`
-  - `min_face_size_px`
-  - `min_quality_score`
-  - `search_threshold`
-- `UpsertEventFaceSearchSettingsRequest` hoje valida apenas configuracao local e publica;
-- `EventFaceSearchSettingResource` hoje nao expoe nenhum campo AWS;
-- `FaceSearchServiceProvider` hoje so registra:
-  - detection providers
-  - embedding providers
-  - vector store
-- `SearchFacesBySelfieAction` hoje depende diretamente de:
-  - `FaceDetectionProviderInterface`
-  - `FaceEmbeddingProviderInterface`
-  - `FaceVectorStoreInterface`
-- o modulo hoje nao tem:
-  - provider records
-  - query records especificos de backend
-  - jobs de provisionamento de collection
-  - health check de backend gerenciado
+- o bloco de config AWS foi implementado com thresholds separados e network settings dedicados;
+- o pacote oficial `aws/aws-sdk-php-laravel` foi integrado ao `composer` e resolvido pelo container;
+- foi adicionada config dedicada em `config/aws.php` para nao conflitar com `AWS_*` usados por storage local;
+- o container agora resolve `AwsRekognitionClientFactory`, `AwsRekognitionFaceSearchBackend`, `LocalPgvectorFaceSearchBackend`, `SelfiePreflightService` e `FaceSearchRouter`;
+- a busca por selfie agora passa por:
+  - `SelfiePreflightService`
+  - `FaceSearchRouter`
+  - backend local ou AWS por configuracao;
+- `EventFaceSearchSetting`, request, action e resource agora suportam configuracao AWS por evento;
+- o form frontend `EventFaceSearchSettingsForm` agora expoe backend, fallback, routing policy, search mode, quality filters e thresholds AWS;
+- `face_search_provider_records` e `face_search_queries` agora existem com migrations, models, factories e payload JSON rastreavel;
+- `EnsureAwsCollectionJob` agora provisiona collection por evento e persiste:
+  - `aws_collection_id`
+  - `aws_collection_arn`
+  - `aws_face_model_version`
+- `ResourceAlreadyExistsException` na criacao de collection ja e tratada como sucesso idempotente.
+- `AwsRekognitionHealthCheckTest` e `AwsImagePreprocessorTest` agora cobrem:
+  - `STS GetCallerIdentity`
+  - `DescribeCollection`
+  - `ListFaces`
+  - hints de IAM minimo
+  - resize/compressao deterministica para `Image.Bytes`
+- `IndexMediaFacesAction` agora roteia por backend e nao depende mais do pipeline local para eventos AWS;
+- `AwsRekognitionFaceSearchBackend::indexMedia()` agora:
+  - gera derivado JPEG para `Image.Bytes`
+  - chama `IndexFaces`
+  - persiste `FaceRecords`
+  - persiste `UnindexedFaces`
+  - remove faces remotas que falham no gate local de `searchable`
+  - evita custo AWS quando o evento continua na lane local.
+- `AwsRekognitionFaceSearchBackend::searchBySelfie()` agora:
+  - gera derivado padronizado para `SearchFacesByImage`
+  - usa `FaceMatchThreshold` e `QualityFilter` separados do lane local
+  - mapeia `FaceId` remoto para `event_media_id` local via `face_search_provider_records`
+  - retorna apenas faces `searchable=true`
+  - devolve payload bruto do provider para auditoria.
+- `SearchFacesBySelfieAction` agora:
+  - abre uma linha de auditoria em `face_search_queries`
+  - registra `backend_key`, `fallback_backend_key` e `routing_policy`
+  - persiste `query_face_bbox_json`, `provider_payload_json`, `result_count` e erro final quando houver.
+
+Estado atual da stack apos `H2-T2`:
+
+- `EventFaceSearchSetting` ja conhece os campos AWS e separa claramente thresholds locais de thresholds nativos da AWS;
+- `UpsertEventFaceSearchSettingsRequest` e `EventFaceSearchSettingResource` ja validam e expoem o contrato AWS por evento;
+- `FaceSearchServiceProvider` ja registra router, backends e factory AWS com resolucao via container;
+- `SearchFacesBySelfieAction` ja nao depende diretamente do trio detector/embedder/vector store;
+- o modulo agora ja tem:
+  - `face_search_provider_records`
+  - `face_search_queries`
+  - `EnsureAwsCollectionJob`
+- o modulo agora tambem ja tem:
+  - `healthCheck` real do backend AWS
+  - preprocessamento `Image.Bytes`
+  - indexacao AWS via `IndexFaces`
+  - persistencia de `UnindexedFaces`
+- o modulo agora tambem ja tem:
+  - busca AWS via `SearchFacesByImage`
+  - auditoria de query em `face_search_queries`
+- o modulo ainda nao tem:
+  - fallback/shadow mode completo
+  - user vectors
 
 Smoke real AWS executado antes da implementacao:
 
@@ -130,6 +214,86 @@ Leitura:
   - `IndexFaces`
   - `SearchFacesByImage`
   - `DeleteFaces`
+
+Bateria executada apos a implementacao inicial de `H1`:
+
+- bateria dirigida:
+  - `php artisan test tests/Unit/FaceSearch/AwsRekognitionClientFactoryTest.php tests/Unit/FaceSearch/FaceSearchRouterTest.php tests/Unit/FaceSearch/SelfiePreflightServiceTest.php tests/Feature/FaceSearch/FaceSearchSettingsTest.php tests/Feature/FaceSearch/FaceSearchSelfieEndpointsTest.php`
+  - resultado:
+    - `20 passed`
+    - `113 assertions`
+- contratos opt-in:
+  - `$env:RUN_FACE_SEARCH_AWS_TDD='1'; php artisan test tests/Unit/FaceSearch/FaceSearchAwsConfigContractTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryContractTest.php tests/Unit/FaceSearch/FaceSearchRouterContractTest.php tests/Unit/FaceSearch/SelfiePreflightServiceContractTest.php tests/Feature/FaceSearch/FaceSearchAwsSettingsContractTest.php tests/Unit/FaceSearch/SearchFacesBySelfieAwsArchitectureContractTest.php tests/Unit/FaceSearch/FaceSearchProviderRecordContractTest.php`
+  - resultado:
+    - `7 passed`
+    - `41 assertions`
+- regressao ampla:
+  - `php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch`
+  - resultado:
+    - `81 passed`
+    - `7 skipped`
+    - `1 failed`
+  - falha residual:
+    - `FaceSearchLocalDatasetManifestTest`
+    - motivo: fixture local externa ausente em `C:\Users\Usuario\Desktop\vipsocial\55159264527_7f683b08f6_o.jpg`
+  - leitura:
+    - a falha ampla atual nao veio da trilha AWS;
+    - ela veio de dependencia externa do dataset consentido local.
+
+Bateria executada apos conclusao de `H2-T1` e `H2-T2`:
+
+- backend:
+  - `php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch`
+  - resultado:
+    - `89 passed`
+    - `7 skipped`
+    - `566 assertions`
+- frontend:
+  - `npm run type-check`
+  - `npx.cmd vitest run src/modules/events/components/face-search`
+  - resultado:
+    - `PASS`
+    - `5 passed`
+- leitura:
+  - a entrada de `provider_records`, `queries`, provisionamento de collection e form AWS nao abriu regressao visivel na base atual.
+
+Bateria executada apos conclusao de `H2-T3` e `H3`:
+
+- backend:
+  - `php artisan test tests/Unit/FaceSearch/AwsRekognitionHealthCheckTest.php tests/Unit/FaceSearch/AwsImagePreprocessorTest.php tests/Unit/FaceSearch/AwsRekognitionFaceSearchBackendTest.php tests/Feature/FaceSearch/FaceIndexingPipelineTest.php tests/Unit/FaceSearch/FaceSearchRouterTest.php`
+  - resultado:
+    - `18 passed`
+    - `103 assertions`
+- regressao ampla:
+  - `php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch`
+  - resultado:
+    - `96 passed`
+    - `7 skipped`
+    - `623 assertions`
+- leitura:
+  - `healthCheck`, preprocessamento `Image.Bytes`, `IndexFaces`, `UnindexedFaces` e gating de indexacao ficaram verdes sem regressao na suite do modulo.
+
+Bateria executada para conclusao de `H4-T2`:
+
+- backend dirigida:
+  - `php artisan test tests/Unit/FaceSearch/AwsRekognitionFaceSearchBackendTest.php tests/Feature/FaceSearch/FaceSearchSelfieEndpointsTest.php tests/Unit/FaceSearch/FaceSearchQueryTest.php`
+  - resultado:
+    - `16 passed`
+    - `130 assertions`
+- contratos opt-in:
+  - `$env:RUN_FACE_SEARCH_AWS_TDD='1'; php artisan test tests/Unit/FaceSearch/FaceSearchAwsConfigContractTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryContractTest.php tests/Unit/FaceSearch/FaceSearchRouterContractTest.php tests/Unit/FaceSearch/SelfiePreflightServiceContractTest.php tests/Feature/FaceSearch/FaceSearchAwsSettingsContractTest.php tests/Unit/FaceSearch/SearchFacesBySelfieAwsArchitectureContractTest.php tests/Unit/FaceSearch/FaceSearchProviderRecordContractTest.php`
+  - resultado:
+    - `7 passed`
+    - `42 assertions`
+- regressao ampla:
+  - `php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch`
+  - resultado:
+    - `98 passed`
+    - `7 skipped`
+    - `659 assertions`
+- leitura:
+  - `SearchFacesByImage` e a auditoria em `face_search_queries` ficaram verdes no backend e na feature principal de selfie;
+  - a suite ampla do modulo continuou estavel apos a entrada do fluxo AWS de busca.
 
 ---
 
@@ -256,6 +420,17 @@ Testes:
 
 ### H1-T1. Integrar o SDK oficial da AWS no app
 
+Status atual:
+
+- [x] `AwsRekognitionClientFactory` implementado.
+- [x] config dedicada adicionada em `config/aws.php` para o package oficial.
+- [x] bloco `face_search.providers.aws_rekognition` implementado em `config/face_search.php`.
+- [x] preparacao minima adicionada em `config/services.php`.
+- [x] exemplos de env adicionados em `.env.example`.
+- [x] retries e timeouts separados para query e indexacao implementados.
+- [x] testes unitarios reais do factory adicionados.
+- [x] pacote `aws/aws-sdk-php-laravel` instalado no `composer`.
+
 Objetivo:
 
 - instalar o pacote oficial;
@@ -290,6 +465,16 @@ Definicao de pronto:
 
 ### H1-T2. Criar abstracao de backend de busca
 
+Status atual:
+
+- [x] `FaceSearchBackendInterface` criado.
+- [x] `LocalPgvectorFaceSearchBackend` criado.
+- [x] `AwsRekognitionFaceSearchBackend` criado com contrato base.
+- [x] `FaceSearchRouter` criado e registrado no provider.
+- [x] `SearchFacesBySelfieAction` refatorada para usar router.
+- [x] `SelfiePreflightService` implementado antes do dispatch de busca.
+- [x] testes unitarios reais de router e preflight adicionados.
+
 Objetivo:
 
 - subir uma camada acima de `detection + embedding + vector store`.
@@ -321,6 +506,15 @@ Definicao de pronto:
 - a introducao do router nao quebra a suite atual de `FaceSearch`.
 
 ### H1-T3. Separar configuracao local da configuracao AWS
+
+Status atual:
+
+- [x] migration backend dos campos AWS criada.
+- [x] `EventFaceSearchSetting` expandido com defaults, fillable e casts AWS.
+- [x] request, action e resource backend atualizados.
+- [x] contrato feature de settings AWS ficou verde.
+- [x] painel frontend agora expoe os campos AWS.
+- [x] testes frontend do form foram expandidos e ficaram verdes.
 
 Objetivo:
 
@@ -355,6 +549,14 @@ Definicao de pronto:
 
 ### H2-T1. Criar persistencia de provider records e queries
 
+Status atual:
+
+- [x] migration `face_search_provider_records` criada.
+- [x] migration `face_search_queries` criada.
+- [x] models, factories e enum de status adicionados.
+- [x] `external_image_id` persistido com contrato deterministico.
+- [x] testes de model/factory e payload JSON verdes.
+
 Objetivo:
 
 - rastrear faces indexadas, `UnindexedFaces`, queries e drift operacional.
@@ -378,6 +580,14 @@ Definicao de pronto:
 
 ### H2-T2. Provisionar collection por evento
 
+Status atual:
+
+- [x] `EnsureAwsCollectionJob` criado.
+- [x] `CreateCollection` e `DescribeCollection` implementados no backend AWS.
+- [x] persistencia de `aws_collection_id`, `aws_collection_arn` e `aws_face_model_version` implementada.
+- [x] `ResourceAlreadyExistsException` tratada como sucesso idempotente.
+- [x] testes de job, backend e settings verdes.
+
 Objetivo:
 
 - isolar o backend AWS por evento e validar health na ativacao.
@@ -400,6 +610,14 @@ Definicao de pronto:
 - ao ativar backend AWS em evento valido, a collection fica provisionada e registrada.
 
 ### H2-T3. Health check operacional e IAM minimo
+
+Status atual:
+
+- [x] `healthCheck` implementado no backend AWS.
+- [x] `STS GetCallerIdentity` incorporado como probe de credencial.
+- [x] `DescribeCollection` e `ListFaces` incorporados como probes operacionais de collection.
+- [x] hints de IAM minimo do MVP adicionados ao payload de health.
+- [x] testes unitarios de `healthy` e `misconfigured` verdes.
 
 Objetivo:
 
@@ -433,6 +651,13 @@ Definicao de pronto:
 
 ### H3-T1. Implementar preprocessamento de imagem para AWS
 
+Status atual:
+
+- [x] `AwsImagePreprocessor` criado.
+- [x] resize deterministico para `long edge` configuravel implementado.
+- [x] normalizacao para `image/jpeg` implementada.
+- [x] budget de bytes validado por teste unitario.
+
 Objetivo:
 
 - garantir baixo custo, latencia previsivel e compatibilidade com `Image.Bytes`.
@@ -455,6 +680,14 @@ Definicao de pronto:
 - imagem padrao do MVP sai pronta para `Bytes` com comportamento deterministico.
 
 ### H3-T2. Indexar galeria via `IndexFaces`
+
+Status atual:
+
+- [x] `AwsRekognitionFaceSearchBackend::indexMedia()` implementado.
+- [x] `IndexFaces` virou o happy path do backend AWS.
+- [x] `FaceRecords` e `UnindexedFaces` agora persistem em `face_search_provider_records`.
+- [x] cleanup de faces remotas antigas por midia implementado.
+- [x] testes unitarios de indexacao e telemetria verdes.
 
 Objetivo:
 
@@ -480,6 +713,14 @@ Definicao de pronto:
 - uma midia de evento AWS gera provider records indexados e nao indexados, com status rastreavel.
 
 ### H3-T3. Gating por evento e por `searchable`
+
+Status atual:
+
+- [x] `IndexMediaFacesAction` agora roteia por backend via `FaceSearchRouter`.
+- [x] eventos sem `enabled=true` continuam gerando zero custo AWS.
+- [x] eventos fora do backend AWS continuam na lane local.
+- [x] faces que falham no gate local ou em media rejeitada sao removidas da collection e persistidas como `searchable=false`.
+- [x] teste feature do pipeline AWS verde.
 
 Objetivo:
 
@@ -536,6 +777,15 @@ Definicao de pronto:
 - selfie ruim falha antes de consumir busca AWS.
 
 ### H4-T2. Implementar busca AWS com `SearchFacesByImage`
+
+Status atual:
+
+- [x] `AwsRekognitionFaceSearchBackend::searchBySelfie()` implementado com `SearchFacesByImage`.
+- [x] derivado padronizado para `Image.Bytes` reutilizado na busca.
+- [x] `FaceId` remoto agora mapeia para `event_media_id` local via `face_search_provider_records`.
+- [x] `SearchFacesBySelfieAction` agora grava auditoria em `face_search_queries`.
+- [x] request segue sincronico no HTTP.
+- [x] testes unitarios e feature do fluxo AWS ficaram verdes.
 
 Objetivo:
 
@@ -916,10 +1166,9 @@ Leitura:
 
 ## Proximo Passo Recomendado
 
-Se a execucao comecar agora, o primeiro bloco deve ser:
+Com `H1`, `H2`, `H3` e `H4-T2` fechados, o proximo bloco deve ser:
 
-1. instalar o SDK oficial e criar o `AwsRekognitionClientFactory`;
-2. criar `FaceSearchBackendInterface` e `FaceSearchRouter`;
-3. expandir settings por evento;
-4. criar migrations de provider records e queries;
-5. so entao entrar no provisionamento e indexacao AWS.
+1. fechar `H4-T3` deixando explicito no produto que o MVP cobre selfie e nao foto de grupo;
+2. entrar em `H5-T1` e `H5-T2` para classificacao de erro AWS, fallback local e shadow mode inicial;
+3. consolidar qual backend respondeu na auditoria de query quando houver fallback;
+4. so depois abrir `H7-T1` para health/reindex/reconcile na operacao do painel.

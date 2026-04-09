@@ -4,6 +4,7 @@ use App\Modules\FaceSearch\DTOs\DetectedFaceData;
 use App\Modules\FaceSearch\DTOs\FaceBoundingBoxData;
 use App\Modules\FaceSearch\DTOs\FaceEmbeddingData;
 use App\Modules\FaceSearch\Jobs\IndexMediaFacesJob;
+use App\Modules\FaceSearch\Services\AwsRekognitionFaceSearchBackend;
 use App\Modules\FaceSearch\Services\FaceDetectionProviderInterface;
 use App\Modules\FaceSearch\Services\FaceEmbeddingProviderInterface;
 use App\Modules\MediaProcessing\Enums\ModerationStatus;
@@ -13,6 +14,7 @@ use App\Modules\MediaProcessing\Models\MediaProcessingRun;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Mockery as m;
 
 it('marks face indexing as skipped when the event has face search disabled', function () {
     Storage::fake('public');
@@ -419,4 +421,75 @@ it('marks face indexing as failed when the provider throws', function () {
 
     expect($media->face_index_status)->toBe('failed')
         ->and($media->last_pipeline_error_code)->toBe('face_index_failed');
+});
+
+it('routes face indexing through aws rekognition when the event backend is configured for aws', function () {
+    Storage::fake('public');
+    Storage::fake('ai-private');
+
+    $event = \App\Modules\Events\Models\Event::factory()->active()->create();
+    \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'recognition_enabled' => true,
+        'search_backend_key' => 'aws_rekognition',
+        'aws_collection_id' => 'eventovivo-face-search-event-' . $event->id,
+    ]);
+
+    $backend = m::mock(AwsRekognitionFaceSearchBackend::class);
+    $backend->shouldReceive('key')
+        ->andReturn('aws_rekognition');
+    $backend->shouldReceive('indexMedia')
+        ->once()
+        ->andReturn([
+            'status' => 'indexed',
+            'source_ref' => 'public:events/' . $event->id . '/variants/900/gallery.jpg',
+            'faces_detected' => 2,
+            'faces_indexed' => 2,
+            'skipped_reason' => null,
+        ]);
+
+    app()->instance(AwsRekognitionFaceSearchBackend::class, $backend);
+    app()->instance(FaceDetectionProviderInterface::class, new class implements FaceDetectionProviderInterface
+    {
+        public function detect(EventMedia $media, \App\Modules\FaceSearch\Models\EventFaceSearchSetting $settings, string $binary): array
+        {
+            throw new RuntimeException('Local detector should not be used when AWS indexing is active.');
+        }
+    });
+
+    $path = UploadedFile::fake()
+        ->image('gallery.jpg', 1200, 900)
+        ->store("events/{$event->id}/variants/900", 'public');
+
+    $media = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'moderation_status' => ModerationStatus::Approved->value,
+        'face_index_status' => 'queued',
+    ]);
+
+    EventMediaVariant::query()->create([
+        'event_media_id' => $media->id,
+        'variant_key' => 'gallery',
+        'disk' => 'public',
+        'path' => $path,
+        'width' => 1200,
+        'height' => 900,
+        'size_bytes' => Storage::disk('public')->size($path),
+        'mime_type' => 'image/jpeg',
+    ]);
+
+    app(IndexMediaFacesJob::class, ['eventMediaId' => $media->id])->handle();
+
+    $media->refresh();
+
+    expect($media->face_index_status)->toBe('indexed');
+
+    $run = MediaProcessingRun::query()
+        ->where('event_media_id', $media->id)
+        ->where('stage_key', 'face_index')
+        ->latest('id')
+        ->first();
+
+    expect($run?->result_json['faces_detected'] ?? null)->toBe(2)
+        ->and($run?->result_json['faces_indexed'] ?? null)->toBe(2);
 });

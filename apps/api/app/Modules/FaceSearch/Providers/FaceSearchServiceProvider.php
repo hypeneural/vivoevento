@@ -19,6 +19,7 @@ use App\Modules\FaceSearch\Console\RunSmokeMinFaceSizeAnalysisCommand;
 use App\Modules\FaceSearch\Console\RunWiderFaceLocalLoaderCommand;
 use App\Modules\FaceSearch\Console\RunXqlfwLocalLoaderCommand;
 use App\Modules\FaceSearch\Services\ArtisanQueueFaceIndexLaneExecutor;
+use App\Modules\FaceSearch\Services\AwsImagePreprocessor;
 use App\Modules\FaceSearch\Services\AwsRekognitionClientFactory;
 use App\Modules\FaceSearch\Services\AwsRekognitionFaceSearchBackend;
 use App\Modules\FaceSearch\Services\CaltechWebFacesLocalLoaderService;
@@ -30,6 +31,7 @@ use App\Modules\FaceSearch\Services\FaceDetectionProviderInterface;
 use App\Modules\FaceSearch\Services\FaceDetectionProviderManager;
 use App\Modules\FaceSearch\Services\FaceEmbeddingProviderInterface;
 use App\Modules\FaceSearch\Services\FaceEmbeddingProviderManager;
+use App\Modules\FaceSearch\Services\FaceSearchMediaSourceLoader;
 use App\Modules\FaceSearch\Services\FaceSearchRouter;
 use App\Modules\FaceSearch\Services\FaceIndexLaneExecutorInterface;
 use App\Modules\FaceSearch\Services\FaceIndexLaneThroughputService;
@@ -52,6 +54,7 @@ use App\Modules\FaceSearch\Services\NullFaceEmbeddingProvider;
 use App\Modules\FaceSearch\Services\PgvectorFaceVectorStore;
 use App\Modules\FaceSearch\Services\WiderFaceLocalLoaderService;
 use App\Modules\FaceSearch\Services\XqlfwLocalLoaderService;
+use Aws\Sdk;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -63,7 +66,12 @@ class FaceSearchServiceProvider extends ServiceProvider
         $this->app->singleton(CompreFaceDetectionProvider::class);
         $this->app->singleton(CompreFaceEmbeddingProvider::class);
         $this->app->singleton(CompreFaceSmokeService::class);
-        $this->app->singleton(AwsRekognitionClientFactory::class);
+        $this->app->singleton(AwsImagePreprocessor::class);
+        $this->app->singleton(AwsRekognitionClientFactory::class, function ($app) {
+            return new AwsRekognitionClientFactory(
+                $app->bound(Sdk::class) ? $app->make(Sdk::class) : null,
+            );
+        });
         $this->app->singleton(AwsRekognitionFaceSearchBackend::class);
         $this->app->singleton(CaltechWebFacesLocalLoaderService::class);
         $this->app->singleton(CalfwLocalLoaderService::class);
@@ -71,6 +79,7 @@ class FaceSearchServiceProvider extends ServiceProvider
         $this->app->singleton(CfpFpLocalLoaderService::class);
         $this->app->singleton(DetectionDatasetProbeService::class);
         $this->app->singleton(FaceSearchBenchmarkService::class);
+        $this->app->singleton(FaceSearchMediaSourceLoader::class);
         $this->app->singleton(FaceSearchThresholdSweepService::class);
         $this->app->singleton(FaceIndexLaneThroughputService::class);
         $this->app->singleton(FaceSizeThresholdSweepService::class);

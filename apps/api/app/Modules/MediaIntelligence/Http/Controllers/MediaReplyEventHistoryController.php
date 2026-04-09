@@ -41,7 +41,10 @@ class MediaReplyEventHistoryController extends BaseController
         $query = EventMedia::query()
             ->with([
                 'event:id,title',
+                'event.contentModerationSettings',
+                'event.mediaIntelligenceSettings',
                 'inboundMessage:id,event_id,trace_id,message_id,message_type,sender_name,sender_phone,sender_external_id',
+                'latestSafetyEvaluation',
                 'latestVlmEvaluation',
                 'latestVlmRun',
                 'variants',
@@ -133,7 +136,10 @@ class MediaReplyEventHistoryController extends BaseController
     {
         $historicoEvento->loadMissing([
             'event:id,title',
+            'event.contentModerationSettings',
+            'event.mediaIntelligenceSettings',
             'inboundMessage:id,event_id,trace_id,message_id,message_type,sender_name,sender_phone,sender_external_id',
+            'latestSafetyEvaluation',
             'latestVlmEvaluation',
             'latestVlmRun',
             'variants',

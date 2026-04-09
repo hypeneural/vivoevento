@@ -1685,6 +1685,36 @@ Tarefas:
   - `Aniversario infantil`
   - `Homologacao livre`
 
+Status desta rodada:
+
+- [x] expansao de `media_intelligence_global_settings` com politica contextual estruturada:
+  - `contextual_policy_preset_key`
+  - `policy_version`
+  - `allow_alcohol`
+  - `allow_tobacco`
+  - `required_people_context`
+  - `blocked_terms_json`
+  - `allowed_exceptions_json`
+  - `freeform_instruction`
+- [x] expansao equivalente de `event_media_intelligence_settings` para override por evento
+- [x] `ContextualModerationPresetCatalog` com presets de produto reutilizaveis no backend
+- [x] `ContextualModerationPolicyResolver` resolvendo a politica efetiva por camadas:
+  - `preset`
+  - `global_setting`
+  - `event_setting`
+- [x] `policy_snapshot_json` e `policy_sources_json` alinhados com a politica contextual resolvida
+- [x] `ContextualModerationPromptBuilder` gerando a instrucao do gate contextual a partir da politica estruturada
+- [x] `freeform_instruction` mantido como complemento e nao mais como regra principal
+- [x] `OpenAiCompatibleVisualReasoningPayloadFactory` deixando de depender de prompt cru como configuracao principal
+
+Validacao desta rodada:
+
+- [x] `MediaIntelligenceGlobalSettingsTest`
+- [x] `MediaIntelligenceSettingsTest`
+- [x] `ContextualModerationPolicyResolverTest`
+- [x] `ContextualModerationPromptBuilderTest`
+- [x] `OpenAiCompatibleVisualReasoningPayloadFactoryTest`
+
 Criterio de aceite:
 
 - o operador basico consegue configurar o caso principal com preset + poucos toggles;
@@ -1712,6 +1742,32 @@ Tarefas:
   - `review_only`
   - `reject`
 - usar `publish_eligibility` para apoiar `effective_media_state`.
+
+Status desta rodada:
+
+- [x] `response_schema_version=contextual-v2` consolidado como schema operacional do gate contextual
+- [x] `VisualReasoningResponseSchemaFactory` exigindo:
+  - `reason_code`
+  - `matched_policies`
+  - `matched_exceptions`
+  - `input_scope_used`
+  - `input_types_considered`
+  - `confidence_band`
+  - `publish_eligibility`
+- [x] parser/provider normalizando os novos campos estruturados em `VisualReasoningEvaluationResult`
+- [x] persistencia desses campos em `event_media_vlm_evaluations`
+- [x] detalhe da midia expondo a ultima avaliacao contextual com motivo estruturado, elegibilidade e snapshot de politica
+- [x] historico de respostas expondo motivo estruturado, escopo, tipos de input e politica aplicada
+- [x] alinhamento do prompt/contexto para deixar explicito qual texto entrou na analise contextual e qual texto ficou disponivel para a resposta automatica
+
+Validacao desta rodada:
+
+- [x] `VisualReasoningResponseSchemaFactoryTest`
+- [x] `OpenAiCompatibleVisualReasoningPayloadFactoryTest`
+- [x] `ContextualModerationPromptBuilderTest`
+- [x] `MediaReplyEventHistoryTest`
+- [x] `EventMediaListTest`
+- [x] regressao focal backend de `MediaIntelligence` + detalhe/listagem: `73 passed`, `596 assertions`
 
 Criterio de aceite:
 
@@ -1741,6 +1797,45 @@ Tarefas:
   - `Basico`
   - `Avancado`
   - `Auditoria`
+
+Status desta rodada:
+
+- [x] rota principal de administracao migrada para `GET /ia/moderacao-de-midia`
+- [x] rota legada `/ia/respostas-de-midia` convertida em redirecionamento para a nova superficie
+- [x] pagina administrativa reestruturada com abas:
+  - `Visao geral`
+  - `Safety objetiva`
+  - `Contexto do evento`
+  - `Laboratorio`
+  - `Catalogo`
+  - `Historico`
+- [x] resumo operacional com cards de politica efetiva no topo da pagina:
+  - `Safety objetiva agora`
+  - `Bloqueio contextual agora`
+  - `Politica efetiva agora`
+- [x] `Safety objetiva` conectado aos endpoints globais reais de configuracao
+- [x] `Contexto do evento` conectado aos campos estruturados do gate contextual:
+  - scopes
+  - modo de texto normalizado
+  - preset
+  - alcool/tabaco
+  - bloqueios
+  - excecoes
+  - instrucao complementar
+- [x] `Historico` enriquecido com:
+  - `reason_code`
+  - `confidence_band`
+  - `publish_eligibility`
+  - `matched_policies`
+  - `matched_exceptions`
+- [x] cards de configuracao no detalhe do evento ajustados para orientar o operador a usar `IA > Moderacao de midia` como superficie principal
+- [ ] bloco lateral fixo dedicado de `Politica efetiva agora` ainda pode evoluir; nesta primeira fatia entrou como resumo operacional no topo
+- [ ] modos explicitos de UX `Basico`, `Avancado` e `Auditoria` ainda precisam refinamento visual e segmentacao mais forte no formulario
+
+Validacao desta rodada:
+
+- [x] `MediaAutomaticRepliesPage.test.tsx`
+- [x] regressao focal frontend da nova superficie administrativa: `6 passed`
 
 Criterio de aceite:
 
@@ -1841,6 +1936,65 @@ Tarefas:
   - schema retornado
   - snapshot da politica
 
+Status desta rodada:
+
+- [x] endpoints de historico real disponiveis em:
+  - `GET /ia/respostas-de-midia/eventos`
+  - `GET /ia/respostas-de-midia/historico-eventos`
+  - `GET /ia/respostas-de-midia/historico-eventos/{historicoEvento}`
+- [x] historico real do backend consolidado com filtros por:
+  - evento
+  - periodo
+  - preset/politica
+  - modelo
+  - sucesso ou falha
+  - remetente
+- [x] `MediaReplyEventHistoryResource` enriquecido com leitura operacional por item:
+  - `effective_media_state`
+  - `safety_decision`
+  - `context_decision`
+  - `operator_decision`
+  - `publication_decision`
+  - `human_reason`
+  - `policy_label`
+  - `policy_inheritance_mode`
+  - `text_context_summary`
+- [x] miniatura e metadados operacionais mantidos no payload do historico real:
+  - `preview_url`
+  - `media_type`
+  - `source_label`
+  - `sender_name`
+- [x] servico backend dedicado para explicar o estado consolidado sem depender de leitura crua de payload:
+  - `MediaOperationalHistorySummaryService`
+- [x] tela `IA > Moderacao de midia` ajustada para o historico real mostrar:
+  - miniatura
+  - origem
+  - tipo de midia
+  - estado efetivo
+  - motivo humano
+  - politica ativa
+  - heranca
+  - resumo do texto considerado
+- [x] detalhe tecnico preservado na propria superficie com:
+  - `reason_code`
+  - `publish_eligibility`
+  - `matched_policies`
+  - `matched_exceptions`
+  - prompt resolvido
+  - variaveis
+  - payload enviado
+  - payload recebido
+- [ ] `policy_snapshot` e `policy_sources` ainda nao aparecem como paineis tecnicos dedicados na UI
+- [ ] ainda faltam filtros de auditoria fina por:
+  - `reason_code`
+  - `publish_eligibility`
+  - decisao final consolidada
+
+Validacao desta rodada:
+
+- [x] `MediaReplyEventHistoryTest`: `3 passed`, `66 assertions`
+- [x] `MediaAutomaticRepliesPage.test.tsx`: fluxo do historico real validado com `6 passed`
+
 Criterio de aceite:
 
 - operador comum entende o comportamento da IA sem abrir payload cru;
@@ -1876,36 +2030,126 @@ Tarefas frontend:
 - testes de modos `Basico`, `Avancado` e `Auditoria`;
 - testes de `placeholderData`, prefetch e transicoes sem flicker forte nas trocas principais.
 
+Status desta rodada:
+
+- [x] aba `Laboratorio` implementada na superficie principal `IA > Moderacao de midia`
+- [x] simulacao manual permite homologar politica com ate `3` imagens por execucao
+- [x] laboratorio ja resolve e persiste:
+  - evento
+  - preset
+  - provider
+  - modelo
+  - prompt efetivo
+  - payload tecnico
+  - resposta retornada
+- [x] historico de testes do laboratorio implementado com:
+  - listagem
+  - filtros basicos
+  - detalhe tecnico completo
+- [x] backend ja possui cobertura dedicada para:
+  - resolvedor de politica contextual
+  - laboratorio de prompt test
+  - historico operacional real
+- [x] frontend ja cobre smoke/regressao da superficie principal:
+  - resumo operacional
+  - configuracao contextual
+  - safety objetiva
+  - catalogo
+  - laboratorio
+  - historico real
+- [ ] ainda falta teste unitario dedicado para `MediaOperationalHistorySummaryService`
+- [ ] ainda faltam testes frontend para:
+  - filtros completos do historico real
+  - estados vazios e de erro
+  - resumo reativo mais detalhado
+- [ ] ainda faltam modos explicitos `Basico`, `Avancado` e `Auditoria`, junto com seus testes
+- [ ] ainda faltam `placeholderData`, prefetch e transicoes mais suaves nas consultas principais
+
+Validacao desta rodada:
+
+- [x] `MediaReplyPromptTestRunsTest`: `3 passed`, `31 assertions`
+- [x] `ContextualModerationPolicyResolverTest`: `1 passed`, `18 assertions`
+- [x] `MediaAutomaticRepliesPage.test.tsx`: `6 passed`
+- [x] suites focadas de suporte:
+  - `php artisan test --filter=MediaIntelligence`: `66 passed`, `504 assertions`
+  - `php artisan test --filter=ContentModeration`: `32 passed`, `184 assertions`
+
+Plano detalhado restante a partir do estado validado:
+
+1. Fechar `IA-MOD-R9` na camada de auditoria tecnica
+   Backend:
+   - expor `policy_snapshot` e `policy_sources` brutos no detalhe real, sem depender apenas de campos derivados;
+   - adicionar filtros opcionais por `reason_code`, `publish_eligibility` e `effective_media_state`;
+   - padronizar labels tecnicos para filtro e badge no frontend.
+   Frontend:
+   - adicionar blocos dedicados de `Snapshot da politica aplicada` e `Origem de cada campo`;
+   - adicionar quick filters para `reason_code`, elegibilidade e estado efetivo;
+   - manter o detalhe tecnico carregando sem perder o item ja selecionado.
+   Testes:
+   - feature tests para novos filtros e para o payload tecnico enriquecido;
+   - unit test dedicado para `MediaOperationalHistorySummaryService`;
+   - testes Vitest para filtros avancados e paineis tecnicos do historico.
+
+2. Fechar `IA-MOD-R10` no laboratorio e na cobertura de regressao
+   Backend:
+   - devolver no laboratorio uma resposta normalizada lado a lado para `safety`, `contexto`, `reply_text` e `publish_eligibility`;
+   - persistir snapshot da politica usada no teste para reproduzibilidade;
+   - aceitar overrides controlados de escopo/contexto apenas dentro do laboratorio.
+   Frontend:
+   - reorganizar o laboratorio em tres blocos claros: entrada, politica efetiva e resultado;
+   - destacar latencia, provider, modelo, prompt resolvido e elegibilidade final;
+   - permitir replay rapido do ultimo teste sem remontar todo o formulario.
+   Testes:
+   - feature tests para merge `global + preset + event_override + runtime_override`;
+   - testes de erro para limite de imagens e falha de provider;
+   - testes Vitest para replay rapido, estados vazios e carregamento.
+
+3. Fechar a segmentacao operacional da UI
+   Frontend:
+   - separar claramente os modos `Basico`, `Avancado` e `Auditoria`;
+   - mover o operador leigo para um fluxo de configuracao menor e mais seguro;
+   - deixar o modo `Auditoria` concentrado em payload, politica e historico.
+   Testes:
+   - validar troca de modos;
+   - validar permissoes;
+   - validar persistencia dos campos por modo.
+
+4. Rodar homologacao real multimodal antes da promocao
+   Operacao:
+   - executar matriz real com imagem, imagem + texto, video, sticker e audio;
+   - registrar `effective_media_state`, `reason_code`, `publish_eligibility` e resposta automatica por canal;
+   - revisar fallback de provider, filas e throughput antes de aumentar volume.
+   Go/no-go:
+   - so promover politica para producao quando laboratorio + historico real + matriz multimodal estiverem consistentes.
+
 Criterio de aceite:
 
 - baterias backend e frontend verdes cobrindo cenarios centrais;
 - laboratorio permite homologar a politica sem contaminar producao.
 
-Critério de aceite:
-
-- baterias backend e frontend verdes cobrindo os cenarios principais.
-
 ---
 
 ## 12. Recomendacao De Sequencia
 
-1. implementar `IA-MOD-R1`
-2. implementar `IA-MOD-R2`
-3. implementar `IA-MOD-R3`
-4. implementar `IA-MOD-R4`
-5. implementar `IA-MOD-R8`
-6. implementar `IA-MOD-R5`
-7. implementar `IA-MOD-R6`
-8. implementar `IA-MOD-R7`
-9. implementar `IA-MOD-R9`
-10. implementar `IA-MOD-R10`
-11. rodar homologacao real com:
+1. [x] implementar `IA-MOD-R1`
+2. [x] implementar `IA-MOD-R2`
+3. [x] implementar `IA-MOD-R3`
+4. [x] implementar `IA-MOD-R4`
+5. [x] implementar `IA-MOD-R8`
+6. [x] implementar `IA-MOD-R5`
+7. [x] implementar `IA-MOD-R6`
+8. [x] implementar `IA-MOD-R7` na fatia inicial
+9. [x] implementar `IA-MOD-R9` na fatia operacional
+10. [ ] fechar `IA-MOD-R9` na auditoria tecnica completa
+11. [x] implementar `IA-MOD-R10` na fatia inicial de laboratorio e regressao
+12. [ ] fechar `IA-MOD-R10` com cobertura ampliada de UX e testes
+13. [ ] rodar homologacao real com:
     - imagem
     - imagem + texto
     - video
     - sticker
     - audio
-12. usar o laboratorio antes de promover politica para producao
+14. [ ] usar o laboratorio antes de promover politica para producao
 
 ---
 

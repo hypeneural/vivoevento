@@ -11,11 +11,21 @@ final class VisualReasoningEvaluationResult
      * @param array<string, mixed> $rawResponse
      * @param array<string, mixed> $requestPayload
      * @param array<string, mixed>|null $promptContext
+     * @param array<int, string> $matchedPolicies
+     * @param array<int, string> $matchedExceptions
+     * @param array<int, string> $inputTypesConsidered
      */
     public function __construct(
         public readonly VisualReasoningDecision $decision,
         public readonly bool $reviewRequired = false,
         public readonly ?string $reason = null,
+        public readonly ?string $reasonCode = null,
+        public readonly array $matchedPolicies = [],
+        public readonly array $matchedExceptions = [],
+        public readonly ?string $inputScopeUsed = null,
+        public readonly array $inputTypesConsidered = [],
+        public readonly ?string $confidenceBand = null,
+        public readonly ?string $publishEligibility = null,
         public readonly ?string $shortCaption = null,
         public readonly ?string $replyText = null,
         public readonly array $tags = [],
@@ -40,9 +50,19 @@ final class VisualReasoningEvaluationResult
      * @param array<string, mixed> $rawResponse
      * @param array<string, mixed> $requestPayload
      * @param array<string, mixed>|null $promptContext
+     * @param array<int, string> $matchedPolicies
+     * @param array<int, string> $matchedExceptions
+     * @param array<int, string> $inputTypesConsidered
      */
     public static function approve(
         ?string $reason = null,
+        ?string $reasonCode = null,
+        array $matchedPolicies = [],
+        array $matchedExceptions = [],
+        ?string $inputScopeUsed = null,
+        array $inputTypesConsidered = [],
+        ?string $confidenceBand = null,
+        ?string $publishEligibility = null,
         ?string $shortCaption = null,
         ?string $replyText = null,
         array $tags = [],
@@ -65,6 +85,13 @@ final class VisualReasoningEvaluationResult
             decision: VisualReasoningDecision::Approve,
             reviewRequired: false,
             reason: $reason,
+            reasonCode: $reasonCode,
+            matchedPolicies: $matchedPolicies,
+            matchedExceptions: $matchedExceptions,
+            inputScopeUsed: $inputScopeUsed,
+            inputTypesConsidered: $inputTypesConsidered,
+            confidenceBand: $confidenceBand,
+            publishEligibility: $publishEligibility,
             shortCaption: $shortCaption,
             replyText: $replyText,
             tags: $tags,
@@ -90,9 +117,19 @@ final class VisualReasoningEvaluationResult
      * @param array<string, mixed> $rawResponse
      * @param array<string, mixed> $requestPayload
      * @param array<string, mixed>|null $promptContext
+     * @param array<int, string> $matchedPolicies
+     * @param array<int, string> $matchedExceptions
+     * @param array<int, string> $inputTypesConsidered
      */
     public static function review(
         ?string $reason = null,
+        ?string $reasonCode = null,
+        array $matchedPolicies = [],
+        array $matchedExceptions = [],
+        ?string $inputScopeUsed = null,
+        array $inputTypesConsidered = [],
+        ?string $confidenceBand = null,
+        ?string $publishEligibility = null,
         ?string $shortCaption = null,
         ?string $replyText = null,
         array $tags = [],
@@ -115,6 +152,13 @@ final class VisualReasoningEvaluationResult
             decision: VisualReasoningDecision::Review,
             reviewRequired: true,
             reason: $reason,
+            reasonCode: $reasonCode,
+            matchedPolicies: $matchedPolicies,
+            matchedExceptions: $matchedExceptions,
+            inputScopeUsed: $inputScopeUsed,
+            inputTypesConsidered: $inputTypesConsidered,
+            confidenceBand: $confidenceBand,
+            publishEligibility: $publishEligibility,
             shortCaption: $shortCaption,
             replyText: $replyText,
             tags: $tags,
@@ -140,9 +184,19 @@ final class VisualReasoningEvaluationResult
      * @param array<string, mixed> $rawResponse
      * @param array<string, mixed> $requestPayload
      * @param array<string, mixed>|null $promptContext
+     * @param array<int, string> $matchedPolicies
+     * @param array<int, string> $matchedExceptions
+     * @param array<int, string> $inputTypesConsidered
      */
     public static function reject(
         ?string $reason = null,
+        ?string $reasonCode = null,
+        array $matchedPolicies = [],
+        array $matchedExceptions = [],
+        ?string $inputScopeUsed = null,
+        array $inputTypesConsidered = [],
+        ?string $confidenceBand = null,
+        ?string $publishEligibility = null,
         ?string $shortCaption = null,
         ?string $replyText = null,
         array $tags = [],
@@ -165,6 +219,13 @@ final class VisualReasoningEvaluationResult
             decision: VisualReasoningDecision::Reject,
             reviewRequired: false,
             reason: $reason,
+            reasonCode: $reasonCode,
+            matchedPolicies: $matchedPolicies,
+            matchedExceptions: $matchedExceptions,
+            inputScopeUsed: $inputScopeUsed,
+            inputTypesConsidered: $inputTypesConsidered,
+            confidenceBand: $confidenceBand,
+            publishEligibility: $publishEligibility,
             shortCaption: $shortCaption,
             replyText: $replyText,
             tags: $tags,
@@ -233,6 +294,13 @@ final class VisualReasoningEvaluationResult
             'decision' => $this->decision->value,
             'review_required' => $this->reviewRequired,
             'reason' => $this->reason,
+            'reason_code' => $this->reasonCode,
+            'matched_policies_json' => $this->matchedPolicies,
+            'matched_exceptions_json' => $this->matchedExceptions,
+            'input_scope_used' => $this->inputScopeUsed,
+            'input_types_considered_json' => $this->inputTypesConsidered,
+            'confidence_band' => $this->confidenceBand,
+            'publish_eligibility' => $this->publishEligibility,
             'short_caption' => $this->shortCaption,
             'reply_text' => $this->replyText,
             'tags_json' => $this->tags,
@@ -255,6 +323,13 @@ final class VisualReasoningEvaluationResult
             'decision' => $this->decision->value,
             'review_required' => $this->reviewRequired,
             'reason' => $this->reason,
+            'reason_code' => $this->reasonCode,
+            'matched_policies' => $this->matchedPolicies,
+            'matched_exceptions' => $this->matchedExceptions,
+            'input_scope_used' => $this->inputScopeUsed,
+            'input_types_considered' => $this->inputTypesConsidered,
+            'confidence_band' => $this->confidenceBand,
+            'publish_eligibility' => $this->publishEligibility,
             'short_caption' => $this->shortCaption,
             'reply_text' => $this->replyText,
             'tags' => $this->tags,
@@ -286,6 +361,13 @@ final class VisualReasoningEvaluationResult
             decision: $this->decision,
             reviewRequired: $this->reviewRequired,
             reason: $this->reason,
+            reasonCode: $this->reasonCode,
+            matchedPolicies: $this->matchedPolicies,
+            matchedExceptions: $this->matchedExceptions,
+            inputScopeUsed: $this->inputScopeUsed,
+            inputTypesConsidered: $this->inputTypesConsidered,
+            confidenceBand: $this->confidenceBand,
+            publishEligibility: $this->publishEligibility,
             shortCaption: $this->shortCaption,
             replyText: $this->replyText,
             tags: $this->tags,

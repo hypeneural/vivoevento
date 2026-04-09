@@ -20,6 +20,7 @@ const routeLabels: Record<string, string> = {
   'settings': 'Configuracoes',
   'settings/whatsapp': 'WhatsApp',
   'ia': 'IA',
+  'ia/moderacao-de-midia': 'Moderação de mídia',
   'ia/respostas-de-midia': 'Respostas automaticas de midia',
 };
 

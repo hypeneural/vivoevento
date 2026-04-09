@@ -1,5 +1,6 @@
 import { Image as ImageIcon, Loader2 } from 'lucide-react';
 
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import type { ApiWallSimulationPreviewItem, ApiWallSimulationResponse } from '@/lib/api-types';
 
 import { getWallSourceMeta } from '../../../wall-source-meta';
@@ -79,66 +80,95 @@ export function WallUpcomingTimeline({
 
           <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                Ordem mais provavel das proximas {simulationPreview.length} exibicoes
-              </p>
+              <div className="space-y-1">
+                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                  Ordem mais provavel das proximas {simulationPreview.length} exibicoes
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Arraste a timeline para o lado para acompanhar a fila prevista em sequencia.
+                </p>
+              </div>
               <span className="rounded-full border border-border/60 bg-background px-3 py-1 text-[11px] text-muted-foreground">
                 {simulationPreview.length} itens
               </span>
             </div>
 
-            <div className="mt-4 space-y-3">
-              {simulationPreview.map((slide) => {
-                const sourceMeta = getWallSourceMeta(slide.source_type ?? 'whatsapp');
+            <ScrollArea className="mt-4 w-full" aria-label="Timeline horizontal das proximas exibicoes">
+              <div className="flex gap-4 pb-4">
+                {simulationPreview.map((slide, index) => {
+                  const sourceMeta = getWallSourceMeta(slide.source_type ?? 'whatsapp');
 
-                return (
-                  <div key={`${slide.position}-${slide.item_id}`} className="flex gap-3 rounded-2xl border border-border/60 bg-background/80 p-3">
-                    <div className="h-16 w-16 flex-none overflow-hidden rounded-2xl border border-border/50 bg-muted/20">
-                      {slide.preview_url ? (
-                        <img
-                          src={slide.preview_url}
-                          alt={`Miniatura da proxima foto de ${slide.sender_name}`}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                          <ImageIcon className="h-4 w-4" />
+                  return (
+                    <div key={`${slide.position}-${slide.item_id}`} className="relative min-w-[272px] max-w-[272px] flex-none">
+                      <div className="rounded-2xl border border-border/60 bg-background/80 p-3 shadow-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex rounded-full border border-border/60 bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                            {slide.eta_seconds}s
+                          </span>
+                          <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium ${sourceMeta.chipClassName}`}>
+                            <sourceMeta.Icon className="h-3.5 w-3.5" />
+                            {sourceMeta.label}
+                          </span>
                         </div>
-                      )}
-                    </div>
 
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex rounded-full border border-border/60 bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-                          {slide.eta_seconds}s
-                        </span>
-                        <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium ${sourceMeta.chipClassName}`}>
-                          <sourceMeta.Icon className="h-3.5 w-3.5" />
-                          {sourceMeta.label}
-                        </span>
-                        {slide.is_replay ? (
-                          <span className="inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-700">
-                            Reprise
-                          </span>
-                        ) : null}
-                        {slide.is_featured ? (
-                          <span className="inline-flex rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
-                            Destaque
-                          </span>
-                        ) : null}
+                        <div className="mt-3 overflow-hidden rounded-2xl border border-border/50 bg-muted/20">
+                          <div className="aspect-[4/3]">
+                            {slide.preview_url ? (
+                              <img
+                                src={slide.preview_url}
+                                alt={`Miniatura da proxima foto de ${slide.sender_name}`}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                                <ImageIcon className="h-4 w-4" />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-3 space-y-2">
+                          <div className="space-y-1">
+                            <p className="truncate text-sm font-semibold text-foreground">{slide.sender_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Posicao {slide.position} da fila prevista para o telao.
+                            </p>
+                            {slide.caption ? (
+                              <p className="line-clamp-2 text-xs leading-relaxed text-foreground/80">
+                                {slide.caption}
+                              </p>
+                            ) : null}
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            {slide.layout_hint ? (
+                              <span className="inline-flex rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-1 text-[11px] font-medium text-sky-700">
+                                Layout {formatLayoutHintLabel(slide.layout_hint)}
+                              </span>
+                            ) : null}
+                            {slide.is_replay ? (
+                              <span className="inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-700">
+                                Reprise
+                              </span>
+                            ) : null}
+                            {slide.is_featured ? (
+                              <span className="inline-flex rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
+                                Destaque
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="space-y-1">
-                        <p className="truncate text-sm font-semibold text-foreground">{slide.sender_name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Posicao {slide.position} da fila prevista para o telao.
-                        </p>
-                      </div>
+                      {index < simulationPreview.length - 1 ? (
+                        <div className="pointer-events-none absolute left-full top-8 hidden h-px w-4 border-t border-dashed border-border/70 md:block" />
+                      ) : null}
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
           </div>
 
           {simulationExplanation.length > 0 ? (
@@ -211,4 +241,31 @@ function formatSimulationExplanation(line: string) {
     .replace(/\bwall\b/gi, 'telao')
     .replace(/\bselector\b/gi, 'organizador da fila')
     .replace(/\breplay\b/gi, 'reprise');
+}
+
+function formatLayoutHintLabel(value: NonNullable<ApiWallSimulationPreviewItem['layout_hint']>) {
+  switch (value) {
+    case 'cinematic':
+      return 'Cinematografico';
+    case 'fullscreen':
+      return 'Tela cheia';
+    case 'split':
+      return 'Tela dividida';
+    case 'polaroid':
+      return 'Polaroid';
+    case 'kenburns':
+      return 'Ken Burns';
+    case 'spotlight':
+      return 'Holofote';
+    case 'gallery':
+      return 'Galeria de arte';
+    case 'carousel':
+      return 'Carrossel';
+    case 'mosaic':
+      return 'Mosaico';
+    case 'grid':
+      return 'Grade';
+    default:
+      return value;
+  }
 }

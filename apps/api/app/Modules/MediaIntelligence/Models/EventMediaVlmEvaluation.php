@@ -23,6 +23,13 @@ class EventMediaVlmEvaluation extends Model
         'decision',
         'review_required',
         'reason',
+        'reason_code',
+        'matched_policies_json',
+        'matched_exceptions_json',
+        'input_scope_used',
+        'input_types_considered_json',
+        'confidence_band',
+        'publish_eligibility',
         'short_caption',
         'reply_text',
         'tags_json',
@@ -40,6 +47,9 @@ class EventMediaVlmEvaluation extends Model
 
     protected $casts = [
         'review_required' => 'boolean',
+        'matched_policies_json' => 'array',
+        'matched_exceptions_json' => 'array',
+        'input_types_considered_json' => 'array',
         'tags_json' => 'array',
         'raw_response_json' => 'array',
         'request_payload_json' => 'array',

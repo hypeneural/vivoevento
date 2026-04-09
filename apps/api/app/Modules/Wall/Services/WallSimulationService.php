@@ -5,6 +5,7 @@ namespace App\Modules\Wall\Services;
 use App\Modules\Wall\Enums\WallEventPhase;
 use App\Modules\Wall\Enums\WallSelectionMode;
 use App\Modules\Wall\Models\EventWallSetting;
+use App\Modules\Wall\Support\WallLayoutHintResolver;
 use App\Modules\Wall\Support\WallSourceNormalizer;
 use App\Modules\Wall\Support\WallSelectionPreset;
 use Carbon\CarbonImmutable;
@@ -15,6 +16,7 @@ class WallSimulationService
     public function __construct(
         private readonly WallPayloadFactory $payloads,
         private readonly WallRuntimeMediaService $runtimeMedia,
+        private readonly WallLayoutHintResolver $layoutHintResolver,
     ) {}
 
     public function simulate(
@@ -34,7 +36,10 @@ class WallSimulationService
         );
 
         $items = $media
-            ->map(fn ($item) => $this->toSimulationItem($this->payloads->media($item)))
+            ->map(fn ($item) => $this->toSimulationItem(
+                $this->payloads->media($item),
+                (string) ($resolvedSettings['layout'] ?? 'auto'),
+            ))
             ->values()
             ->all();
 
@@ -62,6 +67,8 @@ class WallSimulationService
                 'sender_name' => $currentItem['sender_name'] ?: 'Convidado',
                 'sender_key' => $currentItem['senderKey'],
                 'source_type' => $currentItem['source_type'],
+                'caption' => $currentItem['caption'],
+                'layout_hint' => $currentItem['layout_hint'],
                 'duplicate_cluster_key' => $currentItem['duplicateClusterKey'],
                 'is_featured' => (bool) $currentItem['is_featured'],
                 'is_replay' => (int) $currentItem['play_count'] > 1,
@@ -143,7 +150,7 @@ class WallSimulationService
         ];
     }
 
-    private function toSimulationItem(array $payload): array
+    private function toSimulationItem(array $payload, string $requestedLayout): array
     {
         return [
             'id' => $payload['id'],
@@ -152,6 +159,8 @@ class WallSimulationService
             'type' => $payload['type'] ?? 'image',
             'sender_name' => $payload['sender_name'] ?? null,
             'source_type' => WallSourceNormalizer::normalize($payload['source_type'] ?? null),
+            'caption' => $payload['caption'] ?? null,
+            'layout_hint' => $this->layoutHintResolver->resolve($requestedLayout, $payload),
             'sender_key' => $payload['sender_key'] ?? null,
             'senderKey' => $payload['sender_key'] ?? $payload['id'],
             'duplicateClusterKey' => $payload['duplicate_cluster_key'] ?? null,

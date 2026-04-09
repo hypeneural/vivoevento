@@ -33,6 +33,8 @@ describe('WallUpcomingTimeline', () => {
             sender_name: 'Ana',
             sender_key: 'sender-ana',
             source_type: 'upload',
+            caption: 'Entrada principal',
+            layout_hint: 'cinematic',
             duplicate_cluster_key: null,
             is_featured: false,
             is_replay: false,
@@ -61,9 +63,12 @@ describe('WallUpcomingTimeline', () => {
     );
 
     expect(screen.getByText(/Ordem mais provavel das proximas 2 exibicoes/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Timeline horizontal das proximas exibicoes/i)).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /Miniatura da proxima foto de Ana/i })).toBeInTheDocument();
     expect(screen.getByText(/^Upload$/i)).toBeInTheDocument();
     expect(screen.getByText(/^WhatsApp$/i)).toBeInTheDocument();
+    expect(screen.getByText(/Entrada principal/i)).toBeInTheDocument();
+    expect(screen.getByText(/Layout Cinematografico/i)).toBeInTheDocument();
     expect(screen.getByText(/Reprise/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Fila real/i).length).toBeGreaterThan(0);
   });

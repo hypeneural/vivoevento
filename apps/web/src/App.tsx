@@ -122,13 +122,14 @@ function ProtectedRoutes() {
 
           {/* Business */}
           <Route
-            path="ia/respostas-de-midia"
+            path="ia/moderacao-de-midia"
             element={(
               <ModuleGuard moduleKey="settings" requiredPermissions={['settings.manage']}>
                 <AiMediaRepliesPage />
               </ModuleGuard>
             )}
           />
+          <Route path="ia/respostas-de-midia" element={<Navigate to="/ia/moderacao-de-midia" replace />} />
           <Route
             path="partners"
             element={(

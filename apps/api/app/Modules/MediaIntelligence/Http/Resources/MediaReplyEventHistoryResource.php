@@ -2,6 +2,7 @@
 
 namespace App\Modules\MediaIntelligence\Http\Resources;
 
+use App\Modules\MediaIntelligence\Services\MediaOperationalHistorySummaryService;
 use App\Modules\MediaProcessing\Services\MediaAssetUrlService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -11,6 +12,7 @@ class MediaReplyEventHistoryResource extends JsonResource
     public function toArray(Request $request): array
     {
         $assets = app(MediaAssetUrlService::class);
+        $operational = app(MediaOperationalHistorySummaryService::class)->summarize($this->resource);
         $evaluation = $this->latestVlmEvaluation;
         $run = $this->latestVlmRun;
         $inbound = $this->inboundMessage;
@@ -38,6 +40,22 @@ class MediaReplyEventHistoryResource extends JsonResource
             'model_key' => $evaluation?->model_key ?? $run?->model_key,
             'status' => $this->vlm_status,
             'decision' => $evaluation?->decision ?? $run?->decision_key,
+            'effective_media_state' => $operational['effective_media_state'],
+            'safety_decision' => $operational['safety_decision'],
+            'context_decision' => $operational['context_decision'],
+            'operator_decision' => $operational['operator_decision'],
+            'publication_decision' => $operational['publication_decision'],
+            'human_reason' => $operational['human_reason'],
+            'reason' => $evaluation?->reason,
+            'reason_code' => $evaluation?->reason_code,
+            'matched_policies' => $evaluation?->matched_policies_json ?? [],
+            'matched_exceptions' => $evaluation?->matched_exceptions_json ?? [],
+            'input_scope_used' => $evaluation?->input_scope_used,
+            'input_types_considered' => $evaluation?->input_types_considered_json ?? [],
+            'confidence_band' => $evaluation?->confidence_band,
+            'publish_eligibility' => $evaluation?->publish_eligibility,
+            'policy_label' => $operational['policy_label'],
+            'policy_inheritance_mode' => $operational['policy_inheritance_mode'],
             'prompt_template' => $evaluation?->prompt_context_json['template'] ?? null,
             'prompt_resolved' => $evaluation?->prompt_context_json['resolved'] ?? null,
             'prompt_variables' => $evaluation?->prompt_context_json['variables'] ?? [],
@@ -49,6 +67,9 @@ class MediaReplyEventHistoryResource extends JsonResource
             'normalized_text_context_mode' => $evaluation?->normalized_text_context_mode ?? ($promptContext['normalized_text_context_mode'] ?? null),
             'context_scope' => $promptContext['context_scope'] ?? null,
             'reply_scope' => $promptContext['reply_scope'] ?? null,
+            'text_context_summary' => $operational['text_context_summary'],
+            'policy_snapshot' => $evaluation?->policy_snapshot_json ?? [],
+            'policy_sources' => $evaluation?->policy_sources_json ?? [],
             'reply_text' => $evaluation?->reply_text,
             'short_caption' => $evaluation?->short_caption,
             'tags' => $evaluation?->tags_json ?? [],

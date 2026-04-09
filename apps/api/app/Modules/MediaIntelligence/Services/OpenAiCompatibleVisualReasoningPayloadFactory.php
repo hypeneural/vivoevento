@@ -13,6 +13,7 @@ class OpenAiCompatibleVisualReasoningPayloadFactory
         private readonly OpenAiCompatibleMultimodalPayloadNormalizer $normalizer,
         private readonly MediaReplyTextPromptResolver $replyPrompts,
         private readonly NormalizedTextContextBuilder $textContexts,
+        private readonly ContextualModerationPromptBuilder $contextualPrompts,
     ) {}
 
     /**
@@ -26,7 +27,7 @@ class OpenAiCompatibleVisualReasoningPayloadFactory
         array $config,
     ): array {
         $promptContext = $this->promptContext($media, $settings);
-        $userInstructions = $this->userInstructions($media, $settings, $promptContext);
+        $userInstructions = $this->userInstructions($promptContext);
 
         $payload = [
             'model' => (string) ($settings->model_key ?: ($config['model'] ?? '')),
@@ -63,7 +64,7 @@ class OpenAiCompatibleVisualReasoningPayloadFactory
                 'json_schema' => [
                     'name' => 'eventovivo_media_intelligence',
                     'strict' => true,
-                    'schema' => $this->schemas->schema($settings->response_schema_version ?: 'foundation-v1'),
+                    'schema' => $this->schemas->schema($settings->response_schema_version ?: EventMediaIntelligenceSetting::DEFAULT_RESPONSE_SCHEMA_VERSION),
                 ],
             ];
         }
@@ -85,7 +86,8 @@ class OpenAiCompatibleVisualReasoningPayloadFactory
      *   normalized_text_context_mode:string,
      *   normalized_text_context:?string,
      *   context_text_context:?string,
-     *   reply_text_context:?string
+     *   reply_text_context:?string,
+     *   policy_json?:array<string, mixed>
      * }|null
      */
     public function promptContext(
@@ -102,36 +104,52 @@ class OpenAiCompatibleVisualReasoningPayloadFactory
 
         $contextScope = (string) ($settings->context_scope ?? 'image_and_text_context');
         $replyScope = (string) ($settings->reply_scope ?? 'image_and_text_context');
+        $policySnapshot = [
+            'contextual_policy_preset_key' => $settings->contextual_policy_preset_key,
+            'contextual_policy_preset_label' => app(ContextualModerationPresetCatalog::class)
+                ->resolve((string) ($settings->contextual_policy_preset_key ?? 'homologacao_livre'))['label'],
+            'policy_version' => $settings->policy_version,
+            'context_scope' => $contextScope,
+            'allow_alcohol' => (bool) ($settings->allow_alcohol ?? false),
+            'allow_tobacco' => (bool) ($settings->allow_tobacco ?? false),
+            'required_people_context' => $settings->required_people_context,
+            'blocked_terms_json' => $settings->blocked_terms_json ?? [],
+            'allowed_exceptions_json' => $settings->allowed_exceptions_json ?? [],
+            'freeform_instruction' => $settings->contextualFreeformInstruction(),
+            'caption_style_prompt' => $settings->caption_style_prompt,
+        ];
+        $contextText = $contextScope === 'image_and_text_context' ? $normalized['text'] : null;
+        $replyTextContext = $replyScope === 'image_and_text_context' ? $normalized['text'] : null;
+        $contextPrompt = $this->contextualPrompts->build(
+            eventName: (string) ($media->event?->title ?? ''),
+            policySnapshot: $policySnapshot,
+            contextTextContext: $contextText,
+            replyInstruction: data_get($replyPrompt, 'resolved'),
+            replyTextContext: $replyTextContext,
+        );
 
         return array_merge($replyPrompt, [
+            'template' => $contextPrompt['prompt_template'],
+            'variables' => array_merge(
+                data_get($replyPrompt, 'variables', []),
+                $contextPrompt['variables_json'],
+            ),
+            'resolved' => $contextPrompt['prompt_resolved'],
             'context_scope' => $contextScope,
             'reply_scope' => $replyScope,
             'normalized_text_context_mode' => $normalized['mode'],
             'normalized_text_context' => $normalized['text'],
-            'context_text_context' => $contextScope === 'image_and_text_context' ? $normalized['text'] : null,
-            'reply_text_context' => $replyScope === 'image_and_text_context' ? $normalized['text'] : null,
+            'context_text_context' => $contextText,
+            'reply_text_context' => $replyTextContext,
+            'policy_json' => $contextPrompt['policy_json'],
         ]);
     }
 
     /**
-     * @param array{
-     *   resolved?:string,
-     *   context_text_context:?string,
-     *   reply_text_context:?string
-     * }|null $promptContext
+     * @param array<string, mixed>|null $promptContext
      */
-    private function userInstructions(
-        EventMedia $media,
-        EventMediaIntelligenceSetting $settings,
-        ?array $promptContext,
-    ): string {
-        return implode("\n\n", array_filter([
-            trim((string) $settings->approval_prompt),
-            $media->event?->title ? 'Contexto adicional do evento: ' . $media->event->title : null,
-            data_get($promptContext, 'context_text_context') ? 'Texto associado ao envio considerado na analise: ' . data_get($promptContext, 'context_text_context') : null,
-            trim((string) $settings->caption_style_prompt),
-            data_get($promptContext, 'reply_text_context') ? 'Contexto textual disponivel para orientar a resposta automatica: ' . data_get($promptContext, 'reply_text_context') : null,
-            data_get($promptContext, 'resolved') ? 'Instrucao adicional para resposta automatica baseada na imagem: ' . data_get($promptContext, 'resolved') : null,
-        ]));
+    private function userInstructions(?array $promptContext): string
+    {
+        return trim((string) data_get($promptContext, 'resolved', ''));
     }
 }

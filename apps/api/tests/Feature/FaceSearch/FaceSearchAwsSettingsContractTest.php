@@ -1,6 +1,8 @@
 <?php
 
 use App\Modules\Events\Models\Event;
+use App\Modules\FaceSearch\Jobs\EnsureAwsCollectionJob;
+use Illuminate\Support\Facades\Bus;
 
 beforeEach(function () {
     if (! filter_var(env('RUN_FACE_SEARCH_AWS_TDD', false), FILTER_VALIDATE_BOOL)) {
@@ -9,6 +11,8 @@ beforeEach(function () {
 });
 
 it('accepts aws backend settings separately from the local pgvector thresholds', function () {
+    Bus::fake();
+
     [$user, $organization] = $this->actingAsOwner();
 
     $event = Event::factory()->create([
@@ -51,4 +55,6 @@ it('accepts aws backend settings separately from the local pgvector thresholds',
         ->assertJsonPath('data.aws_region', 'us-east-1')
         ->assertJsonPath('data.aws_search_face_match_threshold', 80)
         ->assertJsonPath('data.aws_associate_user_match_threshold', 75);
+
+    Bus::assertDispatched(EnsureAwsCollectionJob::class);
 });

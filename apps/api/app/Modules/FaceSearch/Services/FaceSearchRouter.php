@@ -31,6 +31,10 @@ class FaceSearchRouter
     {
         $backendKey = $settings->search_backend_key ?: 'local_pgvector';
 
+        if ($backendKey === 'aws_rekognition' && ! $settings->recognition_enabled) {
+            $backendKey = 'local_pgvector';
+        }
+
         if (isset($this->backends[$backendKey])) {
             return $this->backends[$backendKey];
         }
@@ -43,7 +47,10 @@ class FaceSearchRouter
     }
 
     /**
-     * @return array<int, FaceSearchMatchData>
+     * @return array{
+     *   matches:array<int, FaceSearchMatchData>,
+     *   provider_payload_json?:array<string, mixed>
+     * }
      */
     public function searchBySelfie(
         Event $event,
@@ -61,5 +68,21 @@ class FaceSearchRouter
             face: $face,
             topK: $topK,
         );
+    }
+
+    /**
+     * @return array{
+     *   status:string,
+     *   source_ref:string|null,
+     *   faces_detected:int,
+     *   faces_indexed:int,
+     *   skipped_reason:string|null,
+     *   quality_summary?:array<string,int>,
+     *   dominant_rejection_reason?:string|null
+     * }
+     */
+    public function indexMedia(EventMedia $media, EventFaceSearchSetting $settings): array
+    {
+        return $this->backendForSettings($settings)->indexMedia($media, $settings);
     }
 }

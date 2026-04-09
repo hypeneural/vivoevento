@@ -2,28 +2,58 @@
 
 namespace App\Modules\FaceSearch\Services;
 
+use Aws\Sdk;
 use Aws\Credentials\Credentials;
 use Aws\Rekognition\RekognitionClient;
 use Aws\Sts\StsClient;
 
 class AwsRekognitionClientFactory
 {
-    public function makeRekognitionClient(string $profile = 'query'): RekognitionClient
+    public function __construct(
+        private readonly ?Sdk $sdk = null,
+    ) {}
+
+    /**
+     * @param array<string, mixed> $overrides
+     */
+    public function makeRekognitionClient(string $profile = 'query', array $overrides = []): RekognitionClient
     {
-        return new RekognitionClient($this->rekognitionConfig($profile));
+        $config = $this->rekognitionConfig($profile, $overrides);
+
+        if ($this->sdk instanceof Sdk) {
+            /** @var RekognitionClient $client */
+            $client = $this->sdk->createRekognition($config);
+
+            return $client;
+        }
+
+        return new RekognitionClient($config);
     }
 
-    public function makeStsClient(): StsClient
+    /**
+     * @param array<string, mixed> $overrides
+     */
+    public function makeStsClient(array $overrides = []): StsClient
     {
-        return new StsClient($this->stsConfig());
+        $config = $this->stsConfig($overrides);
+
+        if ($this->sdk instanceof Sdk) {
+            /** @var StsClient $client */
+            $client = $this->sdk->createSts($config);
+
+            return $client;
+        }
+
+        return new StsClient($config);
     }
 
     /**
      * @return array<string, mixed>
+     * @param array<string, mixed> $overrides
      */
-    public function rekognitionConfig(string $profile = 'query'): array
+    public function rekognitionConfig(string $profile = 'query', array $overrides = []): array
     {
-        $config = (array) config('face_search.providers.aws_rekognition', []);
+        $config = array_replace((array) config('face_search.providers.aws_rekognition', []), $overrides);
 
         return array_filter([
             'version' => (string) ($config['version'] ?? '2016-06-27'),
@@ -47,10 +77,11 @@ class AwsRekognitionClientFactory
 
     /**
      * @return array<string, mixed>
+     * @param array<string, mixed> $overrides
      */
-    public function stsConfig(): array
+    public function stsConfig(array $overrides = []): array
     {
-        $config = (array) config('face_search.providers.aws_rekognition', []);
+        $config = array_replace((array) config('face_search.providers.aws_rekognition', []), $overrides);
 
         return array_filter([
             'version' => (string) ($config['sts_version'] ?? '2011-06-15'),

@@ -5,6 +5,7 @@ interface WallPollingFallbackState {
   eventIntervalMs: number | false;
   settingsIntervalMs: number | false;
   insightsIntervalMs: number | false;
+  liveSnapshotIntervalMs: number | false;
   diagnosticsIntervalMs: number | false;
 }
 
@@ -13,6 +14,7 @@ const POLLING_DISABLED: WallPollingFallbackState = {
   eventIntervalMs: false,
   settingsIntervalMs: false,
   insightsIntervalMs: false,
+  liveSnapshotIntervalMs: false,
   diagnosticsIntervalMs: false,
 };
 
@@ -21,6 +23,7 @@ const POLLING_ENABLED: WallPollingFallbackState = {
   eventIntervalMs: 30000,
   settingsIntervalMs: 20000,
   insightsIntervalMs: 15000,
+  liveSnapshotIntervalMs: 5000,
   diagnosticsIntervalMs: 10000,
 };
 

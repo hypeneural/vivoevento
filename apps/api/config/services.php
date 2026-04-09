@@ -28,6 +28,14 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'face_search_aws' => [
+        'access_key_id' => env('FACE_SEARCH_AWS_ACCESS_KEY_ID'),
+        'secret_access_key' => env('FACE_SEARCH_AWS_SECRET_ACCESS_KEY'),
+        'session_token' => env('FACE_SEARCH_AWS_SESSION_TOKEN'),
+        'region' => env('FACE_SEARCH_AWS_REGION', env('AWS_REGION', env('AWS_DEFAULT_REGION', 'eu-central-1'))),
+        'endpoint' => env('FACE_SEARCH_AWS_ENDPOINT'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

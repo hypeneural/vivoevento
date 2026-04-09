@@ -24,8 +24,14 @@ it('resolves contextual policy from preset, global settings and event overrides 
     EventMediaIntelligenceSetting::factory()->create([
         'event_id' => $event->id,
         'enabled' => true,
+        'provider_key' => 'openrouter',
+        'model_key' => 'openai/gpt-4.1-mini',
+        'mode' => 'gate',
         'contextual_policy_preset_key' => 'corporativo_restrito',
         'allow_alcohol' => false,
+        'allow_tobacco' => null,
+        'required_people_context' => null,
+        'blocked_terms_json' => null,
         'allowed_exceptions_json' => ['palestrante no palco'],
         'freeform_instruction' => 'Aceite palco e plateia, mas nao objetos isolados.',
     ]);

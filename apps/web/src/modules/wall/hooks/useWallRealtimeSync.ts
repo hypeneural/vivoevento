@@ -43,6 +43,7 @@ export function useWallRealtimeSync(eventId: string) {
         queryClient.invalidateQueries({ queryKey: queryKeys.wall.settings(eventId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.wall.diagnostics(eventId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.wall.insights(eventId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.wall.liveSnapshot(eventId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.events.detail(eventId) }),
       ]);
     };
@@ -51,6 +52,7 @@ export function useWallRealtimeSync(eventId: string) {
       void Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.wall.diagnostics(eventId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.wall.insights(eventId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.wall.liveSnapshot(eventId) }),
       ]);
     };
 

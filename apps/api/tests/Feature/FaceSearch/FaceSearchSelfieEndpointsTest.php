@@ -6,6 +6,8 @@ use App\Modules\FaceSearch\DTOs\DetectedFaceData;
 use App\Modules\FaceSearch\DTOs\FaceBoundingBoxData;
 use App\Modules\FaceSearch\DTOs\FaceEmbeddingData;
 use App\Modules\FaceSearch\Models\EventFaceSearchRequest;
+use App\Modules\FaceSearch\Models\FaceSearchQuery;
+use App\Modules\FaceSearch\Services\AwsRekognitionFaceSearchBackend;
 use App\Modules\FaceSearch\Models\EventMediaFace;
 use App\Modules\FaceSearch\Services\CompreFaceEmbeddingProvider;
 use App\Modules\FaceSearch\Services\FaceDetectionProviderInterface;
@@ -16,6 +18,7 @@ use App\Modules\MediaProcessing\Enums\PublicationStatus;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Mockery as m;
 
 it('returns only matches from the requested event in internal selfie search', function () {
     [$user, $organization] = $this->actingAsOwner();
@@ -454,6 +457,89 @@ it('returns only approved and published media in public selfie search and stores
         ->and($request?->result_photo_ids_json)->toBe([$publishedMedia->id])
         ->and($request?->expires_at)->not->toBeNull()
         ->and($request?->expires_at?->greaterThan(now()->addHours(11)))->toBeTrue();
+});
+
+it('searches via aws rekognition and stores backend query audit metadata', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'recognition_enabled' => true,
+        'search_backend_key' => 'aws_rekognition',
+        'fallback_backend_key' => 'local_pgvector',
+        'routing_policy' => 'aws_primary_local_fallback',
+        'aws_collection_id' => 'eventovivo-face-search-event-' . $event->id,
+        'aws_region' => 'eu-central-1',
+        'top_k' => 10,
+    ]);
+
+    bindSingleFaceSearchProviders([0.10, 0.20, 0.30]);
+
+    $eventMedia = EventMedia::factory()->approved()->published()->create([
+        'event_id' => $event->id,
+    ]);
+
+    $backend = m::mock(AwsRekognitionFaceSearchBackend::class);
+    $backend->shouldReceive('key')->andReturn('aws_rekognition');
+    $backend->shouldReceive('searchBySelfie')
+        ->once()
+        ->andReturn([
+            'matches' => [
+                new \App\Modules\FaceSearch\DTOs\FaceSearchMatchData(
+                    faceId: 777,
+                    eventMediaId: $eventMedia->id,
+                    distance: 0.08,
+                    qualityScore: 0.91,
+                    faceAreaRatio: 0.18,
+                    qualityTier: 'search_priority',
+                ),
+            ],
+            'provider_payload_json' => [
+                'FaceModelVersion' => '7.0',
+                'SearchedFaceConfidence' => 99.1,
+            ],
+        ]);
+
+    app()->instance(AwsRekognitionFaceSearchBackend::class, $backend);
+
+    $response = $this->withHeaders(['Accept' => 'application/json'])->post(
+        "/api/v1/events/{$event->id}/face-search/search",
+        [
+            'selfie' => UploadedFile::fake()->image('selfie.jpg'),
+            'include_pending' => true,
+        ],
+    );
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.total_results', 1);
+    $response->assertJsonPath('data.results.0.event_media_id', $eventMedia->id);
+
+    $request = EventFaceSearchRequest::query()->where('event_id', $event->id)->latest('id')->first();
+    $query = FaceSearchQuery::query()->where('event_id', $event->id)->latest('id')->first();
+
+    expect($request)->not->toBeNull()
+        ->and($request?->status)->toBe('completed')
+        ->and($query)->not->toBeNull()
+        ->and($query?->event_face_search_request_id)->toBe($request?->id)
+        ->and($query?->backend_key)->toBe('aws_rekognition')
+        ->and($query?->fallback_backend_key)->toBe('local_pgvector')
+        ->and($query?->routing_policy)->toBe('aws_primary_local_fallback')
+        ->and($query?->status->value)->toBe('completed')
+        ->and($query?->result_count)->toBe(1)
+        ->and($query?->query_face_bbox_json)->toMatchArray([
+            'x' => 24,
+            'y' => 24,
+            'width' => 180,
+            'height' => 180,
+        ])
+        ->and($query?->provider_payload_json)->toMatchArray([
+            'FaceModelVersion' => '7.0',
+            'SearchedFaceConfidence' => 99.1,
+        ]);
 });
 
 function bindSingleFaceSearchProviders(array $vector): void

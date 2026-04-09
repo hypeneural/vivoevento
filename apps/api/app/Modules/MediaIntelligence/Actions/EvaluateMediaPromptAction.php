@@ -4,8 +4,8 @@ namespace App\Modules\MediaIntelligence\Actions;
 
 use App\Modules\MediaIntelligence\DTOs\VisualReasoningEvaluationResult;
 use App\Modules\MediaIntelligence\Models\EventMediaVlmEvaluation;
+use App\Modules\MediaIntelligence\Services\ContextualModerationPolicyResolver;
 use App\Modules\MediaIntelligence\Services\OpenAiCompatibleVisualReasoningPayloadFactory;
-use App\Modules\MediaIntelligence\Services\VisualReasoningPolicySnapshotFactory;
 use App\Modules\MediaIntelligence\Services\VisualReasoningProviderInterface;
 use App\Modules\MediaProcessing\Models\EventMedia;
 
@@ -13,14 +13,18 @@ class EvaluateMediaPromptAction
 {
     public function __construct(
         private readonly VisualReasoningProviderInterface $provider,
-        private readonly VisualReasoningPolicySnapshotFactory $policySnapshots,
+        private readonly ContextualModerationPolicyResolver $policyResolver,
         private readonly OpenAiCompatibleVisualReasoningPayloadFactory $payloadFactory,
     ) {}
 
     public function execute(EventMedia $media): VisualReasoningEvaluationResult
     {
         $media->loadMissing('event.mediaIntelligenceSettings', 'variants', 'inboundMessage');
-        $settings = $media->event?->mediaIntelligenceSettings;
+        $resolvedPolicy = $media->event
+            ? $this->policyResolver->resolveForEvent($media->event)
+            : null;
+        /** @var \App\Modules\MediaIntelligence\Models\EventMediaIntelligenceSetting|null $settings */
+        $settings = $resolvedPolicy['settings'] ?? null;
 
         if ($media->media_type !== 'image') {
             return VisualReasoningEvaluationResult::skipped(
@@ -50,6 +54,10 @@ class EvaluateMediaPromptAction
         $resolvedPromptContext = array_merge(
             $settings ? ($this->payloadFactory->promptContext($media, $settings) ?? []) : [],
             $result->promptContext ?? [],
+            [
+                'policy_snapshot' => $resolvedPolicy['snapshot'] ?? [],
+                'policy_sources' => $resolvedPolicy['sources'] ?? [],
+            ],
         );
         $execution = (array) data_get($result->rawResponse, 'execution', []);
         $runtimeOverrides = [
@@ -62,7 +70,9 @@ class EvaluateMediaPromptAction
             $runtimeOverrides['model_key'] = $result->modelKey;
         }
 
-        $policy = $this->policySnapshots->build($settings, $runtimeOverrides);
+        $policy = $media->event
+            ? $this->policyResolver->resolveForEvent($media->event->fresh('mediaIntelligenceSettings'), $runtimeOverrides)
+            : $resolvedPolicy;
         $evaluationAttributes = $result->toEvaluationAttributes();
         $evaluationAttributes['prompt_context_json'] = $resolvedPromptContext !== [] ? $resolvedPromptContext : null;
         $evaluationAttributes['normalized_text_context'] = $result->normalizedTextContext

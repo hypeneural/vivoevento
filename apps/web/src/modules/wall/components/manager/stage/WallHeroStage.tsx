@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type {
   ApiWallInsightsRecentItem,
+  ApiWallLiveSnapshotResponse,
   ApiWallSettings,
   ApiWallSimulationPreviewItem,
   ApiWallSimulationResponse,
@@ -26,6 +27,7 @@ interface WallHeroStageProps {
   isPaused: boolean;
   status: string;
   selectedMedia: ApiWallInsightsRecentItem | null;
+  liveSnapshot: ApiWallLiveSnapshotResponse | null;
   eventTitle: string;
   eventSchedule: string;
   wallCode: string;
@@ -51,6 +53,7 @@ export function WallHeroStage({
   isPaused,
   status,
   selectedMedia,
+  liveSnapshot,
   eventTitle,
   eventSchedule,
   wallCode,
@@ -68,18 +71,39 @@ export function WallHeroStage({
   isSimulationRefreshing,
   isSimulationDraftPending,
 }: WallHeroStageProps) {
-  const selectedMediaSourceMeta = selectedMedia ? getWallSourceMeta(selectedMedia.source) : null;
+  const activeLiveItem = selectedMedia ?? liveSnapshot?.currentItem ?? null;
+  const selectedMediaSourceMeta = activeLiveItem ? getWallSourceMeta(activeLiveItem.source) : null;
+  const activeLiveSenderName = activeLiveItem?.senderName || 'Convidado';
+  const activeLiveCaption = activeLiveItem && 'caption' in activeLiveItem ? activeLiveItem.caption ?? null : null;
+  const activeLiveRelativeTime = selectedMedia
+    ? formatWallRelativeTime(selectedMedia.createdAt, 'Agora')
+    : formatWallRelativeTime(liveSnapshot?.currentItem?.createdAt, 'Agora');
+  const activeLiveStatusLabel = selectedMedia
+    ? formatWallRecentStatusLabel(selectedMedia.status)
+    : (liveSnapshot?.wallStatusLabel ?? 'Ao vivo');
   const previewMedia = selectedMedia
     ? {
         previewUrl: selectedMedia.previewUrl,
         senderName: selectedMedia.senderName,
         sourceType: selectedMedia.source,
+        isFeatured: selectedMedia.isFeatured ?? false,
+        caption: null,
       }
+    : liveSnapshot?.currentItem
+      ? {
+          previewUrl: liveSnapshot.currentItem.previewUrl,
+          senderName: liveSnapshot.currentItem.senderName,
+          sourceType: liveSnapshot.currentItem.source,
+          isFeatured: liveSnapshot.currentItem.isFeatured ?? false,
+          caption: liveSnapshot.currentItem.caption ?? null,
+        }
     : simulationPreview[0]
       ? {
           previewUrl: simulationPreview[0].preview_url ?? null,
           senderName: simulationPreview[0].sender_name,
           sourceType: simulationPreview[0].source_type ?? 'whatsapp',
+          isFeatured: simulationPreview[0].is_featured,
+          caption: simulationPreview[0].caption ?? null,
         }
       : null;
   const previewUpcomingItems = simulationPreview.slice(1, 4).map((item) => ({
@@ -104,23 +128,23 @@ export function WallHeroStage({
         </TabsList>
 
         <TabsContent value="live" forceMount className="mt-4">
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="overflow-hidden rounded-3xl border border-border/60 bg-muted/30">
               <div className="aspect-[4/3] sm:aspect-video">
                 <AnimatePresence mode="wait" initial={false}>
-                  {selectedMedia ? (
+                  {activeLiveItem ? (
                     <motion.div
-                      key={selectedMedia.id}
+                      key={activeLiveItem.id}
                       initial={{ opacity: 0, scale: 0.985 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.985 }}
                       transition={{ duration: 0.2, ease: 'easeOut' }}
                       className="relative h-full overflow-hidden bg-neutral-950"
                     >
-                      {selectedMedia.previewUrl ? (
+                      {activeLiveItem.previewUrl ? (
                         <img
-                          src={selectedMedia.previewUrl}
-                          alt={`Midia recente enviada por ${selectedMedia.senderName || 'Convidado'}`}
+                          src={activeLiveItem.previewUrl}
+                          alt={`Midia em foco no telao enviada por ${activeLiveSenderName}`}
                           className="h-full w-full object-cover"
                         />
                       ) : (
@@ -138,11 +162,16 @@ export function WallHeroStage({
                       <div className="absolute inset-x-0 bottom-0 space-y-3 p-5 text-white">
                         <div className="space-y-1">
                           <p className="text-xs uppercase tracking-[0.18em] text-white/60">
-                            {WALL_INSIGHTS_COPY.selectedMedia}
+                            {selectedMedia ? WALL_INSIGHTS_COPY.selectedMedia : 'Agora no telao'}
                           </p>
                           <h3 className="text-xl font-semibold">
-                            {selectedMedia.senderName || 'Convidado'}
+                            {activeLiveSenderName}
                           </h3>
+                          {activeLiveCaption ? (
+                            <p className="max-w-2xl text-sm text-white/80">
+                              {activeLiveCaption}
+                            </p>
+                          ) : null}
                         </div>
 
                         <div className="flex flex-wrap gap-2 text-xs">
@@ -153,10 +182,10 @@ export function WallHeroStage({
                             </span>
                           ) : null}
                           <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-2 py-1 font-medium text-white/80">
-                            {formatWallRecentStatusLabel(selectedMedia.status)}
+                            {activeLiveStatusLabel}
                           </span>
                           <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-2 py-1 font-medium text-white/80">
-                            {formatWallRelativeTime(selectedMedia.createdAt, 'Agora')}
+                            {activeLiveRelativeTime}
                           </span>
                         </div>
                       </div>
@@ -227,6 +256,17 @@ export function WallHeroStage({
                         Ver detalhes
                       </Button>
                     )}
+                  />
+                ) : null}
+                {!selectedMedia && liveSnapshot?.currentItem ? (
+                  <InfoCard
+                    label="Agora no telao"
+                    value={liveSnapshot.currentItem.senderName || 'Convidado'}
+                    detail={[
+                      selectedMediaSourceMeta?.label,
+                      liveSnapshot.currentItem.caption,
+                      formatWallRelativeTime(liveSnapshot.currentItem.createdAt, 'Agora'),
+                    ].filter(Boolean).join(' - ')}
                   />
                 ) : null}
                 <InfoCard label="Evento" value={eventTitle} detail={eventSchedule} />

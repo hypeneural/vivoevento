@@ -21,6 +21,10 @@ class RunMediaReplyPromptTestRequest extends FormRequest
             'model_key' => ['required', 'string', 'max:160'],
             'prompt_template' => ['nullable', 'string', 'max:5000'],
             'preset_id' => ['nullable', 'integer', 'exists:ai_media_reply_prompt_presets,id'],
+            'objective_safety_scope_override' => ['nullable', 'string', 'in:image_only,image_and_text_context'],
+            'context_scope_override' => ['nullable', 'string', 'in:image_only,image_and_text_context'],
+            'reply_scope_override' => ['nullable', 'string', 'in:image_only,image_and_text_context'],
+            'normalized_text_context_mode_override' => ['nullable', 'string', 'in:none,body_only,caption_only,body_plus_caption,operator_summary'],
             'images' => ['required', 'array', 'min:1', 'max:3'],
             'images.*' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ];

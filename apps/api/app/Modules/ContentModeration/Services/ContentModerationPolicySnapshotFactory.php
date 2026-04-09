@@ -14,18 +14,26 @@ class ContentModerationPolicySnapshotFactory
     {
         $defaults = EventContentModerationSetting::defaultAttributes();
         $resolvedProviderKey = $this->resolveValue($settings, 'provider_key', $defaults);
+        $resolvedEnabled = $this->resolveValue($settings, 'enabled', $defaults);
+        $resolvedMode = $this->resolveValue($settings, 'mode', $defaults);
+        $resolvedFallbackMode = $this->resolveValue($settings, 'fallback_mode', $defaults);
+        $resolvedAnalysisScope = $this->resolveValue($settings, 'analysis_scope', $defaults);
+        $resolvedNormalizedTextContextMode = $this->resolveValue($settings, 'normalized_text_context_mode', $defaults);
+        $resolvedThresholdVersion = $this->resolveValue($settings, 'threshold_version', $defaults);
+        $resolvedHardBlockThresholds = $this->resolveValue($settings, 'hard_block_thresholds_json', $defaults);
+        $resolvedReviewThresholds = $this->resolveValue($settings, 'review_thresholds_json', $defaults);
 
         $snapshot = [
             'provider_key' => $runtimeOverrides['provider_key'] ?? $resolvedProviderKey,
-            'enabled' => $this->resolveValue($settings, 'enabled', $defaults),
-            'mode' => $this->resolveValue($settings, 'mode', $defaults),
-            'fallback_mode' => $this->resolveValue($settings, 'fallback_mode', $defaults),
-            'analysis_scope' => $this->resolveValue($settings, 'analysis_scope', $defaults),
-            'objective_safety_scope' => $this->resolveValue($settings, 'analysis_scope', $defaults),
-            'normalized_text_context_mode' => $this->resolveValue($settings, 'normalized_text_context_mode', $defaults),
-            'threshold_version' => $this->resolveValue($settings, 'threshold_version', $defaults),
-            'hard_block_thresholds' => $this->resolveValue($settings, 'hard_block_thresholds_json', $defaults),
-            'review_thresholds' => $this->resolveValue($settings, 'review_thresholds_json', $defaults),
+            'enabled' => $runtimeOverrides['enabled'] ?? $resolvedEnabled,
+            'mode' => $runtimeOverrides['mode'] ?? $resolvedMode,
+            'fallback_mode' => $runtimeOverrides['fallback_mode'] ?? $resolvedFallbackMode,
+            'analysis_scope' => $runtimeOverrides['analysis_scope'] ?? $resolvedAnalysisScope,
+            'objective_safety_scope' => $runtimeOverrides['analysis_scope'] ?? $resolvedAnalysisScope,
+            'normalized_text_context_mode' => $runtimeOverrides['normalized_text_context_mode'] ?? $resolvedNormalizedTextContextMode,
+            'threshold_version' => $runtimeOverrides['threshold_version'] ?? $resolvedThresholdVersion,
+            'hard_block_thresholds' => $runtimeOverrides['hard_block_thresholds_json'] ?? $resolvedHardBlockThresholds,
+            'review_thresholds' => $runtimeOverrides['review_thresholds_json'] ?? $resolvedReviewThresholds,
             'provider_version' => $runtimeOverrides['provider_version'] ?? null,
             'model_key' => $runtimeOverrides['model_key'] ?? null,
             'model_snapshot' => $runtimeOverrides['model_snapshot'] ?? null,
@@ -38,15 +46,15 @@ class ContentModerationPolicySnapshotFactory
                 $runtimeOverrides,
                 $resolvedProviderKey,
             ),
-            'enabled' => $this->resolveSource($settings, 'enabled'),
-            'mode' => $this->resolveSource($settings, 'mode'),
-            'fallback_mode' => $this->resolveSource($settings, 'fallback_mode'),
-            'analysis_scope' => $this->resolveSource($settings, 'analysis_scope'),
-            'objective_safety_scope' => $this->resolveSource($settings, 'analysis_scope'),
-            'normalized_text_context_mode' => $this->resolveSource($settings, 'normalized_text_context_mode'),
-            'threshold_version' => $this->resolveSource($settings, 'threshold_version'),
-            'hard_block_thresholds' => $this->resolveSource($settings, 'hard_block_thresholds_json'),
-            'review_thresholds' => $this->resolveSource($settings, 'review_thresholds_json'),
+            'enabled' => $this->resolveOverrideSource($settings, 'enabled', $runtimeOverrides, $resolvedEnabled),
+            'mode' => $this->resolveOverrideSource($settings, 'mode', $runtimeOverrides, $resolvedMode),
+            'fallback_mode' => $this->resolveOverrideSource($settings, 'fallback_mode', $runtimeOverrides, $resolvedFallbackMode),
+            'analysis_scope' => $this->resolveOverrideSource($settings, 'analysis_scope', $runtimeOverrides, $resolvedAnalysisScope),
+            'objective_safety_scope' => $this->resolveOverrideSource($settings, 'analysis_scope', $runtimeOverrides, $resolvedAnalysisScope),
+            'normalized_text_context_mode' => $this->resolveOverrideSource($settings, 'normalized_text_context_mode', $runtimeOverrides, $resolvedNormalizedTextContextMode),
+            'threshold_version' => $this->resolveOverrideSource($settings, 'threshold_version', $runtimeOverrides, $resolvedThresholdVersion),
+            'hard_block_thresholds' => $this->resolveOverrideSource($settings, 'hard_block_thresholds_json', $runtimeOverrides, $resolvedHardBlockThresholds),
+            'review_thresholds' => $this->resolveOverrideSource($settings, 'review_thresholds_json', $runtimeOverrides, $resolvedReviewThresholds),
             'provider_version' => array_key_exists('provider_version', $runtimeOverrides) ? 'runtime_fallback' : 'provider_runtime',
             'model_key' => array_key_exists('model_key', $runtimeOverrides) ? 'runtime_fallback' : 'provider_runtime',
             'model_snapshot' => array_key_exists('model_snapshot', $runtimeOverrides) ? 'runtime_fallback' : 'provider_runtime',

@@ -18,7 +18,23 @@ interface FaceSearchBackendInterface
     public function ensureEventBackend(Event $event, EventFaceSearchSetting $settings): array;
 
     /**
-     * @return array<int, FaceSearchMatchData>
+     * @return array{
+     *   status:string,
+     *   source_ref:string|null,
+     *   faces_detected:int,
+     *   faces_indexed:int,
+     *   skipped_reason:string|null,
+     *   quality_summary?:array<string,int>,
+     *   dominant_rejection_reason?:string|null
+     * }
+     */
+    public function indexMedia(EventMedia $media, EventFaceSearchSetting $settings): array;
+
+    /**
+     * @return array{
+     *   matches:array<int, FaceSearchMatchData>,
+     *   provider_payload_json?:array<string, mixed>
+     * }
      */
     public function searchBySelfie(
         Event $event,

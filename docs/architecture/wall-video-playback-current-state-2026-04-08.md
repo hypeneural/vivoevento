@@ -906,6 +906,100 @@ Hoje nao existe definicao clara de perguntas como:
 
 Sem essas respostas, a stack continua ambigua.
 
+## Refino: os 5 gaps centrais da logica de video
+
+Depois de validar a stack atual e o comportamento da plataforma web, o que realmente falta agora nao e mais "descobrir como o browser funciona". O que falta e transformar video em um fluxo com estados e causas de transicao proprios dentro do wall.
+
+Os 5 gaps centrais sao estes:
+
+### 1. Falta uma maquina de estados propria para video
+
+Hoje o wall conhece bem o estado do player, mas nao o estado de um item de video como entidade de runtime.
+
+Para a proxima fase, faz sentido modelar algo proximo de:
+
+- `idle`
+- `probing`
+- `primed`
+- `starting`
+- `playing`
+- `waiting`
+- `stalled`
+- `paused_by_wall`
+- `completed`
+- `capped`
+- `interrupted`
+- `failed_to_start`
+
+Isso nao descreve o estado atual do codigo; descreve a modelagem recomendada para a primeira entrega robusta de video.
+
+### 2. Falta um scheduler por causa de saida
+
+Enquanto a troca continuar ancorada principalmente em `setTimeout(interval_ms)`, video continua sendo slide decorado.
+
+Para video, o engine precisa decidir a saida do item por causa:
+
+- `ended`
+- `cap_reached`
+- `paused_by_operator`
+- `play_rejected`
+- `stalled_timeout`
+- `replaced_by_command`
+- `media_deleted`
+- `visibility_degraded`
+
+Essa separacao e mais importante do que qualquer refinamento visual do layout.
+
+### 3. Falta readiness real de playback
+
+Hoje o probe atual resolve bem `metadata`, dimensao e orientacao. Isso e util, mas ainda nao prova que o item esta pronto para entrar na tela sem engasgar.
+
+Para video, a proxima fase precisa distinguir pelo menos:
+
+- `metadata_ready`
+- `playback_ready`
+- `buffering`
+- `stalled`
+
+Na pratica:
+
+- `loadedmetadata` ajuda em orientacao/duracao;
+- `readyState >= HAVE_FUTURE_DATA` e um sinal muito melhor para candidato forte a entrar em cena;
+- `HAVE_ENOUGH_DATA` e sinal ainda mais forte;
+- `waiting` e `stalled` precisam alimentar a logica, nao so o diagnostico.
+
+### 4. Falta semantica fechada de pause/resume/falha de play
+
+Hoje ja esta claro que o wall precisa pausar o video real quando entra em `paused`.
+
+O que ainda falta fechar de forma explicita:
+
+- `resume_from_position`
+- `restart_from_zero`
+- `resume_if_same_item_else_restart`
+
+Tambem falta assumir algo fundamental:
+
+- comando do operador nao confirma playback;
+- quem confirma playback e o elemento de midia.
+
+### 5. Falta integrar politica de video com politica de fila
+
+A fairness atual parece correta para imagem, mas video muda a economia da fila.
+
+Se um item pode ocupar `15s`, `20s` ou `30s`, a fila nao pode medir apenas:
+
+- `playCount`
+
+Ela precisa evoluir para algo mais proximo de:
+
+- `display_time_consumed_ms`
+- `completed_count`
+- `capped_count`
+- `interrupted_count`
+
+Essa parte ja entra no encontro entre produto e engenharia, mas faz sentido registrar porque e exatamente aqui que video deixa de ser "imagem com tag video".
+
 ## Melhorias recomendadas
 
 ## P0 - obrigatorias para tratar video corretamente
@@ -920,7 +1014,26 @@ Precisamos de tres comportamentos explicitos:
 
 Hoje apenas anuncio ja e tratado como tipo diferente.
 
-### 2. Tornar video comum playback-aware no reducer
+### 2. Introduzir maquina de estados propria para video no reducer/engine
+
+O player precisa sair do modelo "video como slide" e passar para "video como item com ciclo proprio".
+
+Estados recomendados para a proxima fase:
+
+- `idle`
+- `probing`
+- `primed`
+- `starting`
+- `playing`
+- `waiting`
+- `stalled`
+- `paused_by_wall`
+- `completed`
+- `capped`
+- `interrupted`
+- `failed_to_start`
+
+### 3. Tornar video comum playback-aware com scheduler por causa de saida
 
 Recomendacao:
 
@@ -931,10 +1044,35 @@ Recomendacao:
   - tocar ate um cap
   - aplicar max duration
 - a trilha de video precisa observar `play()`, `pause()`, `readyState`, `waiting`, `stalled` e falhas reais de playback
+- a saida do item precisa ser por causa, nao so por tempo fixo:
+  - `ended`
+  - `cap_reached`
+  - `paused_by_operator`
+  - `play_rejected`
+  - `stalled_timeout`
+  - `replaced_by_command`
+  - `media_deleted`
+  - `visibility_degraded`
 
-### 3. Definir politica de produto para duracao
+### 4. Definir readiness real de playback, nao so metadata
 
-Sugestao objetiva:
+O player precisa distinguir pelo menos:
+
+- `metadata_ready`
+- `playback_ready`
+- `buffering`
+- `stalled`
+
+Direcao recomendada:
+
+- `loadedmetadata` para dimensao/orientacao/duracao;
+- `readyState >= HAVE_FUTURE_DATA` como sinal de entrada forte;
+- `HAVE_ENOUGH_DATA` como sinal excelente;
+- `waiting` e `stalled` alimentando a logica de playback e fallback.
+
+### 5. Definir politica de produto para duracao
+
+Sugestao objetiva de baseline:
 
 - `0s a 15s`
   - tocar ate o fim
@@ -945,7 +1083,7 @@ Sugestao objetiva:
 
 Sem isso, o wall sempre vai parecer "quebrado" para video longo.
 
-### 4. Pausar de verdade o elemento de video quando o wall entra em `paused`
+### 6. Pausar de verdade o elemento de video quando o wall entra em `paused`
 
 O player precisa:
 
@@ -957,7 +1095,17 @@ Detalhe importante:
 
 - quando a trilha playback-aware entrar, o `resume` precisa tratar a `Promise` retornada por `play()`.
 
-### 5. Criar variante otimizada para wall video
+### 7. Definir fallback de playback quando o video falha
+
+O engine precisa ter saidas claras quando o video nao inicia ou degrada no meio:
+
+- `retry_same_source_once`
+- `fallback_to_poster`
+- `skip_and_penalize_asset`
+
+Sem isso, o wall corre o risco de travar ou de ficar semanticamente ambiguo quando um item falha.
+
+### 8. Criar variante otimizada para wall video
 
 Backend idealmente deve gerar, para video:
 
@@ -977,17 +1125,33 @@ Objetivo:
 
 ## P1 - importantes para fluidez e operacao
 
-### 6. Restringir video em layouts multi-slot
+### 9. Bloquear video em layouts multi-slot por padrao
 
-Opcoes:
+Politica recomendada para a primeira entrega seria:
 
-- bloquear video em `carousel/mosaic/grid`
-- ou limitar a no maximo 1 video simultaneo
-- ou converter multi-slot para imagens apenas
+- `video_disallowed_in_multislot = true`
 
-Hoje o comportamento atual e tecnicamente permissivo demais.
+Do ponto de vista de rollout, isso funciona como regra de seguranca do primeiro suporte serio a video, e nao como refinamento cosmetico.
 
-### 7. Melhorar o cache/preload de video
+Excecao futura, se realmente necessária:
+
+- permitir no maximo `1` video simultaneo;
+- apenas quando existir variante otimizada e politica explicita.
+
+### 10. Integrar politica de video com politica de fila
+
+Para video virar first-class citizen, a fila precisa considerar tempo consumido, nao so contagem de exibicoes.
+
+Metricas candidatas:
+
+- `display_time_consumed_ms`
+- `completed_count`
+- `capped_count`
+- `interrupted_count`
+
+Essa parte e importante, mas vem depois da maquina de estados e do scheduler por causa.
+
+### 11. Melhorar o cache/preload de video
 
 Evolucoes recomendadas:
 
@@ -1000,7 +1164,7 @@ Observacao:
 
 - Service Worker pode entrar aqui no futuro, mas nao deveria ser tratado como P0 do wall video.
 
-### 8. Alinhar upload publico e UX de video
+### 12. Alinhar upload publico e UX de video
 
 Precisamos decidir:
 
@@ -1008,23 +1172,27 @@ Precisamos decidir:
 - se sim, a tela publica precisa comunicar isso;
 - se nao, o backend unitario nao deveria aceitar silenciosamente.
 
-### 9. Remover dispatch desnecessario de `GenerateMediaVariantsJob` para video publico
+### 13. Remover dispatch desnecessario de `GenerateMediaVariantsJob` para video publico
 
 Isso simplifica a trilha do backend e evita confusao futuras.
 
 ## P2 - evolucoes de produto
 
-### 10. Analytics de video
+### 14. Analytics de video
 
 Se video virar first-class citizen, precisamos registrar:
 
-- `started`
-- `completed`
-- `interrupted`
-- `interrupted_by_slide`
-- `interrupted_by_pause`
+- `video_start`
+- `video_first_frame`
+- `video_complete`
+- `video_interrupted_by_cap`
+- `video_interrupted_by_slide`
+- `video_interrupted_by_pause`
+- `video_waiting`
+- `video_stalled`
+- `video_play_rejected`
 
-### 11. Regras por evento
+### 15. Regras por evento
 
 Possiveis flags futuras:
 
@@ -1033,7 +1201,7 @@ Possiveis flags futuras:
 - `wall_video_audio_policy`
 - `wall_allow_video_in_multi_layouts`
 
-### 12. Guard rails de plataforma
+### 16. Guard rails de plataforma
 
 Melhorias tecnicas futuras que fazem sentido, mas nao deveriam travar a primeira entrega:
 
@@ -1042,7 +1210,25 @@ Melhorias tecnicas futuras que fazem sentido, mas nao deveriam travar a primeira
 - readiness mais rica baseada em `readyState`, `canplay`, `waiting` e `stalled`
 - `requestVideoFrameCallback()` para telemetria de primeira frame, fluidez e dropped frames
 
-### 13. Ferramentas operacionais
+### 17. Cobertura de testes para a proxima fase
+
+Os testes adicionados nesta rodada caracterizam bem o estado atual. Para a proxima fase, a suite precisa provar o comportamento-alvo.
+
+Testes que realmente passam a importar:
+
+- video comum sem `loop`
+- avanco por `ended`
+- avanco por `cap_reached`
+- `pause()` ao receber `paused`
+- retomada com `play()` resolvido
+- fallback quando `play()` rejeita
+- downgrade por `waiting/stalled`
+- bloqueio de video em multi-slot
+- escolha de variante `wall_video`
+- fallback para `poster`
+- simetria entre boot e realtime quando a elegibilidade muda
+
+### 18. Ferramentas operacionais
 
 Adicionar no manager:
 

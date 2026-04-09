@@ -53,12 +53,30 @@ abstract class AbstractOpenAiCompatibleVisualReasoningProvider implements Visual
 
         $decision = $this->normalizeDecision($decoded['decision'] ?? null, (bool) ($decoded['review'] ?? false));
         $reason = $this->normalizeNullableString($decoded['reason'] ?? null);
+        $reasonCode = $this->normalizeReasonCode($decoded['reason_code'] ?? null, $decision);
+        $matchedPolicies = $this->normalizeTags($decoded['matched_policies'] ?? []);
+        $matchedExceptions = $this->normalizeTags($decoded['matched_exceptions'] ?? []);
+        $inputScopeUsed = $this->normalizeInputScope(
+            $decoded['input_scope_used'] ?? data_get($promptContext, 'context_scope'),
+        );
+        $inputTypesConsidered = $this->normalizeInputTypes(
+            $decoded['input_types_considered'] ?? ($inputScopeUsed === 'image_and_text_context' ? ['image', 'text'] : ['image']),
+        );
+        $confidenceBand = $this->normalizeConfidenceBand($decoded['confidence_band'] ?? null, $decision);
+        $publishEligibility = $this->normalizePublishEligibility($decoded['publish_eligibility'] ?? null, $decision);
         $shortCaption = $this->normalizeNullableString($decoded['short_caption'] ?? null);
         $replyText = $this->normalizeNullableString($decoded['reply_text'] ?? null);
         $tags = $this->normalizeTags($decoded['tags'] ?? []);
 
         $common = [
             'reason' => $reason,
+            'reasonCode' => $reasonCode,
+            'matchedPolicies' => $matchedPolicies,
+            'matchedExceptions' => $matchedExceptions,
+            'inputScopeUsed' => $inputScopeUsed,
+            'inputTypesConsidered' => $inputTypesConsidered,
+            'confidenceBand' => $confidenceBand,
+            'publishEligibility' => $publishEligibility,
             'shortCaption' => $shortCaption,
             'replyText' => $replyText,
             'tags' => $tags,
@@ -254,6 +272,70 @@ abstract class AbstractOpenAiCompatibleVisualReasoningProvider implements Visual
         $trimmed = trim($value);
 
         return $trimmed === '' ? null : $trimmed;
+    }
+
+    private function normalizeReasonCode(mixed $value, string $decision): string
+    {
+        $normalized = $this->normalizeNullableString($value);
+
+        if ($normalized !== null) {
+            return $normalized;
+        }
+
+        return match ($decision) {
+            'approve' => 'context.approved',
+            'reject' => 'policy.uncertain',
+            default => 'policy.uncertain',
+        };
+    }
+
+    private function normalizeInputScope(mixed $value): string
+    {
+        $normalized = $this->normalizeNullableString($value);
+
+        return in_array($normalized, ['image_only', 'image_and_text_context'], true)
+            ? $normalized
+            : 'image_only';
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function normalizeInputTypes(mixed $value): array
+    {
+        $types = $this->normalizeTags($value);
+
+        if ($types === []) {
+            return ['image'];
+        }
+
+        return array_values(array_filter($types, static fn (string $type): bool => in_array($type, ['image', 'text'], true)));
+    }
+
+    private function normalizeConfidenceBand(mixed $value, string $decision): string
+    {
+        $normalized = $this->normalizeNullableString($value);
+
+        if (in_array($normalized, ['high', 'medium', 'low'], true)) {
+            return $normalized;
+        }
+
+        return $decision === 'approve' ? 'high' : 'medium';
+    }
+
+    private function normalizePublishEligibility(mixed $value, string $decision): string
+    {
+        $normalized = $this->normalizeNullableString($value);
+
+        if (in_array($normalized, ['auto_publish', 'review_only', 'reject'], true)) {
+            return $normalized;
+        }
+
+        return match ($decision) {
+            'approve' => 'auto_publish',
+            'reject' => 'reject',
+            default => 'review_only',
+        };
     }
 
     /**

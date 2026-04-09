@@ -12,6 +12,7 @@ const getEventDetailMock = vi.fn();
 const getEventWallSettingsMock = vi.fn();
 const getEventWallDiagnosticsMock = vi.fn();
 const getEventWallInsightsMock = vi.fn();
+const getEventWallLiveSnapshotMock = vi.fn();
 const getEventWallAdsMock = vi.fn();
 const getWallOptionsMock = vi.fn();
 const simulateEventWallMock = vi.fn();
@@ -29,6 +30,7 @@ vi.mock('../api', () => ({
   getEventWallSettings: (...args: unknown[]) => getEventWallSettingsMock(...args),
   getEventWallDiagnostics: (...args: unknown[]) => getEventWallDiagnosticsMock(...args),
   getEventWallInsights: (...args: unknown[]) => getEventWallInsightsMock(...args),
+  getEventWallLiveSnapshot: (...args: unknown[]) => getEventWallLiveSnapshotMock(...args),
   getEventWallAds: (...args: unknown[]) => getEventWallAdsMock(...args),
   getWallOptions: (...args: unknown[]) => getWallOptionsMock(...args),
   simulateEventWall: (...args: unknown[]) => simulateEventWallMock(...args),
@@ -51,6 +53,7 @@ vi.mock('../hooks/useWallPollingFallback', () => ({
     eventIntervalMs: false,
     settingsIntervalMs: false,
     insightsIntervalMs: false,
+    liveSnapshotIntervalMs: false,
     diagnosticsIntervalMs: false,
   }),
 }));
@@ -210,6 +213,31 @@ describe('EventWallManagerPage', () => {
       ],
       lastCaptureAt: '2026-04-02T20:59:00Z',
     });
+    getEventWallLiveSnapshotMock.mockResolvedValue({
+      wallStatus: 'live',
+      wallStatusLabel: 'Ao vivo',
+      layout: 'auto',
+      transitionEffect: 'fade',
+      currentPlayer: {
+        playerInstanceId: 'player-alpha',
+        healthStatus: 'healthy',
+        runtimeStatus: 'playing',
+        connectionStatus: 'connected',
+        lastSeenAt: '2026-04-02T21:00:00Z',
+      },
+      currentItem: {
+        id: 'media_99',
+        previewUrl: 'https://cdn.example.com/live-now.jpg',
+        senderName: 'Juliana Ribeiro',
+        senderKey: 'whatsapp:5511999990009',
+        source: 'whatsapp',
+        caption: 'Entrada da pista',
+        layoutHint: 'cinematic',
+        isFeatured: false,
+        createdAt: '2026-04-02T20:59:00Z',
+      },
+      updatedAt: '2026-04-02T21:00:00Z',
+    });
     getEventWallAdsMock.mockResolvedValue([
       {
         id: 1,
@@ -299,6 +327,8 @@ describe('EventWallManagerPage', () => {
           sender_name: 'Ana',
           sender_key: 'sender-ana',
           source_type: 'upload',
+          caption: 'Entrada principal',
+          layout_hint: 'cinematic',
           duplicate_cluster_key: null,
           is_featured: false,
           is_replay: false,
@@ -312,6 +342,8 @@ describe('EventWallManagerPage', () => {
           sender_name: 'Pedro',
           sender_key: 'sender-pedro',
           source_type: 'whatsapp',
+          caption: null,
+          layout_hint: 'fullscreen',
           duplicate_cluster_key: null,
           is_featured: false,
           is_replay: false,
@@ -358,9 +390,11 @@ describe('EventWallManagerPage', () => {
     });
     expect(screen.getByText(/Total de midias/i)).toBeInTheDocument();
     expect(screen.getByText(/Ultimas chegadas/i)).toBeInTheDocument();
-    expect(screen.getByText(/Previa do rascunho/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Canvas da previa do rascunho/i)).toBeInTheDocument();
     expect(await screen.findByText(/Diagnostico operacional/i)).toBeInTheDocument();
     expect(screen.getByText(/Tela player-alpha/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Agora no telao/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Juliana Ribeiro/i).length).toBeGreaterThan(0);
 
     await waitFor(() => {
       expect(simulateEventWallMock).toHaveBeenCalled();
@@ -376,6 +410,8 @@ describe('EventWallManagerPage', () => {
 
     expect(await screen.findByText(/Ana/)).toBeInTheDocument();
     expect(screen.getAllByText(/^Upload$/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Layout Cinematografico/i)).toBeInTheDocument();
+    expect(screen.getByText(/Entrada principal/i)).toBeInTheDocument();
     expect(await screen.findByText(/55s/)).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getAllByText(/Saudavel/i).length).toBeGreaterThan(0);

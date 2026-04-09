@@ -1,6 +1,7 @@
-import type { ApiWallInsightsResponse } from '@/lib/api-types';
+import type { ApiWallInsightsResponse, ApiWallLiveSnapshotResponse } from '@/lib/api-types';
 
 const previousData = (current: ApiWallInsightsResponse | undefined) => current;
+const previousLiveSnapshot = (current: ApiWallLiveSnapshotResponse | undefined) => current;
 
 export const wallQueryOptions = {
   event: {
@@ -32,5 +33,7 @@ export const wallQueryOptions = {
     staleTime: 0,
     gcTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    placeholderData: previousLiveSnapshot,
   },
 } as const;

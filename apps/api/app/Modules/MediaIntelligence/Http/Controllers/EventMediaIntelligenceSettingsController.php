@@ -6,7 +6,7 @@ use App\Modules\Events\Models\Event;
 use App\Modules\MediaIntelligence\Actions\UpsertEventMediaIntelligenceSettingsAction;
 use App\Modules\MediaIntelligence\Http\Requests\UpsertEventMediaIntelligenceSettingsRequest;
 use App\Modules\MediaIntelligence\Http\Resources\EventMediaIntelligenceSettingResource;
-use App\Modules\MediaIntelligence\Models\EventMediaIntelligenceSetting;
+use App\Modules\MediaIntelligence\Services\ContextualModerationPolicyResolver;
 use App\Shared\Http\BaseController;
 use App\Shared\Support\EventAccessService;
 use Illuminate\Http\JsonResponse;
@@ -18,13 +18,12 @@ class EventMediaIntelligenceSettingsController extends BaseController
         Request $request,
         Event $event,
         EventAccessService $eventAccess,
+        ContextualModerationPolicyResolver $resolver,
     ): JsonResponse {
         abort_unless($eventAccess->can($request->user(), $event, 'media.moderate'), 403);
 
-        $settings = $event->mediaIntelligenceSettings()->firstOrNew(
-            ['event_id' => $event->id],
-            EventMediaIntelligenceSetting::defaultAttributes(),
-        );
+        $resolved = $resolver->resolveForEvent($event);
+        $settings = $resolved['settings'];
         $settings->loadMissing('replyPromptPreset');
 
         return $this->success(new EventMediaIntelligenceSettingResource($settings));
@@ -50,9 +49,10 @@ class EventMediaIntelligenceSettingsController extends BaseController
                 'model_key' => $settings->model_key,
                 'enabled' => (bool) $settings->enabled,
                 'mode' => $settings->mode,
+                'contextual_policy_preset_key' => $settings->contextual_policy_preset_key,
             ])
             ->log('Configuracao de media intelligence atualizada');
 
-        return $this->success(new EventMediaIntelligenceSettingResource($settings->refresh()->loadMissing('replyPromptPreset')));
+        return $this->success(new EventMediaIntelligenceSettingResource($settings->loadMissing('replyPromptPreset')));
     }
 }

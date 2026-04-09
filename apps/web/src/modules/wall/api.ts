@@ -4,6 +4,7 @@ import type {
   ApiWallActionResponse,
   ApiWallDiagnosticsResponse,
   ApiWallInsightsResponse,
+  ApiWallLiveSnapshotResponse,
   ApiWallOptionsResponse,
   ApiWallPlayerCommand,
   ApiWallPlayerCommandResponse,
@@ -26,6 +27,10 @@ export function getEventWallDiagnostics(eventId: string | number) {
 
 export function getEventWallInsights(eventId: string | number) {
   return api.get<ApiWallInsightsResponse>(`/events/${eventId}/wall/insights`);
+}
+
+export function getEventWallLiveSnapshot(eventId: string | number) {
+  return api.get<ApiWallLiveSnapshotResponse>(`/events/${eventId}/wall/live-snapshot`);
 }
 
 export function getEventWallAds(eventId: string | number) {

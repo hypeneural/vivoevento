@@ -18,8 +18,9 @@ it('builds contextual moderation instructions from the structured policy instead
             'freeform_instruction' => 'Se a cena estiver ambigua, prefira review.',
             'caption_style_prompt' => 'Legenda curta e positiva.',
         ],
-        normalizedTextContext: 'Entrada dos noivos na pista.',
+        contextTextContext: 'Entrada dos noivos na pista.',
         replyInstruction: 'Responda de forma curta e calorosa quando a midia for elegivel.',
+        replyTextContext: 'Entrada dos noivos na pista.',
     );
 
     expect(data_get($built, 'prompt_template'))->toContain('politica estruturada')
@@ -29,7 +30,8 @@ it('builds contextual moderation instructions from the structured policy instead
         ->and(data_get($built, 'prompt_resolved'))->toContain('presenca de pessoas: obrigatoria')
         ->and(data_get($built, 'prompt_resolved'))->toContain('bloqueios adicionais: mascaras, armas cenicas')
         ->and(data_get($built, 'prompt_resolved'))->toContain('excecoes permitidas: brinde com espumante')
-        ->and(data_get($built, 'prompt_resolved'))->toContain('texto associado ao envio: Entrada dos noivos na pista.')
+        ->and(data_get($built, 'prompt_resolved'))->toContain('Texto associado ao envio considerado na analise: Entrada dos noivos na pista.')
+        ->and(data_get($built, 'prompt_resolved'))->toContain('Contexto textual disponivel para orientar a resposta automatica: Entrada dos noivos na pista.')
         ->and(data_get($built, 'prompt_resolved'))->toContain('instrucao complementar do operador: Se a cena estiver ambigua, prefira review.')
         ->and(data_get($built, 'policy_json.contextual_policy_preset_key'))->toBe('casamento_equilibrado');
 });

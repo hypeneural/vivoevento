@@ -80,7 +80,7 @@ const NAV_CONFIG: NavGroup[] = [
       { key: 'plans', label: 'Planos', icon: CreditCard, path: '/plans', permission: 'billing.view', module: 'plans' },
       { key: 'analytics', label: 'Relatorios', icon: BarChart3, path: '/analytics', permission: 'analytics.view', module: 'analytics' },
       { key: 'audit', label: 'Auditoria', icon: ClipboardList, path: '/audit', permission: 'audit.view', module: 'audit' },
-      { key: 'ai-media-replies', label: 'IA', icon: Sparkles, path: '/ia/respostas-de-midia', permission: 'settings.manage', module: 'settings' },
+      { key: 'ai-media-replies', label: 'Moderação IA', icon: Sparkles, path: '/ia/moderacao-de-midia', permission: 'settings.manage', module: 'settings' },
       {
         key: 'settings',
         label: 'Configuracoes',

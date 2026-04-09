@@ -11,6 +11,7 @@ describe('useWallPollingFallback', () => {
     expect(result.current.eventIntervalMs).toBe(false);
     expect(result.current.settingsIntervalMs).toBe(false);
     expect(result.current.insightsIntervalMs).toBe(false);
+    expect(result.current.liveSnapshotIntervalMs).toBe(false);
     expect(result.current.diagnosticsIntervalMs).toBe(false);
   });
 
@@ -21,6 +22,7 @@ describe('useWallPollingFallback', () => {
     expect(result.current.eventIntervalMs).toBe(false);
     expect(result.current.settingsIntervalMs).toBe(false);
     expect(result.current.insightsIntervalMs).toBe(false);
+    expect(result.current.liveSnapshotIntervalMs).toBe(false);
     expect(result.current.diagnosticsIntervalMs).toBe(false);
   });
 
@@ -31,6 +33,7 @@ describe('useWallPollingFallback', () => {
     expect(result.current.eventIntervalMs).toBe(30000);
     expect(result.current.settingsIntervalMs).toBe(20000);
     expect(result.current.insightsIntervalMs).toBe(15000);
+    expect(result.current.liveSnapshotIntervalMs).toBe(5000);
     expect(result.current.diagnosticsIntervalMs).toBe(10000);
   });
 
@@ -41,6 +44,7 @@ describe('useWallPollingFallback', () => {
     expect(result.current.eventIntervalMs).toBe(30000);
     expect(result.current.settingsIntervalMs).toBe(20000);
     expect(result.current.insightsIntervalMs).toBe(15000);
+    expect(result.current.liveSnapshotIntervalMs).toBe(5000);
     expect(result.current.diagnosticsIntervalMs).toBe(10000);
   });
 });

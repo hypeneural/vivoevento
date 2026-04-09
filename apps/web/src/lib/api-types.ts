@@ -884,6 +884,26 @@ export interface ApiEventFaceSearchSettings {
   top_k: number;
   allow_public_selfie_search: boolean;
   selfie_retention_hours: number;
+  recognition_enabled: boolean;
+  search_backend_key: 'local_pgvector' | 'aws_rekognition' | 'luxand_managed' | string;
+  fallback_backend_key: 'local_pgvector' | 'aws_rekognition' | 'luxand_managed' | string | null;
+  routing_policy: 'local_only' | 'aws_primary_local_fallback' | 'aws_primary_local_shadow' | 'local_primary_aws_on_error' | string;
+  shadow_mode_percentage: number;
+  aws_region: string;
+  aws_collection_id: string | null;
+  aws_collection_arn: string | null;
+  aws_face_model_version: string | null;
+  aws_search_mode: 'faces' | 'users' | string;
+  aws_index_quality_filter: 'AUTO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'NONE' | string;
+  aws_search_faces_quality_filter: 'AUTO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'NONE' | string;
+  aws_search_users_quality_filter: 'AUTO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'NONE' | string;
+  aws_search_face_match_threshold: number;
+  aws_search_user_match_threshold: number;
+  aws_associate_user_match_threshold: number;
+  aws_max_faces_per_image: number;
+  aws_index_profile_key: string;
+  aws_detection_attributes_json: string[];
+  delete_remote_vectors_on_event_close: boolean;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -1550,6 +1570,8 @@ export interface ApiWallSimulationPreviewItem {
   sender_name: string;
   sender_key: string;
   source_type?: ApiWallMediaSource | null;
+  caption?: string | null;
+  layout_hint?: ApiWallResolvedLayout | null;
   duplicate_cluster_key?: string | null;
   is_featured: boolean;
   is_replay: boolean;
@@ -1657,6 +1679,48 @@ export interface ApiWallInsightsResponse {
   recentItems: ApiWallInsightsRecentItem[];
   sourceMix: ApiWallInsightsSourceMixItem[];
   lastCaptureAt?: string | null;
+}
+
+export type ApiWallResolvedLayout =
+  | 'fullscreen'
+  | 'polaroid'
+  | 'split'
+  | 'cinematic'
+  | 'kenburns'
+  | 'spotlight'
+  | 'gallery'
+  | 'carousel'
+  | 'mosaic'
+  | 'grid';
+
+export interface ApiWallLiveSnapshotPlayer {
+  playerInstanceId: string;
+  healthStatus: 'healthy' | 'degraded' | 'offline';
+  runtimeStatus: ApiWallHeartbeatPayload['runtime_status'];
+  connectionStatus: ApiWallHeartbeatPayload['connection_status'];
+  lastSeenAt?: string | null;
+}
+
+export interface ApiWallLiveSnapshotItem {
+  id: string;
+  previewUrl: string | null;
+  senderName: string | null;
+  senderKey: string;
+  source: ApiWallMediaSource;
+  caption?: string | null;
+  layoutHint?: ApiWallResolvedLayout | null;
+  isFeatured?: boolean;
+  createdAt?: string | null;
+}
+
+export interface ApiWallLiveSnapshotResponse {
+  wallStatus: string;
+  wallStatusLabel: string;
+  layout: ApiWallLayout;
+  transitionEffect: ApiWallTransition;
+  currentPlayer: ApiWallLiveSnapshotPlayer | null;
+  currentItem: ApiWallLiveSnapshotItem | null;
+  updatedAt?: string | null;
 }
 
 export interface ApiWallActionResponse {

@@ -8,6 +8,7 @@ Entregar a primeira versao realmente operacional do novo cockpit do telao em `/e
 
 - topo mais vivo e util;
 - ligacao clara entre insights do evento, palco, timeline recente e detalhe lateral;
+- snapshot real do item atual do wall no palco principal;
 - menos waterfall no carregamento;
 - menos flicker e menos sensacao de painel "piscando";
 - base pronta para evoluir preview real, monitor live e telemetria sem trocar a arquitetura.
@@ -211,8 +212,8 @@ Testes automatizados executados nesta quarta fatia:
 Achados reais desta quarta fatia:
 
 - o palco agora tem uma previa inicial de rascunho sem `iframe`:
-  - ela ainda nao e o renderer compartilhado final do player;
-  - mas ja responde a layout, animacao, marca, QR, creditos e miniaturas laterais.
+  - ela abriu o caminho para reaproveitar o renderer real do player;
+  - mas ainda nao fazia isso por completo nesta fase.
 - `Proximas fotos` deixou de ser apenas texto:
   - cada item agora pode mostrar thumb;
   - origem normalizada;
@@ -262,6 +263,115 @@ Achados reais desta quinta fatia:
   - `WallAppearanceTab.test.tsx`
   - `WallAdsTab.test.tsx`
 
+Sexta fatia executada de acordo com este plano:
+
+- frontend:
+  - `WallPreviewCanvas`
+  - `WallPlayerRuntimeCard`
+  - integracao do preview com primitives reais do player:
+    - `LayoutRenderer`
+    - `BrandingOverlay`
+    - `FeaturedBadge`
+    - `SideThumbnails`
+  - `Proximas fotos` convertida em timeline horizontal com `ScrollArea`
+  - cards de player com cor por saude operacional
+  - nova reducao do peso direto de `EventWallManagerPage.tsx`
+
+Testes automatizados executados nesta sexta fatia:
+
+- frontend focado:
+  - `cd apps/web && npm run test -- src/modules/wall/components/manager/stage/WallPreviewCanvas.test.tsx src/modules/wall/components/manager/diagnostics/WallPlayerRuntimeCard.test.tsx src/modules/wall/components/manager/stage/WallUpcomingTimeline.test.tsx src/modules/wall/components/manager/stage/WallDraftPreviewCard.test.tsx`
+  - `5` testes passando
+- frontend pagina:
+  - `cd apps/web && npm run test -- src/modules/wall/pages/EventWallManagerPage.test.tsx`
+  - `11` testes passando
+- frontend regressao do modulo:
+  - `cd apps/web && npm run test -- src/modules/wall`
+  - `190` testes passando
+- frontend:
+  - `cd apps/web && npm run type-check`
+  - sem erros
+- backend regressao do modulo:
+  - `cd apps/api && php artisan test --filter=Wall`
+  - `57` testes passando
+
+Achados reais desta sexta fatia:
+
+- a `Previa do rascunho` deixou de ser uma composicao paralela do manager:
+  - agora reaproveita renderer e overlays reais do player;
+  - continua sem `iframe`;
+  - continua desacoplada de clock e runtime ao vivo.
+- `Proximas fotos` mudou de lista vertical para timeline horizontal:
+  - caixas compactas por item;
+  - thumb;
+  - origem;
+  - badges de reprise e destaque;
+  - scroll lateral mais condizente com leitura sequencial da fila.
+- o bloco de player ficou mais legivel operacionalmente:
+  - a cor do card agora acompanha a saude do player;
+  - isso reduz o custo de leitura de `Ultimo sinal` e `Sem conexao` em diagnostico denso.
+- a pagina principal voltou a encolher sem reabrir risco no fluxo:
+  - `EventWallManagerPage.tsx` caiu de `1215` para `936` linhas.
+
+Setima fatia executada de acordo com este plano:
+
+- backend:
+  - `GET /events/{event}/wall/live-snapshot`
+  - `WallLiveSnapshotService`
+  - `WallLiveSnapshotResource`
+  - resolvedor unico de `layout_hint` para manager e simulacao
+  - enriquecimento real de `sequence_preview` com:
+    - `caption`
+    - `layout_hint`
+- frontend:
+  - `getEventWallLiveSnapshot`
+  - `useWallLiveSnapshot`
+  - integracao do snapshot real do wall em `WallHeroStage`
+  - copy operacional no `WallPlayerRuntimeCard`
+  - badges de layout e caption na timeline de `Proximas fotos`
+
+Testes automatizados executados nesta setima fatia:
+
+- backend focado:
+  - `cd apps/api && php artisan test --filter=WallLiveSnapshotTest`
+  - `2` testes passando
+- backend focado:
+  - `cd apps/api && php artisan test --filter=WallDiagnosticsTest`
+  - `4` testes passando
+- frontend focado:
+  - `cd apps/web && npm run test -- src/modules/wall/hooks/useWallLiveSnapshot.test.tsx src/modules/wall/hooks/useWallPollingFallback.test.tsx src/modules/wall/hooks/useWallRealtimeSync.test.tsx src/modules/wall/components/manager/diagnostics/WallPlayerRuntimeCard.test.tsx src/modules/wall/components/manager/stage/WallUpcomingTimeline.test.tsx src/modules/wall/pages/EventWallManagerPage.test.tsx`
+  - `24` testes passando
+- frontend regressao do modulo:
+  - `cd apps/web && npm run test -- src/modules/wall`
+  - `193` testes passando
+- frontend:
+  - `cd apps/web && npm run type-check`
+  - sem erros
+- backend regressao do modulo:
+  - `cd apps/api && php artisan test --filter=Wall`
+  - `59` testes passando
+
+Achados reais desta setima fatia:
+
+- o palco agora ja recebe um `live snapshot` real do wall:
+  - item atual;
+  - player mais recente ainda online;
+  - origem;
+  - caption;
+  - `layoutHint`.
+- a simulacao deixou de ficar muda demais para operacao:
+  - `caption` entrou no `sequence_preview`;
+  - `layout_hint` entrou com o mesmo resolvedor de layout usado nesta fase para o monitor do manager.
+- o card de player ficou menos tecnico no ponto de entrada:
+  - `Ultimo envio na tela` virou `Remetente atual`;
+  - `Fotos` virou `Midias carregadas`;
+  - `Uso do cache` virou `Aproveitamento do cache`;
+  - `Espaco local` virou `Espaco no navegador`.
+- a timeline de `Proximas fotos` ficou mais util para leitura rapida:
+  - agora exibe `caption` quando existir;
+  - mostra o `layout` previsto em badge operacional;
+  - continua horizontal e com scroll leve.
+
 ## Resultado esperado ao fim da sprint
 
 Ao final desta sprint, a tela `/events/:id/wall` deve permitir:
@@ -271,6 +381,7 @@ Ao final desta sprint, a tela `/events/:id/wall` deve permitir:
   - `Total de midias`
   - `Ultimas chegadas`
 - selecionar uma midia recente e refletir isso no palco e no detalhe lateral;
+- acompanhar no palco o item real que o wall esta exibindo neste momento;
 - carregar os insights com um unico endpoint agregado;
 - operar com realtime hibrido:
   - WebSocket como principal;
@@ -286,11 +397,13 @@ Ao final desta sprint, a tela `/events/:id/wall` deve permitir:
 ### Entra agora
 
 - `GET /events/{event}/wall/insights`
+- `GET /events/{event}/wall/live-snapshot`
 - `WallTopInsightsRail`
 - `WallTopContributorCard`
 - `WallTotalMediaCard`
 - `WallLiveMediaTimelineStrip`
 - `WallRecentMediaDetailsSheet`
+- `useWallLiveSnapshot`
 - politica de cache por volatilidade
 - `useWallPollingFallback`
 - `useWallRealtimeSync`
@@ -1222,6 +1335,7 @@ Criar ou expandir:
 cd apps/api
 php artisan test --filter=WallInsightsTest
 php artisan test --filter=WallDiagnosticsTest
+php artisan test --filter=WallLiveSnapshotTest
 php artisan test --filter=WallInsightsServiceTest
 ```
 
@@ -1231,6 +1345,7 @@ php artisan test --filter=WallInsightsServiceTest
 cd apps/web
 npm run test -- src/modules/wall/pages/EventWallManagerPage.test.tsx
 npm run test -- src/modules/wall/hooks/useWallTopInsights.test.ts
+npm run test -- src/modules/wall/hooks/useWallLiveSnapshot.test.tsx
 npm run test -- src/modules/wall/hooks/useWallPollingFallback.test.tsx
 npm run test -- src/modules/wall/hooks/useWallRealtimeSync.test.tsx
 npm run test -- src/modules/wall/hooks/useWallSelectedMedia.test.ts
@@ -1253,6 +1368,7 @@ npm run type-check
 ### Backend
 
 - [x] rota `GET /events/{event}/wall/insights`
+- [x] rota `GET /events/{event}/wall/live-snapshot`
 - [x] controller fino
 - [x] query de agregacao
 - [x] service de montagem
@@ -1262,12 +1378,16 @@ npm run type-check
 - [x] testes de contrato e policy
 - [x] `sequence_preview.preview_url`
 - [x] `sequence_preview.source_type`
+- [x] `sequence_preview.caption`
+- [x] `sequence_preview.layout_hint`
 
 ### Frontend
 
 - [x] query keys novas
 - [x] `getEventWallInsights`
+- [x] `getEventWallLiveSnapshot`
 - [x] `useWallTopInsights`
+- [x] `useWallLiveSnapshot`
 - [x] `WallTopInsightsRail`
 - [x] `WallTopContributorCard`
 - [x] `WallTotalMediaCard`
@@ -1285,6 +1405,7 @@ npm run type-check
 - [x] `WallAdsTab` integrado na pagina principal
 - [x] `EventWallManagerPage.tsx` abaixo de `1600` linhas
 - [x] `EventWallManagerPage.tsx` abaixo de `1300` linhas
+- [x] `EventWallManagerPage.tsx` abaixo de `1000` linhas
 
 ### UX/UI
 
@@ -1300,7 +1421,12 @@ npm run type-check
 - [x] nenhum dado essencial dependente apenas de hover
 - [x] previa inicial do rascunho sem `iframe`
 - [x] `Proximas fotos` com thumb e origem
-- [ ] preview com renderer compartilhado do player
+- [x] preview com renderer compartilhado do player
+- [x] `Proximas fotos` como timeline horizontal com scroll
+- [x] card de player com cor por saude operacional
+- [x] palco com `live snapshot` real do wall
+- [x] `Proximas fotos` com `caption` e `layout_hint`
+- [x] card de player com copy operacional
 
 ## Riscos e cuidados
 

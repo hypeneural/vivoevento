@@ -65,7 +65,8 @@ Leitura curta:
 - a implementacao agora separa melhor operacao critica, diagnostico tecnico, previsao de fila e configuracao por contexto;
 - o manager agora usa WebSocket para invalidar queries e fallback de polling leve quando o canal privado cai;
 - o player publico usa um modelo hibrido: boot HTTP + WebSocket + heartbeat HTTP + resync HTTP periodico;
-- o palco agora ja tem uma primeira previa do rascunho sem `iframe`, mas ela ainda nao e o renderer compartilhado definitivo do player;
+- o palco agora ja tem uma previa do rascunho sem `iframe`, reaproveitando renderer e overlays reais do player;
+- o palco agora tambem ja consome um `live snapshot` real do wall para mostrar o item atual quando nao ha selecao manual no manager;
 - a lista "Ordem mais provavel das proximas 12 exibicoes" e uma simulacao com a fila real + draft atual, nao um espelho autoritativo do que esta passando na TV;
 - "Tela d7e1d73a...cfd4" nao e o codigo do telao; e o `player_instance_id` do navegador/player;
 - `R2 | L0 | E0 | S0` significa `ready`, `loading`, `error`, `stale`;
@@ -74,7 +75,9 @@ Leitura curta:
 - o palco agora usa ativacao automatica apenas nas tabs pre-carregadas;
 - o inspector agora usa ativacao manual para nao trocar de contexto por acidente;
 - `Aparencia` e `Anuncios` ja sairam de blocos inline e passaram a componentes proprios do inspector;
-- `Proximas fotos` ja mostra thumb e origem quando a simulacao traz esses campos;
+- `Proximas fotos` agora funciona como timeline horizontal com scroll, thumb e origem;
+- a simulacao agora tambem ja entrega `caption` e `layout_hint`, deixando a leitura da fila mais proxima do palco real;
+- os cards de player no diagnostico agora usam cor por saude operacional, facilitando leitura rapida de online, instabilidade e offline;
 - para subir muito a usabilidade, o caminho certo nao e colocar mais cards na lateral; e separar a experiencia em:
   - barra operacional fixa;
   - workspace principal com preview/monitor;
@@ -93,7 +96,9 @@ Leitura curta:
   - `WallQueueTab` saiu para componente proprio;
   - `WallAppearanceTab` saiu para componente proprio;
   - `WallAdsTab` saiu para componente proprio;
-  - `EventWallManagerPage.tsx` esta em `1215` linhas nesta rodada.
+  - `WallPreviewCanvas` saiu para componente proprio;
+  - `WallPlayerRuntimeCard` saiu para componente proprio;
+  - `EventWallManagerPage.tsx` esta em `936` linhas nesta rodada.
 
 ### Queries da pagina
 
@@ -103,6 +108,7 @@ O manager abre estas queries:
 - `getEventWallSettings(eventId)`
 - `getWallOptions()`
 - `getEventWallInsights(eventId)`
+- `getEventWallLiveSnapshot(eventId)`
 - `getEventWallDiagnostics(eventId)`
 - `getEventWallAds(eventId)`
 - `simulateEventWall(eventId, simulationDraft)`
@@ -140,8 +146,8 @@ Essa organizacao melhorou quatro pontos relevantes, mas ainda deixa gaps importa
 
 1. o operador agora entende melhor o fluxo `ver -> entender -> agir`;
 2. a coluna lateral deixou de ser um inspector infinito e passou a ter contexto por aba;
-3. a preview visual ainda nao e o renderer real do wall;
-4. a pagina ainda precisa amadurecer `preview real` e `monitor live autoritativo` como proximas fatias.
+3. a preview visual agora esta bem mais fiel porque reaproveita primitives reais do player;
+4. a pagina ainda precisa amadurecer `monitor live autoritativo` como proxima fatia.
 
 ## 2. Stack atual do manager do telao
 
@@ -184,11 +190,12 @@ Ao abrir `/events/:id/wall`, a pagina:
 2. busca `wall/settings`;
 3. busca `wall/options`;
 4. busca `wall/insights`;
-5. busca `wall/diagnostics`;
-6. busca `wall/ads`;
-7. monta um `draft` local a partir de `settings`;
-8. com debounce de `650ms`, envia esse draft para `POST /events/{event}/wall/simulate`;
-9. usa a resposta para preencher a previsao da fila e a previa inicial do rascunho.
+5. busca `wall/live-snapshot`;
+6. busca `wall/diagnostics`;
+7. busca `wall/ads`;
+8. monta um `draft` local a partir de `settings`;
+9. com debounce de `650ms`, envia esse draft para `POST /events/{event}/wall/simulate`;
+10. usa a resposta para preencher a previsao da fila e a previa inicial do rascunho.
 
 ### Caracteristica importante
 
@@ -227,6 +234,7 @@ Quando esses eventos chegam, ele invalida queries do TanStack Query:
 - `wall.settings(eventId)`
 - `wall.diagnostics(eventId)`
 - `wall.insights(eventId)`
+- `wall.liveSnapshot(eventId)`
 - `events.detail(eventId)`
 
 ### Ponto importante
@@ -252,6 +260,8 @@ Intervalos aplicados nesta fase:
   - `20000ms`
 - `wall.insights`:
   - `15000ms`
+- `wall.liveSnapshot`:
+  - `5000ms`
 - `wall.diagnostics`:
   - `10000ms`
 
@@ -349,6 +359,22 @@ Ou seja:
 - `health_status` e um resumo operacional;
 - `connection_status` e o estado do socket reportado pelo player.
 
+### Leitura visual atual do card
+
+Nesta rodada, o card por player ganhou tom visual por saude operacional:
+
+- `healthy`
+  - verde
+- `degraded`
+  - laranja
+- `offline`
+  - vermelho
+
+Leitura:
+
+- isso nao muda a regra de negocio do diagnostico;
+- mas reduz muito o tempo de leitura quando existe mais de uma tela conectada.
+
 ## 6. O que significam os KPIs e termos atuais
 
 ## 6.1 KPIs do resumo
@@ -430,39 +456,51 @@ Valores:
 - `disconnected`
 - `error`
 
-### Ultimo envio na tela
+### Remetente atual
 
-Hoje mostra `current_sender_key`.
+Nesta rodada, o card principal deixou de mostrar o `current_sender_key` cru.
 
-Problema:
+Agora a copy operacional prioriza leitura humana, por exemplo:
 
-- esse valor e tecnico demais;
-- pode aparecer como `whatsapp:5511...` ou `guest:nome-slug`;
-- nao e o melhor texto para operador humano.
+- `Convidado via WhatsApp`
+- `Convidado via Telegram`
+- `Equipe do evento`
 
-### Fotos `R2 | L0 | E0 | S0`
+Leitura:
 
-Significados:
+- o valor tecnico ainda existe no diagnostico expandido;
+- mas o resumo do card agora comunica melhor o que esta em foco.
 
-- `R`: `ready` = assets prontos para renderizar
-- `L`: `loading` = assets em carregamento
-- `E`: `error` = assets que falharam
-- `S`: `stale` = asset servido a partir de cache local stale fallback
+### Midias carregadas
 
-`stale` hoje significa:
+No card, o resumo operacional agora ficou assim:
+
+- `32 prontas`
+- `0 carregando`
+- `0 com erro`
+- `0 em cache`
+
+Por baixo disso, a semantica continua a mesma:
+
+- `ready` = assets prontos para renderizar
+- `loading` = assets em carregamento
+- `error` = assets que falharam
+- `stale` = asset servido a partir de cache local stale fallback
+
+`stale` continua significando:
 
 - a rede falhou no carregamento direto;
 - o player conseguiu exibir uma copia local do cache;
 - a tela continuou funcionando, mas usando um fallback menos fresco.
 
-### Uso do cache
+### Aproveitamento do cache
 
 Percentual calculado a partir de:
 
 - `cache_hit_count`
 - `cache_miss_count`
 
-### Espaco local
+### Espaco no navegador
 
 Estimativa do navegador via `navigator.storage.estimate()`:
 
@@ -523,6 +561,8 @@ Cada item da sequencia hoje traz:
 - `preview_url`
 - `sender_name`
 - `source_type`
+- `caption`
+- `layout_hint`
 - `sender_key`
 - `duplicate_cluster_key`
 - `is_featured`
@@ -534,14 +574,14 @@ Cada item da sequencia hoje traz:
 Ainda nao vem:
 
 - icone de origem
-- caption
-- layout efetivo da exibicao
 
 Leitura atualizada:
 
 - o bloco deixou de ser apenas lista textual;
 - a operacao ja consegue ler thumb e origem na previsao;
-- ainda falta enriquecer legenda, layout efetivo e semantica visual mais completa.
+- a previsao agora tambem consegue mostrar legenda curta e o layout previsto da exibicao;
+- a composicao atual do manager usa caixas horizontais com scroll lateral, o que combina melhor com leitura de sequencia;
+- ainda falta enriquecer icone de origem no proprio payload e semantica visual mais completa para video e duracao.
 
 ## 8. Como funcionam os estados do telao
 
@@ -650,20 +690,21 @@ Hoje o operador precisa percorrer:
 
 Isso divide o foco operacional.
 
-## 9.2 A previa atual ainda nao e fiel o bastante
+## 9.2 A previa atual ficou melhor, mas ainda nao fecha o problema inteiro
 
 O manager ja saiu do placeholder puro e agora tem uma `Previa do rascunho`.
 
 Mesmo assim, ela ainda tem limites importantes:
 
-- ainda nao reutiliza o renderer compartilhado final do player;
+- ja reutiliza renderer e overlays reais do player;
 - ainda nao espelha runtime real ou clock real da exibicao;
-- ainda simplifica alguns comportamentos visuais.
+- ainda simplifica alguns comportamentos visuais e de temporizacao.
 
 Leitura:
 
 - a direcao tecnica esta correta porque abandonou `iframe`;
-- mas ainda falta a etapa de `preview fiel` para fechar a experiencia de edicao visual.
+- o salto desta rodada foi importante porque o preview deixou de parecer mock solto;
+- o proximo passo continua sendo aproximar clock, transicao curta e monitor live autoritativo.
 
 ## 9.3 A coluna lateral ficou longa demais
 
@@ -939,6 +980,12 @@ Implementacao recomendada:
   - primeira foto simulada
   - segunda e terceira fotos para transicao curta
 - rodar um loop curto de `3s` enquanto o preview estiver visivel.
+
+Status atual desta trilha:
+
+- a extracao inicial do `WallPreviewCanvas` ja entrou no manager;
+- o preview agora reaproveita `LayoutRenderer`, `BrandingOverlay`, `FeaturedBadge` e `SideThumbnails`;
+- a pendencia principal daqui para frente deixa de ser composicao visual e passa a ser fidelidade temporal e monitor live autoritativo.
 
 Vantagem:
 
@@ -1682,18 +1729,25 @@ Regra importante:
 
 ## 16.2 Payload de monitor ao vivo
 
-Adicionar um canal ou endpoint para runtime snapshot do manager:
+Nesta fase, o manager ja ganhou um endpoint dedicado de snapshot ao vivo:
 
-- `wall.runtime.snapshot.updated`
+- `GET /events/{event}/wall/live-snapshot`
 
-Payload minimo:
+Payload atual:
 
 - item atual
 - remetente atual
 - origem
 - preview atual
-- layout atual
-- ultimo advance
+- `layoutHint`
+- player mais recente ainda online
+- status atual do wall
+
+Leitura:
+
+- isso ja permite trazer o item real do wall para o palco do manager;
+- ainda nao substitui um monitor autoritativo com clock central de advance;
+- um evento broadcastado dedicado continua opcao futura para reduzir ainda mais latencia de sincronizacao.
 
 ## 16.3 Endpoint agregado de insights
 
@@ -1778,10 +1832,12 @@ Leitura:
 
 ## 16.4 Enriquecer `sequence_preview`
 
-Nesta fase, dois enriquecimentos ja entraram no contrato real:
+Nesta fase, quatro enriquecimentos ja entraram no contrato real:
 
 - `preview_url`
 - `source_type`
+- `caption`
+- `layout_hint`
 
 Pendencias que continuam valendo para a proxima rodada:
 

@@ -23,9 +23,9 @@ return new class extends Migration
             $table->boolean('require_json_output')->default(true)->after('normalized_text_context_mode');
             $table->string('contextual_policy_preset_key', 80)->default('homologacao_livre')->after('require_json_output');
             $table->string('policy_version', 100)->default('contextual-policy-v1')->after('contextual_policy_preset_key');
-            $table->boolean('allow_alcohol')->default(true)->after('policy_version');
-            $table->boolean('allow_tobacco')->default(true)->after('allow_alcohol');
-            $table->string('required_people_context', 40)->default('optional')->after('allow_tobacco');
+            $table->boolean('allow_alcohol')->nullable()->after('policy_version');
+            $table->boolean('allow_tobacco')->nullable()->after('allow_alcohol');
+            $table->string('required_people_context', 40)->nullable()->after('allow_tobacco');
             $table->json('blocked_terms_json')->nullable()->after('required_people_context');
             $table->json('allowed_exceptions_json')->nullable()->after('blocked_terms_json');
             $table->text('freeform_instruction')->nullable()->after('allowed_exceptions_json');

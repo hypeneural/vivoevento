@@ -2,6 +2,7 @@ import { api } from '@/lib/api';
 import type { PaginatedResponse } from '@/lib/api-types';
 
 import type {
+  ContentModerationGlobalSettings,
   MediaReplyEventHistoryItem,
   MediaReplyEventOption,
   MediaIntelligenceGlobalSettings,
@@ -11,16 +12,27 @@ import type {
   RunMediaReplyPromptTestPayload,
   SaveMediaReplyPromptCategoryPayload,
   SaveMediaReplyPromptPresetPayload,
+  UpdateContentModerationGlobalSettingsPayload,
   UpdateMediaIntelligenceGlobalSettingsPayload,
 } from './types';
 
 export const aiMediaRepliesService = {
   getConfiguration() {
-    return api.get<MediaIntelligenceGlobalSettings>('/ia/respostas-de-midia/configuracao');
+    return api.get<MediaIntelligenceGlobalSettings>('/media-intelligence/global-settings');
   },
 
   updateConfiguration(payload: UpdateMediaIntelligenceGlobalSettingsPayload) {
-    return api.patch<MediaIntelligenceGlobalSettings>('/ia/respostas-de-midia/configuracao', {
+    return api.patch<MediaIntelligenceGlobalSettings>('/media-intelligence/global-settings', {
+      body: payload,
+    });
+  },
+
+  getSafetyConfiguration() {
+    return api.get<ContentModerationGlobalSettings>('/content-moderation/global-settings');
+  },
+
+  updateSafetyConfiguration(payload: UpdateContentModerationGlobalSettingsPayload) {
+    return api.patch<ContentModerationGlobalSettings>('/content-moderation/global-settings', {
       body: payload,
     });
   },
@@ -81,6 +93,22 @@ export const aiMediaRepliesService = {
 
     if (payload.preset_id) {
       formData.append('preset_id', String(payload.preset_id));
+    }
+
+    if (payload.objective_safety_scope_override) {
+      formData.append('objective_safety_scope_override', payload.objective_safety_scope_override);
+    }
+
+    if (payload.context_scope_override) {
+      formData.append('context_scope_override', payload.context_scope_override);
+    }
+
+    if (payload.reply_scope_override) {
+      formData.append('reply_scope_override', payload.reply_scope_override);
+    }
+
+    if (payload.normalized_text_context_mode_override) {
+      formData.append('normalized_text_context_mode_override', payload.normalized_text_context_mode_override);
     }
 
     payload.images.forEach((image) => {

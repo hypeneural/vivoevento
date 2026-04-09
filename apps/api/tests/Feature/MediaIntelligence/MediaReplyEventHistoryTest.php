@@ -74,7 +74,21 @@ it('filters real event history by event, preset name, sender query and provider'
         'event_media_id' => $matchingMedia->id,
         'provider_key' => 'openrouter',
         'model_key' => 'openai/gpt-4.1-mini',
+        'reason' => 'A imagem combina com a celebracao.',
+        'reason_code' => 'context.match.event',
+        'matched_policies_json' => ['preset:casamento_equilibrado'],
+        'matched_exceptions_json' => ['brinde com espumante'],
+        'input_scope_used' => 'image_and_text_context',
+        'input_types_considered_json' => ['image', 'text'],
+        'confidence_band' => 'high',
+        'publish_eligibility' => 'auto_publish',
         'reply_text' => 'Memorias que fazem o coracao sorrir!',
+        'policy_snapshot_json' => [
+            'contextual_policy_preset_key' => 'casamento_equilibrado',
+        ],
+        'policy_sources_json' => [
+            'allow_alcohol' => 'preset',
+        ],
         'prompt_context_json' => [
             'template' => 'Use {nome_do_evento}.',
             'variables' => ['nome_do_evento' => 'Casamento Ana e Pedro'],
@@ -144,6 +158,15 @@ it('filters real event history by event, preset name, sender query and provider'
     $response->assertJsonPath('data.0.id', $matchingMedia->id)
         ->assertJsonPath('data.0.event_title', 'Casamento Ana e Pedro')
         ->assertJsonPath('data.0.provider_key', 'openrouter')
+        ->assertJsonPath('data.0.reason_code', 'context.match.event')
+        ->assertJsonPath('data.0.confidence_band', 'high')
+        ->assertJsonPath('data.0.publish_eligibility', 'auto_publish')
+        ->assertJsonPath('data.0.effective_media_state', 'published')
+        ->assertJsonPath('data.0.context_decision', 'approved')
+        ->assertJsonPath('data.0.policy_label', 'Casamento romantico')
+        ->assertJsonPath('data.0.policy_inheritance_mode', 'preset')
+        ->assertJsonPath('data.0.text_context_summary', 'A decisao usou imagem + texto normalizado.')
+        ->assertJsonPath('data.0.human_reason', 'A imagem combina com a celebracao.')
         ->assertJsonPath('data.0.preset_name', 'Casamento romantico')
         ->assertJsonPath('data.0.sender_phone', '5548998483594')
         ->assertJsonPath('data.0.status', 'completed');
@@ -180,9 +203,24 @@ it('shows a real event history entry with prompt context and payloads', function
         'event_media_id' => $media->id,
         'provider_key' => 'openrouter',
         'model_key' => 'openai/gpt-4.1-mini',
+        'reason' => 'A camera faz sentido para o evento.',
+        'reason_code' => 'context.match.event',
+        'matched_policies_json' => ['preset:homologacao_livre'],
+        'matched_exceptions_json' => ['camera_fotografica'],
+        'input_scope_used' => 'image_only',
+        'input_types_considered_json' => ['image'],
+        'confidence_band' => 'medium',
+        'publish_eligibility' => 'review_only',
         'reply_text' => 'Momento especial!',
         'request_payload_json' => ['model' => 'openai/gpt-4.1-mini'],
         'raw_response_json' => ['reply_text' => 'Momento especial!'],
+        'policy_snapshot_json' => [
+            'contextual_policy_preset_key' => 'homologacao_livre',
+            'allow_alcohol' => true,
+        ],
+        'policy_sources_json' => [
+            'allow_alcohol' => 'preset',
+        ],
         'prompt_context_json' => [
             'template' => 'Use {nome_do_evento}.',
             'variables' => ['nome_do_evento' => 'Evento Teste'],
@@ -216,10 +254,26 @@ it('shows a real event history entry with prompt context and payloads', function
     $response->assertJsonPath('data.id', $media->id)
         ->assertJsonPath('data.event_title', 'Evento Teste')
         ->assertJsonPath('data.trace_id', 'trace-show')
+        ->assertJsonPath('data.effective_media_state', 'published')
+        ->assertJsonPath('data.context_decision', 'approved')
+        ->assertJsonPath('data.policy_label', 'Festas vibrantes')
+        ->assertJsonPath('data.policy_inheritance_mode', 'preset')
+        ->assertJsonPath('data.text_context_summary', 'A decisao usou somente a imagem.')
+        ->assertJsonPath('data.human_reason', 'A camera faz sentido para o evento.')
         ->assertJsonPath('data.prompt_template', 'Use {nome_do_evento}.')
         ->assertJsonPath('data.prompt_resolved', 'Use Evento Teste.')
         ->assertJsonPath('data.prompt_variables.nome_do_evento', 'Evento Teste')
         ->assertJsonPath('data.preset_name', 'Festas vibrantes')
+        ->assertJsonPath('data.reason', 'A camera faz sentido para o evento.')
+        ->assertJsonPath('data.reason_code', 'context.match.event')
+        ->assertJsonPath('data.matched_policies.0', 'preset:homologacao_livre')
+        ->assertJsonPath('data.matched_exceptions.0', 'camera_fotografica')
+        ->assertJsonPath('data.input_scope_used', 'image_only')
+        ->assertJsonPath('data.input_types_considered.0', 'image')
+        ->assertJsonPath('data.confidence_band', 'medium')
+        ->assertJsonPath('data.publish_eligibility', 'review_only')
+        ->assertJsonPath('data.policy_snapshot.contextual_policy_preset_key', 'homologacao_livre')
+        ->assertJsonPath('data.policy_sources.allow_alcohol', 'preset')
         ->assertJsonPath('data.normalized_text_context', 'Legenda enviada pelo convidado')
         ->assertJsonPath('data.normalized_text_context_mode', 'caption_only')
         ->assertJsonPath('data.context_scope', 'image_only')

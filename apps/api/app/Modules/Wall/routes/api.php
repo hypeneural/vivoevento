@@ -3,6 +3,7 @@
 use App\Modules\Wall\Http\Controllers\EventWallAdController;
 use App\Modules\Wall\Http\Controllers\EventWallController;
 use App\Modules\Wall\Http\Controllers\EventWallInsightsController;
+use App\Modules\Wall\Http\Controllers\EventWallLiveSnapshotController;
 use App\Modules\Wall\Http\Controllers\PublicWallController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,6 +28,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('events/{event}/wall/diagnostics', [EventWallController::class, 'diagnostics'])
         ->whereNumber('event');
     Route::get('events/{event}/wall/insights', [EventWallInsightsController::class, 'show'])
+        ->whereNumber('event');
+    Route::get('events/{event}/wall/live-snapshot', [EventWallLiveSnapshotController::class, 'show'])
         ->whereNumber('event');
     Route::post('events/{event}/wall/simulate', [EventWallController::class, 'simulate'])
         ->whereNumber('event');

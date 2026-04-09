@@ -98,7 +98,7 @@ describe('useWallRealtimeSync', () => {
     });
   });
 
-  it('invalida settings, diagnostics, insights e evento ao reconectar', async () => {
+  it('invalida settings, diagnostics, insights, snapshot ao vivo e evento ao reconectar', async () => {
     const fakePusher = createFakePusher();
     createWallManagerPusherMock.mockReturnValue(fakePusher);
 
@@ -131,6 +131,7 @@ describe('useWallRealtimeSync', () => {
       expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: queryKeys.wall.settings('31') });
       expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: queryKeys.wall.diagnostics('31') });
       expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: queryKeys.wall.insights('31') });
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: queryKeys.wall.liveSnapshot('31') });
       expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: queryKeys.events.detail('31') });
     });
 
@@ -140,7 +141,7 @@ describe('useWallRealtimeSync', () => {
     expect(disconnectWallManagerPusherMock).toHaveBeenCalled();
   });
 
-  it('invalida apenas diagnostico e insights quando chega evento tecnico do wall', async () => {
+  it('invalida diagnostico, insights e snapshot ao vivo quando chega evento tecnico do wall', async () => {
     const fakePusher = createFakePusher();
     createWallManagerPusherMock.mockReturnValue(fakePusher);
 
@@ -166,6 +167,7 @@ describe('useWallRealtimeSync', () => {
     await waitFor(() => {
       expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: queryKeys.wall.diagnostics('31') });
       expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: queryKeys.wall.insights('31') });
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: queryKeys.wall.liveSnapshot('31') });
     });
 
     expect(invalidateQueriesSpy).not.toHaveBeenCalledWith({ queryKey: queryKeys.wall.settings('31') });
