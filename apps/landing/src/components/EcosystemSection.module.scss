@@ -1,17 +1,17 @@
-﻿@use '../styles/variables' as *;
+@use '../styles/variables' as *;
 @use '../styles/mixins' as *;
 
 .section {
-  padding-top: 1rem;
+  padding-top: 0;
 }
 
 .header {
   display: grid;
-  gap: 1rem;
-  margin-bottom: 1.8rem;
+  gap: 0.5rem;
+  margin-bottom: 1.2rem;
 
   :global(.section-title) {
-    margin-top: 1rem;
+    margin-top: 0.5rem;
     max-width: 18ch;
   }
 }

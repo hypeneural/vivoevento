@@ -16,6 +16,7 @@ class WallPlayerRuntimeStatus extends Model
         'runtime_status',
         'connection_status',
         'current_item_id',
+        'current_item_started_at',
         'current_sender_key',
         'ready_count',
         'loading_count',
@@ -44,6 +45,7 @@ class WallPlayerRuntimeStatus extends Model
         'cache_hit_count' => 'integer',
         'cache_miss_count' => 'integer',
         'cache_stale_fallback_count' => 'integer',
+        'current_item_started_at' => 'datetime',
         'last_sync_at' => 'datetime',
         'last_heartbeat_at' => 'datetime',
     ];

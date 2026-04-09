@@ -1,12 +1,12 @@
 const ROLE_LABELS: Record<string, string> = {
-  'super-admin': 'Super Admin',
-  super_admin: 'Super Admin',
+  'super-admin': 'Superadministrador',
+  super_admin: 'Superadministrador',
   'platform-admin': 'Administrador da plataforma',
   platform_admin: 'Administrador da plataforma',
-  'partner-owner': 'Propriet\u00E1rio',
-  partner_owner: 'Propriet\u00E1rio',
-  'partner-manager': 'Gerente',
-  partner_manager: 'Gerente',
+  'partner-owner': 'Proprietario',
+  partner_owner: 'Proprietario',
+  'partner-manager': 'Gerente da organizacao',
+  partner_manager: 'Gerente da organizacao',
   'event-operator': 'Operador de evento',
   event_operator: 'Operador de evento',
   financial: 'Financeiro',
@@ -17,10 +17,15 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const ROLE_NAME_FALLBACKS: Record<string, string> = {
-  'owner da organizacao': 'Propriet\u00E1rio',
-  'owner da organização': 'Propriet\u00E1rio',
+  'super admin': 'Superadministrador',
+  'super administrador': 'Superadministrador',
+  'owner da organizacao': 'Proprietario',
+  'owner da organização': 'Proprietario',
+  owner: 'Proprietario',
   'gerente da organizacao': 'Gerente',
   'gerente da organização': 'Gerente',
+  manager: 'Gerente',
+  'event operator': 'Operador de evento',
   'admin da plataforma': 'Administrador da plataforma',
 };
 

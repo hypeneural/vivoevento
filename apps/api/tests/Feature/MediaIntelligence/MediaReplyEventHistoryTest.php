@@ -2,6 +2,8 @@
 
 use App\Modules\Events\Models\Event;
 use App\Modules\InboundMedia\Models\InboundMessage;
+use App\Modules\ContentModeration\Models\EventContentModerationSetting;
+use App\Modules\MediaIntelligence\Models\EventMediaIntelligenceSetting;
 use App\Modules\MediaIntelligence\Models\EventMediaVlmEvaluation;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Models\MediaProcessingRun;
@@ -281,4 +283,121 @@ it('shows a real event history entry with prompt context and payloads', function
         ->assertJsonPath('data.reply_text', 'Momento especial!')
         ->assertJsonPath('data.request_payload.model', 'openai/gpt-4.1-mini')
         ->assertJsonPath('data.response_payload.reply_text', 'Momento especial!');
+});
+
+it('filters real event history by reason code, publish eligibility and effective media state', function () {
+    [$user] = $this->actingAsSuperAdmin();
+
+    $event = Event::factory()->aiModeration()->create([
+        'title' => 'Evento com auditoria completa',
+    ]);
+
+    EventContentModerationSetting::factory()->create([
+        'event_id' => $event->id,
+        'provider_key' => 'openai',
+        'mode' => 'enforced',
+        'enabled' => true,
+    ]);
+
+    EventMediaIntelligenceSetting::factory()->gate()->create([
+        'event_id' => $event->id,
+        'provider_key' => 'openrouter',
+        'enabled' => true,
+    ]);
+
+    $publishedInbound = InboundMessage::query()->create([
+        'event_id' => $event->id,
+        'provider' => 'zapi',
+        'message_id' => 'wamid.audit.published.' . Str::random(6),
+        'message_type' => 'image',
+        'sender_phone' => '5548991111111',
+        'sender_name' => 'Publicado',
+        'sender_external_id' => '5548991111111',
+        'trace_id' => 'trace-published',
+        'status' => 'processed',
+        'received_at' => now(),
+    ]);
+
+    $publishedMedia = EventMedia::factory()->published()->create([
+        'event_id' => $event->id,
+        'inbound_message_id' => $publishedInbound->id,
+        'safety_status' => 'pass',
+        'vlm_status' => 'completed',
+    ]);
+
+    EventMediaVlmEvaluation::factory()->create([
+        'event_id' => $event->id,
+        'event_media_id' => $publishedMedia->id,
+        'provider_key' => 'openrouter',
+        'model_key' => 'openai/gpt-4.1-mini',
+        'reason_code' => 'context.match.event',
+        'publish_eligibility' => 'auto_publish',
+        'prompt_context_json' => [
+            'template' => 'Use {nome_do_evento}.',
+            'variables' => ['nome_do_evento' => 'Evento com auditoria completa'],
+            'resolved' => 'Use Evento com auditoria completa.',
+            'preset_name' => 'Homologacao livre',
+        ],
+    ]);
+
+    $rejectedInbound = InboundMessage::query()->create([
+        'event_id' => $event->id,
+        'provider' => 'zapi',
+        'message_id' => 'wamid.audit.rejected.' . Str::random(6),
+        'message_type' => 'image',
+        'sender_phone' => '5548992222222',
+        'sender_name' => 'Rejeitado',
+        'sender_external_id' => '5548992222222',
+        'trace_id' => 'trace-rejected',
+        'status' => 'processed',
+        'received_at' => now(),
+    ]);
+
+    $rejectedMedia = EventMedia::factory()->approved()->create([
+        'event_id' => $event->id,
+        'inbound_message_id' => $rejectedInbound->id,
+        'safety_status' => 'pass',
+        'vlm_status' => 'rejected',
+        'publication_status' => 'draft',
+    ]);
+
+    EventMediaVlmEvaluation::factory()->create([
+        'event_id' => $event->id,
+        'event_media_id' => $rejectedMedia->id,
+        'provider_key' => 'openrouter',
+        'model_key' => 'openai/gpt-4.1-mini',
+        'reason_code' => 'context.reject.object',
+        'publish_eligibility' => 'reject',
+        'reason' => 'O objeto nao faz sentido para o contexto do evento.',
+        'prompt_context_json' => [
+            'template' => 'Use {nome_do_evento}.',
+            'variables' => ['nome_do_evento' => 'Evento com auditoria completa'],
+            'resolved' => 'Use Evento com auditoria completa.',
+            'preset_name' => 'Corporativo restrito',
+        ],
+    ]);
+
+    $publishedResponse = $this->apiGet(
+        '/ia/respostas-de-midia/historico-eventos?reason_code=context.match.event&publish_eligibility=auto_publish&effective_media_state=published&per_page=10'
+    );
+
+    $this->assertApiPaginated($publishedResponse);
+    expect($publishedResponse->json('data'))->toHaveCount(1);
+    $publishedResponse
+        ->assertJsonPath('data.0.id', $publishedMedia->id)
+        ->assertJsonPath('data.0.reason_code', 'context.match.event')
+        ->assertJsonPath('data.0.publish_eligibility', 'auto_publish')
+        ->assertJsonPath('data.0.effective_media_state', 'published');
+
+    $rejectedResponse = $this->apiGet(
+        '/ia/respostas-de-midia/historico-eventos?reason_code=context.reject.object&publish_eligibility=reject&effective_media_state=rejected&per_page=10'
+    );
+
+    $this->assertApiPaginated($rejectedResponse);
+    expect($rejectedResponse->json('data'))->toHaveCount(1);
+    $rejectedResponse
+        ->assertJsonPath('data.0.id', $rejectedMedia->id)
+        ->assertJsonPath('data.0.reason_code', 'context.reject.object')
+        ->assertJsonPath('data.0.publish_eligibility', 'reject')
+        ->assertJsonPath('data.0.effective_media_state', 'rejected');
 });

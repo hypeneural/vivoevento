@@ -168,6 +168,20 @@ export interface PublicEventCheckoutPayload {
   };
 }
 
+export interface PublicCheckoutIdentityCheckPayload {
+  whatsapp: string;
+  email?: string | null;
+}
+
+export interface PublicCheckoutIdentityCheckResponse {
+  identity_status: 'new_account' | 'login_suggested' | 'authenticated_match' | 'authenticated_mismatch';
+  title: string | null;
+  description: string | null;
+  action_label: string | null;
+  login_url: string | null;
+  cooldown_seconds: number | null;
+}
+
 export interface PublicEventCheckoutConfirmPayload {
   gateway_provider?: string | null;
   gateway_order_id?: string | null;
@@ -906,6 +920,36 @@ export interface ApiEventFaceSearchSettings {
   delete_remote_vectors_on_event_close: boolean;
   created_at: string | null;
   updated_at: string | null;
+}
+
+export interface ApiEventFaceSearchHealthCheck {
+  backend_key: string;
+  status: string;
+  checked_at: string;
+  required_actions?: string[];
+  checks?: Record<string, string>;
+  identity?: {
+    account?: string | null;
+    arn?: string | null;
+    user_id?: string | null;
+  } | null;
+  collection?: {
+    collection_id?: string | null;
+    collection_arn?: string | null;
+    face_model_version?: string | null;
+    face_count?: number | null;
+  } | null;
+  error_code?: string | null;
+  error_message?: string | null;
+}
+
+export interface ApiEventFaceSearchOperationResponse {
+  status: string;
+  backend_key: string;
+  queued_media_count?: number;
+  job?: string;
+  collection_id?: string | null;
+  skipped_reason?: string | null;
 }
 
 export interface ApiEventContentModerationSettings {
@@ -1720,6 +1764,7 @@ export interface ApiWallLiveSnapshotResponse {
   transitionEffect: ApiWallTransition;
   currentPlayer: ApiWallLiveSnapshotPlayer | null;
   currentItem: ApiWallLiveSnapshotItem | null;
+  advancedAt?: string | null;
   updatedAt?: string | null;
 }
 

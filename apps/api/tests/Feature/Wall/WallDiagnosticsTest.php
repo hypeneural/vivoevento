@@ -2,6 +2,7 @@
 
 use App\Modules\Events\Models\Event;
 use App\Modules\Events\Models\EventModule;
+use App\Modules\Wall\Events\PrivateWallLiveSnapshotUpdated;
 use App\Modules\InboundMedia\Models\InboundMessage;
 use App\Modules\Wall\Events\WallDiagnosticsUpdated;
 use App\Modules\Wall\Models\EventWallSetting;
@@ -161,6 +162,45 @@ it('broadcasts diagnostics updates on the private event wall channel when the ag
     );
 });
 
+it('broadcasts a dedicated live snapshot update on heartbeat for the manager channel', function () {
+    $event = Event::factory()->active()->create();
+    enableWallModule($event);
+
+    $settings = EventWallSetting::factory()->live()->create([
+        'event_id' => $event->id,
+    ]);
+
+    EventFacade::fake([PrivateWallLiveSnapshotUpdated::class]);
+
+    $this->postJson("/api/v1/public/wall/{$settings->wall_code}/heartbeat", [
+        'player_instance_id' => 'player-snapshot-broadcast',
+        'runtime_status' => 'playing',
+        'connection_status' => 'connected',
+        'current_item_id' => 'media_88',
+        'current_sender_key' => 'whatsapp:5511666666666',
+        'ready_count' => 4,
+        'loading_count' => 0,
+        'error_count' => 0,
+        'stale_count' => 0,
+        'cache_enabled' => true,
+        'persistent_storage' => 'indexeddb',
+        'cache_usage_bytes' => 1048576,
+        'cache_quota_bytes' => 8388608,
+        'cache_hit_count' => 9,
+        'cache_miss_count' => 1,
+        'cache_stale_fallback_count' => 0,
+        'last_sync_at' => now()->toIso8601String(),
+        'last_fallback_reason' => null,
+    ])->assertOk();
+
+    EventFacade::assertDispatched(
+        PrivateWallLiveSnapshotUpdated::class,
+        fn (PrivateWallLiveSnapshotUpdated $eventPayload) => $eventPayload->eventId === $event->id
+            && ($eventPayload->payload['currentPlayer']['playerInstanceId'] ?? null) === 'player-snapshot-broadcast'
+            && ($eventPayload->payload['advancedAt'] ?? null) !== null,
+    );
+});
+
 it('simulates the next wall slides using the real event queue and draft settings', function () {
     [$user, $organization] = $this->actingAsManager();
 
@@ -281,4 +321,51 @@ it('simulates the next wall slides using the real event queue and draft settings
         ->assertJsonPath('data.sequence_preview.0.preview_url', rtrim((string) config('app.url'), '/')."/storage/events/{$event->id}/variants/{$carlaPublished->id}/thumb.webp")
         ->assertJsonPath('data.sequence_preview.1.sender_name', 'Bruno')
         ->assertJsonPath('data.sequence_preview.2.sender_name', 'Ana');
+});
+
+it('simulation excludes media that are not eligible for the current wall orientation', function () {
+    [$user, $organization] = $this->actingAsManager();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+    ]);
+    enableWallModule($event);
+
+    EventWallSetting::factory()->live()->create([
+        'event_id' => $event->id,
+        'accepted_orientation' => 'landscape',
+    ]);
+
+    $landscape = \App\Modules\MediaProcessing\Models\EventMedia::factory()->published()->create([
+        'event_id' => $event->id,
+        'source_type' => 'whatsapp',
+        'source_label' => 'Ana',
+        'width' => 1920,
+        'height' => 1080,
+        'published_at' => now(),
+    ]);
+
+    $portrait = \App\Modules\MediaProcessing\Models\EventMedia::factory()->published()->create([
+        'event_id' => $event->id,
+        'media_type' => 'video',
+        'mime_type' => 'video/mp4',
+        'source_type' => 'whatsapp',
+        'source_label' => 'Bia',
+        'width' => 1080,
+        'height' => 1920,
+        'published_at' => now()->subSecond(),
+    ]);
+
+    $response = $this->apiPost("/events/{$event->id}/wall/simulate", [
+        'selection_mode' => 'balanced',
+        'event_phase' => 'flow',
+        'interval_ms' => 8000,
+    ]);
+
+    $this->assertApiSuccess($response);
+
+    $previewIds = collect($response->json('data.sequence_preview'))->pluck('item_id')->all();
+
+    expect($previewIds)->toContain('media_'.$landscape->id)
+        ->and($previewIds)->not->toContain('media_'.$portrait->id);
 });

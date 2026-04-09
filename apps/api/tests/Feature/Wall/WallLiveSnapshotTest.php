@@ -111,8 +111,149 @@ it('returns the current wall live snapshot using the latest online player heartb
         ->assertJsonPath('data.currentItem.senderName', 'Juliana Ribeiro')
         ->assertJsonPath('data.currentItem.source', 'whatsapp')
         ->assertJsonPath('data.currentItem.caption', 'Entrada da pista')
-        ->assertJsonPath('data.currentItem.layoutHint', 'cinematic');
+        ->assertJsonPath('data.currentItem.layoutHint', 'cinematic')
+        ->assertJsonPath('data.advancedAt', fn ($value) => filled($value));
 
     expect($response->json('data.currentItem.previewUrl'))
         ->toContain("events/{$event->id}/variants/{$media->id}/thumb.webp");
+});
+
+it('preserves the advance clock while the same media stays on screen and updates it when the item changes', function () {
+    [$user, $organization] = $this->actingAsManager();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+    ]);
+    enableWallModuleForLiveSnapshot($event);
+
+    $settings = EventWallSetting::factory()->live()->create([
+        'event_id' => $event->id,
+        'layout' => 'auto',
+        'transition_effect' => 'fade',
+    ]);
+
+    $messageA = InboundMessage::query()->create([
+        'event_id' => $event->id,
+        'provider' => 'whatsapp',
+        'message_id' => 'msg-live-clock-a',
+        'message_type' => 'image',
+        'sender_phone' => '5511999991001',
+        'sender_name' => 'Carla',
+        'status' => 'received',
+        'received_at' => now()->subMinutes(2),
+    ]);
+
+    $messageB = InboundMessage::query()->create([
+        'event_id' => $event->id,
+        'provider' => 'whatsapp',
+        'message_id' => 'msg-live-clock-b',
+        'message_type' => 'image',
+        'sender_phone' => '5511999991002',
+        'sender_name' => 'Bruno',
+        'status' => 'received',
+        'received_at' => now()->subMinute(),
+    ]);
+
+    $firstMedia = EventMedia::factory()->published()->create([
+        'event_id' => $event->id,
+        'inbound_message_id' => $messageA->id,
+        'source_type' => 'whatsapp',
+        'source_label' => 'WhatsApp',
+        'caption' => 'Primeira entrada',
+        'width' => 1920,
+        'height' => 1080,
+        'published_at' => now()->subMinute(),
+    ]);
+
+    $secondMedia = EventMedia::factory()->published()->create([
+        'event_id' => $event->id,
+        'inbound_message_id' => $messageB->id,
+        'source_type' => 'whatsapp',
+        'source_label' => 'WhatsApp',
+        'caption' => 'Segunda entrada',
+        'width' => 1920,
+        'height' => 1080,
+        'published_at' => now(),
+    ]);
+
+    $this->postJson("/api/v1/public/wall/{$settings->wall_code}/heartbeat", [
+        'player_instance_id' => 'player-live-clock',
+        'runtime_status' => 'playing',
+        'connection_status' => 'connected',
+        'current_item_id' => 'media_'.$firstMedia->id,
+        'current_sender_key' => 'whatsapp:5511999991001',
+        'ready_count' => 8,
+        'loading_count' => 0,
+        'error_count' => 0,
+        'stale_count' => 0,
+        'cache_enabled' => true,
+        'persistent_storage' => 'indexeddb',
+        'cache_usage_bytes' => 1048576,
+        'cache_quota_bytes' => 8388608,
+        'cache_hit_count' => 14,
+        'cache_miss_count' => 2,
+        'cache_stale_fallback_count' => 0,
+        'last_sync_at' => now()->toIso8601String(),
+        'last_fallback_reason' => null,
+    ])->assertOk();
+
+    $firstSnapshot = $this->apiGet("/events/{$event->id}/wall/live-snapshot");
+    $firstAdvancedAt = $firstSnapshot->json('data.advancedAt');
+
+    expect($firstAdvancedAt)->not()->toBeNull();
+
+    $this->travel(20)->seconds();
+
+    $this->postJson("/api/v1/public/wall/{$settings->wall_code}/heartbeat", [
+        'player_instance_id' => 'player-live-clock',
+        'runtime_status' => 'playing',
+        'connection_status' => 'connected',
+        'current_item_id' => 'media_'.$firstMedia->id,
+        'current_sender_key' => 'whatsapp:5511999991001',
+        'ready_count' => 9,
+        'loading_count' => 0,
+        'error_count' => 0,
+        'stale_count' => 0,
+        'cache_enabled' => true,
+        'persistent_storage' => 'indexeddb',
+        'cache_usage_bytes' => 1048576,
+        'cache_quota_bytes' => 8388608,
+        'cache_hit_count' => 15,
+        'cache_miss_count' => 2,
+        'cache_stale_fallback_count' => 0,
+        'last_sync_at' => now()->toIso8601String(),
+        'last_fallback_reason' => null,
+    ])->assertOk();
+
+    $sameItemSnapshot = $this->apiGet("/events/{$event->id}/wall/live-snapshot");
+
+    expect($sameItemSnapshot->json('data.advancedAt'))->toBe($firstAdvancedAt);
+
+    $this->travel(5)->seconds();
+
+    $this->postJson("/api/v1/public/wall/{$settings->wall_code}/heartbeat", [
+        'player_instance_id' => 'player-live-clock',
+        'runtime_status' => 'playing',
+        'connection_status' => 'connected',
+        'current_item_id' => 'media_'.$secondMedia->id,
+        'current_sender_key' => 'whatsapp:5511999991002',
+        'ready_count' => 9,
+        'loading_count' => 0,
+        'error_count' => 0,
+        'stale_count' => 0,
+        'cache_enabled' => true,
+        'persistent_storage' => 'indexeddb',
+        'cache_usage_bytes' => 1048576,
+        'cache_quota_bytes' => 8388608,
+        'cache_hit_count' => 16,
+        'cache_miss_count' => 2,
+        'cache_stale_fallback_count' => 0,
+        'last_sync_at' => now()->toIso8601String(),
+        'last_fallback_reason' => null,
+    ])->assertOk();
+
+    $changedItemSnapshot = $this->apiGet("/events/{$event->id}/wall/live-snapshot");
+
+    expect($changedItemSnapshot->json('data.currentItem.id'))->toBe('media_'.$secondMedia->id)
+        ->and($changedItemSnapshot->json('data.advancedAt'))->not()->toBe($firstAdvancedAt);
 });

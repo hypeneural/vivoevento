@@ -422,7 +422,33 @@ describe('SettingsPage', () => {
     });
   });
 
-  it('invites a team member from settings and removes an existing non-owner member', async () => {
+  it('requires name whatsapp and perfil before inviting a team member from settings', async () => {
+    renderPage();
+
+    activateTab(/equipe/i);
+    fireEvent.click(await screen.findByRole('button', { name: /convidar/i }));
+
+    const submitButton = screen.getByRole('button', { name: /adicionar membro/i });
+
+    expect(submitButton).toBeDisabled();
+
+    fireEvent.change(await screen.findByPlaceholderText(/nome do membro/i), {
+      target: { value: 'Novo Membro' },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/5511999999999/i), {
+      target: { value: '11999998888' },
+    });
+
+    expect(submitButton).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText(/perfil \*/i), {
+      target: { value: 'partner-manager' },
+    });
+
+    expect(submitButton).toBeEnabled();
+  });
+
+  it('invites a team member from settings and confirms removing an existing non-owner member', async () => {
     renderPage();
 
     activateTab(/equipe/i);
@@ -431,8 +457,11 @@ describe('SettingsPage', () => {
     fireEvent.change(await screen.findByPlaceholderText(/nome do membro/i), {
       target: { value: 'Novo Membro' },
     });
-    fireEvent.change(screen.getByPlaceholderText(/membro@organizacao.com/i), {
-      target: { value: 'novo-membro@organizacao.com' },
+    fireEvent.change(screen.getByPlaceholderText(/5511999999999/i), {
+      target: { value: '11999998888' },
+    });
+    fireEvent.change(screen.getByLabelText(/perfil \*/i), {
+      target: { value: 'partner-manager' },
     });
     fireEvent.click(screen.getByRole('button', { name: /adicionar membro/i }));
 
@@ -440,7 +469,7 @@ describe('SettingsPage', () => {
       expect(inviteCurrentOrganizationTeamMemberMock).toHaveBeenCalledWith(expect.objectContaining({
         user: expect.objectContaining({
           name: 'Novo Membro',
-          email: 'novo-membro@organizacao.com',
+          phone: '11999998888',
         }),
         role_key: 'partner-manager',
       }));
@@ -449,6 +478,7 @@ describe('SettingsPage', () => {
     expect(screen.queryByRole('button', { name: /remover maria team/i })).not.toBeInTheDocument();
 
     fireEvent.click(await screen.findByRole('button', { name: /remover carlos gestor/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /confirmar remocao/i }));
 
     await waitFor(() => {
       expect(removeCurrentOrganizationTeamMemberMock).toHaveBeenCalledWith(11);

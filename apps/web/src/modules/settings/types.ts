@@ -37,13 +37,20 @@ export interface CurrentOrganizationLogoUploadResponse {
   logo_url: string;
 }
 
+export type InviteCurrentOrganizationTeamMemberRoleKey =
+  | 'partner-owner'
+  | 'partner-manager'
+  | 'event-operator'
+  | 'financeiro'
+  | 'viewer';
+
 export interface InviteCurrentOrganizationTeamMemberPayload {
   user: {
     name: string;
-    email: string;
-    phone?: string;
+    email?: string;
+    phone: string;
   };
-  role_key: 'partner-owner' | 'partner-manager' | 'event-operator' | 'financeiro' | 'viewer';
+  role_key: InviteCurrentOrganizationTeamMemberRoleKey;
   is_owner?: boolean;
 }
 

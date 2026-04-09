@@ -7,6 +7,7 @@ use App\Modules\Organizations\Models\Organization;
 use App\Modules\Organizations\Models\OrganizationMember;
 use App\Modules\Partners\Actions\RebuildPartnerStatsAction;
 use App\Modules\Users\Models\User;
+use App\Shared\Support\PhoneNumber;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -19,19 +20,32 @@ class InviteCurrentOrganizationTeamMemberAction
     public function execute(Organization $organization, array $data, User $actor): OrganizationMember
     {
         return DB::transaction(function () use ($organization, $data, $actor) {
-            $memberUser = User::query()->firstOrCreate(
-                ['email' => $data['user']['email']],
-                [
+            $normalizedPhone = PhoneNumber::normalizeBrazilianWhatsApp($data['user']['phone']);
+            $providedEmail = trim((string) ($data['user']['email'] ?? ''));
+
+            $memberUser = null;
+
+            if ($providedEmail !== '') {
+                $memberUser = User::query()->where('email', $providedEmail)->first();
+            }
+
+            if (! $memberUser) {
+                $memberUser = User::query()->where('phone', $normalizedPhone)->first();
+            }
+
+            if (! $memberUser) {
+                $memberUser = User::query()->create([
                     'name' => $data['user']['name'],
-                    'phone' => $data['user']['phone'] ?? null,
+                    'email' => $providedEmail !== '' ? $providedEmail : "invite+{$normalizedPhone}@eventovivo.local",
+                    'phone' => $normalizedPhone,
                     'password' => Str::random(40),
                     'status' => 'active',
-                ],
-            );
+                ]);
+            }
 
             $memberUser->fill([
                 'name' => $memberUser->name ?: $data['user']['name'],
-                'phone' => $memberUser->phone ?: ($data['user']['phone'] ?? null),
+                'phone' => $memberUser->phone ?: $normalizedPhone,
             ])->save();
 
             if (! $memberUser->hasRole($data['role_key'])) {

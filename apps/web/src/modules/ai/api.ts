@@ -149,6 +149,9 @@ export const aiMediaRepliesService = {
     status?: string | null;
     preset_name?: string | null;
     sender_query?: string | null;
+    reason_code?: string | null;
+    publish_eligibility?: string | null;
+    effective_media_state?: string | null;
     date_from?: string | null;
     date_to?: string | null;
     per_page?: number;
@@ -161,6 +164,9 @@ export const aiMediaRepliesService = {
         status: params?.status ?? undefined,
         preset_name: params?.preset_name ?? undefined,
         sender_query: params?.sender_query ?? undefined,
+        reason_code: params?.reason_code ?? undefined,
+        publish_eligibility: params?.publish_eligibility ?? undefined,
+        effective_media_state: params?.effective_media_state ?? undefined,
         date_from: params?.date_from ?? undefined,
         date_to: params?.date_to ?? undefined,
         per_page: params?.per_page ?? 15,

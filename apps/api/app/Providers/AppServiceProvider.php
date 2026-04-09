@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Horizon\Events\LongWaitDetected;
 
@@ -40,6 +41,28 @@ class AppServiceProvider extends ServiceProvider
             $key = sprintf('public-face-search:%s:%s', $event, $request->ip() ?: 'guest');
 
             return Limit::perMinute(10)->by($key);
+        });
+
+        RateLimiter::for('public-checkout-identity', function (Request $request) {
+            $phone = preg_replace('/\D+/', '', (string) $request->input('whatsapp', ''));
+            $email = Str::lower(trim((string) $request->input('email', '')));
+            $fingerprint = hash('sha256', sprintf('%s|%s', $phone, $email));
+            $key = sprintf('public-checkout-identity:%s:%s', $fingerprint, $request->ip() ?: 'guest');
+
+            return Limit::perMinute(5)
+                ->by($key)
+                ->response(function (Request $request, array $headers) use ($key) {
+                    $cooldownSeconds = max(1, RateLimiter::availableIn($key));
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Muitas tentativas em pouco tempo. Tente novamente em instantes.',
+                        'cooldown_seconds' => $cooldownSeconds,
+                        'meta' => [
+                            'request_id' => 'req_' . Str::random(12),
+                        ],
+                    ], 429, $headers);
+                });
         });
 
         Event::listen(LongWaitDetected::class, function (LongWaitDetected $event): void {

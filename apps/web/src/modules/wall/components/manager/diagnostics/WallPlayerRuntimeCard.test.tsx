@@ -62,10 +62,11 @@ describe('WallPlayerRuntimeCard', () => {
   it('usa copy operacional em vez de rotulos tecnicos crus', () => {
     render(<WallPlayerRuntimeCard player={makePlayer()} />);
 
-    expect(screen.getByText(/Remetente atual/i)).toBeInTheDocument();
-    expect(screen.getByText(/Midias carregadas/i)).toBeInTheDocument();
-    expect(screen.getByText(/Aproveitamento do cache/i)).toBeInTheDocument();
-    expect(screen.getByText(/Espaco no navegador/i)).toBeInTheDocument();
+    expect(screen.getByText(/Situacao atual/i)).toBeInTheDocument();
+    expect(screen.getByText(/Conexao agora/i)).toBeInTheDocument();
+    expect(screen.getByText(/Quem esta na tela/i)).toBeInTheDocument();
+    expect(screen.getByText(/Fila pronta/i)).toBeInTheDocument();
     expect(screen.getByText(/Convidado via WhatsApp/i)).toBeInTheDocument();
+    expect(screen.getByText(/Tudo esta estavel nesta tela agora/i)).toBeInTheDocument();
   });
 });

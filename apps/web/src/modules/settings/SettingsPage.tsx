@@ -5,6 +5,16 @@ import { Link } from 'react-router-dom';
 import { ImageUp, Loader2, MessageSquare, Plus, Save, Send, Trash2, Upload } from 'lucide-react';
 
 import { useAuth } from '@/app/providers/AuthProvider';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,7 +40,11 @@ import { UserAvatar } from '@/shared/components/UserAvatar';
 import type { UserRole } from '@/shared/types';
 
 import { settingsService } from './api';
-import type { InviteCurrentOrganizationTeamMemberPayload } from './types';
+import type {
+  InviteCurrentOrganizationTeamMemberPayload,
+  InviteCurrentOrganizationTeamMemberRoleKey,
+  OrganizationTeamMember,
+} from './types';
 
 const ROLE_KEYS: UserRole[] = [
   'super_admin',
@@ -57,13 +71,17 @@ const SETTINGS_PERMISSION_MODULES: Array<{ key: string; label: string; permissio
   ];
 });
 
-const DEFAULT_INVITE_FORM: InviteCurrentOrganizationTeamMemberPayload = {
+type InviteFormState = Omit<InviteCurrentOrganizationTeamMemberPayload, 'role_key'> & {
+  role_key: InviteCurrentOrganizationTeamMemberRoleKey | '';
+};
+
+const DEFAULT_INVITE_FORM: InviteFormState = {
   user: {
     name: '',
     email: '',
     phone: '',
   },
-  role_key: 'partner-manager',
+  role_key: '',
   is_owner: false,
 };
 
@@ -104,7 +122,8 @@ export default function SettingsPage() {
   const [replyTextPrompt, setReplyTextPrompt] = useState('');
   const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const [inviteForm, setInviteForm] = useState<InviteCurrentOrganizationTeamMemberPayload>(DEFAULT_INVITE_FORM);
+  const [inviteForm, setInviteForm] = useState<InviteFormState>(DEFAULT_INVITE_FORM);
+  const [memberPendingRemoval, setMemberPendingRemoval] = useState<OrganizationTeamMember | null>(null);
 
   useEffect(() => {
     setOrganizationForm({
@@ -281,6 +300,9 @@ export default function SettingsPage() {
   });
 
   const teamMembers = teamQuery.data?.data ?? [];
+  const inviteFormIsValid = inviteForm.user.name.trim() !== ''
+    && (inviteForm.user.phone?.trim() ?? '') !== ''
+    && inviteForm.role_key !== '';
 
   const handleSaveOrganization = () => {
     organizationMutation.mutate({
@@ -306,11 +328,15 @@ export default function SettingsPage() {
   };
 
   const handleInviteMember = () => {
+    if (!inviteFormIsValid) {
+      return;
+    }
+
     inviteMemberMutation.mutate({
       user: {
         name: inviteForm.user.name.trim(),
-        email: inviteForm.user.email.trim(),
-        phone: inviteForm.user.phone?.trim() || undefined,
+        email: inviteForm.user.email?.trim() || undefined,
+        phone: inviteForm.user.phone.trim(),
       },
       role_key: inviteForm.role_key,
       is_owner: inviteForm.is_owner,
@@ -568,7 +594,7 @@ export default function SettingsPage() {
                           size="icon"
                           className="text-destructive"
                           aria-label={`Remover ${teamMember.user?.name || 'membro'}`}
-                          onClick={() => removeMemberMutation.mutate(teamMember.id)}
+                          onClick={() => setMemberPendingRemoval(teamMember)}
                           disabled={removeMemberMutation.isPending}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -818,7 +844,7 @@ export default function SettingsPage() {
 
           <div className="space-y-4">
             <div>
-              <Label htmlFor="invite-member-name">Nome</Label>
+              <Label htmlFor="invite-member-name">Nome *</Label>
               <Input
                 id="invite-member-name"
                 placeholder="Nome do membro"
@@ -831,11 +857,11 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <Label htmlFor="invite-member-email">E-mail</Label>
+              <Label htmlFor="invite-member-email">E-mail (opcional)</Label>
               <Input
                 id="invite-member-email"
                 placeholder="membro@organizacao.com"
-                value={inviteForm.user.email}
+                value={inviteForm.user.email ?? ''}
                 onChange={(event) => setInviteForm((current) => ({
                   ...current,
                   user: { ...current.user, email: event.target.value },
@@ -844,10 +870,10 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <Label htmlFor="invite-member-phone">Telefone</Label>
+              <Label htmlFor="invite-member-phone">WhatsApp *</Label>
               <Input
                 id="invite-member-phone"
-                placeholder="11999999999"
+                placeholder="5511999999999"
                 value={inviteForm.user.phone ?? ''}
                 onChange={(event) => setInviteForm((current) => ({
                   ...current,
@@ -857,36 +883,72 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <Label htmlFor="invite-member-role">Perfil</Label>
+              <Label htmlFor="invite-member-role">Perfil *</Label>
               <select
                 id="invite-member-role"
                 className="mt-1.5 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={inviteForm.role_key}
                 onChange={(event) => setInviteForm((current) => ({
                   ...current,
-                  role_key: event.target.value as InviteCurrentOrganizationTeamMemberPayload['role_key'],
+                  role_key: event.target.value as InviteCurrentOrganizationTeamMemberRoleKey | '',
                 }))}
               >
-                <option value="partner-manager">Gerente</option>
+                <option value="" disabled>Selecione um perfil</option>
+                <option value="partner-manager">Gerente da organizacao</option>
                 <option value="event-operator">Operador de evento</option>
                 <option value="financeiro">Financeiro</option>
                 <option value="viewer">Visualizador</option>
                 <option value="partner-owner">Proprietario</option>
               </select>
             </div>
+
+            <p className="text-xs text-muted-foreground">
+              Nome, WhatsApp e perfil sao obrigatorios. O convite por link e envio via WhatsApp ainda sera ligado no backend.
+            </p>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleInviteMember} disabled={inviteMemberMutation.isPending}>
+            <Button onClick={handleInviteMember} disabled={inviteMemberMutation.isPending || !inviteFormIsValid}>
               {inviteMemberMutation.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plus className="mr-1 h-4 w-4" />}
               Adicionar membro
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={memberPendingRemoval !== null} onOpenChange={(open) => {
+        if (!open) {
+          setMemberPendingRemoval(null);
+        }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover membro da equipe?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acao remove o acesso de {memberPendingRemoval?.user?.name || 'este membro'} da organizacao atual.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (!memberPendingRemoval) {
+                  return;
+                }
+
+                removeMemberMutation.mutate(memberPendingRemoval.id);
+                setMemberPendingRemoval(null);
+              }}
+            >
+              Confirmar remocao
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
 }

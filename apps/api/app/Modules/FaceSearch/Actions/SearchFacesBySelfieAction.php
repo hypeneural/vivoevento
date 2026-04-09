@@ -144,7 +144,7 @@ class SearchFacesBySelfieAction
             ]);
 
             $candidateLimit = min(200, max(1, (int) $settings->top_k) * 4);
-            $execution = $backend->searchBySelfie(
+            $execution = $this->router->executeSelfieSearch(
                 event: $event,
                 settings: $settings,
                 probeMedia: $probeMedia,
@@ -165,9 +165,12 @@ class SearchFacesBySelfieAction
             );
 
             $query?->forceFill([
-                'status' => FaceSearchQueryStatus::Completed,
+                'backend_key' => (string) ($execution['response_backend_key'] ?? $backend->key()),
+                'status' => ($execution['query_status'] ?? FaceSearchQueryStatus::Completed->value) === FaceSearchQueryStatus::Degraded->value
+                    ? FaceSearchQueryStatus::Degraded
+                    : FaceSearchQueryStatus::Completed,
                 'result_count' => count($results),
-                'provider_payload_json' => $execution['provider_payload_json'] ?? null,
+                'provider_payload_json' => $this->buildQueryAuditPayload($execution),
                 'finished_at' => now(),
                 'error_code' => null,
                 'error_message' => null,
@@ -225,6 +228,25 @@ class SearchFacesBySelfieAction
         $name = $selfie->getClientOriginalName() ?: $selfie->getFilename() ?: 'selfie-upload';
 
         return sprintf('%s://%s', $storageStrategy !== '' ? $storageStrategy : 'memory_only', $name);
+    }
+
+    /**
+     * @param array<string, mixed> $execution
+     * @return array<string, mixed>
+     */
+    private function buildQueryAuditPayload(array $execution): array
+    {
+        return array_filter([
+            'primary_backend_key' => $execution['primary_backend_key'] ?? null,
+            'response_backend_key' => $execution['response_backend_key'] ?? null,
+            'fallback_backend_key' => $execution['fallback_backend_key'] ?? null,
+            'fallback_triggered' => $execution['fallback_triggered'] ?? false,
+            'primary_duration_ms' => $execution['primary_duration_ms'] ?? null,
+            'response_duration_ms' => $execution['response_duration_ms'] ?? null,
+            'primary_failure' => $execution['primary_failure'] ?? null,
+            'shadow' => $execution['shadow'] ?? null,
+            'provider_response' => $execution['provider_payload_json'] ?? null,
+        ], static fn (mixed $value): bool => $value !== null);
     }
 
     /**

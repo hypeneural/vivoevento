@@ -17,6 +17,7 @@ import { WallManagerSection } from '../../WallManagerSection';
 import { WALL_INSIGHTS_COPY, formatWallRecentStatusLabel } from '../../../wall-copy';
 import { getWallSourceMeta } from '../../../wall-source-meta';
 import { formatWallRelativeTime } from '../../../wall-view-models';
+import { WallAdvanceClock } from './WallAdvanceClock';
 import { WallDraftPreviewCard } from './WallDraftPreviewCard';
 import { WallUpcomingTimeline } from './WallUpcomingTimeline';
 
@@ -187,6 +188,14 @@ export function WallHeroStage({
                           <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-2 py-1 font-medium text-white/80">
                             {activeLiveRelativeTime}
                           </span>
+                          {!selectedMedia && liveSnapshot?.currentItem ? (
+                            <WallAdvanceClock
+                              advancedAt={liveSnapshot.advancedAt}
+                              intervalMs={wallSettings.interval_ms}
+                              isLive={isLive}
+                              isPaused={isPaused}
+                            />
+                          ) : null}
                         </div>
                       </div>
                     </motion.div>

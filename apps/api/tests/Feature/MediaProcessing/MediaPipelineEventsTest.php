@@ -42,6 +42,35 @@ it('broadcasts a wall publish event when a media published event is dispatched',
     });
 });
 
+it('does not broadcast a wall publish event when media orientation mismatches the wall policy', function () {
+    $domainEvent = Event::factory()->active()->create();
+
+    EventModule::query()->create([
+        'event_id' => $domainEvent->id,
+        'module_key' => 'wall',
+        'is_enabled' => true,
+    ]);
+
+    EventWallSetting::factory()->live()->create([
+        'event_id' => $domainEvent->id,
+        'accepted_orientation' => 'landscape',
+    ]);
+
+    $media = EventMedia::factory()->published()->create([
+        'event_id' => $domainEvent->id,
+        'media_type' => 'video',
+        'mime_type' => 'video/mp4',
+        'width' => 1080,
+        'height' => 1920,
+    ]);
+
+    EventFacade::fake([WallMediaPublished::class]);
+
+    event(MediaPublished::fromMedia($media));
+
+    EventFacade::assertNotDispatched(WallMediaPublished::class);
+});
+
 it('dispatches a media published domain event when approving already published media', function () {
     [$user, $organization] = $this->actingAsOwner();
 

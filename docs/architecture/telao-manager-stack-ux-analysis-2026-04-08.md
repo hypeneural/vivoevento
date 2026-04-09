@@ -67,6 +67,7 @@ Leitura curta:
 - o player publico usa um modelo hibrido: boot HTTP + WebSocket + heartbeat HTTP + resync HTTP periodico;
 - o palco agora ja tem uma previa do rascunho sem `iframe`, reaproveitando renderer e overlays reais do player;
 - o palco agora tambem ja consome um `live snapshot` real do wall para mostrar o item atual quando nao ha selecao manual no manager;
+- o manager agora tambem recebe um evento dedicado `wall.runtime.snapshot.updated`, reduzindo a dependencia de refetch para atualizar o monitor live;
 - a lista "Ordem mais provavel das proximas 12 exibicoes" e uma simulacao com a fila real + draft atual, nao um espelho autoritativo do que esta passando na TV;
 - "Tela d7e1d73a...cfd4" nao e o codigo do telao; e o `player_instance_id` do navegador/player;
 - `R2 | L0 | E0 | S0` significa `ready`, `loading`, `error`, `stale`;
@@ -78,6 +79,8 @@ Leitura curta:
 - `Proximas fotos` agora funciona como timeline horizontal com scroll, thumb e origem;
 - a simulacao agora tambem ja entrega `caption` e `layout_hint`, deixando a leitura da fila mais proxima do palco real;
 - os cards de player no diagnostico agora usam cor por saude operacional, facilitando leitura rapida de online, instabilidade e offline;
+- o palco agora exibe um relogio operacional de troca usando `advancedAt` do snapshot e `interval_ms` do wall;
+- o diagnostico por player agora abre um detalhe expandido em `Sheet` no desktop e `Drawer` no mobile, com copy mais orientada a operacao;
 - para subir muito a usabilidade, o caminho certo nao e colocar mais cards na lateral; e separar a experiencia em:
   - barra operacional fixa;
   - workspace principal com preview/monitor;
@@ -98,7 +101,9 @@ Leitura curta:
   - `WallAdsTab` saiu para componente proprio;
   - `WallPreviewCanvas` saiu para componente proprio;
   - `WallPlayerRuntimeCard` saiu para componente proprio;
-  - `EventWallManagerPage.tsx` esta em `936` linhas nesta rodada.
+  - `WallPlayerDetailsSheet` saiu para componente proprio;
+  - `WallAdvanceClock` saiu para componente proprio;
+  - `EventWallManagerPage.tsx` esta em `958` linhas nesta rodada.
 
 ### Queries da pagina
 
@@ -204,7 +209,8 @@ O draft fica local ate o operador salvar.
 Isso reduz chamadas enquanto o usuario mexe em sliders e toggles, mas gera uma tensao de UX:
 
 - o operador esta vendo "uma previsao do que ficaria";
-- mas nao esta vendo "um preview real do wall aplicando esse draft".
+- e agora ja ganhou uma previa visual bem mais fiel do draft;
+- mas ainda nao esta vendo um runtime autoritativo completo do wall aplicando esse draft.
 
 ## 4. Realtime atual: WebSocket, heartbeat e polling
 
@@ -228,14 +234,21 @@ O manager escuta estes eventos:
 - `wall.status.changed`
 - `wall.expired`
 - `wall.diagnostics.updated`
+- `wall.runtime.snapshot.updated`
 
-Quando esses eventos chegam, ele invalida queries do TanStack Query:
+Quando chegam `settings`, `status`, `expired` e `diagnostics`, o manager invalida queries do TanStack Query:
 
 - `wall.settings(eventId)`
 - `wall.diagnostics(eventId)`
 - `wall.insights(eventId)`
 - `wall.liveSnapshot(eventId)`
 - `events.detail(eventId)`
+
+Quando chega `wall.runtime.snapshot.updated`:
+
+- o manager aplica o payload direto em `wall.liveSnapshot(eventId)`;
+- evita esperar refetch para atualizar o palco;
+- mantem a invalidacao como fallback nos outros eventos de mudanca estrutural.
 
 ### Ponto importante
 
@@ -279,6 +292,12 @@ O player publico usa:
 - canal publico `wall.{wallCode}`
 - `POST /public/wall/{wallCode}/heartbeat`
 - resync periodico chamando `boot` de novo
+
+Nesta fase, o heartbeat tambem passou a alimentar um snapshot dedicado para o manager:
+
+- o backend atualiza `current_item_started_at` por player;
+- monta o `liveSnapshot` mais recente;
+- e emite `wall.runtime.snapshot.updated` no canal privado do evento.
 
 #### Timings atuais do player
 
@@ -517,6 +536,29 @@ Complementos do card:
 - `last_sync_at`;
 - `last_fallback_reason`.
 
+### Detalhe expandido do player
+
+Nesta rodada, o diagnostico ganhou um segundo nivel menos tecnico:
+
+- clique explicito no card abre detalhe expandido;
+- `Sheet` no desktop;
+- `Drawer` no mobile.
+
+O detalhe expandido passou a responder em linguagem operacional:
+
+- `Situacao atual`
+- `Conexao agora`
+- `Quem esta na tela`
+- `Fila pronta`
+- `Aproveitamento do cache`
+- `Espaco usado no navegador`
+
+Leitura:
+
+- o resumo continua bom para varredura rapida;
+- o detalhe expandido agora ajuda a decidir quando intervir;
+- os valores tecnicos ainda existem, mas ficaram no contexto certo em vez de disputar atencao no card principal.
+
 ## 7. Como funciona "Ordem mais provavel das proximas 12 exibicoes"
 
 ## Resposta curta
@@ -697,14 +739,15 @@ O manager ja saiu do placeholder puro e agora tem uma `Previa do rascunho`.
 Mesmo assim, ela ainda tem limites importantes:
 
 - ja reutiliza renderer e overlays reais do player;
-- ainda nao espelha runtime real ou clock real da exibicao;
+- ja convive melhor com o monitor ao vivo porque o palco passou a usar snapshot real e clock estimado de advance;
+- ainda nao espelha um clock central autoritativo da exibicao;
 - ainda simplifica alguns comportamentos visuais e de temporizacao.
 
 Leitura:
 
 - a direcao tecnica esta correta porque abandonou `iframe`;
 - o salto desta rodada foi importante porque o preview deixou de parecer mock solto;
-- o proximo passo continua sendo aproximar clock, transicao curta e monitor live autoritativo.
+- o proximo passo continua sendo subir de clock estimado para monitor live mais autoritativo e mais centralizado.
 
 ## 9.3 A coluna lateral ficou longa demais
 
@@ -1000,23 +1043,35 @@ Objetivo:
 
 - acompanhar o que o wall realmente esta exibindo agora.
 
-Hoje isso ainda nao existe de forma autoritativa.
+Hoje ja existe uma primeira trilha operacional de monitor ao vivo, mas ela ainda nao e autoritativa no nivel de clock central do engine.
 
-Para fazer direito, existem dois caminhos:
+O caminho curto ja entrou nesta fase:
 
-#### Caminho curto
+- `GET /events/{event}/wall/live-snapshot`
+- evento privado `wall.runtime.snapshot.updated`
+- `advancedAt` derivado de `current_item_started_at` do player mais recente
+- relogio visual no palco calculado por `interval_ms`
 
-Adicionar um snapshot manager-only com payload compacto:
+Leitura:
+
+- isso ja entrega item atual, origem, remetente e tempo restante estimado;
+- melhora muito a leitura operacional no manager;
+- mas ainda depende do ritmo do heartbeat e do ultimo player reportado.
+
+Para fechar isso de forma mais forte, ainda existem dois caminhos:
+
+#### Caminho curto ja implementado
+
+Payload atual do snapshot:
 
 - `current_item_id`
 - `current_item_preview_url`
 - `current_sender_name`
 - `current_source_type`
 - `current_layout`
-- `current_transition`
 - `advanced_at`
 
-Esse snapshot pode ser emitido por um player monitorado a cada `advance`.
+Hoje esse snapshot e atualizado a partir do player monitorado mais recente.
 
 #### Caminho robusto
 
@@ -1034,7 +1089,9 @@ Para esta fase:
 
 ## O que mostrar no monitor ao vivo
 
-Se a pagina ganhar um monitor de runtime real, a composicao minima recomendada e:
+Nesta fase, o palco ja mostra a maior parte desta composicao quando existe `liveSnapshot` e nao ha selecao manual.
+
+Composicao minima recomendada:
 
 - imagem atual
 - badge de origem:
@@ -1101,8 +1158,12 @@ Enriquecer `WallSimulationPreviewItem` com:
 Observacao:
 
 `WallPayloadFactory::media()` ja conhece `url` e `source_type`.
-Nesta fase, `WallSimulationService` ja repassa `preview_url` e `source_type` no `sequence_preview`.
-As proximas pendencias aqui continuam sendo `caption`, `layout_hint` e uma camada visual mais rica no frontend.
+Nesta fase, `WallSimulationService` ja repassa `preview_url`, `source_type`, `caption` e `layout_hint` no `sequence_preview`.
+As proximas pendencias aqui continuam sendo:
+
+- icones de origem mais ricos no proprio payload ou no mapper do frontend;
+- semantica visual mais forte para video, duracao e estado de replay;
+- ligacao ainda mais direta entre previsao, snapshot ao vivo e detalhe operacional.
 
 ## Icones de origem
 
@@ -1325,7 +1386,8 @@ Leitura:
 ### TanStack Query
 
 - a documentacao de `query invalidation` reforca exatamente o padrao que o manager ja usa: realtime invalida a query e o Query Client refaz a leitura.
-- o gap atual nao esta no modelo da lib, e sim na falta de fallback de refetch quando o canal privado cai.
+- o gap que existia nesta area nao estava no modelo da lib, e sim na falta de fallback de refetch quando o canal privado caia.
+- nesta fase, esse ponto ja foi fechado com `useWallPollingFallback` e com atualizacao direta do `liveSnapshot` via evento dedicado.
 - a documentacao de `important defaults` reforca que queries stale podem refetch em mount, foco e reconexao se nao controlarmos isso explicitamente.
 - a documentacao de `render optimizations` reforca que `select` pode reduzir o payload entregue aos componentes sem alterar o cache, o que combina muito bem com o topo do cockpit.
 
@@ -1740,14 +1802,20 @@ Payload atual:
 - origem
 - preview atual
 - `layoutHint`
+- `advancedAt`
 - player mais recente ainda online
 - status atual do wall
+
+Evento realtime atual:
+
+- `wall.runtime.snapshot.updated`
 
 Leitura:
 
 - isso ja permite trazer o item real do wall para o palco do manager;
+- isso ja permite mostrar um clock operacional de troca no palco;
 - ainda nao substitui um monitor autoritativo com clock central de advance;
-- um evento broadcastado dedicado continua opcao futura para reduzir ainda mais latencia de sincronizacao.
+- o proximo salto aqui deixa de ser "ter snapshot" e passa a ser "ter snapshot mais autoritativo e com semantica temporal mais forte".
 
 ## 16.3 Endpoint agregado de insights
 
@@ -1975,7 +2043,8 @@ export const wallQueryKeys = {
 
 ### Comportamento recomendado
 
-- `useWallRealtimeSync` invalida `insights`, `liveSnapshot`, `diagnostics` e `settings`;
+- `useWallRealtimeSync` invalida `insights`, `diagnostics` e `settings`;
+- `useWallRealtimeSync` aplica `liveSnapshot` direto no cache quando chega `wall.runtime.snapshot.updated`;
 - `useWallPollingFallback` ativa `refetchInterval` apenas em `disconnected` ou `offline`;
 - ao reconectar, o manager invalida tudo e corta o polling;
 - `useWallRecentMediaTimeline` pausa auto-scroll em hover para nao brigar com o usuario;
@@ -2049,6 +2118,87 @@ Se eu tivesse que decidir a proxima sprint hoje:
 - criaria um endpoint agregado `wall/insights` para topo + recentes;
 - enriqueceria a previsao das proximas 12 exibicoes com thumbnail e origem;
 - simplificaria a linguagem dos KPIs antes de adicionar novos blocos.
+
+## Proximo bloco recomendado apos esta sprint
+
+Com o cockpit atual estabilizado, o proximo bloco mais coerente deixa de ser reorganizacao de layout e passa a ser consolidacao de fonte autoritativa.
+
+Plano executavel detalhado desta continuidade:
+
+- `docs/architecture/telao-cockpit-sprint-implementation-plan-2026-04-08.md`
+  - secao `Plano executavel do bloco novo`
+
+### 1. Monitor live mais autoritativo
+
+Hoje o manager ja tem:
+
+- snapshot dedicado
+- evento privado de snapshot
+- clock estimado de troca
+
+O que ainda falta:
+
+- mover o `advancedAt` de uma leitura derivada do heartbeat para uma fonte mais proxima do `advance` real
+- decidir se o snapshot deve carregar tambem `nextItem`
+- reduzir a diferenca entre `monitor live` e `simulacao`
+
+### 2. Historico confiavel de exibidas
+
+Hoje:
+
+- `totals.displayed` ainda nao e numero autoritativo
+- o backend ainda nao guarda historico acumulado confiavel de exibidas
+
+Proximo passo:
+
+- criar essa trilha no backend e devolver o valor pronto para UI
+
+### 3. Semantica visual final de origem e video
+
+Hoje:
+
+- a timeline ja tem thumb, origem textual, `caption` e `layout_hint`
+- o playback de video do wall continua com gaps especificos de produto e engine
+
+Proximo passo:
+
+- consolidar badge e rotulo final de origem
+- destacar video de forma consistente entre timeline, monitor e detalhe
+- ligar essa evolucao ao plano proprio de video em:
+  - `docs/architecture/wall-video-playback-current-state-2026-04-08.md`
+  - `docs/architecture/wall-video-playback-execution-plan-2026-04-08.md`
+
+## Revalidacao complementar executada em 2026-04-09
+
+Cockpit do wall:
+
+- `cd apps/api && php artisan test --filter=Wall`
+  - `62` testes passando
+- `cd apps/web && npm run test -- src/modules/wall`
+  - `199` testes passando
+- `cd apps/web && npm run type-check`
+  - sem erros
+
+Baseline de video e intake:
+
+- `cd apps/api && php artisan test --filter=PublicUploadTest`
+  - `8` testes passando
+- `cd apps/web && npm run test -- src/modules/wall/player/components/MediaSurface.test.tsx src/modules/wall/player/engine/cache.test.ts src/modules/wall/player/engine/preload.test.ts`
+  - `12` testes passando
+
+Leitura:
+
+- a base atual do cockpit esta verde para seguir evoluindo;
+- a trilha de video atual continua caracterizada por testes reais;
+- isso reduz risco de misturar a proxima fase de monitor autoritativo com regressao de playback atual.
+
+### Ordem recomendada desta continuidade
+
+1. fonte autoritativa de `advancedAt`
+2. `nextItem` no `liveSnapshot`
+3. historico confiavel de exibidas
+4. semantica final de origem e video
+5. polimento e regressao completa
 
 ## Fontes oficiais consultadas para a proposta
 

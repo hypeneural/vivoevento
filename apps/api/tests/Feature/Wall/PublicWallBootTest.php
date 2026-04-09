@@ -106,3 +106,47 @@ it('returns the public wall boot payload with media settings and sender identity
         ->assertJsonPath('data.files.0.height', 1920)
         ->assertJsonPath('data.files.0.orientation', 'vertical');
 });
+
+it('excludes orientation-mismatched media from the public boot payload', function () {
+    Storage::fake('public');
+
+    $domainEvent = Event::factory()->active()->create([
+        'title' => 'Evento Wall Landscape',
+    ]);
+
+    EventModule::query()->create([
+        'event_id' => $domainEvent->id,
+        'module_key' => 'wall',
+        'is_enabled' => true,
+    ]);
+
+    $settings = EventWallSetting::factory()->live()->create([
+        'event_id' => $domainEvent->id,
+        'accepted_orientation' => 'landscape',
+    ]);
+
+    $portraitMedia = EventMedia::factory()->published()->create([
+        'event_id' => $domainEvent->id,
+        'original_filename' => 'portrait-video.mp4',
+        'media_type' => 'video',
+        'mime_type' => 'video/mp4',
+        'width' => 1080,
+        'height' => 1920,
+    ]);
+
+    EventMediaVariant::query()->create([
+        'event_media_id' => $portraitMedia->id,
+        'variant_key' => 'wall',
+        'disk' => 'public',
+        'path' => "wall/{$portraitMedia->id}.mp4",
+        'width' => 1080,
+        'height' => 1920,
+    ]);
+
+    $response = $this->apiGet("/public/wall/{$settings->wall_code}/boot");
+
+    $this->assertApiSuccess($response);
+
+    $response->assertJsonCount(0, 'data.files')
+        ->assertJsonPath('data.settings.accepted_orientation', 'landscape');
+});

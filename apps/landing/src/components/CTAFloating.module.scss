@@ -94,30 +94,31 @@
   margin: 0;
   cursor: pointer;
   
-  // Positioning
+  // Positioning — above the ::before pseudo
   position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  z-index: 1;
+  top: 0.6rem;
+  right: 0.6rem;
+  z-index: 10;
   
-  // Sizing
+  // Sizing — larger click target
   @include flex-center;
-  width: 2rem;
-  height: 2rem;
+  width: 2.4rem;
+  height: 2.4rem;
   
   // Visual style
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  color: $c-white-64;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: $c-white-80;
+  pointer-events: auto;
   
   // Transitions
   transition: background 180ms ease, color 180ms ease, transform 180ms ease;
   
   // Hover state
   &:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.16);
     color: $c-white;
-    transform: scale(1.05);
+    transform: scale(1.1);
   }
   
   // Focus state (accessibility)
@@ -129,7 +130,8 @@
   
   // Active state
   &:active {
-    transform: scale(0.95);
+    transform: scale(0.9);
+    background: rgba(255, 255, 255, 0.2);
   }
 }
 

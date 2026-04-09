@@ -236,6 +236,7 @@ describe('EventWallManagerPage', () => {
         isFeatured: false,
         createdAt: '2026-04-02T20:59:00Z',
       },
+      advancedAt: '2026-04-02T20:59:52Z',
       updatedAt: '2026-04-02T21:00:00Z',
     });
     getEventWallAdsMock.mockResolvedValue([
@@ -446,6 +447,18 @@ describe('EventWallManagerPage', () => {
 
     expect(await screen.findByText(/Detalhes da midia recente/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Carla/i).length).toBeGreaterThan(0);
+  }, 15000);
+
+  it('abre o detalhe operacional expandido do player', async () => {
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', {
+      name: /Ver detalhe da tela player-alpha/i,
+    }));
+
+    expect(await screen.findByText(/Detalhes da tela conectada/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Tudo esta estavel nesta tela agora/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Situacao atual/i).length).toBeGreaterThan(0);
   }, 15000);
 
   it('navega pelos comandos principais do toolbar com as setas', async () => {

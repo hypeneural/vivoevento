@@ -28,33 +28,34 @@ const matches = [
 
 // Facial landmark nodes calibrated to the Unsplash selfie model
 // photo-1494790108377 displayed at object-position: center 18%
+// Face center is approx 49% horizontal, eyes at ~28% vertical
 const faceNodes = [
   // Eyes — outer corners
-  { x: "36%", y: "34%" },
-  { x: "62%", y: "33%" },
-  // Eyes — inner corners
-  { x: "44%", y: "35%" },
-  { x: "54%", y: "34%" },
+  { x: "37%", y: "28%" },
+  { x: "61%", y: "27%" },
+  // Eyes — inner corners  
+  { x: "44%", y: "29%" },
+  { x: "55%", y: "28%" },
   // Eyebrows — arches
-  { x: "38%", y: "29%" },
-  { x: "60%", y: "28%" },
+  { x: "39%", y: "23%" },
+  { x: "59%", y: "22%" },
   // Nose — bridge
-  { x: "49%", y: "38%" },
+  { x: "49%", y: "32%" },
   // Nose — tip
-  { x: "49%", y: "46%" },
+  { x: "49%", y: "38%" },
   // Nose — wings
-  { x: "44%", y: "47%" },
-  { x: "54%", y: "47%" },
+  { x: "45%", y: "39%" },
+  { x: "54%", y: "39%" },
   // Mouth — corners
-  { x: "41%", y: "55%" },
-  { x: "57%", y: "55%" },
+  { x: "42%", y: "46%" },
+  { x: "57%", y: "46%" },
   // Mouth — center upper lip
-  { x: "49%", y: "53%" },
+  { x: "49%", y: "44%" },
   // Chin
-  { x: "49%", y: "65%" },
+  { x: "49%", y: "54%" },
   // Jaw — left and right
-  { x: "33%", y: "52%" },
-  { x: "65%", y: "51%" },
+  { x: "34%", y: "43%" },
+  { x: "64%", y: "42%" },
 ];
 
 export default function FaceSearchSection() {

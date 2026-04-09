@@ -4,6 +4,8 @@ import type {
   ApiEventCommercialStatus,
   ApiEventContentModerationSettings,
   ApiEventDetail,
+  ApiEventFaceSearchHealthCheck,
+  ApiEventFaceSearchOperationResponse,
   ApiEventFaceSearchSettings,
   ApiEventMediaIntelligenceSettings,
   ApiEventMediaItem,
@@ -176,6 +178,26 @@ export function updateEventFaceSearchSettings(
   return api.patch<ApiEventFaceSearchSettings>(`/events/${eventId}/face-search/settings`, {
     body: payload,
   });
+}
+
+export function getEventFaceSearchHealth(eventId: string | number) {
+  return api.get<ApiEventFaceSearchHealthCheck>(`/events/${eventId}/face-search/health`);
+}
+
+export function reindexEventFaceSearch(eventId: string | number) {
+  return api.post<ApiEventFaceSearchOperationResponse>(`/events/${eventId}/face-search/reindex`, {
+    body: {},
+  });
+}
+
+export function reconcileEventFaceSearch(eventId: string | number) {
+  return api.post<ApiEventFaceSearchOperationResponse>(`/events/${eventId}/face-search/reconcile`, {
+    body: {},
+  });
+}
+
+export function deleteEventFaceSearchCollection(eventId: string | number) {
+  return api.delete<ApiEventFaceSearchOperationResponse>(`/events/${eventId}/face-search/collection`);
 }
 
 export function getEventShareLinks(eventId: string | number) {

@@ -19,6 +19,10 @@ O documento foi revisado com:
 - execucao de testes backend e frontend;
 - adicao de novos testes para caracterizar o comportamento atual de video.
 
+Plano de execucao derivado desta analise:
+
+- `docs/architecture/wall-video-playback-execution-plan-2026-04-08.md`
+
 ## Resumo executivo
 
 Hoje o wall suporta `image` e `video` como itens normais da fila, mas o suporte a video ainda e "video como slide", nao "video como playback de primeira classe".
@@ -867,16 +871,27 @@ Efeito:
 - torna a stack mais confusa;
 - passa a ideia de que existe estrategia real de variante para video quando hoje nao existe.
 
-### 6. Boot inicial e realtime nao usam exatamente o mesmo gate de elegibilidade
+### 6. Simetria base entre boot, realtime e simulacao foi corrigida
 
-Hoje:
+Estado atualizado:
 
-- `WallRuntimeMediaService` carrega o boot inicial;
-- `WallEligibilityService` controla especialmente o realtime.
+- `WallRuntimeMediaService` agora filtra a fila com `WallEligibilityService`;
+- boot, broadcast realtime e simulacao passaram a compartilhar o mesmo gate atual para:
+  - `settings->isPlayable()`
+  - `approved + published`
+  - `media_type` permitido
+  - orientacao aceita
 
-Efeito:
+Validacao:
 
-- a logica de aceite pode nao ser 100% simetrica entre boot e broadcast.
+- `PublicWallBootTest` agora confirma que o boot exclui midia vertical em wall `landscape`;
+- `MediaPipelineEventsTest` confirma que o realtime nao broadcasta esse mesmo caso;
+- `WallDiagnosticsTest` confirma que a simulacao tambem nao inclui esse item.
+
+O que ainda falta nesta trilha:
+
+- a elegibilidade especifica de video ainda nao esta completa;
+- `video_enabled`, politica de duracao, variante obrigatoria e `poster` ainda nao fazem parte do gate unico.
 
 ### 7. Nao existe estrategia de wall-specific video variants
 
@@ -1272,11 +1287,19 @@ Resultado observado:
 
 Executado:
 
+- `cd apps/api && php artisan test --filter=Wall`
 - `cd apps/api && php artisan test --filter=PublicUploadTest`
+- `cd apps/api && php artisan test tests/Feature/Wall/PublicWallBootTest.php`
+- `cd apps/api && php artisan test tests/Unit/Modules/Wall/WallEligibilityServiceTest.php`
+- `cd apps/api && php artisan test tests/Unit/Modules/MediaProcessing/MediaAssetUrlServiceTest.php tests/Unit/Modules/MediaProcessing/MediaVariantGeneratorServiceTest.php`
 
 Resultado:
 
-- `PASS`, `8` testes, `71` assertions
+- `Wall` -> `PASS`, `66` testes, `301` assertions
+- `PublicUploadTest` -> `PASS`, `8` testes, `71` assertions
+- `PublicWallBootTest` -> `PASS`, `2` testes, `38` assertions
+- `WallEligibilityServiceTest` -> `PASS`, `7` testes, `11` assertions
+- `MediaAssetUrlServiceTest + MediaVariantGeneratorServiceTest` -> `PASS`, `3` testes, `3` assertions
 
 Cobertura relevante confirmada:
 
@@ -1284,16 +1307,21 @@ Cobertura relevante confirmada:
 - upload publico unitario de video
 - face indexing em imagem publica
 - indisponibilidade operacional do upload
+- boot, realtime e simulacao agora compartilham o mesmo gate atual de orientacao/playable
+- sem variante de video, o wall ainda cai no arquivo original
+- o gerador atual de variantes ainda nao produz `wall_video` nem `poster` para video
 
 ### Testes frontend executados
 
 Executado:
 
 - `cd apps/web && npx.cmd vitest run src/modules/wall/player`
+- `cd apps/web && npx.cmd vitest run src/modules/wall/player/engine/selectors.test.ts src/modules/wall/player/engine/cache.test.ts src/modules/wall/player/engine/preload.test.ts src/modules/wall/player/components/MediaSurface.test.tsx`
 
 Resultado:
 
 - `PASS`, `22` arquivos, `155` testes
+- `PASS`, `4` arquivos, `24` testes
 
 ### Novos testes adicionados nesta rodada
 
@@ -1301,11 +1329,23 @@ Backend:
 
 - `apps/api/tests/Feature/InboundMedia/PublicUploadTest.php`
   - valida upload publico unitario de video
+- `apps/api/tests/Feature/Wall/PublicWallBootTest.php`
+  - valida que boot agora exclui midia fora da orientacao aceita
+- `apps/api/tests/Feature/MediaProcessing/MediaPipelineEventsTest.php`
+  - valida que realtime nao broadcasta midia fora da orientacao aceita
+- `apps/api/tests/Feature/Wall/WallDiagnosticsTest.php`
+  - valida que a simulacao tambem respeita a mesma elegibilidade
+- `apps/api/tests/Unit/Modules/MediaProcessing/MediaAssetUrlServiceTest.php`
+  - valida fallback atual de video para original e preferencia por variante quando existir
+- `apps/api/tests/Unit/Modules/MediaProcessing/MediaVariantGeneratorServiceTest.php`
+  - valida que o gerador atual ainda nao cria variantes reais para video
 
 Frontend:
 
 - `apps/web/src/modules/wall/player/components/MediaSurface.test.tsx`
   - valida que video comum do slideshow renderiza `autoplay + muted + loop + playsInline`
+- `apps/web/src/modules/wall/player/engine/selectors.test.ts`
+  - valida que o engine atual prefere itens `ready`, mas ainda permite itens `idle` quando nao existe nenhum `ready`
 - `apps/web/src/modules/wall/player/engine/cache.test.ts`
   - valida probe de metadata de video com `preload="metadata"`
 - `apps/web/src/modules/wall/player/engine/preload.test.ts`

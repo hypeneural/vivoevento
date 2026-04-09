@@ -3,11 +3,13 @@
 namespace App\Modules\Wall\Http\Controllers;
 
 use App\Modules\Analytics\Services\AnalyticsTracker;
+use App\Modules\Wall\Events\PrivateWallLiveSnapshotUpdated;
 use App\Modules\Wall\Http\Requests\WallHeartbeatRequest;
 use App\Modules\Wall\Http\Resources\WallBootResource;
 use App\Modules\Wall\Jobs\RecalculateWallDiagnosticsJob;
 use App\Modules\Wall\Models\EventWallSetting;
 use App\Modules\Wall\Services\WallDiagnosticsService;
+use App\Modules\Wall\Services\WallLiveSnapshotService;
 use App\Modules\Wall\Services\WallRuntimeMediaService;
 use App\Shared\Http\BaseController;
 use Illuminate\Http\JsonResponse;
@@ -65,6 +67,7 @@ class PublicWallController extends BaseController
         WallHeartbeatRequest $request,
         string $wallCode,
         WallDiagnosticsService $diagnostics,
+        WallLiveSnapshotService $snapshots,
     ): JsonResponse {
         $settings = $this->resolveWallSetting($wallCode);
 
@@ -73,6 +76,10 @@ class PublicWallController extends BaseController
         }
 
         $diagnostics->recordHeartbeat($settings, $request->validated());
+        event(new PrivateWallLiveSnapshotUpdated(
+            $settings->event_id,
+            $snapshots->buildSnapshot($settings),
+        ));
         RecalculateWallDiagnosticsJob::dispatch($settings->id);
 
         return $this->success([

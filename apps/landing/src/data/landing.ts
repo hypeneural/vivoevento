@@ -422,7 +422,7 @@ export const heroVariations: HeroVariations = {
       lead: "Controle total.",
       accent: ["Moderação inteligente,", "operação segura."],
     },
-    subheadline: "Receba por QR, aprove com IA e publique em galeria, jogos, telão e busca facial.",
+    subheadline: "Receba Fotos e Vídeos por QR, aprove com IA e publique em galeria, jogos, telão e busca facial.",
     flowSteps: [
       {
         number: 1,
@@ -487,7 +487,7 @@ export const heroVariations: HeroVariations = {
       lead: "Fotos dos convidados.",
       accent: ["Viram experiência", "ao vivo no evento."],
     },
-    subheadline: "Transforme fotos em galeria ao vivo, jogos, telão e busca por selfie.",
+    subheadline: "Receba Fotos e Vídeos por QR, aprove com IA e publique em galeria, jogos, telão e busca facial.",
     flowSteps: [
       {
         number: 1,
@@ -552,7 +552,7 @@ export const heroVariations: HeroVariations = {
       lead: "Engajamento em escala.",
       accent: ["Galeria, jogos e telão", "em tempo real."],
     },
-    subheadline: "Alto volume: múltiplos canais, moderação IA e publicação simultânea.",
+    subheadline: "Receba Fotos e Vídeos por QR, aprove com IA e publique em galeria, jogos, telão e busca facial.",
     flowSteps: [
       {
         number: 1,

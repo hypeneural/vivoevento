@@ -119,6 +119,21 @@ it('invites and removes organization team members through current organization s
     ]);
 });
 
+it('requires whatsapp phone when inviting organization team members', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $response = $this->apiPost('/organizations/current/team', [
+        'user' => [
+            'name' => 'Equipe Sem WhatsApp',
+            'email' => 'sem-whatsapp@eventovivo.test',
+        ],
+        'role_key' => 'partner-manager',
+        'is_owner' => false,
+    ]);
+
+    $this->assertApiValidationError($response, ['user.phone']);
+});
+
 it('does not allow removing the owner membership from current organization settings', function () {
     [$user, $organization] = $this->actingAsOwner();
 

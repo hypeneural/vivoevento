@@ -46,7 +46,7 @@ class SelfiePreflightService
 
         if (count($detectedFaces) > 1) {
             throw ValidationException::withMessages([
-                'selfie' => ['Envie uma selfie com apenas uma pessoa visivel.'],
+                'selfie' => ['Envie uma selfie com apenas uma pessoa visivel. Busca por foto de grupo ainda nao faz parte desta versao.'],
             ]);
         }
 

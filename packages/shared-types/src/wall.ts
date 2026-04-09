@@ -6,6 +6,7 @@ export const WALL_EVENT_NAMES = {
   statusChanged: 'wall.status.changed',
   expired: 'wall.expired',
   diagnosticsUpdated: 'wall.diagnostics.updated',
+  liveSnapshotUpdated: 'wall.runtime.snapshot.updated',
   playerCommand: 'wall.player.command',
   adsUpdated: 'wall.ads.updated',
 } as const;

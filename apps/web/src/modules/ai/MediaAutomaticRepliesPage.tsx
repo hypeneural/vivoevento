@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { FolderTree, Loader2, Plus, Save, Sparkles, TestTube2, Trash2 } from 'lucide-react';
+import { CircleHelp, FolderTree, Loader2, Plus, Save, Sparkles, TestTube2, Trash2 } from 'lucide-react';
 
 import { useAuth } from '@/app/providers/AuthProvider';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { ApiError } from '@/lib/api';
 import { PageHeader } from '@/shared/components/PageHeader';
@@ -31,6 +32,7 @@ import type {
   MediaReplyPromptCategory,
   MediaReplyPromptPreset,
   MediaReplyPromptTestRun,
+  RunMediaReplyPromptTestPayload,
   SaveMediaReplyPromptCategoryPayload,
   SaveMediaReplyPromptPresetPayload,
 } from './types';
@@ -62,7 +64,7 @@ function scopeLabel(value: string | null | undefined): string {
     case 'image_only':
       return 'Somente imagem';
     case 'image_and_text_context':
-      return 'Imagem + texto';
+      return 'Imagem + texto do envio';
     default:
       return value || 'Nao definido';
   }
@@ -71,18 +73,154 @@ function scopeLabel(value: string | null | undefined): string {
 function normalizedTextContextModeLabel(value: string | null | undefined): string {
   switch (value) {
     case 'none':
-      return 'Sem texto';
+      return 'Nao usar texto';
     case 'body_only':
-      return 'Somente corpo';
+      return 'Somente mensagem';
     case 'caption_only':
       return 'Somente caption';
     case 'body_plus_caption':
-      return 'Corpo + caption';
+      return 'Mensagem + caption';
     case 'operator_summary':
       return 'Resumo do operador';
     default:
       return value || 'Nao definido';
   }
+}
+
+function safetyModeLabel(value: string | null | undefined): string {
+  switch (value) {
+    case 'enforced':
+      return 'Bloquear automaticamente';
+    case 'observe_only':
+      return 'Somente monitorar';
+    default:
+      return value || 'Nao definido';
+  }
+}
+
+function safetyFallbackLabel(value: string | null | undefined): string {
+  switch (value) {
+    case 'review':
+      return 'Mandar para revisao';
+    case 'block':
+      return 'Bloquear por seguranca';
+    default:
+      return value || 'Nao definido';
+  }
+}
+
+function contextModeLabel(value: string | null | undefined): string {
+  switch (value) {
+    case 'gate':
+      return 'Bloquear antes de publicar';
+    case 'enrich_only':
+      return 'So sugerir sem bloquear';
+    default:
+      return value || 'Nao definido';
+  }
+}
+
+function contextFallbackLabel(value: string | null | undefined): string {
+  switch (value) {
+    case 'review':
+      return 'Mandar para revisao';
+    case 'skip':
+      return 'Seguir sem esta analise';
+    default:
+      return value || 'Nao definido';
+  }
+}
+
+function providerLabel(value: string | null | undefined): string {
+  switch (value) {
+    case 'noop':
+      return 'Desligado';
+    case 'openai':
+      return 'OpenAI';
+    case 'openrouter':
+      return 'OpenRouter';
+    case 'vllm':
+      return 'vLLM';
+    default:
+      return value || 'Nao definido';
+  }
+}
+
+function contextualPresetLabel(value: string | null | undefined): string {
+  switch (value) {
+    case 'casamento_equilibrado':
+      return 'Casamento equilibrado';
+    case 'casamento_rigido':
+      return 'Casamento rigido';
+    case 'formatura':
+      return 'Formatura';
+    case 'corporativo_restrito':
+      return 'Corporativo restrito';
+    case 'aniversario_infantil':
+      return 'Aniversario infantil';
+    case 'homologacao_livre':
+      return 'Homologacao livre';
+    default:
+      return value || 'Nao definido';
+  }
+}
+
+function requiredPeopleContextLabel(value: string | null | undefined): string {
+  switch (value) {
+    case 'required':
+      return 'Obrigatorio ter pessoas';
+    case 'optional':
+      return 'Pessoas opcionais';
+    default:
+      return value || 'Nao definido';
+  }
+}
+
+function HelpTooltip({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={title}
+          className="inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <CircleHelp className="h-3.5 w-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top" align="start" className="max-w-sm rounded-xl px-4 py-3">
+        <div className="space-y-1.5">
+          <p className="text-sm font-semibold">{title}</p>
+          <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function HelpLabel({
+  htmlFor,
+  children,
+  title,
+  description,
+}: {
+  htmlFor?: string;
+  children: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <Label htmlFor={htmlFor}>{children}</Label>
+      <HelpTooltip title={title} description={description} />
+    </div>
+  );
 }
 
 function publishEligibilityLabel(value: string | null | undefined): string {
@@ -181,6 +319,41 @@ function policyInheritanceLabel(value: string | null | undefined): string {
   }
 }
 
+function moderationDecisionLabel(value: string | null | undefined): string {
+  switch (value) {
+    case 'pass':
+    case 'approved':
+      return 'Aprovado';
+    case 'review':
+    case 'review_required':
+      return 'Em revisão';
+    case 'rejected':
+    case 'reject':
+      return 'Rejeitado';
+    case 'published':
+      return 'Publicado';
+    case 'pending':
+      return 'Pendente';
+    case 'none':
+      return 'Sem ação';
+    default:
+      return value || 'Nao informado';
+  }
+}
+
+function confidenceBandLabel(value: string | null | undefined): string {
+  switch (value) {
+    case 'high':
+      return 'Alta';
+    case 'medium':
+      return 'Media';
+    case 'low':
+      return 'Baixa';
+    default:
+      return value || 'Nao informada';
+  }
+}
+
 function effectiveStateBadgeVariant(value: string | null | undefined): 'default' | 'secondary' | 'destructive' | 'outline' {
   switch (value) {
     case 'published':
@@ -219,11 +392,16 @@ function emptyCategoryForm(): SaveMediaReplyPromptCategoryPayload {
   };
 }
 
+type ManagementMode = 'basico' | 'avancado' | 'auditoria';
+type ManagementSection = 'visao-geral' | 'safety' | 'configuracao' | 'teste' | 'catalogo' | 'historico';
+
 export default function MediaAutomaticRepliesPage() {
   const { meUser: user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const canManageGlobalAi = user?.role.key === 'super-admin' || user?.role.key === 'platform-admin';
+  const [managementMode, setManagementMode] = useState<ManagementMode>('basico');
+  const [activeSection, setActiveSection] = useState<ManagementSection>('visao-geral');
 
   const [standardInstruction, setStandardInstruction] = useState('');
   const [standardFixedTemplates, setStandardFixedTemplates] = useState('');
@@ -282,6 +460,8 @@ export default function MediaAutomaticRepliesPage() {
   const [testNormalizedTextContextModeOverride, setTestNormalizedTextContextModeOverride] = useState<'inherit' | 'none' | 'body_only' | 'caption_only' | 'body_plus_caption' | 'operator_summary'>('inherit');
   const [testFiles, setTestFiles] = useState<File[]>([]);
   const [latestTestRun, setLatestTestRun] = useState<MediaReplyPromptTestRun | null>(null);
+  const [lastRunnableTestPayload, setLastRunnableTestPayload] = useState<RunMediaReplyPromptTestPayload | null>(null);
+  const [labExecutionError, setLabExecutionError] = useState<string | null>(null);
 
   const [historyEventId, setHistoryEventId] = useState('');
   const [historyProviderKey, setHistoryProviderKey] = useState<string>('all');
@@ -293,6 +473,9 @@ export default function MediaAutomaticRepliesPage() {
   const [realHistoryModelKey, setRealHistoryModelKey] = useState('');
   const [realHistoryPresetName, setRealHistoryPresetName] = useState('');
   const [realHistorySenderQuery, setRealHistorySenderQuery] = useState('');
+  const [realHistoryReasonCode, setRealHistoryReasonCode] = useState('');
+  const [realHistoryPublishEligibility, setRealHistoryPublishEligibility] = useState<string>('all');
+  const [realHistoryEffectiveState, setRealHistoryEffectiveState] = useState<string>('all');
   const [realHistoryDateFrom, setRealHistoryDateFrom] = useState('');
   const [realHistoryDateTo, setRealHistoryDateTo] = useState('');
   const [selectedRealHistoryId, setSelectedRealHistoryId] = useState<number | null>(null);
@@ -301,23 +484,28 @@ export default function MediaAutomaticRepliesPage() {
     queryKey: ['ia', 'respostas-de-midia', 'configuracao'],
     queryFn: () => aiMediaRepliesService.getConfiguration(),
     enabled: canManageGlobalAi,
+    placeholderData: (previousData) => previousData,
   });
   const safetyConfigurationQuery = useQuery({
     queryKey: ['ia', 'moderacao-de-midia', 'safety-global'],
     queryFn: () => aiMediaRepliesService.getSafetyConfiguration(),
     enabled: canManageGlobalAi,
+    placeholderData: (previousData) => previousData,
   });
   const categoriesQuery = useQuery({
     queryKey: ['ia', 'respostas-de-midia', 'categorias'],
     queryFn: () => aiMediaRepliesService.listCategories(),
+    placeholderData: (previousData) => previousData,
   });
   const presetsQuery = useQuery({
     queryKey: ['ia', 'respostas-de-midia', 'presets'],
     queryFn: () => aiMediaRepliesService.listPresets(),
+    placeholderData: (previousData) => previousData,
   });
   const eventOptionsQuery = useQuery({
     queryKey: ['ia', 'respostas-de-midia', 'eventos'],
     queryFn: () => aiMediaRepliesService.listEventOptions(),
+    placeholderData: (previousData) => previousData,
   });
   const historyQuery = useQuery({
     queryKey: ['ia', 'respostas-de-midia', 'testes', historyEventId, historyProviderKey, historyStatus],
@@ -327,6 +515,7 @@ export default function MediaAutomaticRepliesPage() {
       status: historyStatus !== 'all' ? historyStatus : null,
       per_page: 15,
     }),
+    placeholderData: (previousData) => previousData,
   });
   const realHistoryQuery = useQuery({
     queryKey: [
@@ -339,6 +528,9 @@ export default function MediaAutomaticRepliesPage() {
       realHistoryModelKey,
       realHistoryPresetName,
       realHistorySenderQuery,
+      realHistoryReasonCode,
+      realHistoryPublishEligibility,
+      realHistoryEffectiveState,
       realHistoryDateFrom,
       realHistoryDateTo,
     ],
@@ -349,21 +541,50 @@ export default function MediaAutomaticRepliesPage() {
       status: realHistoryStatus !== 'all' ? realHistoryStatus : null,
       preset_name: realHistoryPresetName.trim() !== '' ? realHistoryPresetName.trim() : null,
       sender_query: realHistorySenderQuery.trim() !== '' ? realHistorySenderQuery.trim() : null,
+      reason_code: realHistoryReasonCode.trim() !== '' ? realHistoryReasonCode.trim() : null,
+      publish_eligibility: realHistoryPublishEligibility !== 'all' ? realHistoryPublishEligibility : null,
+      effective_media_state: realHistoryEffectiveState !== 'all' ? realHistoryEffectiveState : null,
       date_from: realHistoryDateFrom.trim() !== '' ? realHistoryDateFrom : null,
       date_to: realHistoryDateTo.trim() !== '' ? realHistoryDateTo : null,
       per_page: 15,
     }),
+    placeholderData: (previousData) => previousData,
   });
   const historyDetailQuery = useQuery({
     queryKey: ['ia', 'respostas-de-midia', 'testes', 'detalhe', selectedHistoryId],
     queryFn: () => aiMediaRepliesService.getPromptTest(selectedHistoryId as number),
     enabled: selectedHistoryId !== null,
+    placeholderData: (previousData) => previousData,
   });
   const realHistoryDetailQuery = useQuery({
     queryKey: ['ia', 'respostas-de-midia', 'historico-eventos', 'detalhe', selectedRealHistoryId],
     queryFn: () => aiMediaRepliesService.getEventHistoryItem(selectedRealHistoryId as number),
     enabled: selectedRealHistoryId !== null,
+    placeholderData: (previousData) => previousData,
   });
+
+  const availableSections = useMemo<Array<{ value: ManagementSection; label: string }>>(() => {
+    switch (managementMode) {
+      case 'avancado':
+        return [
+          { value: 'safety', label: 'Segurança objetiva' },
+          { value: 'configuracao', label: 'Contexto do evento' },
+          { value: 'catalogo', label: 'Catálogo' },
+        ];
+      case 'auditoria':
+        return [
+          { value: 'teste', label: 'Laboratório' },
+          { value: 'historico', label: 'Historico' },
+        ];
+      case 'basico':
+      default:
+        return [
+          { value: 'visao-geral', label: 'Visão geral' },
+          { value: 'safety', label: 'Segurança objetiva' },
+          { value: 'configuracao', label: 'Contexto do evento' },
+        ];
+    }
+  }, [managementMode]);
 
   useEffect(() => {
     setStandardInstruction(configurationQuery.data?.reply_text_prompt ?? '');
@@ -542,6 +763,38 @@ export default function MediaAutomaticRepliesPage() {
     });
   }, [realHistoryQuery.data]);
 
+  useEffect(() => {
+    if (!availableSections.some((section) => section.value === activeSection)) {
+      setActiveSection(availableSections[0]?.value ?? 'visao-geral');
+    }
+  }, [activeSection, availableSections]);
+
+  useEffect(() => {
+    const firstId = historyQuery.data?.data?.[0]?.id ?? null;
+
+    if (firstId === null) {
+      return;
+    }
+
+    queryClient.prefetchQuery({
+      queryKey: ['ia', 'respostas-de-midia', 'testes', 'detalhe', firstId],
+      queryFn: () => aiMediaRepliesService.getPromptTest(firstId),
+    });
+  }, [historyQuery.data, queryClient]);
+
+  useEffect(() => {
+    const firstId = realHistoryQuery.data?.data?.[0]?.id ?? null;
+
+    if (firstId === null) {
+      return;
+    }
+
+    queryClient.prefetchQuery({
+      queryKey: ['ia', 'respostas-de-midia', 'historico-eventos', 'detalhe', firstId],
+      queryFn: () => aiMediaRepliesService.getEventHistoryItem(firstId),
+    });
+  }, [queryClient, realHistoryQuery.data]);
+
   const updateConfigurationMutation = useMutation({
     mutationFn: () => aiMediaRepliesService.updateConfiguration({
       enabled: contextEnabled,
@@ -610,13 +863,13 @@ export default function MediaAutomaticRepliesPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['ia', 'moderacao-de-midia', 'safety-global'] });
       toast({
-        title: 'Safety objetiva atualizada',
+        title: 'Seguranca objetiva atualizada',
         description: 'A politica global de safety foi salva.',
       });
     },
     onError: () => {
       toast({
-        title: 'Falha ao salvar safety objetiva',
+        title: 'Falha ao salvar seguranca objetiva',
         description: 'Nao foi possivel atualizar a politica global de safety.',
         variant: 'destructive',
       });
@@ -730,8 +983,7 @@ export default function MediaAutomaticRepliesPage() {
     },
   });
 
-  const runPromptTestMutation = useMutation({
-    mutationFn: () => aiMediaRepliesService.runPromptTest({
+  const buildPromptTestPayload = (): RunMediaReplyPromptTestPayload => ({
       event_id: testEventId.trim() !== '' ? Number(testEventId) : null,
       provider_key: testProviderKey,
       model_key: testModelKey.trim(),
@@ -750,9 +1002,17 @@ export default function MediaAutomaticRepliesPage() {
         ? testNormalizedTextContextModeOverride
         : null,
       images: testFiles,
-    }),
+    });
+
+  const runPromptTestMutation = useMutation({
+    mutationFn: (payload: RunMediaReplyPromptTestPayload) => aiMediaRepliesService.runPromptTest(payload),
+    onMutate: (payload) => {
+      setLabExecutionError(null);
+      setLastRunnableTestPayload(payload);
+    },
     onSuccess: async (result) => {
       setLatestTestRun(result);
+      setLabExecutionError(null);
       await queryClient.invalidateQueries({ queryKey: ['ia', 'respostas-de-midia', 'testes'] });
       setSelectedHistoryId(result.id);
       toast({
@@ -764,6 +1024,8 @@ export default function MediaAutomaticRepliesPage() {
       const message = error instanceof ApiError && error.isValidation
         ? error.fieldError('images') ?? error.message
         : error.message;
+
+      setLabExecutionError(message);
 
       toast({
         title: 'Falha ao executar teste',
@@ -782,6 +1044,19 @@ export default function MediaAutomaticRepliesPage() {
     ? latestTestRun
     : historyDetailQuery.data ?? null;
   const activeRealHistoryDetail = realHistoryDetailQuery.data ?? null;
+
+  const executePromptTest = () => {
+    const payload = buildPromptTestPayload();
+    runPromptTestMutation.mutate(payload);
+  };
+
+  const replayLatestPromptTest = () => {
+    if (lastRunnableTestPayload === null) {
+      return;
+    }
+
+    runPromptTestMutation.mutate(lastRunnableTestPayload);
+  };
   const configurationLoading = canManageGlobalAi && configurationQuery.isLoading;
   const safetyConfigurationLoading = canManageGlobalAi && safetyConfigurationQuery.isLoading;
   const historyFiltersSummary = useMemo(() => ({
@@ -801,31 +1076,85 @@ export default function MediaAutomaticRepliesPage() {
       return matchesCategory && matchesSearch;
     });
   }, [catalogCategoryFilter, catalogPresetSearch, presets]);
+  const isBasicMode = managementMode === 'basico';
+  const isAdvancedMode = managementMode === 'avancado';
+  const isAuditMode = managementMode === 'auditoria';
+  const modeDescription = useMemo(() => {
+    switch (managementMode) {
+      case 'avancado':
+        return 'Libera escopos, fallbacks, thresholds e catalogo para ajuste fino controlado.';
+      case 'auditoria':
+        return 'Concentra laboratorio, historico real, payload tecnico e snapshot da politica efetiva.';
+      case 'basico':
+      default:
+        return 'Mostra apenas o que o operador leigo precisa para ligar, desligar e entender a politica ativa.';
+    }
+  }, [managementMode]);
+
+  const prefetchHistoryDetail = (itemId: number) => {
+    void queryClient.prefetchQuery({
+      queryKey: ['ia', 'respostas-de-midia', 'testes', 'detalhe', itemId],
+      queryFn: () => aiMediaRepliesService.getPromptTest(itemId),
+    });
+  };
+
+  const prefetchRealHistoryDetail = (itemId: number) => {
+    void queryClient.prefetchQuery({
+      queryKey: ['ia', 'respostas-de-midia', 'historico-eventos', 'detalhe', itemId],
+      queryFn: () => aiMediaRepliesService.getEventHistoryItem(itemId),
+    });
+  };
 
   return (
     <motion.div initial={false} animate={{ opacity: 1 }} className="space-y-6">
       <PageHeader
         title="Moderação de mídia"
-        description="Centralize safety objetiva, bloqueio contextual, laboratório e histórico técnico da IA em uma única área."
+        description="Centralize a seguranca automatica, o bloqueio por contexto, o laboratorio e o historico tecnico da IA em uma unica area."
       />
 
-      <Tabs defaultValue="visao-geral">
+      <div className="glass rounded-xl p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-1">
+            <div className="text-sm font-medium">Modo da tela</div>
+            <p className="text-sm text-muted-foreground">{modeDescription}</p>
+          </div>
+
+          <Tabs
+            value={managementMode}
+            onValueChange={(value) => setManagementMode(value as ManagementMode)}
+            className="w-full lg:w-auto"
+          >
+            <TabsList className="grid w-full grid-cols-3 lg:w-auto">
+              <TabsTrigger value="basico">Básico</TabsTrigger>
+              <TabsTrigger value="avancado">Avançado</TabsTrigger>
+              <TabsTrigger value="auditoria">Auditoria</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      </div>
+
+      <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as ManagementSection)}>
         <TabsList className="flex-wrap bg-muted/50">
-          <TabsTrigger value="visao-geral">Visão geral</TabsTrigger>
-          <TabsTrigger value="safety">Safety objetiva</TabsTrigger>
-          <TabsTrigger value="configuracao">Contexto do evento</TabsTrigger>
-          <TabsTrigger value="teste">Laboratório</TabsTrigger>
-          <TabsTrigger value="catalogo">Catálogo</TabsTrigger>
-          <TabsTrigger value="historico">Historico</TabsTrigger>
+          {availableSections.map((section) => (
+            <TabsTrigger key={section.value} value={section.value}>
+              {section.label}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
+        <motion.div
+          key={`${managementMode}-${activeSection}`}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+        >
         <TabsContent value="visao-geral" className="mt-6">
           <div className="grid gap-6 xl:grid-cols-3">
             <div className="glass space-y-3 rounded-xl p-6">
               <div className="space-y-1">
-                <h3 className="font-semibold">Safety objetiva agora</h3>
+                <h3 className="font-semibold">Segurança objetiva agora</h3>
                 <p className="text-sm text-muted-foreground">
-                  Gate objetivo por categoria nativa do provider, sem misturar regra contextual.
+                  Camada automatica que olha categorias nativas da IA, sem misturar regras do evento.
                 </p>
               </div>
               {safetyConfigurationLoading ? (
@@ -836,9 +1165,9 @@ export default function MediaAutomaticRepliesPage() {
               ) : (
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <div>Estado: <span className="font-medium text-foreground">{safetyEnabled ? 'Ativo' : 'Desligado'}</span></div>
-                  <div>Modo: <span className="font-medium text-foreground">{safetyMode}</span></div>
+                  <div>Como decide: <span className="font-medium text-foreground">{safetyModeLabel(safetyMode)}</span></div>
                   <div>Escopo: <span className="font-medium text-foreground">{scopeLabel(safetyScope)}</span></div>
-                  <div>Fallback: <span className="font-medium text-foreground">{safetyFallbackMode}</span></div>
+                  <div>Se a IA falhar: <span className="font-medium text-foreground">{safetyFallbackLabel(safetyFallbackMode)}</span></div>
                 </div>
               )}
             </div>
@@ -847,7 +1176,7 @@ export default function MediaAutomaticRepliesPage() {
               <div className="space-y-1">
                 <h3 className="font-semibold">Bloqueio contextual agora</h3>
                 <p className="text-sm text-muted-foreground">
-                  Política estruturada do evento resolvida no backend antes do VLM.
+                  Politica do evento resolvida no backend antes da analise contextual.
                 </p>
               </div>
               {configurationLoading ? (
@@ -858,27 +1187,27 @@ export default function MediaAutomaticRepliesPage() {
               ) : (
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <div>Estado: <span className="font-medium text-foreground">{contextEnabled ? 'Ativo' : 'Desligado'}</span></div>
-                  <div>Modo: <span className="font-medium text-foreground">{contextMode}</span></div>
+                  <div>Como decide: <span className="font-medium text-foreground">{contextModeLabel(contextMode)}</span></div>
                   <div>Escopo do gate: <span className="font-medium text-foreground">{scopeLabel(contextScope)}</span></div>
                   <div>Escopo da resposta: <span className="font-medium text-foreground">{scopeLabel(replyScope)}</span></div>
-                  <div>Preset: <span className="font-medium text-foreground">{contextPresetKey || 'Nao definido'}</span></div>
+                  <div>Perfil: <span className="font-medium text-foreground">{contextualPresetLabel(contextPresetKey)}</span></div>
                 </div>
               )}
             </div>
 
             <div className="glass space-y-3 rounded-xl p-6">
               <div className="space-y-1">
-                <h3 className="font-semibold">Política efetiva agora</h3>
+                <h3 className="font-semibold">Politica efetiva agora</h3>
                 <p className="text-sm text-muted-foreground">
-                  Resumo rápido para operação leiga, antes de abrir configuração avançada.
+                  Resumo rapido para operacao do dia a dia, antes de abrir a configuracao avancada.
                 </p>
               </div>
               <div className="space-y-2 text-sm text-muted-foreground">
-                <div>Álcool: <span className="font-medium text-foreground">{allowAlcohol ? 'Permitido' : 'Bloqueado'}</span></div>
+                <div>Alcool: <span className="font-medium text-foreground">{allowAlcohol ? 'Permitido' : 'Bloqueado'}</span></div>
                 <div>Tabaco: <span className="font-medium text-foreground">{allowTobacco ? 'Permitido' : 'Bloqueado'}</span></div>
-                <div>Pessoas na imagem: <span className="font-medium text-foreground">{requiredPeopleContext === 'required' ? 'Obrigatórias' : 'Opcionais'}</span></div>
+                <div>Pessoas na imagem: <span className="font-medium text-foreground">{requiredPeopleContextLabel(requiredPeopleContext)}</span></div>
                 <div>Bloqueios adicionais: <span className="font-medium text-foreground">{textareaToList(blockedTermsText).length}</span></div>
-                <div>Exceções permitidas: <span className="font-medium text-foreground">{textareaToList(allowedExceptionsText).length}</span></div>
+                <div>Excecoes permitidas: <span className="font-medium text-foreground">{textareaToList(allowedExceptionsText).length}</span></div>
               </div>
             </div>
           </div>
@@ -888,9 +1217,9 @@ export default function MediaAutomaticRepliesPage() {
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
             <div className="glass space-y-4 rounded-xl p-6">
               <div className="space-y-1">
-                <h3 className="font-semibold">Safety objetiva global</h3>
+                <h3 className="font-semibold">Seguranca objetiva global</h3>
                 <p className="text-sm text-muted-foreground">
-                  Essa camada usa categorias nativas do provider e define block ou review antes do gate contextual.
+                  Essa camada usa categorias nativas da IA e decide se a midia pode seguir, se precisa de revisao ou se deve ser bloqueada.
                 </p>
               </div>
 
@@ -901,7 +1230,7 @@ export default function MediaAutomaticRepliesPage() {
               ) : safetyConfigurationLoading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Carregando safety objetiva...
+                  Carregando seguranca objetiva...
                 </div>
               ) : safetyConfigurationQuery.isError ? (
                 <div className="rounded-lg border border-destructive/30 p-4 text-sm text-destructive">
@@ -914,7 +1243,7 @@ export default function MediaAutomaticRepliesPage() {
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <Label htmlFor="safety-enabled">Safety ativa</Label>
-                          <p className="mt-1 text-xs text-muted-foreground">Liga a moderação objetiva por imagem ou imagem + texto.</p>
+                          <p className="mt-1 text-xs text-muted-foreground">Liga a seguranca automatica por imagem ou imagem com texto associado.</p>
                         </div>
                         <Switch
                           id="safety-enabled"
@@ -926,48 +1255,78 @@ export default function MediaAutomaticRepliesPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="safety-mode">Modo do gate</Label>
+                      <HelpLabel
+                        htmlFor="safety-mode"
+                        title="Como a segurança decide"
+                        description="Define se a seguranca bloqueia automaticamente ou apenas sinaliza para acompanhamento."
+                      >
+                        Como a seguranca decide
+                      </HelpLabel>
                       <Select value={safetyMode} onValueChange={(value) => setSafetyMode(value as 'enforced' | 'observe_only')}>
                         <SelectTrigger id="safety-mode" aria-label="Modo do gate de safety">
                           <SelectValue placeholder="Selecione o modo" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="enforced">Enforced</SelectItem>
-                          <SelectItem value="observe_only">Observe only</SelectItem>
+                          <SelectItem value="enforced">Bloquear automaticamente</SelectItem>
+                          <SelectItem value="observe_only">Somente monitorar</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
 
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  {isAdvancedMode ? (
+                    <>
+                      <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-4 text-sm text-amber-900">
+                        Antes de promover mudancas globais para producao, rode o Laboratório no modo <strong>Auditoria</strong> e confirme o historico técnico.
+                      </div>
+
+                      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <div className="space-y-2">
-                      <Label htmlFor="safety-provider">Provider</Label>
+                      <HelpLabel
+                        htmlFor="safety-provider"
+                        title="Servico de IA da seguranca"
+                        description="Escolhe qual servico faz a leitura objetiva da imagem antes do contexto do evento."
+                      >
+                        Servico de IA
+                      </HelpLabel>
                       <Select value={safetyProviderKey} onValueChange={(value) => setSafetyProviderKey(value as 'openai' | 'noop')}>
                         <SelectTrigger id="safety-provider" aria-label="Provider de safety">
                           <SelectValue placeholder="Selecione o provider" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="openai">OpenAI</SelectItem>
-                          <SelectItem value="noop">Noop</SelectItem>
+                          <SelectItem value="openai">{providerLabel('openai')}</SelectItem>
+                          <SelectItem value="noop">{providerLabel('noop')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="safety-fallback">Fallback</Label>
+                      <HelpLabel
+                        htmlFor="safety-fallback"
+                        title="Se a IA falhar"
+                        description="Escolhe o que acontece quando a camada objetiva fica indisponivel ou retorna erro."
+                      >
+                        Se a IA falhar
+                      </HelpLabel>
                       <Select value={safetyFallbackMode} onValueChange={(value) => setSafetyFallbackMode(value as 'review' | 'block')}>
                         <SelectTrigger id="safety-fallback" aria-label="Fallback de safety">
                           <SelectValue placeholder="Selecione o fallback" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="review">Mandar para review</SelectItem>
-                          <SelectItem value="block">Bloquear por falha</SelectItem>
+                          <SelectItem value="review">Mandar para revisao</SelectItem>
+                          <SelectItem value="block">Bloquear por seguranca</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="safety-scope">Escopo</Label>
+                      <HelpLabel
+                        htmlFor="safety-scope"
+                        title="O que entra na analise"
+                        description="Define se a seguranca objetiva usa apenas a imagem ou tambem o texto normalizado que veio junto do envio."
+                      >
+                        O que entra na analise
+                      </HelpLabel>
                       <Select value={safetyScope} onValueChange={(value) => setSafetyScope(value as 'image_only' | 'image_and_text_context')}>
                         <SelectTrigger id="safety-scope" aria-label="Escopo da safety">
                           <SelectValue placeholder="Selecione o escopo" />
@@ -980,7 +1339,13 @@ export default function MediaAutomaticRepliesPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="safety-threshold-version">Versao dos thresholds</Label>
+                      <HelpLabel
+                        htmlFor="safety-threshold-version"
+                        title="Perfil de sensibilidade"
+                        description="Nome interno da calibracao usada para os pontos de revisao e bloqueio desta camada."
+                      >
+                        Perfil de sensibilidade
+                      </HelpLabel>
                       <Input
                         id="safety-threshold-version"
                         value={safetyThresholdVersion}
@@ -991,7 +1356,13 @@ export default function MediaAutomaticRepliesPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="safety-normalized-text-context-mode">Modo do texto normalizado</Label>
+                    <HelpLabel
+                      htmlFor="safety-normalized-text-context-mode"
+                      title="Texto usado na analise"
+                      description="Escolhe qual texto complementar entra junto com a imagem quando o escopo inclui texto."
+                    >
+                      Texto usado na analise
+                    </HelpLabel>
                     <Select
                       value={safetyNormalizedTextContextMode}
                       onValueChange={(value) => setSafetyNormalizedTextContextMode(value as 'none' | 'body_only' | 'caption_only' | 'body_plus_caption' | 'operator_summary')}
@@ -1001,9 +1372,9 @@ export default function MediaAutomaticRepliesPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">Nenhum texto</SelectItem>
-                        <SelectItem value="body_only">Somente body text</SelectItem>
-                        <SelectItem value="caption_only">Somente legenda</SelectItem>
-                        <SelectItem value="body_plus_caption">Body + legenda</SelectItem>
+                        <SelectItem value="body_only">Somente mensagem</SelectItem>
+                        <SelectItem value="caption_only">Somente caption</SelectItem>
+                        <SelectItem value="body_plus_caption">Mensagem + caption</SelectItem>
                         <SelectItem value="operator_summary">Resumo do operador</SelectItem>
                       </SelectContent>
                     </Select>
@@ -1011,7 +1382,13 @@ export default function MediaAutomaticRepliesPage() {
 
                   <div className="grid gap-4 xl:grid-cols-2">
                     <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
-                      <div className="font-medium">Thresholds de review</div>
+                      <div className="flex items-center gap-2 font-medium">
+                        Pontos para revisao manual
+                        <HelpTooltip
+                          title="Quando mandar para revisao"
+                          description="Quanto menor o valor, mais cedo a IA sinaliza a midia para revisao humana."
+                        />
+                      </div>
                       <div className="mt-4 grid gap-4 md:grid-cols-3">
                         <div className="space-y-2">
                           <Label htmlFor="safety-review-nudity">Nudez</Label>
@@ -1029,7 +1406,13 @@ export default function MediaAutomaticRepliesPage() {
                     </div>
 
                     <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
-                      <div className="font-medium">Thresholds de block</div>
+                      <div className="flex items-center gap-2 font-medium">
+                        Pontos para bloqueio automatico
+                        <HelpTooltip
+                          title="Quando bloquear automaticamente"
+                          description="Quanto menor o valor, mais cedo a IA bloqueia a midia sem passar para a proxima etapa."
+                        />
+                      </div>
                       <div className="mt-4 grid gap-4 md:grid-cols-3">
                         <div className="space-y-2">
                           <Label htmlFor="safety-block-nudity">Nudez</Label>
@@ -1047,11 +1430,30 @@ export default function MediaAutomaticRepliesPage() {
                     </div>
                   </div>
 
+                    </>
+                  ) : (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                        <div className="font-medium">Resumo operacional</div>
+                        <div className="mt-2 space-y-1 text-muted-foreground">
+                          <div>Servico atual: {providerLabel(safetyProviderKey)}</div>
+                          <div>Escopo: {scopeLabel(safetyScope)}</div>
+                          <div>Texto complementar: {normalizedTextContextModeLabel(safetyNormalizedTextContextMode)}</div>
+                          <div>Se a IA falhar: {safetyFallbackLabel(safetyFallbackMode)}</div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-dashed border-border/60 p-4 text-sm text-muted-foreground">
+                        Para ajustar thresholds, escopos e calibracao fina, troque para o modo <strong>Avançado</strong>.
+                      </div>
+                    </div>
+                  )}
+
                   <Button type="button" onClick={() => updateSafetyConfigurationMutation.mutate()} disabled={updateSafetyConfigurationMutation.isPending}>
                     {updateSafetyConfigurationMutation.isPending
                       ? <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                       : <Save className="mr-1 h-4 w-4" />}
-                    Salvar safety objetiva
+                    Salvar seguranca objetiva
                   </Button>
                 </>
               )}
@@ -1063,9 +1465,9 @@ export default function MediaAutomaticRepliesPage() {
                 <h3 className="font-semibold">Leitura operacional</h3>
               </div>
               <div className="mt-4 space-y-3 text-sm text-muted-foreground">
-                <p>Safety objetiva decide por categorias nativas como nudez, violência e autoagressão.</p>
-                <p>Quando o modo estiver em <strong>observe_only</strong>, o resultado continua rastreado mas não derruba a publicação sozinho.</p>
-                <p>O escopo define se a moderação objetiva considera apenas a imagem ou também o texto normalizado associado ao envio.</p>
+                <p>A seguranca objetiva decide por categorias nativas como nudez, violencia e autoagressao.</p>
+                <p>Quando o modo estiver em <strong>Somente monitorar</strong>, o resultado continua rastreado, mas nao derruba a publicacao sozinho.</p>
+                <p>O escopo define se a moderacao considera apenas a imagem ou tambem o texto normalizado associado ao envio.</p>
               </div>
             </div>
           </div>
@@ -1077,7 +1479,7 @@ export default function MediaAutomaticRepliesPage() {
               <div className="space-y-1">
                 <h3 className="font-semibold">Contexto do evento e resposta</h3>
                 <p className="text-sm text-muted-foreground">
-                  Defina a política estruturada do gate contextual e a resposta automática herdada pelos eventos.
+                  Defina a politica estruturada do contexto do evento e a resposta automatica herdada pelos eventos.
                 </p>
               </div>
 
@@ -1101,7 +1503,7 @@ export default function MediaAutomaticRepliesPage() {
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <Label htmlFor="context-enabled">Gate contextual ativo</Label>
-                          <p className="mt-1 text-xs text-muted-foreground">Liga a avaliação semântica da imagem antes da publicação.</p>
+                          <p className="mt-1 text-xs text-muted-foreground">Liga a avaliacao semantica da imagem antes da publicacao.</p>
                         </div>
                         <Switch
                           id="context-enabled"
@@ -1115,8 +1517,14 @@ export default function MediaAutomaticRepliesPage() {
                     <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <Label htmlFor="context-require-json">JSON estruturado obrigatório</Label>
-                          <p className="mt-1 text-xs text-muted-foreground">Mantém o parser estável com schema estrito do domínio.</p>
+                          <HelpLabel
+                            htmlFor="context-require-json"
+                            title="Resposta estruturada obrigatoria"
+                            description="Exige retorno em formato validado para reduzir respostas ambiguas e facilitar auditoria."
+                          >
+                            Resposta estruturada obrigatoria
+                          </HelpLabel>
+                          <p className="mt-1 text-xs text-muted-foreground">Mantem a leitura estavel com um formato tecnico fixo do dominio.</p>
                         </div>
                         <Switch
                           id="context-require-json"
@@ -1128,36 +1536,151 @@ export default function MediaAutomaticRepliesPage() {
                     </div>
                   </div>
 
+                  {isBasicMode ? (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <HelpLabel
+                              htmlFor="context-mode-basic"
+                              title="Como o bloqueio contextual age"
+                              description="Define se esta camada só sugere contexto para auditoria ou se pode bloquear antes de publicar."
+                            >
+                              Como o bloqueio contextual age
+                            </HelpLabel>
+                            <Select value={contextMode} onValueChange={(value) => setContextMode(value as 'enrich_only' | 'gate')}>
+                              <SelectTrigger id="context-mode-basic" aria-label="Modo basico do gate contextual">
+                                <SelectValue placeholder="Selecione o modo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="enrich_only">So sugerir sem bloquear</SelectItem>
+                                <SelectItem value="gate">Bloquear antes de publicar</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <HelpLabel
+                              htmlFor="context-preset-basic"
+                              title="Perfil contextual"
+                              description="Aplica um conjunto pronto de regras para acelerar a configuracao de cada tipo de evento."
+                            >
+                              Perfil contextual
+                            </HelpLabel>
+                            <Select value={contextPresetKey} onValueChange={setContextPresetKey}>
+                              <SelectTrigger id="context-preset-basic" aria-label="Preset contextual basico">
+                                <SelectValue placeholder="Selecione o preset" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="casamento_equilibrado">Casamento equilibrado</SelectItem>
+                                <SelectItem value="casamento_rigido">Casamento rígido</SelectItem>
+                                <SelectItem value="formatura">Formatura</SelectItem>
+                                <SelectItem value="corporativo_restrito">Corporativo restrito</SelectItem>
+                                <SelectItem value="aniversario_infantil">Aniversário infantil</SelectItem>
+                                <SelectItem value="homologacao_livre">Homologação livre</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid gap-4 md:grid-cols-3">
+                          <div className="rounded-lg border border-border/60 bg-background/70 p-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <Label htmlFor="allow-alcohol-basic">Permitir alcool</Label>
+                                <p className="mt-1 text-xs text-muted-foreground">Mantem brindes e bebidas dentro do contexto permitido.</p>
+                              </div>
+                              <Switch id="allow-alcohol-basic" checked={allowAlcohol} onCheckedChange={setAllowAlcohol} />
+                            </div>
+                          </div>
+
+                          <div className="rounded-lg border border-border/60 bg-background/70 p-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <Label htmlFor="allow-tobacco-basic">Permitir cigarro</Label>
+                                <p className="mt-1 text-xs text-muted-foreground">Inclui cigarro, vape e tabaco dentro da regra do evento.</p>
+                              </div>
+                              <Switch id="allow-tobacco-basic" checked={allowTobacco} onCheckedChange={setAllowTobacco} />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <HelpLabel
+                              htmlFor="required-people-context-basic"
+                              title="Exigir pessoas na imagem"
+                              description="Define se o contexto do evento precisa encontrar pessoas na foto ou se imagens de objetos também podem passar."
+                            >
+                              Exigir pessoas na imagem
+                            </HelpLabel>
+                            <Select value={requiredPeopleContext} onValueChange={(value) => setRequiredPeopleContext(value as 'optional' | 'required')}>
+                              <SelectTrigger id="required-people-context-basic" aria-label="Presença de pessoas obrigatória no modo básico">
+                                <SelectValue placeholder="Selecione a regra" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="optional">Opcional</SelectItem>
+                                <SelectItem value="required">Obrigatória</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border border-dashed border-border/60 p-4 text-sm text-muted-foreground">
+                        Escopos, fallbacks, excecoes, bloqueios adicionais e versoes tecnicas ficam concentrados no modo <strong>Avançado</strong>.
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {isAdvancedMode ? (
+                    <>
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <div className="space-y-2">
-                      <Label htmlFor="context-provider">Provider contextual</Label>
+                      <HelpLabel
+                        htmlFor="context-provider"
+                        title="Servico de IA do contexto"
+                        description="Escolhe o servico que avalia se a imagem combina ou nao com as regras do evento."
+                      >
+                        Servico de IA do contexto
+                      </HelpLabel>
                       <Select value={contextProviderKey} onValueChange={(value) => setContextProviderKey(value as 'vllm' | 'openrouter' | 'noop')}>
                         <SelectTrigger id="context-provider" aria-label="Provider contextual">
                           <SelectValue placeholder="Selecione o provider" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="vllm">vLLM</SelectItem>
-                          <SelectItem value="openrouter">OpenRouter</SelectItem>
-                          <SelectItem value="noop">Noop</SelectItem>
+                          <SelectItem value="vllm">{providerLabel('vllm')}</SelectItem>
+                          <SelectItem value="openrouter">{providerLabel('openrouter')}</SelectItem>
+                          <SelectItem value="noop">{providerLabel('noop')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="context-mode">Modo do gate contextual</Label>
+                      <HelpLabel
+                        htmlFor="context-mode"
+                        title="Como o bloqueio contextual age"
+                        description="Define se esta camada so sugere contexto para auditoria ou se pode bloquear antes de publicar."
+                      >
+                        Como o bloqueio contextual age
+                      </HelpLabel>
                       <Select value={contextMode} onValueChange={(value) => setContextMode(value as 'enrich_only' | 'gate')}>
                         <SelectTrigger id="context-mode" aria-label="Modo do gate contextual">
                           <SelectValue placeholder="Selecione o modo" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="enrich_only">Apenas enriquecer</SelectItem>
-                          <SelectItem value="gate">Bloquear</SelectItem>
+                          <SelectItem value="enrich_only">So sugerir sem bloquear</SelectItem>
+                          <SelectItem value="gate">Bloquear antes de publicar</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="context-scope">Escopo do contexto</Label>
+                      <HelpLabel
+                        htmlFor="context-scope"
+                        title="O que entra na analise do contexto"
+                        description="Escolhe se o contexto usa apenas a imagem ou tambem o texto normalizado do envio."
+                      >
+                        O que entra na analise do contexto
+                      </HelpLabel>
                       <Select value={contextScope} onValueChange={(value) => setContextScope(value as 'image_only' | 'image_and_text_context')}>
                         <SelectTrigger id="context-scope" aria-label="Escopo do contexto">
                           <SelectValue placeholder="Selecione o escopo" />
@@ -1170,7 +1693,13 @@ export default function MediaAutomaticRepliesPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="reply-scope">Escopo da resposta</Label>
+                      <HelpLabel
+                        htmlFor="reply-scope"
+                        title="O que entra na resposta automatica"
+                        description="Escolhe quais sinais podem ser usados para montar a resposta automatica que sera devolvida ao participante."
+                      >
+                        O que entra na resposta automatica
+                      </HelpLabel>
                       <Select value={replyScope} onValueChange={(value) => setReplyScope(value as 'image_only' | 'image_and_text_context')}>
                         <SelectTrigger id="reply-scope" aria-label="Escopo da resposta">
                           <SelectValue placeholder="Selecione o escopo" />
@@ -1189,11 +1718,11 @@ export default function MediaAutomaticRepliesPage() {
                       <Input id="context-model-key" value={contextModelKey} onChange={(event) => setContextModelKey(event.target.value)} />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="context-prompt-version">Versao do prompt</Label>
+                      <Label htmlFor="context-prompt-version">Versao interna do prompt</Label>
                       <Input id="context-prompt-version" value={contextPromptVersion} onChange={(event) => setContextPromptVersion(event.target.value)} />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="context-response-schema-version">Versao do schema</Label>
+                      <Label htmlFor="context-response-schema-version">Versao do formato de resposta</Label>
                       <Input id="context-response-schema-version" value={contextResponseSchemaVersion} onChange={(event) => setContextResponseSchemaVersion(event.target.value)} />
                     </div>
                     <div className="space-y-2">
@@ -1204,20 +1733,32 @@ export default function MediaAutomaticRepliesPage() {
 
                   <div className="grid gap-4 md:grid-cols-3">
                     <div className="space-y-2">
-                      <Label htmlFor="context-fallback-mode">Fallback contextual</Label>
+                      <HelpLabel
+                        htmlFor="context-fallback-mode"
+                        title="Se a IA contextual falhar"
+                        description="Escolhe se a midia vai para revisao manual ou se segue sem esta camada contextual."
+                      >
+                        Se a IA contextual falhar
+                      </HelpLabel>
                       <Select value={contextFallbackMode} onValueChange={(value) => setContextFallbackMode(value as 'review' | 'skip')}>
                         <SelectTrigger id="context-fallback-mode" aria-label="Fallback contextual">
                           <SelectValue placeholder="Selecione o fallback" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="review">Mandar para review</SelectItem>
-                          <SelectItem value="skip">Ignorar enriquecimento</SelectItem>
+                          <SelectItem value="review">Mandar para revisao</SelectItem>
+                          <SelectItem value="skip">Seguir sem esta analise</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="context-preset-key">Preset contextual</Label>
+                      <HelpLabel
+                        htmlFor="context-preset-key"
+                        title="Perfil contextual"
+                        description="Aplica um conjunto pronto de regras para acelerar a configuracao de cada tipo de evento."
+                      >
+                        Perfil contextual
+                      </HelpLabel>
                       <Select value={contextPresetKey} onValueChange={setContextPresetKey}>
                         <SelectTrigger id="context-preset-key" aria-label="Preset contextual">
                           <SelectValue placeholder="Selecione o preset" />
@@ -1234,22 +1775,28 @@ export default function MediaAutomaticRepliesPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="context-normalized-text-mode">Modo do texto normalizado</Label>
+                      <HelpLabel
+                        htmlFor="context-normalized-text-mode"
+                        title="Texto usado na analise"
+                        description="Escolhe qual texto complementar entra na avaliacao contextual e na resposta automatica."
+                      >
+                        Texto usado na analise
+                      </HelpLabel>
                       <Select
                         value={normalizedTextContextMode}
                         onValueChange={(value) => setNormalizedTextContextMode(value as 'none' | 'body_only' | 'caption_only' | 'body_plus_caption' | 'operator_summary')}
                       >
                         <SelectTrigger id="context-normalized-text-mode" aria-label="Modo do texto normalizado do contexto">
                           <SelectValue placeholder="Selecione o modo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Nenhum texto</SelectItem>
-                          <SelectItem value="body_only">Somente body text</SelectItem>
-                          <SelectItem value="caption_only">Somente legenda</SelectItem>
-                          <SelectItem value="body_plus_caption">Body + legenda</SelectItem>
-                          <SelectItem value="operator_summary">Resumo do operador</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum texto</SelectItem>
+                        <SelectItem value="body_only">Somente mensagem</SelectItem>
+                        <SelectItem value="caption_only">Somente caption</SelectItem>
+                        <SelectItem value="body_plus_caption">Mensagem + caption</SelectItem>
+                        <SelectItem value="operator_summary">Resumo do operador</SelectItem>
+                      </SelectContent>
+                    </Select>
                     </div>
                   </div>
 
@@ -1257,8 +1804,8 @@ export default function MediaAutomaticRepliesPage() {
                     <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <Label htmlFor="allow-alcohol">Permitir álcool</Label>
-                          <p className="mt-1 text-xs text-muted-foreground">Exceções continuam sendo respeitadas pelo gate.</p>
+                          <Label htmlFor="allow-alcohol">Permitir alcool</Label>
+                          <p className="mt-1 text-xs text-muted-foreground">As excecoes registradas continuam sendo respeitadas pelo bloqueio.</p>
                         </div>
                         <Switch id="allow-alcohol" checked={allowAlcohol} onCheckedChange={setAllowAlcohol} />
                       </div>
@@ -1268,14 +1815,20 @@ export default function MediaAutomaticRepliesPage() {
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <Label htmlFor="allow-tobacco">Permitir cigarro</Label>
-                          <p className="mt-1 text-xs text-muted-foreground">Inclui cigarro, vape e tabaco no contexto do produto.</p>
+                          <p className="mt-1 text-xs text-muted-foreground">Inclui cigarro, vape e tabaco dentro da regra contextual do produto.</p>
                         </div>
                         <Switch id="allow-tobacco" checked={allowTobacco} onCheckedChange={setAllowTobacco} />
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="required-people-context">Pessoas obrigatórias</Label>
+                      <HelpLabel
+                        htmlFor="required-people-context"
+                        title="Exigir pessoas na imagem"
+                        description="Define se o contexto do evento precisa encontrar pessoas na foto ou se imagens de objetos tambem podem passar."
+                      >
+                        Exigir pessoas na imagem
+                      </HelpLabel>
                       <Select value={requiredPeopleContext} onValueChange={(value) => setRequiredPeopleContext(value as 'optional' | 'required')}>
                         <SelectTrigger id="required-people-context" aria-label="Presença de pessoas obrigatória">
                           <SelectValue placeholder="Selecione a regra" />
@@ -1290,7 +1843,13 @@ export default function MediaAutomaticRepliesPage() {
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="blocked-terms">Bloquear também</Label>
+                      <HelpLabel
+                        htmlFor="blocked-terms"
+                        title="Bloquear tambem"
+                        description="Liste termos ou objetos extras que devem pesar contra a publicacao dentro deste contexto."
+                      >
+                        Bloquear tambem
+                      </HelpLabel>
                       <Textarea
                         id="blocked-terms"
                         value={blockedTermsText}
@@ -1298,11 +1857,17 @@ export default function MediaAutomaticRepliesPage() {
                         rows={6}
                         placeholder={'mascaras\narmas cenicas'}
                       />
-                      <p className="text-xs text-muted-foreground">Use um termo por linha para expandir o bloqueio contextual.</p>
+                      <p className="text-xs text-muted-foreground">Use um item por linha para ampliar o bloqueio contextual.</p>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="allowed-exceptions">Exceções permitidas</Label>
+                      <HelpLabel
+                        htmlFor="allowed-exceptions"
+                        title="Excecoes permitidas"
+                        description="Liste situacoes conhecidas que aliviam falsos positivos e permitem a midia mesmo em um contexto mais rigido."
+                      >
+                        Excecoes permitidas
+                      </HelpLabel>
                       <Textarea
                         id="allowed-exceptions"
                         value={allowedExceptionsText}
@@ -1310,12 +1875,18 @@ export default function MediaAutomaticRepliesPage() {
                         rows={6}
                         placeholder={'brinde com espumante\ncamera fotografica'}
                       />
-                      <p className="text-xs text-muted-foreground">Use uma exceção por linha para aliviar falsos positivos previsíveis.</p>
+                      <p className="text-xs text-muted-foreground">Use uma excecao por linha para aliviar falsos positivos previsiveis.</p>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="freeform-instruction">Instrução complementar do operador</Label>
+                    <HelpLabel
+                      htmlFor="freeform-instruction"
+                      title="Instrucao extra do operador"
+                      description="Campo opcional para ajuste fino depois do perfil contextual e dos toggles estruturados."
+                    >
+                      Instrucao extra do operador
+                    </HelpLabel>
                     <Textarea
                       id="freeform-instruction"
                       value={freeformInstruction}
@@ -1324,9 +1895,11 @@ export default function MediaAutomaticRepliesPage() {
                       placeholder="Opcional. Serve para ajuste fino depois do preset e dos toggles estruturados."
                     />
                   </div>
+                    </>
+                  ) : null}
 
                   <div className="space-y-2">
-                    <Label htmlFor="ia-preset-padrao">Preset padrao</Label>
+                    <Label htmlFor="ia-preset-padrao">Perfil padrao da resposta</Label>
                     <Select value={standardPresetId} onValueChange={setStandardPresetId}>
                       <SelectTrigger id="ia-preset-padrao" aria-label="Preset padrao">
                         <SelectValue placeholder="Selecione um preset opcional" />
@@ -1341,12 +1914,12 @@ export default function MediaAutomaticRepliesPage() {
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      O preset padrao aplica um estilo base antes da instrucao padrao ou do texto do evento.
+                      O perfil padrao aplica um estilo base antes da instrucao principal ou do texto do evento.
                     </p>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="ia-instrucao-padrao">Instrucao padrao</Label>
+                    <Label htmlFor="ia-instrucao-padrao">Instrucao principal da resposta</Label>
                     <Textarea
                       id="ia-instrucao-padrao"
                       value={standardInstruction}
@@ -1355,12 +1928,12 @@ export default function MediaAutomaticRepliesPage() {
                       disabled={updateConfigurationMutation.isPending}
                     />
                     <p className="text-xs text-muted-foreground">
-                      A aplicacao resolve a variavel <code>{'{nome_do_evento}'}</code> no backend antes de enviar o prompt ao provider.
+                      A aplicacao resolve a variavel <code>{'{nome_do_evento}'}</code> no backend antes de enviar o prompt ao servico de IA.
                     </p>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="ia-textos-fixos-padrao">Textos fixos padrao</Label>
+                    <Label htmlFor="ia-textos-fixos-padrao">Respostas prontas de apoio</Label>
                     <Textarea
                       id="ia-textos-fixos-padrao"
                       value={standardFixedTemplates}
@@ -1370,7 +1943,7 @@ export default function MediaAutomaticRepliesPage() {
                       placeholder={'Memorias que fazem o coracao sorrir!\nMomento de risadas e lembrancas!'}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Use um texto por linha. Esses textos servem de fallback para eventos no modo de texto fixo aleatorio.
+                      Use um texto por linha. Esses textos servem de fallback para eventos no modo de resposta fixa aleatoria.
                     </p>
                   </div>
 
@@ -1546,9 +2119,9 @@ export default function MediaAutomaticRepliesPage() {
 
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="teste-safety-scope-override">Scope de safety objetiva</Label>
+                    <Label htmlFor="teste-safety-scope-override">O que entra na seguranca objetiva</Label>
                     <Select value={testObjectiveSafetyScopeOverride} onValueChange={(value) => setTestObjectiveSafetyScopeOverride(value as typeof testObjectiveSafetyScopeOverride)}>
-                      <SelectTrigger id="teste-safety-scope-override" aria-label="Scope de safety objetiva do laboratorio">
+                      <SelectTrigger id="teste-safety-scope-override" aria-label="O que entra na seguranca objetiva do laboratorio">
                         <SelectValue placeholder="Herdar" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1560,9 +2133,9 @@ export default function MediaAutomaticRepliesPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="teste-context-scope-override">Scope do gate contextual</Label>
+                    <Label htmlFor="teste-context-scope-override">O que entra no bloqueio contextual</Label>
                     <Select value={testContextScopeOverride} onValueChange={(value) => setTestContextScopeOverride(value as typeof testContextScopeOverride)}>
-                      <SelectTrigger id="teste-context-scope-override" aria-label="Scope do gate contextual do laboratorio">
+                      <SelectTrigger id="teste-context-scope-override" aria-label="O que entra no bloqueio contextual do laboratorio">
                         <SelectValue placeholder="Herdar" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1574,9 +2147,9 @@ export default function MediaAutomaticRepliesPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="teste-reply-scope-override">Scope da resposta</Label>
+                    <Label htmlFor="teste-reply-scope-override">O que entra na resposta automatica</Label>
                     <Select value={testReplyScopeOverride} onValueChange={(value) => setTestReplyScopeOverride(value as typeof testReplyScopeOverride)}>
-                      <SelectTrigger id="teste-reply-scope-override" aria-label="Scope da resposta do laboratorio">
+                      <SelectTrigger id="teste-reply-scope-override" aria-label="O que entra na resposta automatica do laboratorio">
                         <SelectValue placeholder="Herdar" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1599,9 +2172,9 @@ export default function MediaAutomaticRepliesPage() {
                       <SelectContent>
                         <SelectItem value="inherit">Herdar</SelectItem>
                         <SelectItem value="none">Sem texto</SelectItem>
-                        <SelectItem value="body_only">Somente corpo</SelectItem>
+                        <SelectItem value="body_only">Somente mensagem</SelectItem>
                         <SelectItem value="caption_only">Somente caption</SelectItem>
-                        <SelectItem value="body_plus_caption">Corpo + caption</SelectItem>
+                        <SelectItem value="body_plus_caption">Mensagem + caption</SelectItem>
                         <SelectItem value="operator_summary">Resumo do operador</SelectItem>
                       </SelectContent>
                     </Select>
@@ -1621,6 +2194,9 @@ export default function MediaAutomaticRepliesPage() {
                 <p className="text-xs text-muted-foreground">
                   O teste aceita de 1 a 3 imagens, mas o pipeline produtivo continua congelado em 1 imagem por midia.
                 </p>
+                <p className="text-xs text-muted-foreground">
+                  Video, sticker e audio continuam homologados pela matriz do pipeline real. Este laboratorio cobre apenas entradas de imagem.
+                </p>
                 {testFiles.length > 0 ? (
                   <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm">
                     <div className="font-medium">Arquivos selecionados</div>
@@ -1636,7 +2212,7 @@ export default function MediaAutomaticRepliesPage() {
               <div className="flex flex-wrap gap-3">
                 <Button
                   type="button"
-                  onClick={() => runPromptTestMutation.mutate()}
+                  onClick={executePromptTest}
                   disabled={runPromptTestMutation.isPending || testFiles.length === 0}
                 >
                   {runPromptTestMutation.isPending
@@ -1648,8 +2224,8 @@ export default function MediaAutomaticRepliesPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => runPromptTestMutation.mutate()}
-                  disabled={runPromptTestMutation.isPending || latestTestRun === null || testFiles.length === 0}
+                  onClick={replayLatestPromptTest}
+                  disabled={runPromptTestMutation.isPending || lastRunnableTestPayload === null}
                 >
                   Repetir ultimo teste
                 </Button>
@@ -1669,12 +2245,24 @@ export default function MediaAutomaticRepliesPage() {
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Homologando a politica...
                 </div>
+              ) : labExecutionError !== null && latestTestRun === null ? (
+                <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+                  <div className="font-medium">Falha ao executar o laboratorio</div>
+                  <div className="mt-1">{labExecutionError}</div>
+                </div>
               ) : latestTestRun === null ? (
                 <div className="rounded-lg border border-dashed border-border/60 p-4 text-sm text-muted-foreground">
                   Execute um teste para visualizar a politica efetiva, o resultado lado a lado e os dados tecnicos.
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {labExecutionError !== null ? (
+                    <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+                      <div className="font-medium">Falha ao executar o laboratorio</div>
+                      <div className="mt-1">{labExecutionError}</div>
+                    </div>
+                  ) : null}
+
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={runStatusBadgeVariant(latestTestRun.status)}>
                       {runStatusLabel(latestTestRun.status)}
@@ -1687,7 +2275,7 @@ export default function MediaAutomaticRepliesPage() {
                     <div className="font-medium">Politica efetiva agora</div>
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
                       <div>
-                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Safety objetiva</div>
+                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Seguranca objetiva</div>
                         <div className="mt-1 text-foreground">
                           {scopeLabel((latestTestRun.policy_snapshot.safety?.analysis_scope as string | undefined) ?? null)}
                         </div>
@@ -1696,7 +2284,7 @@ export default function MediaAutomaticRepliesPage() {
                         </div>
                       </div>
                       <div>
-                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Gate contextual</div>
+                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Bloqueio contextual</div>
                         <div className="mt-1 text-foreground">
                           {scopeLabel((latestTestRun.policy_snapshot.context?.context_scope as string | undefined) ?? null)}
                         </div>
@@ -1705,7 +2293,7 @@ export default function MediaAutomaticRepliesPage() {
                         </div>
                       </div>
                       <div>
-                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Scope da resposta</div>
+                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Resposta automatica</div>
                         <div className="mt-1 text-foreground">
                           {scopeLabel((latestTestRun.policy_snapshot.context?.reply_scope as string | undefined) ?? null)}
                         </div>
@@ -1726,19 +2314,19 @@ export default function MediaAutomaticRepliesPage() {
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
-                      <div className="font-medium">Safety objetiva</div>
+                      <div className="font-medium">Seguranca objetiva</div>
                       <div className="mt-2 flex items-center gap-2">
                         <Badge variant={latestTestRun.final_summary.safety_is_blocking ? 'default' : 'outline'}>
-                          {latestTestRun.final_summary.safety_is_blocking ? 'Bloqueante' : 'Observacao'}
+                          {latestTestRun.final_summary.safety_is_blocking ? 'Bloqueante' : 'So monitoramento'}
                         </Badge>
                         <span className="text-muted-foreground">
-                          {latestTestRun.safety_results[0]?.decision || 'Nao executado'}
+                          {moderationDecisionLabel(latestTestRun.safety_results[0]?.decision) || 'Nao executado'}
                         </span>
                       </div>
                       <div className="mt-2 space-y-1 text-muted-foreground">
-                        <div>Pass: {latestTestRun.final_summary.safety_counts?.pass ?? 0}</div>
-                        <div>Review: {latestTestRun.final_summary.safety_counts?.review ?? 0}</div>
-                        <div>Block: {latestTestRun.final_summary.safety_counts?.block ?? 0}</div>
+                        <div>Aprovadas: {latestTestRun.final_summary.safety_counts?.pass ?? 0}</div>
+                        <div>Em revisao: {latestTestRun.final_summary.safety_counts?.review ?? 0}</div>
+                        <div>Bloqueadas: {latestTestRun.final_summary.safety_counts?.block ?? 0}</div>
                         <div>Erro: {latestTestRun.final_summary.safety_counts?.error ?? 0}</div>
                       </div>
                       {latestTestRun.safety_results[0]?.error_message ? (
@@ -1747,19 +2335,19 @@ export default function MediaAutomaticRepliesPage() {
                     </div>
 
                     <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
-                      <div className="font-medium">Gate contextual</div>
+                      <div className="font-medium">Bloqueio contextual</div>
                       <div className="mt-2 flex items-center gap-2">
                         <Badge variant={latestTestRun.final_summary.context_is_blocking ? 'default' : 'outline'}>
-                          {latestTestRun.final_summary.context_is_blocking ? 'Bloqueante' : 'Enriquecimento'}
+                          {latestTestRun.final_summary.context_is_blocking ? 'Bloqueante' : 'So sugerir'}
                         </Badge>
                         <span className="text-muted-foreground">
-                          {latestTestRun.contextual_results[0]?.decision || 'Nao executado'}
+                          {moderationDecisionLabel(latestTestRun.contextual_results[0]?.decision) || 'Nao executado'}
                         </span>
                       </div>
                       <div className="mt-2 space-y-1 text-muted-foreground">
-                        <div>Approve: {latestTestRun.final_summary.context_counts?.approve ?? 0}</div>
-                        <div>Review: {latestTestRun.final_summary.context_counts?.review ?? 0}</div>
-                        <div>Reject: {latestTestRun.final_summary.context_counts?.reject ?? 0}</div>
+                        <div>Aprovadas: {latestTestRun.final_summary.context_counts?.approve ?? 0}</div>
+                        <div>Em revisao: {latestTestRun.final_summary.context_counts?.review ?? 0}</div>
+                        <div>Rejeitadas: {latestTestRun.final_summary.context_counts?.reject ?? 0}</div>
                         <div>Erro: {latestTestRun.final_summary.context_counts?.error ?? 0}</div>
                       </div>
                       <div className="mt-2 text-xs text-muted-foreground">
@@ -2241,6 +2829,8 @@ export default function MediaAutomaticRepliesPage() {
                       key={item.id}
                       type="button"
                       className={`w-full rounded-lg border p-3 text-left transition ${selectedHistoryId === item.id ? 'border-primary bg-primary/5' : 'border-border/60 bg-muted/20'}`}
+                      onMouseEnter={() => prefetchHistoryDetail(item.id)}
+                      onFocus={() => prefetchHistoryDetail(item.id)}
                       onClick={() => setSelectedHistoryId(item.id)}
                     >
                       <div className="flex items-center justify-between gap-3">
@@ -2424,6 +3014,49 @@ export default function MediaAutomaticRepliesPage() {
                   />
                 </div>
 
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="historico-real-reason-code">Código do motivo</Label>
+                    <Input
+                      id="historico-real-reason-code"
+                      value={realHistoryReasonCode}
+                      onChange={(event) => setRealHistoryReasonCode(event.target.value)}
+                      placeholder="Ex: context.match.event"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="historico-real-publish-eligibility">Elegibilidade</Label>
+                    <Select value={realHistoryPublishEligibility} onValueChange={setRealHistoryPublishEligibility}>
+                      <SelectTrigger id="historico-real-publish-eligibility" aria-label="Filtro de elegibilidade do historico real">
+                        <SelectValue placeholder="Todas" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        <SelectItem value="auto_publish">Publicar automaticamente</SelectItem>
+                        <SelectItem value="review_only">Revisao manual</SelectItem>
+                        <SelectItem value="reject">Rejeitar</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="historico-real-effective-state">Estado efetivo</Label>
+                    <Select value={realHistoryEffectiveState} onValueChange={setRealHistoryEffectiveState}>
+                      <SelectTrigger id="historico-real-effective-state" aria-label="Filtro de estado efetivo do historico real">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="published">Publicado</SelectItem>
+                        <SelectItem value="approved">Aprovado</SelectItem>
+                        <SelectItem value="pending_moderation">Em moderacao</SelectItem>
+                        <SelectItem value="rejected">Rejeitado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="historico-real-data-inicial">Data inicial</Label>
@@ -2463,6 +3096,8 @@ export default function MediaAutomaticRepliesPage() {
                       key={item.id}
                       type="button"
                       className={`w-full rounded-lg border p-3 text-left transition ${selectedRealHistoryId === item.id ? 'border-primary bg-primary/5' : 'border-border/60 bg-muted/20'}`}
+                      onMouseEnter={() => prefetchRealHistoryDetail(item.id)}
+                      onFocus={() => prefetchRealHistoryDetail(item.id)}
                       onClick={() => setSelectedRealHistoryId(item.id)}
                     >
                       <div className="flex items-start gap-3">
@@ -2535,7 +3170,7 @@ export default function MediaAutomaticRepliesPage() {
                       {effectiveStateLabel(activeRealHistoryDetail.effective_media_state)}
                     </Badge>
                     <Badge variant={activeRealHistoryDetail.status === 'failed' ? 'destructive' : 'outline'}>
-                      Pipeline VLM: {activeRealHistoryDetail.status || 'sem status'}
+                      Pipeline contextual: {activeRealHistoryDetail.status || 'sem status'}
                     </Badge>
                     {activeRealHistoryDetail.provider_key ? <Badge variant="outline">{activeRealHistoryDetail.provider_key}</Badge> : null}
                     {activeRealHistoryDetail.model_key ? <Badge variant="outline">{activeRealHistoryDetail.model_key}</Badge> : null}
@@ -2575,10 +3210,10 @@ export default function MediaAutomaticRepliesPage() {
                       <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
                         <div className="font-medium">Decisoes consolidadas</div>
                         <div className="mt-2 space-y-1 text-muted-foreground">
-                          <div>Safety: {activeRealHistoryDetail.safety_decision || 'Nao informado'}</div>
-                          <div>Contexto: {activeRealHistoryDetail.context_decision || 'Nao informado'}</div>
-                          <div>Operador: {activeRealHistoryDetail.operator_decision || 'Nao informado'}</div>
-                          <div>Publicacao: {activeRealHistoryDetail.publication_decision || 'Nao informado'}</div>
+                          <div>Seguranca objetiva: {moderationDecisionLabel(activeRealHistoryDetail.safety_decision)}</div>
+                          <div>Contexto do evento: {moderationDecisionLabel(activeRealHistoryDetail.context_decision)}</div>
+                          <div>Revisao do operador: {moderationDecisionLabel(activeRealHistoryDetail.operator_decision)}</div>
+                          <div>Publicacao final: {moderationDecisionLabel(activeRealHistoryDetail.publication_decision)}</div>
                         </div>
                       </div>
                     </div>
@@ -2597,14 +3232,14 @@ export default function MediaAutomaticRepliesPage() {
                     </div>
 
                     <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
-                      <div className="font-medium">Decisão e resposta</div>
+                      <div className="font-medium">Decisao e resposta</div>
                       <div className="mt-2 space-y-1 text-muted-foreground">
                         <div>Preset: {activeRealHistoryDetail.preset_name || 'Sem preset'}</div>
                         <div>Origem do preset: {activeRealHistoryDetail.prompt_preset_source || 'Nao informada'}</div>
                         <div>Origem da instrucao: {activeRealHistoryDetail.prompt_instruction_source || 'Nao informada'}</div>
-                        <div>Reason code: {activeRealHistoryDetail.reason_code || 'Nao informado'}</div>
-                        <div>Confianca: {activeRealHistoryDetail.confidence_band || 'Nao informada'}</div>
-                        <div>Elegibilidade: {activeRealHistoryDetail.publish_eligibility || 'Nao informada'}</div>
+                        <div>Codigo do motivo: {activeRealHistoryDetail.reason_code || 'Nao informado'}</div>
+                        <div>Confianca da avaliacao: {confidenceBandLabel(activeRealHistoryDetail.confidence_band)}</div>
+                        <div>Elegibilidade para publicar: {publishEligibilityLabel(activeRealHistoryDetail.publish_eligibility)}</div>
                         <div>Resposta: {activeRealHistoryDetail.reply_text || 'Sem resposta automatica'}</div>
                       </div>
                     </div>
@@ -2612,7 +3247,7 @@ export default function MediaAutomaticRepliesPage() {
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
-                      <div className="font-medium">Políticas que bateram</div>
+                      <div className="font-medium">Regras que influenciaram a decisao</div>
                       <div className="mt-2 space-y-1 text-muted-foreground">
                         {activeRealHistoryDetail.matched_policies.length > 0
                           ? activeRealHistoryDetail.matched_policies.map((policy) => (
@@ -2623,7 +3258,7 @@ export default function MediaAutomaticRepliesPage() {
                     </div>
 
                     <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
-                      <div className="font-medium">Exceções consideradas</div>
+                      <div className="font-medium">Excecoes consideradas</div>
                       <div className="mt-2 space-y-1 text-muted-foreground">
                         {activeRealHistoryDetail.matched_exceptions.length > 0
                           ? activeRealHistoryDetail.matched_exceptions.map((policy) => (
@@ -2652,6 +3287,21 @@ export default function MediaAutomaticRepliesPage() {
                     </pre>
                   </div>
 
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                      <div className="font-medium">Snapshot da politica efetiva</div>
+                      <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                        {JSON.stringify(activeRealHistoryDetail.policy_snapshot ?? {}, null, 2)}
+                      </pre>
+                    </div>
+                    <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
+                      <div className="font-medium">Origem de cada campo da politica</div>
+                      <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                        {JSON.stringify(activeRealHistoryDetail.policy_sources ?? {}, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+
                   <div className="grid gap-4">
                     <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-sm">
                       <div className="font-medium">Payload enviado</div>
@@ -2671,6 +3321,7 @@ export default function MediaAutomaticRepliesPage() {
             </div>
           </div>
         </TabsContent>
+        </motion.div>
       </Tabs>
     </motion.div>
   );

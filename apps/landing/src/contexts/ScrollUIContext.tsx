@@ -9,7 +9,7 @@ type ScrollUIContextValue = {
 
 const ScrollUIContext = createContext<ScrollUIContextValue | undefined>(undefined);
 
-const FLOATING_CTA_THRESHOLD = 80; // Aparece após 80% de scroll
+const FLOATING_CTA_THRESHOLD = 45; // Aparece após 45% de scroll (mais pro meio da página)
 
 export function ScrollUIProvider({ children }: { children: ReactNode }) {
   const [activeSection, setActiveSection] = useState<string>('hero');

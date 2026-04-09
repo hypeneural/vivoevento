@@ -1,4 +1,4 @@
-﻿@use './variables' as *;
+@use './variables' as *;
 
 @mixin flex-center {
   display: flex;
@@ -30,9 +30,9 @@
   color: inherit;
 }
 
-// Section padding with 50% increase
+// Section padding — tighter for compact layout
 @mixin section-padding {
-  padding: $space-xl 0; // clamp(6rem, 9vw, 7.5rem) - 50% increase from 5rem/7vw/7.5rem
+  padding: clamp(3.5rem, 6vw, 5.5rem) 0;
 }
 
 // Display title with improved hierarchy

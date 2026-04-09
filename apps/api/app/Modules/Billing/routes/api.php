@@ -3,6 +3,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('public/event-packages', [\App\Modules\Billing\Http\Controllers\EventPackageController::class, 'publicIndex']);
 Route::post('public/trial-events', [\App\Modules\Billing\Http\Controllers\PublicTrialEventController::class, 'store']);
+Route::post('public/checkout-identity/check', [\App\Modules\Billing\Http\Controllers\PublicCheckoutIdentityController::class, 'check'])
+    ->middleware('throttle:public-checkout-identity');
 Route::post('public/event-checkouts', [\App\Modules\Billing\Http\Controllers\PublicEventCheckoutController::class, 'store']);
 Route::get('public/event-checkouts/{billingOrder:uuid}', [\App\Modules\Billing\Http\Controllers\PublicEventCheckoutController::class, 'show']);
 Route::post('public/event-checkouts/{billingOrder:uuid}/confirm', [\App\Modules\Billing\Http\Controllers\PublicEventCheckoutController::class, 'confirm']);

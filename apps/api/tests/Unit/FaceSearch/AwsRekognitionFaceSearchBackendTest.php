@@ -12,9 +12,11 @@ use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Models\EventMediaVariant;
 use App\Modules\FaceSearch\Services\AwsRekognitionClientFactory;
 use App\Modules\FaceSearch\Services\AwsRekognitionFaceSearchBackend;
+use App\Modules\MediaProcessing\Services\ProviderCircuitBreaker;
 use Aws\Exception\AwsException;
 use Aws\Rekognition\RekognitionClient;
 use Aws\Command;
+use App\Shared\Exceptions\ProviderCircuitOpenException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Mockery as m;
@@ -493,4 +495,293 @@ it('searches faces by image and maps aws face ids back to searchable event media
         ->and($result['matches'][0]->distance)->toBe(0.015)
         ->and($result['matches'][0]->qualityTier)->toBe('search_priority')
         ->and($result['provider_payload_json']['SearchedFaceConfidence'] ?? null)->toBe(99.1);
+});
+
+it('opens the aws circuit after repeated search failures and blocks the immediate retry', function () {
+    config()->set('face_search.providers.aws_rekognition.circuit_breaker.failure_threshold', 1);
+    config()->set('face_search.providers.aws_rekognition.circuit_breaker.open_seconds', 60);
+    Storage::fake('public');
+
+    $event = Event::factory()->create();
+
+    $settings = \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'recognition_enabled' => true,
+        'search_backend_key' => 'aws_rekognition',
+        'aws_region' => 'eu-central-1',
+        'aws_collection_id' => 'eventovivo-face-search-event-' . $event->id,
+    ]);
+
+    $probeMedia = EventMedia::factory()->create([
+        'event_id' => $event->id,
+    ]);
+
+    $selfiePath = UploadedFile::fake()
+        ->image('selfie.jpg', 1200, 900)
+        ->store('tmp', 'public');
+    $selfieBinary = Storage::disk('public')->get($selfiePath);
+
+    $client = m::mock(RekognitionClient::class);
+    $factory = m::mock(AwsRekognitionClientFactory::class);
+
+    $factory->shouldReceive('makeRekognitionClient')
+        ->once()
+        ->with('query', ['region' => 'eu-central-1'])
+        ->andReturn($client);
+
+    $client->shouldReceive('searchFacesByImage')
+        ->once()
+        ->andThrow(new AwsException(
+            'throttled',
+            new Command('SearchFacesByImage'),
+            ['code' => 'ThrottlingException'],
+        ));
+
+    $backend = new AwsRekognitionFaceSearchBackend(
+        $factory,
+        new AwsImagePreprocessor,
+        new FaceQualityGateService,
+        circuitBreaker: app(ProviderCircuitBreaker::class),
+    );
+
+    try {
+        $backend->searchBySelfie(
+            event: $event,
+            settings: $settings,
+            probeMedia: $probeMedia,
+            binary: $selfieBinary,
+            face: new DetectedFaceData(
+                boundingBox: new FaceBoundingBoxData(40, 50, 180, 180),
+                detectionConfidence: 0.99,
+                qualityScore: 0.92,
+                isPrimaryCandidate: true,
+            ),
+            topK: 12,
+        );
+    } catch (AwsException) {
+        // First failure opens the circuit.
+    }
+
+    expect(fn () => $backend->searchBySelfie(
+        event: $event,
+        settings: $settings,
+        probeMedia: $probeMedia,
+        binary: $selfieBinary,
+        face: new DetectedFaceData(
+            boundingBox: new FaceBoundingBoxData(40, 50, 180, 180),
+            detectionConfidence: 0.99,
+            qualityScore: 0.92,
+            isPrimaryCandidate: true,
+        ),
+        topK: 12,
+    ))->toThrow(ProviderCircuitOpenException::class);
+});
+
+it('reconciles aws collection drift by restoring remote matches, creating remote-only records and soft deleting local-only records', function () {
+    $event = Event::factory()->create();
+
+    $settings = \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'recognition_enabled' => true,
+        'search_backend_key' => 'aws_rekognition',
+        'aws_region' => 'eu-central-1',
+        'aws_collection_id' => 'eventovivo-face-search-event-' . $event->id,
+        'aws_collection_arn' => null,
+        'aws_face_model_version' => null,
+    ]);
+
+    $matchedMedia = EventMedia::factory()->approved()->published()->create([
+        'event_id' => $event->id,
+    ]);
+    $remoteOnlyMedia = EventMedia::factory()->approved()->published()->create([
+        'event_id' => $event->id,
+    ]);
+
+    $matchedRecord = \Database\Factories\FaceSearchProviderRecordFactory::new()->create([
+        'event_id' => $event->id,
+        'event_media_id' => $matchedMedia->id,
+        'backend_key' => 'aws_rekognition',
+        'provider_key' => 'aws_rekognition',
+        'collection_id' => $settings->aws_collection_id,
+        'face_id' => 'face-matched',
+        'searchable' => true,
+    ]);
+
+    $localOnlyRecord = \Database\Factories\FaceSearchProviderRecordFactory::new()->create([
+        'event_id' => $event->id,
+        'event_media_id' => $matchedMedia->id,
+        'backend_key' => 'aws_rekognition',
+        'provider_key' => 'aws_rekognition',
+        'collection_id' => $settings->aws_collection_id,
+        'face_id' => 'face-local-only',
+        'searchable' => true,
+    ]);
+
+    $restoredRecord = \Database\Factories\FaceSearchProviderRecordFactory::new()->create([
+        'event_id' => $event->id,
+        'event_media_id' => $matchedMedia->id,
+        'backend_key' => 'aws_rekognition',
+        'provider_key' => 'aws_rekognition',
+        'collection_id' => $settings->aws_collection_id,
+        'face_id' => 'face-restored',
+        'searchable' => true,
+    ]);
+    $restoredRecord->delete();
+
+    $client = m::mock(RekognitionClient::class);
+    $factory = m::mock(AwsRekognitionClientFactory::class);
+
+    $factory->shouldReceive('makeRekognitionClient')
+        ->once()
+        ->with('query', ['region' => 'eu-central-1'])
+        ->andReturn($client);
+
+    $client->shouldReceive('describeCollection')
+        ->once()
+        ->with(['CollectionId' => $settings->aws_collection_id])
+        ->andReturn([
+            'CollectionARN' => 'arn:aws:rekognition:eu-central-1:123456789012:collection/' . $settings->aws_collection_id,
+            'FaceModelVersion' => '7.0',
+            'FaceCount' => 3,
+        ]);
+
+    $client->shouldReceive('listFaces')
+        ->once()
+        ->with([
+            'CollectionId' => $settings->aws_collection_id,
+            'MaxResults' => 4096,
+        ])
+        ->andReturn([
+            'Faces' => [
+                [
+                    'FaceId' => 'face-matched',
+                    'ImageId' => 'image-matched',
+                    'ExternalImageId' => 'evt:' . $event->id . ':media:' . $matchedMedia->id . ':rev:abc123',
+                    'Confidence' => 98.4,
+                    'BoundingBox' => [
+                        'Left' => 0.12,
+                        'Top' => 0.10,
+                        'Width' => 0.25,
+                        'Height' => 0.25,
+                    ],
+                ],
+                [
+                    'FaceId' => 'face-restored',
+                    'ImageId' => 'image-restored',
+                    'ExternalImageId' => 'evt:' . $event->id . ':media:' . $matchedMedia->id . ':rev:def456',
+                    'Confidence' => 97.0,
+                    'BoundingBox' => [
+                        'Left' => 0.32,
+                        'Top' => 0.20,
+                        'Width' => 0.20,
+                        'Height' => 0.20,
+                    ],
+                ],
+                [
+                    'FaceId' => 'face-remote-only',
+                    'ImageId' => 'image-remote-only',
+                    'ExternalImageId' => 'evt:' . $event->id . ':media:' . $remoteOnlyMedia->id . ':rev:ghi789',
+                    'Confidence' => 95.1,
+                    'BoundingBox' => [
+                        'Left' => 0.55,
+                        'Top' => 0.18,
+                        'Width' => 0.16,
+                        'Height' => 0.16,
+                    ],
+                ],
+            ],
+        ]);
+
+    $backend = new AwsRekognitionFaceSearchBackend($factory);
+
+    $summary = $backend->reconcileCollection($event, $settings);
+
+    $settings->refresh();
+    $matchedRecord->refresh();
+    $restoredRecord = FaceSearchProviderRecord::query()
+        ->where('face_id', 'face-restored')
+        ->first();
+    $remoteOnlyRecord = FaceSearchProviderRecord::query()
+        ->where('face_id', 'face-remote-only')
+        ->first();
+    $localOnlyRecord = FaceSearchProviderRecord::withTrashed()
+        ->where('id', $localOnlyRecord->id)
+        ->first();
+
+    expect($summary)->toMatchArray([
+        'backend_key' => 'aws_rekognition',
+        'collection_id' => $settings->aws_collection_id,
+        'remote_face_count' => 3,
+        'local_face_count_before' => 2,
+        'matched_records' => 1,
+        'restored_records' => 1,
+        'remote_only_records_created' => 1,
+        'local_only_records_soft_deleted' => 1,
+    ])->and($settings->aws_face_model_version)->toBe('7.0')
+        ->and($settings->aws_collection_arn)->toContain($settings->aws_collection_id)
+        ->and($matchedRecord->image_id)->toBe('image-matched')
+        ->and($matchedRecord->bbox_json)->toMatchArray([
+            'left' => 0.12,
+            'top' => 0.10,
+            'width' => 0.25,
+            'height' => 0.25,
+        ])
+        ->and($restoredRecord)->not->toBeNull()
+        ->and($restoredRecord?->trashed())->toBeFalse()
+        ->and($remoteOnlyRecord)->not->toBeNull()
+        ->and($remoteOnlyRecord?->event_media_id)->toBe($remoteOnlyMedia->id)
+        ->and($remoteOnlyRecord?->searchable)->toBeFalse()
+        ->and($remoteOnlyRecord?->unindexed_reasons_json)->toBe(['remote_only_face'])
+        ->and($localOnlyRecord)->not->toBeNull()
+        ->and($localOnlyRecord?->trashed())->toBeTrue();
+});
+
+it('deletes the aws collection idempotently and soft deletes local provider records', function () {
+    $event = Event::factory()->create();
+
+    $settings = \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'recognition_enabled' => true,
+        'search_backend_key' => 'aws_rekognition',
+        'aws_region' => 'eu-central-1',
+        'aws_collection_id' => 'eventovivo-face-search-event-' . $event->id,
+        'aws_collection_arn' => 'arn:aws:rekognition:eu-central-1:123456789012:collection/eventovivo-face-search-event-' . $event->id,
+        'aws_face_model_version' => '7.0',
+    ]);
+
+    $providerRecord = \Database\Factories\FaceSearchProviderRecordFactory::new()->create([
+        'event_id' => $event->id,
+        'backend_key' => 'aws_rekognition',
+        'provider_key' => 'aws_rekognition',
+        'collection_id' => $settings->aws_collection_id,
+        'face_id' => 'face-delete-me',
+    ]);
+
+    $client = m::mock(RekognitionClient::class);
+    $factory = m::mock(AwsRekognitionClientFactory::class);
+
+    $factory->shouldReceive('makeRekognitionClient')
+        ->once()
+        ->with('query', ['region' => 'eu-central-1'])
+        ->andReturn($client);
+
+    $client->shouldReceive('deleteCollection')
+        ->once()
+        ->with(['CollectionId' => $settings->aws_collection_id])
+        ->andReturn([
+            'StatusCode' => 200,
+        ]);
+
+    $backend = new AwsRekognitionFaceSearchBackend($factory);
+
+    $backend->deleteEventBackend($event, $settings);
+
+    $settings->refresh();
+    $providerRecord = \App\Modules\FaceSearch\Models\FaceSearchProviderRecord::withTrashed()->find($providerRecord->id);
+
+    expect($settings->aws_collection_id)->toBeNull()
+        ->and($settings->aws_collection_arn)->toBeNull()
+        ->and($settings->aws_face_model_version)->toBeNull()
+        ->and($providerRecord)->not->toBeNull()
+        ->and($providerRecord?->trashed())->toBeTrue();
 });

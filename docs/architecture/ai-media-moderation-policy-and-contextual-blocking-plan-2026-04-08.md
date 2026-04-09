@@ -2034,18 +2034,44 @@ Status desta rodada:
 
 - [x] aba `Laboratorio` implementada na superficie principal `IA > Moderacao de midia`
 - [x] simulacao manual permite homologar politica com ate `3` imagens por execucao
-- [x] laboratorio ja resolve e persiste:
-  - evento
-  - preset
-  - provider
-  - modelo
-  - prompt efetivo
-  - payload tecnico
-  - resposta retornada
+- [x] laboratorio agora resolve e persiste lado a lado:
+  - `safety_results`
+  - `contextual_results`
+  - `response_text`
+  - `final_summary`
+- [x] laboratorio persiste o snapshot efetivo usado no teste:
+  - `policy_snapshot_json`
+  - `policy_sources_json`
+- [x] laboratorio aceita overrides controlados sem contaminar producao:
+  - `objective_safety_scope_override`
+  - `context_scope_override`
+  - `reply_scope_override`
+  - `normalized_text_context_mode_override`
+- [x] laboratorio tolera falha de camada e continua explicavel:
+  - `status=partial`
+  - `error_message` por camada
+  - `evaluation_errors_count`
 - [x] historico de testes do laboratorio implementado com:
   - listagem
   - filtros basicos
   - detalhe tecnico completo
+- [x] frontend do laboratorio foi reorganizado em tres blocos claros:
+  - entrada
+  - politica efetiva
+  - resultado operacional
+- [x] frontend destaca no resultado:
+  - provider
+  - modelo
+  - latencia
+  - prompt resolvido
+  - elegibilidade final
+  - estado efetivo projetado
+- [x] frontend permite replay rapido do ultimo teste reutilizando o ultimo payload executado, mesmo quando a selecao atual de arquivos esta vazia
+- [x] frontend agora exibe estado vazio explicito no laboratorio antes da primeira execucao
+- [x] frontend agora exibe erro inline no laboratorio quando a execucao falha, sem depender apenas de toast
+- [x] contrato do laboratorio ficou explicitamente `image-only`:
+  - uploads nao-imagem sao rejeitados na request
+  - a propria UI avisa que `video`, `sticker` e `audio` continuam homologados pela matriz do pipeline real
 - [x] backend ja possui cobertura dedicada para:
   - resolvedor de politica contextual
   - laboratorio de prompt test
@@ -2060,19 +2086,45 @@ Status desta rodada:
 - [ ] ainda falta teste unitario dedicado para `MediaOperationalHistorySummaryService`
 - [ ] ainda faltam testes frontend para:
   - filtros completos do historico real
-  - estados vazios e de erro
   - resumo reativo mais detalhado
 - [ ] ainda faltam modos explicitos `Basico`, `Avancado` e `Auditoria`, junto com seus testes
 - [ ] ainda faltam `placeholderData`, prefetch e transicoes mais suaves nas consultas principais
 
 Validacao desta rodada:
 
-- [x] `MediaReplyPromptTestRunsTest`: `3 passed`, `31 assertions`
+- [x] migration local aplicada:
+  - `php artisan migrate --force`
+  - `2026_04_08_230500_add_laboratory_homologation_columns_to_ai_media_reply_test_runs`: `DONE`
+- [x] `MediaReplyPromptTestRunsTest`: `6 passed`, `68 assertions`
+- [x] `MediaReplyPromptTestSummaryServiceTest`: `3 passed`
 - [x] `ContextualModerationPolicyResolverTest`: `1 passed`, `18 assertions`
-- [x] `MediaAutomaticRepliesPage.test.tsx`: `6 passed`
+- [x] `MediaAutomaticRepliesPage.test.tsx`: `9 passed`
+- [x] `npm run type-check`: `ok`
 - [x] suites focadas de suporte:
-  - `php artisan test --filter=MediaIntelligence`: `66 passed`, `504 assertions`
+  - `php artisan test tests/Feature/MediaIntelligence tests/Unit/MediaIntelligence tests/Feature/MediaProcessing/EventMediaListTest.php`: `78 passed`, `651 assertions`
   - `php artisan test --filter=ContentModeration`: `32 passed`, `184 assertions`
+- [x] matriz automatizada do fluxo atual por tipo de anexo:
+  - `php artisan test tests/Feature/MediaIntelligence/MediaReplyPromptTestRunsTest.php tests/Unit/MediaIntelligence/MediaReplyPromptTestSummaryServiceTest.php tests/Feature/MediaIntelligence/MediaIntelligencePipelineTest.php tests/Feature/InboundMedia/InboundMediaPipelineTest.php --filter="(runs a synchronous media reply laboratory|persists a vlm evaluation|downloads inbound video|captures inbound audio)"`: `4 passed`, `72 assertions`
+  - `php artisan test tests/Feature/WhatsApp/WhatsAppEventIntakeTest.php --filter="does not route stickers to the inbound media pipeline even when a direct intake session is active"`: `1 passed`, `4 assertions`
+
+Leitura da matriz homologada nesta rodada:
+
+- `imagem`
+  - homologada no laboratorio sincrono com `safety + contexto + resposta + elegibilidade final`
+- `imagem + texto`
+  - homologada no pipeline contextual com `body_text` normalizado e `context_scope=image_and_text_context`
+- `video`
+  - homologado no pipeline inbound como `EventMedia` de `video`, pulando etapas image-only
+- `sticker`
+  - homologado como anexo ignorado para galeria/telao
+- `audio`
+  - homologado como captura `event_audio`, sem criar `EventMedia`
+
+Observacao importante:
+
+- a homologacao multimodal acima valida o comportamento real do app e do pipeline local;
+- ela nao significa que `video`, `sticker` ou `audio` entraram no laboratorio contextual;
+- o laboratorio continua intencionalmente `image-only` nesta fase.
 
 Plano detalhado restante a partir do estado validado:
 
@@ -2092,32 +2144,55 @@ Plano detalhado restante a partir do estado validado:
 
 2. Fechar `IA-MOD-R10` no laboratorio e na cobertura de regressao
    Backend:
-   - devolver no laboratorio uma resposta normalizada lado a lado para `safety`, `contexto`, `reply_text` e `publish_eligibility`;
-   - persistir snapshot da politica usada no teste para reproduzibilidade;
-   - aceitar overrides controlados de escopo/contexto apenas dentro do laboratorio.
+   - [x] devolver no laboratorio uma resposta normalizada lado a lado para `safety`, `contexto`, `reply_text` e `publish_eligibility`;
+   - [x] persistir snapshot da politica usada no teste para reproduzibilidade;
+   - [x] aceitar overrides controlados de escopo/contexto apenas dentro do laboratorio;
+   - [x] retornar `partial` em falhas por camada sem perder explicabilidade do teste.
    Frontend:
-   - reorganizar o laboratorio em tres blocos claros: entrada, politica efetiva e resultado;
-   - destacar latencia, provider, modelo, prompt resolvido e elegibilidade final;
-   - permitir replay rapido do ultimo teste sem remontar todo o formulario.
+   - [x] reorganizar o laboratorio em tres blocos claros: entrada, politica efetiva e resultado;
+   - [x] destacar latencia, provider, modelo, prompt resolvido e elegibilidade final;
+   - [x] permitir replay rapido do ultimo teste reutilizando o ultimo payload valido.
    Testes:
-   - feature tests para merge `global + preset + event_override + runtime_override`;
-   - testes de erro para limite de imagens e falha de provider;
-   - testes Vitest para replay rapido, estados vazios e carregamento.
+   - [x] feature tests para merge `global + preset + event_override + runtime_override`;
+   - [x] testes de erro para limite de imagens e falha de provider;
+   - [x] testes Vitest dedicados para replay rapido, estados vazios e erro inline do laboratorio.
 
 3. Fechar a segmentacao operacional da UI
    Frontend:
+   - [x] traduzir os termos mais tecnicos da superficie principal para linguagem operacional:
+     - `observe_only`
+     - `enforced`
+     - `thresholds`
+     - `fallback`
+     - `scope`
+     - `reason/publish labels` mais visiveis no historico
+   - [x] adicionar tooltips explicativos nos campos mais sensiveis de:
+     - `Seguranca objetiva`
+     - `Contexto do evento`
+     - leitura de thresholds, fallback e escopo
+   - [x] reduzir vazamento de termos crus do backend na camada principal:
+     - `safety objetiva` -> `Seguranca objetiva`
+     - `gate contextual` -> `Bloqueio contextual`
+     - `scope da resposta` -> `Resposta automatica`
+     - `reason code` -> `Codigo do motivo`
    - separar claramente os modos `Basico`, `Avancado` e `Auditoria`;
    - mover o operador leigo para um fluxo de configuracao menor e mais seguro;
    - deixar o modo `Auditoria` concentrado em payload, politica e historico.
    Testes:
+   - [x] Vitest focal da superficie principal ajustado para garantir:
+     - labels mais humanas
+     - ausencia de enums crus na leitura principal
+     - tooltips explicativos na aba de seguranca
    - validar troca de modos;
    - validar permissoes;
    - validar persistencia dos campos por modo.
 
-4. Rodar homologacao real multimodal antes da promocao
+4. Rodar homologacao multimodal do fluxo atual antes da promocao
    Operacao:
-   - executar matriz real com imagem, imagem + texto, video, sticker e audio;
-   - registrar `effective_media_state`, `reason_code`, `publish_eligibility` e resposta automatica por canal;
+   - [x] executar matriz local com imagem, imagem + texto, video, sticker e audio;
+   - [x] registrar por teste o comportamento esperado de cada tipo de anexo na stack atual;
+   - [ ] complementar com rodada provider-live externa se o ambiente alvo exigir evidencias alem da matriz automatizada local;
+   - [ ] registrar `effective_media_state`, `reason_code`, `publish_eligibility` e resposta automatica por canal nos cenarios com provider externo;
    - revisar fallback de provider, filas e throughput antes de aumentar volume.
    Go/no-go:
    - so promover politica para producao quando laboratorio + historico real + matriz multimodal estiverem consistentes.
@@ -2142,14 +2217,23 @@ Criterio de aceite:
 9. [x] implementar `IA-MOD-R9` na fatia operacional
 10. [ ] fechar `IA-MOD-R9` na auditoria tecnica completa
 11. [x] implementar `IA-MOD-R10` na fatia inicial de laboratorio e regressao
-12. [ ] fechar `IA-MOD-R10` com cobertura ampliada de UX e testes
-13. [ ] rodar homologacao real com:
+12. [x] fechar `IA-MOD-R10` na cobertura de UX do laboratorio para:
+    - replay rapido
+    - estado vazio
+    - erro inline
+    - contrato `image-only`
+13. [x] rodar homologacao automatizada local com:
     - imagem
     - imagem + texto
     - video
     - sticker
     - audio
-14. [ ] usar o laboratorio antes de promover politica para producao
+14. [ ] complementar a promocao com rodada provider-live externa, se o ambiente alvo exigir
+15. [ ] usar o laboratorio antes de promover politica para producao
+16. [x] melhorar a copy e a explicabilidade da superficie principal com:
+    - termos mais simples para operador leigo
+    - tooltips explicativos nos pontos de maior ambiguidade
+    - historico principal com linguagem menos tecnica
 
 ---
 

@@ -6,6 +6,10 @@ Plano detalhado complementar:
 
 - `docs/architecture/public-event-checkout-v2-implementation-plan-2026-04-08.md`
 
+Validacao complementar executada em:
+
+- `2026-04-09`
+
 ## Objetivo
 
 Este documento analisa o estado atual da jornada publica em `/checkout/evento`, cruzando:
@@ -40,6 +44,47 @@ Conclusao pratica:
 - boa parte da melhoria pode ser feita so no frontend
 - a etapa 2 nao deve ser "cadastro ou login" para todo mundo; ela deve ser "seus dados"
 - para uma versao realmente boa, vale adicionar um pre-check silencioso de identidade no backend e sugerir login so quando houver conta existente
+
+## Validacao Complementar De `2026-04-09`
+
+### Bateria executada
+
+Backend:
+
+- `php artisan test --filter=PublicEventCheckoutTest`
+- `php artisan test --filter=EventPackageCatalogTest`
+- `php artisan test --filter=BillingTest`
+
+Frontend:
+
+- `npm run test -- PublicEventCheckoutPage.test.tsx public-event-packages.service.test.ts PlansPage.test.tsx`
+- `npm run type-check`
+
+Resultado:
+
+- tudo verde na bateria rodada
+
+Leitura:
+
+- o checkout atual esta funcional no contrato atual
+- os principais problemas seguem sendo UX, linguagem e composicao da tela
+- a V2 nao esta corrigindo um fluxo quebrado; ela esta reduzindo friccao e acoplamento
+
+### Achados confirmados apos os testes e leitura do codigo
+
+- a retomada apos login para Pix esta validada no frontend e no backend
+- o rascunho seguro nao restaura PAN/CVV
+- a tela atual ainda depende fortemente de `gateway_status`
+- o formulario atual usa `form.watch(...)` em massa no page root
+- o checkout atual ainda persiste `last-uuid` e `resume-draft` em `localStorage`
+- o checkout de cartao atual opera com `installments: 1`
+- `apps/web/playwright.config.ts` existe, mas o runner `@playwright/test` ainda nao esta instalado em `apps/web`
+
+Implicacao:
+
+- o plano V2 continua correto
+- os pontos de hardening e a fase E2E continuam necessarios
+- a parte de UX precisa nascer junto com uma refatoracao estrutural do formulario, nao apenas com nova copy
 
 ## Escopo Da Analise
 

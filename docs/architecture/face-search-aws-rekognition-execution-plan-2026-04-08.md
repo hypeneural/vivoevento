@@ -48,7 +48,13 @@ Este plano existe para responder 7 perguntas de execucao:
 - [x] indexacao AWS via `IndexFaces` implementada com persistencia de `UnindexedFaces`.
 - [x] gating por evento/backend/searchable implementado no pipeline de indexacao.
 - [x] busca AWS via `SearchFacesByImage` implementada com auditoria em `face_search_queries`.
-- [ ] fallback/shadow mode AWS ainda nao implementado.
+- [x] `H4-T3` fechado com mensagem explicita de selfie-only e bloqueio claro para foto de grupo.
+- [x] classificacao de erro AWS alinhada ao padrao do repositorio.
+- [x] fallback local e shadow mode inicial implementados no fluxo de selfie.
+- [x] shadow comparativo completo e reconciliacao AWS implementados.
+- [x] `H7-T1` fechado com endpoints operacionais e painel AWS por evento.
+- [x] smoke real AWS com imagem validado para `IndexFaces + SearchFacesByImage + DeleteFaces`.
+- [x] preparacao operacional do piloto `H7-T2` documentada no plano.
 - [ ] user vectors AWS ainda nao implementados.
 
 Ultima bateria executada:
@@ -56,11 +62,11 @@ Ultima bateria executada:
 - comando:
   - `php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch`
 - resultado:
-  - `98 passed`
+  - `118 passed`
   - `7 skipped`
-  - `659 assertions`
+  - `841 assertions`
 - leitura:
-  - a trilha `H1 + H2 + H3 + H4-T2` manteve a suite ampla de `FaceSearch` verde;
+  - a trilha `H1 + H2 + H3 + H4 + H5 + H7-T1` continuou verde depois do smoke real com imagem;
   - os `7 skipped` continuam sendo apenas os contratos TDD AWS em modo opt-in.
 
 Bateria frontend executada:
@@ -70,9 +76,19 @@ Bateria frontend executada:
   - `npx.cmd vitest run src/modules/events/components/face-search`
 - resultado:
   - `type-check = PASS`
-  - `EventFaceSearchSettingsForm.test.tsx = 5 passed`
+  - `EventFaceSearchSettingsForm.test.tsx + EventFaceSearchSettingsCard.test.tsx = 7 passed`
 - leitura:
-  - o painel agora aceita o contrato AWS por evento sem quebrar tipagem nem fluxo do form.
+  - o painel agora aceita o contrato AWS por evento e expoe operacao de `health/reindex/reconcile/delete collection` sem quebrar tipagem nem fluxo do form.
+
+Bateria de contratos opt-in reexecutada apos o smoke real com imagem:
+
+- comando:
+  - `$env:RUN_FACE_SEARCH_AWS_TDD='1'; php artisan test tests/Unit/FaceSearch/FaceSearchAwsConfigContractTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryContractTest.php tests/Unit/FaceSearch/FaceSearchRouterContractTest.php tests/Unit/FaceSearch/SelfiePreflightServiceContractTest.php tests/Feature/FaceSearch/FaceSearchAwsSettingsContractTest.php tests/Unit/FaceSearch/SearchFacesBySelfieAwsArchitectureContractTest.php tests/Unit/FaceSearch/FaceSearchProviderRecordContractTest.php`
+- resultado:
+  - `7 passed`
+  - `42 assertions`
+- leitura:
+  - a fundacao contratual da integracao AWS continuou intacta depois do rerun operacional e do smoke real com imagem.
 
 Bateria dirigida executada para `H2-T3` e `H3`:
 
@@ -174,8 +190,12 @@ Estado atual da stack apos `H2-T2`:
 - o modulo agora tambem ja tem:
   - busca AWS via `SearchFacesByImage`
   - auditoria de query em `face_search_queries`
+- o modulo agora tambem ja tem:
+  - fallback local por politica de rota
+  - shadow mode inicial no fluxo de selfie
+  - classificacao de falha AWS com `reason codes` alinhados ao app
 - o modulo ainda nao tem:
-  - fallback/shadow mode completo
+  - shadow comparativo completo com reconciliacao
   - user vectors
 
 Smoke real AWS executado antes da implementacao:
@@ -210,10 +230,61 @@ Leitura:
 - a regiao `eu-central-1` esta funcional;
 - a policy ja cobre o baseline operacional do MVP para collections;
 - o SDK base ja esta disponivel no projeto;
-- ainda falta validar com imagem real:
-  - `IndexFaces`
-  - `SearchFacesByImage`
-  - `DeleteFaces`
+
+Rerun operacional validado em `2026-04-09`:
+
+- comando:
+  - `php scripts/face-search-aws-smoke.php`
+- resultado:
+  - `STS GetCallerIdentity = OK`
+  - `Account=426912654290`
+  - `Arn=arn:aws:iam::426912654290:user/eventovivo`
+  - `CreateCollection=OK`
+  - `DescribeCollection=OK`
+  - `FaceModelVersion=7.0`
+  - `ListCollections=OK`
+  - `ListFaces=OK`
+  - `DeleteCollection=OK`
+- leitura:
+  - a credencial continua valida em `eu-central-1`;
+  - o baseline de operacao de collection segue funcional depois da entrada de `H7-T1`;
+  - o smoke real de imagem ficou isolado para uma rodada dedicada com `Image.Bytes` e preprocessamento identico ao do app.
+
+Smoke real AWS com imagem validado em `2026-04-09`:
+
+- comando:
+  - `php scripts/face-search-aws-smoke.php --index-image="C:\Users\Usuario\Desktop\vipsocial\55160539780_ffeb73e159_o.jpg" --query-image="C:\Users\Usuario\Desktop\vipsocial\55159264527_7f683b08f6_o.jpg"`
+- imagens usadas:
+  - indexacao:
+    - `55160539780_ffeb73e159_o.jpg`
+  - busca:
+    - `55159264527_7f683b08f6_o.jpg`
+- preprocessamento:
+  - `Image.Bytes` gerado pelo mesmo `AwsImagePreprocessor` do modulo
+  - index bytes:
+    - `129892`
+    - `1081x1920`
+  - query bytes:
+    - `140231`
+    - `1920x1081`
+- resultado:
+  - `STS GetCallerIdentity = OK`
+  - `CreateCollection = OK`
+  - `DescribeCollection = OK`
+  - `IndexFaces = OK`
+  - `UnindexedFaces = 0`
+  - `SearchFacesByImage = OK`
+  - `Top match Similarity = 100.00`
+  - `DeleteFaces = OK`
+  - `DeleteCollection = OK`
+- leitura:
+  - a credencial, o IAM e a regiao atual cobrem o fluxo real do MVP com imagem;
+  - o preprocessamento deterministico para `Image.Bytes` esta funcional fora dos testes unitarios;
+  - o par de imagens real retornou o `FaceId` indexado como top match e confirmou o caminho ponta a ponta:
+    - `IndexFaces`
+    - `SearchFacesByImage`
+    - `DeleteFaces`
+    - `DeleteCollection`
 
 Bateria executada apos a implementacao inicial de `H1`:
 
@@ -294,6 +365,84 @@ Bateria executada para conclusao de `H4-T2`:
 - leitura:
   - `SearchFacesByImage` e a auditoria em `face_search_queries` ficaram verdes no backend e na feature principal de selfie;
   - a suite ampla do modulo continuou estavel apos a entrada do fluxo AWS de busca.
+
+Bateria executada para conclusao de `H4-T3`, `H5-T1` e `H5-T2`:
+
+- bateria dirigida:
+  - `php artisan test tests/Unit/FaceSearch/FaceSearchFailureClassifierTest.php tests/Unit/FaceSearch/FaceSearchRouterTest.php tests/Unit/FaceSearch/AwsRekognitionFaceSearchBackendTest.php tests/Unit/FaceSearch/SelfiePreflightServiceTest.php tests/Feature/FaceSearch/FaceSearchSelfieEndpointsTest.php`
+  - resultado:
+    - `29 passed`
+    - `203 assertions`
+- contratos opt-in:
+  - `$env:RUN_FACE_SEARCH_AWS_TDD='1'; php artisan test tests/Unit/FaceSearch/FaceSearchAwsConfigContractTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryContractTest.php tests/Unit/FaceSearch/FaceSearchRouterContractTest.php tests/Unit/FaceSearch/SelfiePreflightServiceContractTest.php tests/Feature/FaceSearch/FaceSearchAwsSettingsContractTest.php tests/Unit/FaceSearch/SearchFacesBySelfieAwsArchitectureContractTest.php tests/Unit/FaceSearch/FaceSearchProviderRecordContractTest.php`
+  - resultado:
+    - `7 passed`
+    - `42 assertions`
+- regressao ampla:
+  - `php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch`
+  - resultado:
+    - `108 passed`
+    - `7 skipped`
+    - `728 assertions`
+- leitura:
+  - o produto agora bloqueia foto de grupo com mensagem explicita de selfie-only;
+  - falhas AWS agora entram no idioma operacional do app com `failure_class` e `reason_code`;
+  - `aws_primary_local_fallback`, `local_primary_aws_on_error` e `aws_primary_local_shadow` passaram a ter base executavel no router e na auditoria da query.
+
+Bateria executada para conclusao de `H5-T3`:
+
+- bateria dirigida:
+  - `php artisan test tests/Unit/FaceSearch/ShadowModeDecisionTest.php tests/Unit/FaceSearch/ReconcileAwsCollectionJobTest.php tests/Unit/FaceSearch/AwsRekognitionFaceSearchBackendTest.php tests/Unit/FaceSearch/FaceSearchRouterTest.php tests/Feature/FaceSearch/FaceSearchSelfieEndpointsTest.php`
+  - resultado:
+    - `28 passed`
+    - `263 assertions`
+- contratos opt-in:
+  - `$env:RUN_FACE_SEARCH_AWS_TDD='1'; php artisan test tests/Unit/FaceSearch/FaceSearchAwsConfigContractTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryContractTest.php tests/Unit/FaceSearch/FaceSearchRouterContractTest.php tests/Unit/FaceSearch/SelfiePreflightServiceContractTest.php tests/Feature/FaceSearch/FaceSearchAwsSettingsContractTest.php tests/Unit/FaceSearch/SearchFacesBySelfieAwsArchitectureContractTest.php tests/Unit/FaceSearch/FaceSearchProviderRecordContractTest.php`
+  - resultado:
+    - `7 passed`
+    - `42 assertions`
+- regressao ampla:
+  - `php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch`
+  - resultado:
+    - `112 passed`
+    - `7 skipped`
+    - `799 assertions`
+- leitura:
+  - o comparativo de shadow agora persiste latencia, interseccao, divergencia e diferenca de top match entre backend primario e shadow;
+  - `ReconcileAwsCollectionJob` e a reconciliacao por `DescribeCollection + ListFaces` passaram a cobrir drift remoto/local sem apagar historico no escuro;
+  - `H5` fechou com fallback, shadow e reconciliacao verdes na suite ampla do modulo.
+
+Bateria executada para conclusao de `H7-T1`:
+
+- backend dirigida:
+  - `php artisan test tests/Feature/FaceSearch/FaceSearchOperationsTest.php tests/Unit/FaceSearch/AwsRekognitionFaceSearchBackendTest.php`
+  - resultado:
+    - `13 passed`
+    - `123 assertions`
+- frontend:
+  - `npx.cmd vitest run src/modules/events/components/face-search/EventFaceSearchSettingsCard.test.tsx src/modules/events/components/face-search/EventFaceSearchSettingsForm.test.tsx`
+  - resultado:
+    - `7 passed`
+- type-check:
+  - `npm run type-check`
+  - resultado:
+    - `PASS`
+- contratos opt-in:
+  - `$env:RUN_FACE_SEARCH_AWS_TDD='1'; php artisan test tests/Unit/FaceSearch/FaceSearchAwsConfigContractTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryContractTest.php tests/Unit/FaceSearch/FaceSearchRouterContractTest.php tests/Unit/FaceSearch/SelfiePreflightServiceContractTest.php tests/Feature/FaceSearch/FaceSearchAwsSettingsContractTest.php tests/Unit/FaceSearch/SearchFacesBySelfieAwsArchitectureContractTest.php tests/Unit/FaceSearch/FaceSearchProviderRecordContractTest.php`
+  - resultado:
+    - `7 passed`
+    - `42 assertions`
+- regressao ampla:
+  - `php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch`
+  - resultado:
+    - `118 passed`
+    - `7 skipped`
+    - `841 assertions`
+- leitura:
+  - o backend agora expoe endpoints operacionais de `health`, `reindex`, `reconcile` e `delete collection`;
+  - o painel agora mostra status da collection e o ultimo health rodado na sessao operacional;
+  - `DeleteCollection` entrou de forma idempotente com cleanup local de provider records;
+  - a suite ampla continuou verde depois da entrada da camada operacional.
 
 ---
 
@@ -812,6 +961,12 @@ Definicao de pronto:
 
 ### H4-T3. Separar claramente selfie de foto de grupo
 
+Status atual:
+
+- [x] `SelfiePreflightService` agora devolve mensagem explicita de selfie-only.
+- [x] o fluxo principal bloqueia foto de grupo antes de consumir a busca gerenciada.
+- [x] testes unitarios e feature cobrem o caso de varias pessoas na imagem.
+
 Objetivo:
 
 - evitar erro conceitual de produto.
@@ -836,6 +991,13 @@ Definicao de pronto:
 
 ### H5-T1. Alinhar classificacao de erro ao padrao do repositorio
 
+Status atual:
+
+- [x] `FaceSearchFailureClassifier` implementado.
+- [x] erros AWS agora mapeiam `failure_class` + `reason_code`.
+- [x] `AwsRekognitionFaceSearchBackend` agora usa `ProviderCircuitBreaker`.
+- [x] testes de classificador e circuit breaker ficaram verdes.
+
 Objetivo:
 
 - aproveitar `PipelineFailureClassifier` e `ProviderCircuitBreaker`.
@@ -853,7 +1015,7 @@ Subtarefas:
 
 Testes obrigatorios:
 
-- `AwsRekognitionFailureClassifierTest`
+- `FaceSearchFailureClassifierTest`
 - testes de circuit breaker no backend AWS
 
 Definicao de pronto:
@@ -861,6 +1023,15 @@ Definicao de pronto:
 - erros da AWS entram no mesmo idioma operacional do app.
 
 ### H5-T2. Implementar fallback local
+
+Status atual:
+
+- [x] `FaceSearchRouter` agora executa busca com primary/fallback/shadow por politica.
+- [x] `aws_primary_local_fallback` implementado.
+- [x] `local_primary_aws_on_error` implementado.
+- [x] `aws_primary_local_shadow` implementado em modo inicial.
+- [x] `SearchFacesBySelfieAction` agora registra qual backend respondeu e quando houve fallback.
+- [x] testes unitarios e feature do fallback/shadow ficaram verdes.
 
 Objetivo:
 
@@ -884,6 +1055,21 @@ Definicao de pronto:
 - evento consegue operar com backend primario e fallback definidos por politica.
 
 ### H5-T3. Implementar shadow mode e reconciliacao
+
+Status atual:
+
+- [x] `shadow_mode_percentage` agora executa shadow com comparativo rico por query.
+- [x] o comparativo persiste:
+  - `latency_ms`
+  - `shared_event_media_ids`
+  - `primary_only_event_media_ids`
+  - `shadow_only_event_media_ids`
+  - `top_match_same`
+  - `divergence_ratio`
+- [x] `ReconcileAwsCollectionJob` implementado.
+- [x] `AwsRekognitionFaceSearchBackend::reconcileCollection()` implementado com `DescribeCollection + ListFaces`.
+- [x] reconciliacao agora restaura registros locais que ainda existem na AWS, cria placeholders para faces remotas sem registro local e faz soft delete de faces locais ausentes na collection.
+- [x] testes unitarios/feature da reconciliacao e do comparativo de shadow ficaram verdes.
 
 Objetivo:
 
@@ -981,6 +1167,19 @@ Definicao de pronto:
 
 ### H7-T1. Painel e operacao
 
+Status atual:
+
+- [x] o form continua expondo backend, fallback, thresholds AWS, `profile_key` e `search_mode`.
+- [x] endpoints operacionais criados:
+  - `GET /events/{event}/face-search/health`
+  - `POST /events/{event}/face-search/reindex`
+  - `POST /events/{event}/face-search/reconcile`
+  - `DELETE /events/{event}/face-search/collection`
+- [x] o painel agora mostra status da collection e o ultimo health rodado.
+- [x] `reindex` agora garante provisionamento do backend antes de enfileirar `IndexMediaFacesJob`.
+- [x] `delete collection` agora apaga a collection AWS de forma idempotente e faz soft delete dos `provider_records` locais.
+- [x] testes backend e frontend de operacao ficaram verdes.
+
 Objetivo:
 
 - tornar a operacao AWS administravel por evento.
@@ -1006,6 +1205,13 @@ Definicao de pronto:
 
 ### H7-T2. Rollout controlado
 
+Status atual:
+
+- [x] smoke real de imagem validado no fluxo completo `IndexFaces + SearchFacesByImage + DeleteFaces`.
+- [x] checklist operacional do piloto definido neste plano.
+- [ ] piloto com eventos reais ainda nao executado.
+- [ ] metas reais de custo/latencia/fallback ainda nao foram medidas em producao.
+
 Objetivo:
 
 - trocar de backend com seguranca.
@@ -1018,7 +1224,40 @@ Subtarefas:
   - latencia por query
   - taxa de fallback
   - taxa de `UnindexedFaces`
+  - taxa de divergencia do shadow
 - so ampliar rollout depois de shadow mode aceitavel.
+
+Preparacao recomendada do piloto:
+
+- selecionar `1` a `3` eventos com:
+  - reconhecimento facial explicitamente ativo
+  - operador disponivel para acompanhar `health`, `reindex` e `reconcile`
+  - galeria inicial pequena ou media na primeira semana de piloto
+- comecar em `aws_primary_local_shadow` para medir divergencia sem trocar a resposta do produto;
+- promover para `aws_primary_local_fallback` apenas depois de pelo menos `1` rodada de reindex completa e smoke real de selfie valida no evento;
+- manter `local_primary_aws_on_error` como fallback reverso pronto para rollback rapido;
+- revisar por evento:
+  - `healthCheck`
+  - `face_search_queries`
+  - `face_search_provider_records`
+  - `UnindexedFaces`
+  - `shadow divergence`
+
+Metas iniciais recomendadas para aceitar o piloto:
+
+- `p95` de query AWS abaixo de `4000 ms`;
+- taxa de fallback abaixo de `10%`;
+- taxa de `UnindexedFaces` sem dominancia inesperada de `LOW_FACE_QUALITY` ou `SMALL_BOUNDING_BOX`;
+- shadow divergence controlada e explicavel nos eventos piloto;
+- zero drift critico depois de `reconcile`.
+
+Criticos de rollback:
+
+- `healthCheck` recorrente em estado `misconfigured` ou `provider_unavailable`;
+- fallback sustentado acima da meta;
+- shadow divergence alta sem explicacao operacional;
+- custo por evento acima da banda aprovada para o piloto;
+- aumento de reclamacao de selfie sem retorno no conjunto correto.
 
 Testes obrigatorios:
 
@@ -1027,7 +1266,7 @@ Testes obrigatorios:
 
 Definicao de pronto:
 
-- piloto pequeno aprovado com custo e latencia dentro da meta.
+- piloto pequeno aprovado com custo, latencia, fallback e divergencia dentro da meta recomendada.
 
 ---
 
@@ -1166,9 +1405,10 @@ Leitura:
 
 ## Proximo Passo Recomendado
 
-Com `H1`, `H2`, `H3` e `H4-T2` fechados, o proximo bloco deve ser:
+Com `H1`, `H2`, `H3`, `H4`, `H5` e `H7-T1` fechados, o proximo bloco deve ser:
 
-1. fechar `H4-T3` deixando explicito no produto que o MVP cobre selfie e nao foto de grupo;
-2. entrar em `H5-T1` e `H5-T2` para classificacao de erro AWS, fallback local e shadow mode inicial;
-3. consolidar qual backend respondeu na auditoria de query quando houver fallback;
-4. so depois abrir `H7-T1` para health/reindex/reconcile na operacao do painel.
+1. executar o piloto operacional de `H7-T2` em `1` a `3` eventos com `aws_primary_local_shadow`;
+2. medir custo por evento, latencia por query, taxa de fallback, taxa de `UnindexedFaces` e divergencia do shadow;
+3. promover apenas eventos estaveis para `aws_primary_local_fallback`;
+4. manter `H6` fora do caminho critico ate o piloto AWS estabilizar com shadow e reconciliacao ativos;
+5. so depois abrir `SearchUsersByImage` e user vectors.

@@ -64,6 +64,10 @@ return [
             'search_face_match_threshold' => (float) env('FACE_SEARCH_AWS_SEARCH_FACE_MATCH_THRESHOLD', 80),
             'search_user_match_threshold' => (float) env('FACE_SEARCH_AWS_SEARCH_USER_MATCH_THRESHOLD', 80),
             'associate_user_match_threshold' => (float) env('FACE_SEARCH_AWS_ASSOCIATE_USER_MATCH_THRESHOLD', 75),
+            'circuit_breaker' => [
+                'failure_threshold' => (int) env('FACE_SEARCH_AWS_CIRCUIT_FAILURE_THRESHOLD', 3),
+                'open_seconds' => (int) env('FACE_SEARCH_AWS_CIRCUIT_OPEN_SECONDS', 30),
+            ],
             'detection_attributes' => array_values(array_filter(array_map(
                 static fn (string $value): string => trim($value),
                 explode(',', (string) env('FACE_SEARCH_AWS_DETECTION_ATTRIBUTES', 'DEFAULT,FACE_OCCLUDED')),

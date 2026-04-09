@@ -64,6 +64,6 @@ describe('AppSidebar', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('link', { name: /^ia$/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /modera/i })).toBeInTheDocument();
   });
 });

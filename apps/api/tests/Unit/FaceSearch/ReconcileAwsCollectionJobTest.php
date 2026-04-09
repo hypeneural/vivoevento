@@ -1,0 +1,42 @@
+<?php
+
+use App\Modules\Events\Models\Event;
+use App\Modules\FaceSearch\Jobs\ReconcileAwsCollectionJob;
+use App\Modules\FaceSearch\Services\AwsRekognitionFaceSearchBackend;
+use Mockery as m;
+
+it('calls the aws backend to reconcile the collection for an eligible event', function () {
+    $event = Event::factory()->create();
+
+    \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'recognition_enabled' => true,
+        'search_backend_key' => 'aws_rekognition',
+    ]);
+
+    $backend = m::mock(AwsRekognitionFaceSearchBackend::class);
+    $backend->shouldReceive('reconcileCollection')
+        ->once()
+        ->withArgs(fn ($loadedEvent, $settings) => $loadedEvent->id === $event->id && $settings->event_id === $event->id);
+
+    $job = new ReconcileAwsCollectionJob($event->id);
+
+    $job->handle($backend);
+});
+
+it('does nothing when the event is not configured to use aws rekognition during reconciliation', function () {
+    $event = Event::factory()->create();
+
+    \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'recognition_enabled' => false,
+        'search_backend_key' => 'local_pgvector',
+    ]);
+
+    $backend = m::mock(AwsRekognitionFaceSearchBackend::class);
+    $backend->shouldNotReceive('reconcileCollection');
+
+    $job = new ReconcileAwsCollectionJob($event->id);
+
+    $job->handle($backend);
+});

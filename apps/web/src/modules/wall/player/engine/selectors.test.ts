@@ -297,4 +297,45 @@ describe('wall selectors', () => {
     expect(runtimeItem.orientation).toBe('vertical');
     expect(runtimeItem.original_url).toBe('https://cdn.example.com/media-vertical-original.jpg');
   });
+
+  it('prefers ready items when at least one renderable item is ready', () => {
+    const eligibleIds = selectEligibleWallItems([
+      makeRuntimeItem({
+        id: 'video_idle',
+        type: 'video',
+        assetStatus: 'idle',
+        created_at: '2026-04-01T10:03:00Z',
+      }),
+      makeRuntimeItem({
+        id: 'image_ready',
+        type: 'image',
+        assetStatus: 'ready',
+        created_at: '2026-04-01T10:02:00Z',
+      }),
+    ]).map((item) => item.id);
+
+    expect(eligibleIds).toEqual(['image_ready']);
+  });
+
+  it('falls back to idle items when no renderable item is ready yet', () => {
+    const eligibleIds = selectEligibleWallItems([
+      makeRuntimeItem({
+        id: 'video_idle_a',
+        type: 'video',
+        assetStatus: 'idle',
+        created_at: '2026-04-01T10:03:00Z',
+      }),
+      makeRuntimeItem({
+        id: 'video_idle_b',
+        type: 'video',
+        assetStatus: 'idle',
+        sender_name: 'Joao',
+        senderKey: 'sender-joao',
+        sender_key: 'sender-joao',
+        created_at: '2026-04-01T10:02:00Z',
+      }),
+    ]).map((item) => item.id);
+
+    expect(eligibleIds).toEqual(expect.arrayContaining(['video_idle_a', 'video_idle_b']));
+  });
 });

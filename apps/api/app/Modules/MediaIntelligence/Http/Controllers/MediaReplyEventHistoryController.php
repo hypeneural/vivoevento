@@ -2,9 +2,14 @@
 
 namespace App\Modules\MediaIntelligence\Http\Controllers;
 
+use App\Modules\ContentModeration\Models\ContentModerationGlobalSetting;
 use App\Modules\Events\Models\Event;
 use App\Modules\MediaIntelligence\Http\Requests\ListMediaReplyEventHistoryRequest;
 use App\Modules\MediaIntelligence\Http\Resources\MediaReplyEventHistoryResource;
+use App\Modules\MediaIntelligence\Models\MediaIntelligenceGlobalSetting;
+use App\Modules\MediaProcessing\Enums\MediaDecisionSource;
+use App\Modules\MediaProcessing\Enums\ModerationStatus;
+use App\Modules\MediaProcessing\Enums\PublicationStatus;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Shared\Http\BaseController;
 use Illuminate\Database\Eloquent\Builder;
@@ -40,7 +45,7 @@ class MediaReplyEventHistoryController extends BaseController
     {
         $query = EventMedia::query()
             ->with([
-                'event:id,title',
+                'event:id,title,moderation_mode',
                 'event.contentModerationSettings',
                 'event.mediaIntelligenceSettings',
                 'inboundMessage:id,event_id,trace_id,message_id,message_type,sender_name,sender_phone,sender_external_id',
@@ -127,6 +132,22 @@ class MediaReplyEventHistoryController extends BaseController
             $query->whereDate('created_at', '<=', (string) $request->string('date_to'));
         }
 
+        if ($request->filled('reason_code')) {
+            $reasonCode = (string) $request->string('reason_code');
+
+            $query->whereHas('latestVlmEvaluation', fn (Builder $evaluationQuery) => $evaluationQuery->where('reason_code', $reasonCode));
+        }
+
+        if ($request->filled('publish_eligibility')) {
+            $publishEligibility = (string) $request->string('publish_eligibility');
+
+            $query->whereHas('latestVlmEvaluation', fn (Builder $evaluationQuery) => $evaluationQuery->where('publish_eligibility', $publishEligibility));
+        }
+
+        if ($request->filled('effective_media_state')) {
+            $this->applyEffectiveStateFilter($query, (string) $request->string('effective_media_state'));
+        }
+
         $runs = $query->paginate((int) $request->integer('per_page', 15));
 
         return $this->paginated(MediaReplyEventHistoryResource::collection($runs));
@@ -135,7 +156,7 @@ class MediaReplyEventHistoryController extends BaseController
     public function show(EventMedia $historicoEvento): JsonResponse
     {
         $historicoEvento->loadMissing([
-            'event:id,title',
+            'event:id,title,moderation_mode',
             'event.contentModerationSettings',
             'event.mediaIntelligenceSettings',
             'inboundMessage:id,event_id,trace_id,message_id,message_type,sender_name,sender_phone,sender_external_id',
@@ -146,5 +167,179 @@ class MediaReplyEventHistoryController extends BaseController
         ]);
 
         return $this->success(new MediaReplyEventHistoryResource($historicoEvento));
+    }
+
+    private function applyEffectiveStateFilter(Builder $query, string $state): void
+    {
+        match ($state) {
+            'published' => $this->applyPublishedStateFilter($query),
+            'approved' => $this->applyApprovedStateFilter($query),
+            'pending_moderation' => $this->applyPendingModerationStateFilter($query),
+            'rejected' => $this->applyRejectedStateFilter($query),
+            default => null,
+        };
+    }
+
+    private function applyPublishedStateFilter(Builder $query): void
+    {
+        $query
+            ->where('moderation_status', ModerationStatus::Approved->value)
+            ->where('publication_status', PublicationStatus::Published->value)
+            ->where(function (Builder $builder): void {
+                $builder
+                    ->where('vlm_status', 'completed')
+                    ->orWhere(function (Builder $nonBlockingContext): void {
+                        $nonBlockingContext->where(function (Builder $blockedContext): void {
+                            $this->applyBlockingContextFilter($blockedContext, ['completed']);
+                        });
+                    });
+            })
+            ->where(function (Builder $builder): void {
+                $builder
+                    ->where('safety_status', 'pass')
+                    ->orWhere(function (Builder $nonBlockingSafety): void {
+                        $nonBlockingSafety->where(function (Builder $blockedSafety): void {
+                            $this->applyBlockingSafetyFilter($blockedSafety, ['pass']);
+                        });
+                    });
+            })
+            ->where(function (Builder $builder): void {
+                $builder
+                    ->where('decision_source', '!=', MediaDecisionSource::UserOverride->value)
+                    ->orWhere('moderation_status', '!=', ModerationStatus::Rejected->value);
+            });
+    }
+
+    private function applyApprovedStateFilter(Builder $query): void
+    {
+        $query
+            ->where('moderation_status', ModerationStatus::Approved->value)
+            ->where('publication_status', '!=', PublicationStatus::Published->value)
+            ->where('publication_status', '!=', PublicationStatus::Hidden->value)
+            ->where(function (Builder $builder): void {
+                $builder
+                    ->where('vlm_status', 'completed')
+                    ->orWhere(function (Builder $nonBlockingContext): void {
+                        $nonBlockingContext->where(function (Builder $blockedContext): void {
+                            $this->applyBlockingContextFilter($blockedContext, ['completed']);
+                        });
+                    });
+            })
+            ->where(function (Builder $builder): void {
+                $builder
+                    ->where('safety_status', 'pass')
+                    ->orWhere(function (Builder $nonBlockingSafety): void {
+                        $nonBlockingSafety->where(function (Builder $blockedSafety): void {
+                            $this->applyBlockingSafetyFilter($blockedSafety, ['pass']);
+                        });
+                    });
+            });
+    }
+
+    private function applyPendingModerationStateFilter(Builder $query): void
+    {
+        $query->where(function (Builder $builder): void {
+            $builder
+                ->where('moderation_status', ModerationStatus::Pending->value)
+                ->orWhere(function (Builder $safetyPending): void {
+                    $this->applyBlockingSafetyFilter($safetyPending, ['queued', 'review', 'failed'], true);
+                })
+                ->orWhere(function (Builder $contextPending): void {
+                    $this->applyBlockingContextFilter($contextPending, ['queued', 'review', 'failed'], true);
+                });
+        });
+    }
+
+    private function applyRejectedStateFilter(Builder $query): void
+    {
+        $query->where(function (Builder $builder): void {
+            $builder
+                ->where(function (Builder $operatorRejected): void {
+                    $operatorRejected
+                        ->where('decision_source', MediaDecisionSource::UserOverride->value)
+                        ->where('moderation_status', ModerationStatus::Rejected->value);
+                })
+                ->orWhere('moderation_status', ModerationStatus::Rejected->value)
+                ->orWhere(function (Builder $safetyRejected): void {
+                    $this->applyBlockingSafetyFilter($safetyRejected, ['block']);
+                })
+                ->orWhere(function (Builder $contextRejected): void {
+                    $this->applyBlockingContextFilter($contextRejected, ['rejected']);
+                });
+        });
+    }
+
+    private function applyBlockingSafetyFilter(Builder $query, array $statuses, bool $includeNull = false): void
+    {
+        $global = ContentModerationGlobalSetting::query()->firstOrNew(
+            ['id' => 1],
+            ContentModerationGlobalSetting::defaultAttributes(),
+        );
+
+        $query
+            ->where('media_type', 'image')
+            ->where(function (Builder $statusQuery) use ($statuses, $includeNull): void {
+                if ($includeNull) {
+                    $statusQuery
+                        ->whereNull('safety_status')
+                        ->orWhereIn('safety_status', $statuses);
+
+                    return;
+                }
+
+                $statusQuery->whereIn('safety_status', $statuses);
+            })
+            ->whereHas('event', function (Builder $eventQuery) use ($global): void {
+                $eventQuery
+                    ->where('moderation_mode', 'ai')
+                    ->where(function (Builder $blockingQuery) use ($global): void {
+                        $blockingQuery->whereHas('contentModerationSettings', function (Builder $settingsQuery): void {
+                            $settingsQuery
+                                ->where('enabled', true)
+                                ->where('mode', '!=', 'observe_only');
+                        });
+
+                        if (($global->enabled ?? false) && $global->mode !== 'observe_only') {
+                            $blockingQuery->orWhereDoesntHave('contentModerationSettings');
+                        }
+                    });
+            });
+    }
+
+    private function applyBlockingContextFilter(Builder $query, array $statuses, bool $includeNull = false): void
+    {
+        $global = MediaIntelligenceGlobalSetting::query()->firstOrNew(
+            ['id' => 1],
+            MediaIntelligenceGlobalSetting::defaultAttributes(),
+        );
+
+        $query
+            ->where('media_type', 'image')
+            ->where(function (Builder $statusQuery) use ($statuses, $includeNull): void {
+                if ($includeNull) {
+                    $statusQuery
+                        ->whereNull('vlm_status')
+                        ->orWhereIn('vlm_status', $statuses);
+
+                    return;
+                }
+
+                $statusQuery->whereIn('vlm_status', $statuses);
+            })
+            ->whereHas('event', function (Builder $eventQuery) use ($global): void {
+                $eventQuery
+                    ->where('moderation_mode', 'ai')
+                    ->where(function (Builder $blockingQuery) use ($global): void {
+                        $blockingQuery->whereHas('mediaIntelligenceSettings', function (Builder $settingsQuery): void {
+                            $settingsQuery
+                                ->where('enabled', true)
+                                ->where('mode', 'gate');
+                        });
+
+                        if (($global->enabled ?? false) && $global->mode === 'gate') {
+                            $blockingQuery->orWhereDoesntHave('mediaIntelligenceSettings');
+                        }
+                    });
+            });
     }
 }

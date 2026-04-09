@@ -5,6 +5,7 @@ import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WALL_EVENT_NAMES } from '@eventovivo/shared-types/wall';
 
+import type { ApiWallLiveSnapshotResponse } from '@/lib/api-types';
 import { queryKeys } from '@/lib/query-client';
 
 import { useWallRealtimeSync } from './useWallRealtimeSync';
@@ -172,5 +173,65 @@ describe('useWallRealtimeSync', () => {
 
     expect(invalidateQueriesSpy).not.toHaveBeenCalledWith({ queryKey: queryKeys.wall.settings('31') });
     expect(invalidateQueriesSpy).not.toHaveBeenCalledWith({ queryKey: queryKeys.events.detail('31') });
+  });
+
+  it('atualiza o snapshot ao vivo direto no cache quando chega o evento dedicado', async () => {
+    const fakePusher = createFakePusher();
+    createWallManagerPusherMock.mockReturnValue(fakePusher);
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+    const setQueryDataSpy = vi.spyOn(queryClient, 'setQueryData');
+    const invalidateQueriesSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const snapshotPayload: ApiWallLiveSnapshotResponse = {
+      wallStatus: 'live',
+      wallStatusLabel: 'Ao vivo',
+      layout: 'auto',
+      transitionEffect: 'fade',
+      currentPlayer: {
+        playerInstanceId: 'player-live',
+        healthStatus: 'healthy',
+        runtimeStatus: 'playing',
+        connectionStatus: 'connected',
+        lastSeenAt: '2026-04-08T22:10:00Z',
+      },
+      currentItem: {
+        id: 'media_10',
+        previewUrl: 'https://cdn.example.com/live.jpg',
+        senderName: 'Juliana',
+        senderKey: 'whatsapp:5511999999999',
+        source: 'whatsapp',
+        caption: 'Entrada principal',
+        layoutHint: 'cinematic',
+        isFeatured: false,
+        createdAt: '2026-04-08T22:09:50Z',
+      },
+      advancedAt: '2026-04-08T22:09:52Z',
+      updatedAt: '2026-04-08T22:10:00Z',
+    };
+
+    renderHook(() => useWallRealtimeSync('31'), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    invalidateQueriesSpy.mockClear();
+
+    act(() => {
+      fakePusher.emitChannelEvent(WALL_EVENT_NAMES.liveSnapshotUpdated, snapshotPayload);
+    });
+
+    await waitFor(() => {
+      expect(setQueryDataSpy).toHaveBeenCalledWith(
+        queryKeys.wall.liveSnapshot('31'),
+        snapshotPayload,
+      );
+    });
+
+    expect(invalidateQueriesSpy).not.toHaveBeenCalledWith({ queryKey: queryKeys.wall.liveSnapshot('31') });
   });
 });

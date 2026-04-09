@@ -7,6 +7,7 @@ use App\Modules\MediaProcessing\Enums\PublicationStatus;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\Wall\Enums\WallAcceptedOrientation;
 use App\Modules\Wall\Models\EventWallSetting;
+use Illuminate\Support\Collection;
 
 class WallEligibilityService
 {
@@ -21,6 +22,32 @@ class WallEligibilityService
             && $media->moderation_status === ModerationStatus::Approved
             && in_array($media->media_type, ['image', 'video'], true)
             && $this->matchesOrientationRule($media, $settings);
+    }
+
+    /**
+     * Filter a collection using the same eligibility gate used by realtime broadcasts.
+     *
+     * @param  Collection<int, EventMedia>  $media
+     * @return Collection<int, EventMedia>
+     */
+    public function filterEligibleMedia(
+        Collection $media,
+        EventWallSetting $settings,
+        ?int $limit = null,
+    ): Collection {
+        if (! $settings->isPlayable()) {
+            return collect();
+        }
+
+        $filtered = $media->filter(
+            fn (EventMedia $item): bool => $this->mediaCanAppear($item, $settings)
+        );
+
+        if ($limit !== null) {
+            $filtered = $filtered->take(max(1, $limit));
+        }
+
+        return $filtered->values();
     }
 
     /**

@@ -36,6 +36,7 @@ class WallLiveSnapshotService
                 'lastSeenAt' => $playerPayload['last_seen_at'],
             ] : null,
             'currentItem' => $currentItem,
+            'advancedAt' => $player?->current_item_started_at?->toIso8601String(),
             'updatedAt' => $playerPayload['updated_at'] ?? $settings->updated_at?->toIso8601String(),
         ];
     }

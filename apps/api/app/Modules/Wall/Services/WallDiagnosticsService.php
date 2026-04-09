@@ -16,32 +16,38 @@ class WallDiagnosticsService
 
     public function recordHeartbeat(EventWallSetting $settings, array $payload): WallPlayerRuntimeStatus
     {
-        return WallPlayerRuntimeStatus::query()->updateOrCreate(
-            [
-                'event_wall_setting_id' => $settings->id,
-                'player_instance_id' => $payload['player_instance_id'],
-            ],
-            [
-                'runtime_status' => $payload['runtime_status'],
-                'connection_status' => $payload['connection_status'],
-                'current_item_id' => $payload['current_item_id'] ?? null,
-                'current_sender_key' => $payload['current_sender_key'] ?? null,
-                'ready_count' => (int) ($payload['ready_count'] ?? 0),
-                'loading_count' => (int) ($payload['loading_count'] ?? 0),
-                'error_count' => (int) ($payload['error_count'] ?? 0),
-                'stale_count' => (int) ($payload['stale_count'] ?? 0),
-                'cache_enabled' => (bool) ($payload['cache_enabled'] ?? false),
-                'persistent_storage' => (string) ($payload['persistent_storage'] ?? 'none'),
-                'cache_usage_bytes' => $payload['cache_usage_bytes'] ?? null,
-                'cache_quota_bytes' => $payload['cache_quota_bytes'] ?? null,
-                'cache_hit_count' => (int) ($payload['cache_hit_count'] ?? 0),
-                'cache_miss_count' => (int) ($payload['cache_miss_count'] ?? 0),
-                'cache_stale_fallback_count' => (int) ($payload['cache_stale_fallback_count'] ?? 0),
-                'last_sync_at' => $payload['last_sync_at'] ?? null,
-                'last_heartbeat_at' => now(),
-                'last_fallback_reason' => $payload['last_fallback_reason'] ?? null,
-            ],
-        );
+        $player = WallPlayerRuntimeStatus::query()->firstOrNew([
+            'event_wall_setting_id' => $settings->id,
+            'player_instance_id' => $payload['player_instance_id'],
+        ]);
+
+        $currentItemId = $payload['current_item_id'] ?? null;
+
+        $player->fill([
+            'runtime_status' => $payload['runtime_status'],
+            'connection_status' => $payload['connection_status'],
+            'current_item_id' => $currentItemId,
+            'current_item_started_at' => $this->resolveCurrentItemStartedAt($player, $currentItemId),
+            'current_sender_key' => $payload['current_sender_key'] ?? null,
+            'ready_count' => (int) ($payload['ready_count'] ?? 0),
+            'loading_count' => (int) ($payload['loading_count'] ?? 0),
+            'error_count' => (int) ($payload['error_count'] ?? 0),
+            'stale_count' => (int) ($payload['stale_count'] ?? 0),
+            'cache_enabled' => (bool) ($payload['cache_enabled'] ?? false),
+            'persistent_storage' => (string) ($payload['persistent_storage'] ?? 'none'),
+            'cache_usage_bytes' => $payload['cache_usage_bytes'] ?? null,
+            'cache_quota_bytes' => $payload['cache_quota_bytes'] ?? null,
+            'cache_hit_count' => (int) ($payload['cache_hit_count'] ?? 0),
+            'cache_miss_count' => (int) ($payload['cache_miss_count'] ?? 0),
+            'cache_stale_fallback_count' => (int) ($payload['cache_stale_fallback_count'] ?? 0),
+            'last_sync_at' => $payload['last_sync_at'] ?? null,
+            'last_heartbeat_at' => now(),
+            'last_fallback_reason' => $payload['last_fallback_reason'] ?? null,
+        ]);
+
+        $player->save();
+
+        return $player->fresh();
     }
 
     public function diagnosticsPayload(EventWallSetting $settings): array
@@ -127,6 +133,7 @@ class WallDiagnosticsService
             'runtime_status' => $player->runtime_status,
             'connection_status' => $player->connection_status,
             'current_item_id' => $player->current_item_id,
+            'current_item_started_at' => $player->current_item_started_at?->toIso8601String(),
             'current_sender_key' => $player->current_sender_key,
             'ready_count' => (int) $player->ready_count,
             'loading_count' => (int) $player->loading_count,
@@ -329,6 +336,19 @@ class WallDiagnosticsService
     private function hasPersistentStorage(WallPlayerRuntimeStatus $player): bool
     {
         return ! in_array($player->persistent_storage, ['none', 'unknown', 'unavailable', ''], true);
+    }
+
+    private function resolveCurrentItemStartedAt(WallPlayerRuntimeStatus $player, ?string $currentItemId): ?\Illuminate\Support\Carbon
+    {
+        if (! $currentItemId) {
+            return null;
+        }
+
+        if (! $player->exists || $player->current_item_id !== $currentItemId) {
+            return now();
+        }
+
+        return $player->current_item_started_at ?? now();
     }
 
     private function hasMaterialSummaryChange(

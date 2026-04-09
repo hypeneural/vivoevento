@@ -9,6 +9,7 @@ use App\Modules\FaceSearch\DTOs\FaceSearchMatchData;
 use App\Modules\FaceSearch\Models\EventFaceSearchSetting;
 use App\Modules\FaceSearch\Models\FaceSearchProviderRecord;
 use App\Modules\MediaProcessing\Enums\ModerationStatus;
+use App\Modules\MediaProcessing\Services\ProviderCircuitBreaker;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use Aws\Exception\AwsException;
 use Aws\Rekognition\RekognitionClient;
@@ -23,6 +24,7 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
         private readonly AwsImagePreprocessor $preprocessor = new AwsImagePreprocessor,
         private readonly FaceQualityGateService $qualityGate = new FaceQualityGateService,
         private readonly FaceSearchMediaSourceLoader $sourceLoader = new FaceSearchMediaSourceLoader,
+        private readonly ?ProviderCircuitBreaker $circuitBreaker = null,
     ) {}
 
     public function key(): string
@@ -36,18 +38,24 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
         $client = $this->rekognitionClient($settings, 'index');
 
         try {
-            $client->createCollection([
-                'CollectionId' => $collectionId,
-            ]);
+            $this->callAws(
+                operation: 'index',
+                callback: fn () => $client->createCollection([
+                    'CollectionId' => $collectionId,
+                ]),
+            );
         } catch (AwsException $exception) {
             if (! $this->isResourceAlreadyExists($exception)) {
                 throw $exception;
             }
         }
 
-        $description = $this->toArray($client->describeCollection([
-            'CollectionId' => $collectionId,
-        ]));
+        $description = $this->toArray($this->callAws(
+            operation: 'query',
+            callback: fn () => $client->describeCollection([
+                'CollectionId' => $collectionId,
+            ]),
+        ));
 
         $settings->forceFill([
             'aws_collection_id' => $collectionId,
@@ -82,16 +90,19 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
         $this->cleanupExistingProviderRecords($client, $media, $collectionId);
 
         try {
-            $response = $this->toArray($client->indexFaces([
-                'CollectionId' => $collectionId,
-                'Image' => [
-                    'Bytes' => $prepared['binary'],
-                ],
-                'ExternalImageId' => $externalImageId,
-                'QualityFilter' => $settings->aws_index_quality_filter,
-                'MaxFaces' => $this->resolveMaxFaces($settings),
-                'DetectionAttributes' => $this->resolveDetectionAttributes($settings),
-            ]));
+            $response = $this->toArray($this->callAws(
+                operation: 'index',
+                callback: fn () => $client->indexFaces([
+                    'CollectionId' => $collectionId,
+                    'Image' => [
+                        'Bytes' => $prepared['binary'],
+                    ],
+                    'ExternalImageId' => $externalImageId,
+                    'QualityFilter' => $settings->aws_index_quality_filter,
+                    'MaxFaces' => $this->resolveMaxFaces($settings),
+                    'DetectionAttributes' => $this->resolveDetectionAttributes($settings),
+                ]),
+            ));
         } catch (AwsException $exception) {
             if ($this->isNoFaceFound($exception)) {
                 return [
@@ -221,10 +232,13 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
             ->all();
 
         if ($rejectedFaceIds !== []) {
-            $client->deleteFaces([
-                'CollectionId' => $collectionId,
-                'FaceIds' => $rejectedFaceIds,
-            ]);
+            $this->callAws(
+                operation: 'index',
+                callback: fn () => $client->deleteFaces([
+                    'CollectionId' => $collectionId,
+                    'FaceIds' => $rejectedFaceIds,
+                ]),
+            );
         }
 
         return [
@@ -251,18 +265,24 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
             'max_bytes' => 5_242_880,
         ]);
         $collectionId = $this->resolveCollectionId($event, $settings);
-        $client = $this->rekognitionClient($settings, 'query');
 
         try {
-            $response = $this->toArray($client->searchFacesByImage([
-                'CollectionId' => $collectionId,
-                'Image' => [
-                    'Bytes' => $prepared['binary'],
-                ],
-                'FaceMatchThreshold' => (float) $settings->aws_search_face_match_threshold,
-                'MaxFaces' => max(1, min(4096, $topK)),
-                'QualityFilter' => $settings->aws_search_faces_quality_filter,
-            ]));
+            $response = $this->toArray($this->callAws(
+                operation: 'query',
+                callback: function () use ($collectionId, $prepared, $settings, $topK) {
+                    $client = $this->rekognitionClient($settings, 'query');
+
+                    return $client->searchFacesByImage([
+                        'CollectionId' => $collectionId,
+                        'Image' => [
+                            'Bytes' => $prepared['binary'],
+                        ],
+                        'FaceMatchThreshold' => (float) $settings->aws_search_face_match_threshold,
+                        'MaxFaces' => max(1, min(4096, $topK)),
+                        'QualityFilter' => $settings->aws_search_faces_quality_filter,
+                    ]);
+                },
+            ));
         } catch (AwsException $exception) {
             if ($this->isNoFaceFound($exception)) {
                 throw ValidationException::withMessages([
@@ -356,7 +376,10 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
             $sts = $this->clients->makeStsClient([
                 'region' => $region,
             ]);
-            $identity = $this->toArray($sts->getCallerIdentity());
+            $identity = $this->toArray($this->callAws(
+                operation: 'query',
+                callback: fn () => $sts->getCallerIdentity(),
+            ));
 
             $result['identity'] = [
                 'account' => $identity['Account'] ?? null,
@@ -370,9 +393,12 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
 
         try {
             $client = $this->rekognitionClient($settings, 'query');
-            $description = $this->toArray($client->describeCollection([
-                'CollectionId' => $settings->aws_collection_id,
-            ]));
+            $description = $this->toArray($this->callAws(
+                operation: 'query',
+                callback: fn () => $client->describeCollection([
+                    'CollectionId' => $settings->aws_collection_id,
+                ]),
+            ));
             $result['collection'] = [
                 'collection_id' => $settings->aws_collection_id,
                 'collection_arn' => $description['CollectionARN'] ?? $settings->aws_collection_arn,
@@ -381,10 +407,13 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
             ];
             $result['checks']['collection'] = 'ok';
 
-            $client->listFaces([
-                'CollectionId' => $settings->aws_collection_id,
-                'MaxResults' => 1,
-            ]);
+            $this->callAws(
+                operation: 'query',
+                callback: fn () => $client->listFaces([
+                    'CollectionId' => $settings->aws_collection_id,
+                    'MaxResults' => 1,
+                ]),
+            );
             $result['checks']['list_faces'] = 'ok';
 
             return $result;
@@ -393,9 +422,178 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
         }
     }
 
+    /**
+     * @return array{
+     *   backend_key:string,
+     *   collection_id:string,
+     *   remote_face_count:int,
+     *   local_face_count_before:int,
+     *   matched_records:int,
+     *   restored_records:int,
+     *   remote_only_records_created:int,
+     *   local_only_records_soft_deleted:int
+     * }
+     */
+    public function reconcileCollection(Event $event, EventFaceSearchSetting $settings): array
+    {
+        $collectionId = $this->resolveCollectionId($event, $settings);
+        $client = $this->rekognitionClient($settings, 'query');
+
+        $description = $this->toArray($this->callAws(
+            operation: 'query',
+            callback: fn () => $client->describeCollection([
+                'CollectionId' => $collectionId,
+            ]),
+        ));
+
+        $settings->forceFill([
+            'aws_collection_id' => $collectionId,
+            'aws_collection_arn' => (string) ($description['CollectionARN'] ?? $settings->aws_collection_arn),
+            'aws_face_model_version' => (string) ($description['FaceModelVersion'] ?? $settings->aws_face_model_version),
+        ])->save();
+
+        $remoteFaces = collect($this->listAllFaces($client, $collectionId))
+            ->filter(fn (mixed $face): bool => is_array($face) && is_string($face['FaceId'] ?? null))
+            ->keyBy(fn (array $face): string => (string) $face['FaceId']);
+
+        $localRecords = FaceSearchProviderRecord::query()
+            ->withTrashed()
+            ->where('event_id', $event->id)
+            ->where('backend_key', $this->key())
+            ->where('collection_id', $collectionId)
+            ->whereNotNull('face_id')
+            ->get()
+            ->keyBy('face_id');
+
+        $localActiveRecords = $localRecords->filter(fn (FaceSearchProviderRecord $record): bool => ! $record->trashed());
+        $matchedRecords = 0;
+        $restoredRecords = 0;
+        $remoteOnlyRecordsCreated = 0;
+
+        foreach ($remoteFaces as $faceId => $remoteFace) {
+            /** @var array<string, mixed> $remoteFace */
+            $remoteFace = (array) $remoteFace;
+
+            if ($localRecords->has($faceId)) {
+                /** @var FaceSearchProviderRecord $record */
+                $record = $localRecords->get($faceId);
+
+                if ($record->trashed()) {
+                    $record->restore();
+                    $restoredRecords++;
+                } else {
+                    $matchedRecords++;
+                }
+
+                $record->forceFill([
+                    'image_id' => $remoteFace['ImageId'] ?? $record->image_id,
+                    'external_image_id' => $remoteFace['ExternalImageId'] ?? $record->external_image_id,
+                    'bbox_json' => $this->listFaceBoundingBoxArray($remoteFace),
+                    'provider_payload_json' => $remoteFace,
+                    'indexed_at' => now(),
+                ])->save();
+
+                continue;
+            }
+
+            FaceSearchProviderRecord::query()->create([
+                'event_id' => $event->id,
+                'event_media_id' => $this->resolveMediaIdFromExternalImageId($event, $remoteFace['ExternalImageId'] ?? null),
+                'provider_key' => $this->key(),
+                'backend_key' => $this->key(),
+                'collection_id' => $collectionId,
+                'face_id' => $faceId,
+                'image_id' => $remoteFace['ImageId'] ?? null,
+                'external_image_id' => $remoteFace['ExternalImageId'] ?? null,
+                'bbox_json' => $this->listFaceBoundingBoxArray($remoteFace),
+                'quality_json' => [
+                    'confidence' => $remoteFace['Confidence'] ?? null,
+                    'reconciliation_source' => 'list_faces',
+                ],
+                'unindexed_reasons_json' => ['remote_only_face'],
+                'searchable' => false,
+                'indexed_at' => now(),
+                'provider_payload_json' => $remoteFace,
+            ]);
+
+            $remoteOnlyRecordsCreated++;
+        }
+
+        $remoteFaceIds = $remoteFaces->keys()->all();
+        $localOnlyRecords = $localActiveRecords
+            ->filter(fn (FaceSearchProviderRecord $record): bool => ! in_array($record->face_id, $remoteFaceIds, true));
+
+        foreach ($localOnlyRecords as $record) {
+            $payload = is_array($record->provider_payload_json) ? $record->provider_payload_json : [];
+            $record->forceFill([
+                'provider_payload_json' => [
+                    ...$payload,
+                    'reconciliation' => [
+                        'status' => 'local_only_soft_deleted',
+                        'reconciled_at' => now()->toIso8601String(),
+                    ],
+                ],
+            ])->save();
+            $record->delete();
+        }
+
+        return [
+            'backend_key' => $this->key(),
+            'collection_id' => $collectionId,
+            'remote_face_count' => $remoteFaces->count(),
+            'local_face_count_before' => $localActiveRecords->count(),
+            'matched_records' => $matchedRecords,
+            'restored_records' => $restoredRecords,
+            'remote_only_records_created' => $remoteOnlyRecordsCreated,
+            'local_only_records_soft_deleted' => $localOnlyRecords->count(),
+        ];
+    }
+
     public function deleteEventBackend(Event $event, EventFaceSearchSetting $settings): void
     {
-        throw new LogicException('AWS Rekognition backend teardown will be implemented in a later phase.');
+        $collectionId = is_string($settings->aws_collection_id) ? trim($settings->aws_collection_id) : '';
+
+        if ($collectionId !== '') {
+            $client = $this->rekognitionClient($settings, 'query');
+
+            try {
+                $this->callAws(
+                    operation: 'query',
+                    callback: fn () => $client->deleteCollection([
+                        'CollectionId' => $collectionId,
+                    ]),
+                );
+            } catch (AwsException $exception) {
+                if (($exception->getAwsErrorCode() ?? null) !== 'ResourceNotFoundException') {
+                    throw $exception;
+                }
+            }
+        }
+
+        FaceSearchProviderRecord::query()
+            ->where('event_id', $event->id)
+            ->where('backend_key', $this->key())
+            ->when($collectionId !== '', fn ($query) => $query->where('collection_id', $collectionId))
+            ->whereNull('deleted_at')
+            ->get()
+            ->each(function (FaceSearchProviderRecord $record): void {
+                $payload = is_array($record->provider_payload_json) ? $record->provider_payload_json : [];
+                $record->forceFill([
+                    'provider_payload_json' => [
+                        ...$payload,
+                        'collection_deleted' => [
+                            'deleted_at' => now()->toIso8601String(),
+                        ],
+                    ],
+                ])->save();
+                $record->delete();
+            });
+
+        $settings->forceFill([
+            'aws_collection_id' => null,
+            'aws_collection_arn' => null,
+            'aws_face_model_version' => null,
+        ])->save();
     }
 
     /**
@@ -501,10 +699,13 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
             ->all();
 
         if ($existingFaceIds !== []) {
-            $client->deleteFaces([
-                'CollectionId' => $collectionId,
-                'FaceIds' => $existingFaceIds,
-            ]);
+            $this->callAws(
+                operation: 'index',
+                callback: fn () => $client->deleteFaces([
+                    'CollectionId' => $collectionId,
+                    'FaceIds' => $existingFaceIds,
+                ]),
+            );
         }
 
         FaceSearchProviderRecord::query()
@@ -650,5 +851,114 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
 
         return $code === 'InvalidParameterException'
             && str_contains($message, 'no face');
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function listAllFaces(RekognitionClient $client, string $collectionId): array
+    {
+        $faces = [];
+        $nextToken = null;
+
+        do {
+            $payload = [
+                'CollectionId' => $collectionId,
+                'MaxResults' => 4096,
+            ];
+
+            if (is_string($nextToken) && $nextToken !== '') {
+                $payload['NextToken'] = $nextToken;
+            }
+
+            $response = $this->toArray($this->callAws(
+                operation: 'query',
+                callback: fn () => $client->listFaces($payload),
+            ));
+
+            foreach ((array) ($response['Faces'] ?? []) as $face) {
+                if (is_array($face)) {
+                    $faces[] = $face;
+                }
+            }
+
+            $nextToken = is_string($response['NextToken'] ?? null) ? $response['NextToken'] : null;
+        } while ($nextToken !== null);
+
+        return $faces;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function listFaceBoundingBoxArray(array $face): ?array
+    {
+        $boundingBox = (array) ($face['BoundingBox'] ?? []);
+
+        if ($boundingBox === []) {
+            return null;
+        }
+
+        return [
+            'left' => isset($boundingBox['Left']) ? (float) $boundingBox['Left'] : null,
+            'top' => isset($boundingBox['Top']) ? (float) $boundingBox['Top'] : null,
+            'width' => isset($boundingBox['Width']) ? (float) $boundingBox['Width'] : null,
+            'height' => isset($boundingBox['Height']) ? (float) $boundingBox['Height'] : null,
+        ];
+    }
+
+    private function resolveMediaIdFromExternalImageId(Event $event, mixed $externalImageId): ?int
+    {
+        if (! is_string($externalImageId) || $externalImageId === '') {
+            return null;
+        }
+
+        if (! preg_match('/^evt:(\d+):media:(\d+):rev:/', $externalImageId, $matches)) {
+            return null;
+        }
+
+        $eventId = (int) ($matches[1] ?? 0);
+        $mediaId = (int) ($matches[2] ?? 0);
+
+        if ($eventId !== $event->id || $mediaId <= 0) {
+            return null;
+        }
+
+        $exists = EventMedia::query()
+            ->where('event_id', $event->id)
+            ->whereKey($mediaId)
+            ->exists();
+
+        return $exists ? $mediaId : null;
+    }
+
+    private function circuitBreaker(): ProviderCircuitBreaker
+    {
+        return $this->circuitBreaker ?? app(ProviderCircuitBreaker::class);
+    }
+
+    private function circuitBreakerFailureThreshold(): int
+    {
+        return (int) config('face_search.providers.aws_rekognition.circuit_breaker.failure_threshold', 0);
+    }
+
+    private function circuitBreakerOpenSeconds(): int
+    {
+        return (int) config('face_search.providers.aws_rekognition.circuit_breaker.open_seconds', 0);
+    }
+
+    private function circuitScope(string $operation): string
+    {
+        return "face-search:aws-rekognition:{$operation}";
+    }
+
+    private function callAws(string $operation, callable $callback): mixed
+    {
+        return $this->circuitBreaker()->call(
+            scope: $this->circuitScope($operation),
+            failureThreshold: $this->circuitBreakerFailureThreshold(),
+            openSeconds: $this->circuitBreakerOpenSeconds(),
+            callback: $callback,
+        );
     }
 }

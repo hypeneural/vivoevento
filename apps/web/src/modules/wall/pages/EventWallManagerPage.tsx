@@ -36,6 +36,7 @@ import { HelpTooltip } from '../components/WallManagerHelp';
 import { WallManagerSection } from '../components/WallManagerSection';
 import { WallAdsTab } from '../components/manager/inspector/WallAdsTab';
 import { WallAppearanceTab } from '../components/manager/inspector/WallAppearanceTab';
+import { WallPlayerDetailsSheet } from '../components/manager/diagnostics/WallPlayerDetailsSheet';
 import { WallPlayerRuntimeCard } from '../components/manager/diagnostics/WallPlayerRuntimeCard';
 import { WallCommandToolbar } from '../components/manager/layout/WallCommandToolbar';
 import { WallInspectorTabs } from '../components/manager/inspector/WallInspectorTabs';
@@ -166,6 +167,8 @@ export default function EventWallManagerPage() {
   const [selectedAdFile, setSelectedAdFile] = useState<File | null>(null);
   const [selectedAdDuration, setSelectedAdDuration] = useState('10');
   const [isRecentDetailsOpen, setIsRecentDetailsOpen] = useState(false);
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  const [isPlayerDetailsOpen, setIsPlayerDetailsOpen] = useState(false);
   const [activeStageTab, setActiveStageTab] = useState<'live' | 'upcoming'>('live');
   const [activeInspectorTab, setActiveInspectorTab] = useState<'queue' | 'appearance' | 'ads'>('queue');
   const adFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -330,6 +333,7 @@ export default function EventWallManagerPage() {
 
   const diagnosticsSummary = diagnosticsQuery.data?.summary ?? settings?.diagnostics_summary ?? null;
   const diagnosticsPlayers = diagnosticsQuery.data?.players ?? [];
+  const selectedPlayer = diagnosticsPlayers.find((player) => player.player_instance_id === selectedPlayerId) ?? null;
   const insights = insightsQuery.data ?? null;
   const insightsRecentItems = insights?.recentItems ?? [];
   const liveSnapshot = liveSnapshotQuery.data ?? null;
@@ -819,7 +823,14 @@ export default function EventWallManagerPage() {
               {diagnosticsPlayers.length > 0 ? (
                 <div className="grid gap-3">
                   {diagnosticsPlayers.map((player) => (
-                    <WallPlayerRuntimeCard key={player.player_instance_id} player={player} />
+                    <WallPlayerRuntimeCard
+                      key={player.player_instance_id}
+                      player={player}
+                      onOpenDetails={(currentPlayer) => {
+                        setSelectedPlayerId(currentPlayer.player_instance_id);
+                        setIsPlayerDetailsOpen(true);
+                      }}
+                    />
                   ))}
                 </div>
               ) : (
@@ -938,6 +949,11 @@ export default function EventWallManagerPage() {
         open={isRecentDetailsOpen && selectedMedia !== null}
         onOpenChange={setIsRecentDetailsOpen}
         item={selectedMedia}
+      />
+      <WallPlayerDetailsSheet
+        open={isPlayerDetailsOpen && selectedPlayer !== null}
+        onOpenChange={setIsPlayerDetailsOpen}
+        player={selectedPlayer}
       />
     </motion.div>
   );

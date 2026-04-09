@@ -22,9 +22,9 @@ gsap.registerPlugin(useGSAP);
 
 // Trust points simplificados
 const trustPoints = [
-  { icon: Check, text: "Sem app", detail: "QR + web + WhatsApp" },
-  { icon: Check, text: "IA configurável", detail: "Você decide o nível" },
-  { icon: Check, text: "Tempo real", detail: "Galeria, jogos, telão, busca" },
+  { icon: Check, text: "Não precisa instalar App", detail: "Receba por QR, Link, WhatsApp ou Telegram" },
+  { icon: Check, text: "IA configurável para as mídias", detail: "Modera, trata foto e responde personalizada" },
+  { icon: Check, text: "Tempo real", detail: "Galeria Personalizada, Telão Dinâmico, Jogos, Mini Site" },
 ];
 
 export default function HeroExperience() {

@@ -67,5 +67,5 @@ it('fails preflight when the selfie has more than one visible person', function 
     $service = new SelfiePreflightService($detector, app(FaceQualityGateService::class));
 
     expect(fn () => $service->validateForSearch($event, $settings, 'binary-image', true))
-        ->toThrow(ValidationException::class, 'Envie uma selfie com apenas uma pessoa visivel.');
+        ->toThrow(ValidationException::class, 'Envie uma selfie com apenas uma pessoa visivel. Busca por foto de grupo ainda nao faz parte desta versao.');
 });

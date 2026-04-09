@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { WALL_EVENT_NAMES } from '@eventovivo/shared-types/wall';
 
+import type { ApiWallLiveSnapshotResponse } from '@/lib/api-types';
 import { queryKeys } from '@/lib/query-client';
 
 import { createWallManagerPusher, disconnectWallManagerPusher } from '../realtime/pusher';
@@ -56,6 +57,10 @@ export function useWallRealtimeSync(eventId: string) {
       ]);
     };
 
+    const applyLiveSnapshot = (payload: ApiWallLiveSnapshotResponse) => {
+      queryClient.setQueryData(queryKeys.wall.liveSnapshot(eventId), payload);
+    };
+
     const handleStateChange = ({ current }: { current: string }) => {
       if (current === 'connected') {
         setRealtimeState('connected');
@@ -80,6 +85,7 @@ export function useWallRealtimeSync(eventId: string) {
     channel.bind(WALL_EVENT_NAMES.statusChanged, refreshAll);
     channel.bind(WALL_EVENT_NAMES.expired, refreshAll);
     channel.bind(WALL_EVENT_NAMES.diagnosticsUpdated, refreshDiagnostics);
+    channel.bind(WALL_EVENT_NAMES.liveSnapshotUpdated, applyLiveSnapshot);
 
     return () => {
       pusher.connection.unbind('state_change', handleStateChange);
@@ -87,6 +93,7 @@ export function useWallRealtimeSync(eventId: string) {
       channel.unbind(WALL_EVENT_NAMES.statusChanged, refreshAll);
       channel.unbind(WALL_EVENT_NAMES.expired, refreshAll);
       channel.unbind(WALL_EVENT_NAMES.diagnosticsUpdated, refreshDiagnostics);
+      channel.unbind(WALL_EVENT_NAMES.liveSnapshotUpdated, applyLiveSnapshot);
       pusher.unsubscribe(channelName);
       disconnectWallManagerPusher();
       setRealtimeState('disconnected');

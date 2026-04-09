@@ -8,6 +8,7 @@ use App\Modules\FaceSearch\DTOs\FaceEmbeddingData;
 use App\Modules\FaceSearch\Models\EventFaceSearchRequest;
 use App\Modules\FaceSearch\Models\FaceSearchQuery;
 use App\Modules\FaceSearch\Services\AwsRekognitionFaceSearchBackend;
+use App\Modules\FaceSearch\Services\FaceSearchRouter;
 use App\Modules\FaceSearch\Models\EventMediaFace;
 use App\Modules\FaceSearch\Services\CompreFaceEmbeddingProvider;
 use App\Modules\FaceSearch\Services\FaceDetectionProviderInterface;
@@ -16,6 +17,8 @@ use App\Modules\FaceSearch\Services\FaceVectorStoreInterface;
 use App\Modules\MediaProcessing\Enums\ModerationStatus;
 use App\Modules\MediaProcessing\Enums\PublicationStatus;
 use App\Modules\MediaProcessing\Models\EventMedia;
+use Aws\Command;
+use Aws\Exception\AwsException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Mockery as m;
@@ -220,6 +223,45 @@ it('returns a clear validation error when the selfie has no valid face', functio
 
     expect($request?->status)->toBe('failed')
         ->and($request?->faces_detected)->toBe(0);
+});
+
+it('returns a clear validation error when the upload is a group photo instead of a selfie', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+    ]);
+
+    app()->instance(FaceDetectionProviderInterface::class, new class implements FaceDetectionProviderInterface
+    {
+        public function detect(\App\Modules\MediaProcessing\Models\EventMedia $media, \App\Modules\FaceSearch\Models\EventFaceSearchSetting $settings, string $binary): array
+        {
+            return [
+                new DetectedFaceData(
+                    boundingBox: new FaceBoundingBoxData(10, 10, 120, 120),
+                    qualityScore: 0.95,
+                ),
+                new DetectedFaceData(
+                    boundingBox: new FaceBoundingBoxData(180, 10, 120, 120),
+                    qualityScore: 0.91,
+                ),
+            ];
+        }
+    });
+
+    $response = $this->withHeaders(['Accept' => 'application/json'])->post(
+        "/api/v1/events/{$event->id}/face-search/search",
+        [
+            'selfie' => UploadedFile::fake()->image('grupo.jpg'),
+        ],
+    );
+
+    $this->assertApiValidationError($response, ['selfie']);
+    $response->assertJsonPath('errors.selfie.0', 'Envie uma selfie com apenas uma pessoa visivel. Busca por foto de grupo ainda nao faz parte desta versao.');
 });
 
 it('stores reject tier and reason when the selfie fails the quality gate', function () {
@@ -505,6 +547,7 @@ it('searches via aws rekognition and stores backend query audit metadata', funct
         ]);
 
     app()->instance(AwsRekognitionFaceSearchBackend::class, $backend);
+    app()->forgetInstance(FaceSearchRouter::class);
 
     $response = $this->withHeaders(['Accept' => 'application/json'])->post(
         "/api/v1/events/{$event->id}/face-search/search",
@@ -537,9 +580,168 @@ it('searches via aws rekognition and stores backend query audit metadata', funct
             'height' => 180,
         ])
         ->and($query?->provider_payload_json)->toMatchArray([
-            'FaceModelVersion' => '7.0',
-            'SearchedFaceConfidence' => 99.1,
+            'primary_backend_key' => 'aws_rekognition',
+            'response_backend_key' => 'aws_rekognition',
+            'fallback_backend_key' => 'local_pgvector',
+            'fallback_triggered' => false,
+            'provider_response' => [
+                'FaceModelVersion' => '7.0',
+                'SearchedFaceConfidence' => 99.1,
+            ],
         ]);
+});
+
+it('falls back to local pgvector when aws search fails with a transient provider error', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'recognition_enabled' => true,
+        'search_backend_key' => 'aws_rekognition',
+        'fallback_backend_key' => 'local_pgvector',
+        'routing_policy' => 'aws_primary_local_fallback',
+        'aws_collection_id' => 'eventovivo-face-search-event-' . $event->id,
+        'aws_region' => 'eu-central-1',
+        'top_k' => 10,
+        'search_threshold' => 0.4,
+    ]);
+
+    bindSingleFaceSearchProviders([0.10, 0.20, 0.30]);
+
+    $eventMedia = EventMedia::factory()->approved()->published()->create([
+        'event_id' => $event->id,
+    ]);
+    seedFaceEmbedding($event->id, $eventMedia->id, [0.10, 0.20, 0.30]);
+
+    $backend = m::mock(AwsRekognitionFaceSearchBackend::class);
+    $backend->shouldReceive('key')->andReturn('aws_rekognition');
+    $backend->shouldReceive('searchBySelfie')
+        ->once()
+        ->andThrow(new AwsException(
+            'throttled',
+            new Command('SearchFacesByImage'),
+            ['code' => 'ThrottlingException'],
+        ));
+
+    app()->instance(AwsRekognitionFaceSearchBackend::class, $backend);
+    app()->forgetInstance(FaceSearchRouter::class);
+
+    $response = $this->withHeaders(['Accept' => 'application/json'])->post(
+        "/api/v1/events/{$event->id}/face-search/search",
+        [
+            'selfie' => UploadedFile::fake()->image('selfie.jpg'),
+            'include_pending' => true,
+        ],
+    );
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.total_results', 1);
+    $response->assertJsonPath('data.results.0.event_media_id', $eventMedia->id);
+
+    $query = FaceSearchQuery::query()->where('event_id', $event->id)->latest('id')->first();
+
+    expect($query)->not->toBeNull()
+        ->and($query?->backend_key)->toBe('local_pgvector')
+        ->and($query?->status->value)->toBe('degraded')
+        ->and($query?->provider_payload_json)->toMatchArray([
+            'primary_backend_key' => 'aws_rekognition',
+            'response_backend_key' => 'local_pgvector',
+            'fallback_backend_key' => 'local_pgvector',
+            'fallback_triggered' => true,
+        ]);
+
+    expect(data_get($query?->provider_payload_json, 'primary_failure.failure_class'))->toBe('transient')
+        ->and(data_get($query?->provider_payload_json, 'primary_failure.reason_code'))->toBe('throttled')
+        ->and(data_get($query?->provider_payload_json, 'primary_failure.exception_class'))->toBe(AwsException::class)
+        ->and(data_get($query?->provider_payload_json, 'primary_failure.message'))->toBe('throttled');
+});
+
+it('runs local shadow search without changing the aws primary response', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'recognition_enabled' => true,
+        'search_backend_key' => 'aws_rekognition',
+        'fallback_backend_key' => 'local_pgvector',
+        'routing_policy' => 'aws_primary_local_shadow',
+        'shadow_mode_percentage' => 100,
+        'aws_collection_id' => 'eventovivo-face-search-event-' . $event->id,
+        'aws_region' => 'eu-central-1',
+        'top_k' => 10,
+        'search_threshold' => 0.4,
+    ]);
+
+    bindSingleFaceSearchProviders([0.20, 0.10, 0.40]);
+
+    $awsMedia = EventMedia::factory()->approved()->published()->create([
+        'event_id' => $event->id,
+    ]);
+    $shadowMedia = EventMedia::factory()->approved()->published()->create([
+        'event_id' => $event->id,
+    ]);
+    seedFaceEmbedding($event->id, $shadowMedia->id, [0.20, 0.10, 0.40]);
+
+    $backend = m::mock(AwsRekognitionFaceSearchBackend::class);
+    $backend->shouldReceive('key')->andReturn('aws_rekognition');
+    $backend->shouldReceive('searchBySelfie')
+        ->once()
+        ->andReturn([
+            'matches' => [
+                new \App\Modules\FaceSearch\DTOs\FaceSearchMatchData(
+                    faceId: 888,
+                    eventMediaId: $awsMedia->id,
+                    distance: 0.04,
+                    qualityScore: 0.94,
+                    faceAreaRatio: 0.22,
+                    qualityTier: 'search_priority',
+                ),
+            ],
+            'provider_payload_json' => [
+                'FaceModelVersion' => '7.0',
+                'SearchedFaceConfidence' => 99.4,
+            ],
+        ]);
+
+    app()->instance(AwsRekognitionFaceSearchBackend::class, $backend);
+    app()->forgetInstance(FaceSearchRouter::class);
+
+    $response = $this->withHeaders(['Accept' => 'application/json'])->post(
+        "/api/v1/events/{$event->id}/face-search/search",
+        [
+            'selfie' => UploadedFile::fake()->image('selfie.jpg'),
+            'include_pending' => true,
+        ],
+    );
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.total_results', 1);
+    $response->assertJsonPath('data.results.0.event_media_id', $awsMedia->id);
+
+    $query = FaceSearchQuery::query()->where('event_id', $event->id)->latest('id')->first();
+
+    expect($query)->not->toBeNull()
+        ->and($query?->backend_key)->toBe('aws_rekognition')
+        ->and($query?->status->value)->toBe('completed')
+        ->and(data_get($query?->provider_payload_json, 'shadow.backend_key'))->toBe('local_pgvector')
+        ->and(data_get($query?->provider_payload_json, 'shadow.status'))->toBe('completed')
+        ->and(data_get($query?->provider_payload_json, 'shadow.result_count'))->toBe(1)
+        ->and(data_get($query?->provider_payload_json, 'shadow.comparison.primary_result_count'))->toBe(1)
+        ->and(data_get($query?->provider_payload_json, 'shadow.comparison.shadow_result_count'))->toBe(1)
+        ->and(data_get($query?->provider_payload_json, 'shadow.comparison.top_match_same'))->toBeFalse()
+        ->and(data_get($query?->provider_payload_json, 'response_backend_key'))->toBe('aws_rekognition');
+
+    expect(data_get($query?->provider_payload_json, 'primary_duration_ms'))->toBeInt()
+        ->and(data_get($query?->provider_payload_json, 'response_duration_ms'))->toBeInt()
+        ->and(data_get($query?->provider_payload_json, 'shadow.latency_ms'))->toBeInt();
 });
 
 function bindSingleFaceSearchProviders(array $vector): void

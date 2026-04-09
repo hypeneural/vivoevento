@@ -7,12 +7,12 @@
   left: 0;
   width: 100%;
   z-index: 60;
-  padding: 0.7rem 0 0;
+  padding: 0.65rem 0 0;
   transition: transform 220ms ease, padding 220ms ease;
 }
 
 .compact {
-  transform: translateY(-0.24rem);
+  transform: translateY(-0.2rem);
 }
 
 .progressBar {
@@ -28,8 +28,8 @@
 
 .shell {
   position: relative;
-  padding: 0.66rem 0.86rem;
-  border-radius: 28px;
+  padding: 0.5rem 0.7rem;
+  border-radius: 999px;
   border: 1px solid rgba(115, 236, 255, 0.1);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 26%),
@@ -46,170 +46,143 @@
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(circle at 16% 12%, rgba($c-accent, 0.14), transparent 26%),
-      radial-gradient(circle at 86% 18%, rgba($c-accent-warm, 0.16), transparent 24%);
-    pointer-events: none;
-  }
-
-  &::after {
-    content: '';
-    position: absolute;
-    left: 1.1rem;
-    right: 1.1rem;
-    bottom: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba($c-accent, 0.16), transparent);
+      radial-gradient(circle at 16% 12%, rgba($c-accent, 0.10), transparent 26%),
+      radial-gradient(circle at 86% 18%, rgba($c-accent-warm, 0.10), transparent 24%);
     pointer-events: none;
   }
 }
 
 .scrolled .shell {
-  border-color: rgba(115, 236, 255, 0.18);
+  border-color: rgba(115, 236, 255, 0.16);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 26%),
-    rgba(5, 9, 19, 0.84);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 26%),
+    rgba(5, 9, 19, 0.88);
   box-shadow:
     0 22px 66px rgba(0, 0, 0, 0.38),
-    0 0 64px rgba(115, 236, 255, 0.08);
+    0 0 48px rgba(115, 236, 255, 0.06);
 }
 
 .inner {
   position: relative;
   z-index: 1;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+  display: flex;
   align-items: center;
-  gap: 0.72rem;
-  min-height: calc(#{$header-height} - 2.05rem);
+  gap: 0.5rem;
+  min-height: 2.6rem;
 }
+
+// ─── Brand ────────────────────────────────────────
 
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.72rem;
+  gap: 0.55rem;
   min-width: 0;
-  padding: 0.22rem 0.28rem 0.22rem 0.12rem;
+  padding: 0.15rem 0.2rem;
   border-radius: 18px;
-  transition: transform 180ms ease, background 180ms ease;
+  flex-shrink: 0;
+  transition: transform 180ms ease;
 }
 
 .brand:hover {
-  background: rgba(255, 255, 255, 0.03);
   transform: translateY(-1px);
-}
-
-.brand:hover .mark {
-  transform: translateY(-1px) scale(1.02);
-  box-shadow: 0 0 42px rgba(115, 236, 255, 0.18);
 }
 
 .mark {
   @include flex-center;
   position: relative;
-  width: 2.7rem;
-  height: 2.7rem;
-  border-radius: 18px;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 14px;
   border: 1px solid rgba($c-accent, 0.22);
   background: linear-gradient(135deg, rgba($c-accent, 0.2), rgba($c-accent-secondary, 0.24));
   color: $c-accent;
   box-shadow: $shadow-glow;
   transition: transform 180ms ease, box-shadow 180ms ease;
-
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 5px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    pointer-events: none;
-  }
+  flex-shrink: 0;
 }
 
 .wordmark {
   display: grid;
-  gap: 0.08rem;
+  gap: 0.04rem;
   font-family: $font-display;
-  font-size: 1rem;
+  font-size: 0.92rem;
+  font-weight: 700;
   letter-spacing: -0.03em;
+  white-space: nowrap;
 
   small {
     display: none;
     font-family: $font-body;
     color: $c-white-48;
-    font-size: 0.64rem;
+    font-size: 0.58rem;
     letter-spacing: 0.12em;
     text-transform: uppercase;
   }
 }
 
+// ─── Nav links ────────────────────────────────────
+
 .nav {
   display: none;
-  justify-self: center;
+  flex: 1;
+  justify-content: center;
   align-items: center;
-  gap: 0.22rem;
-  min-height: 2.8rem;
-  padding: 0.22rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(255, 255, 255, 0.03);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  min-width: 0;
+  gap: 0.15rem;
 
   a {
     position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 2.34rem;
-    padding: 0 0.72rem;
+    min-height: 2.1rem;
+    padding: 0 0.6rem;
     border-radius: 999px;
     color: $c-white-64;
-    font-size: 0.84rem;
-    font-weight: 800;
+    font-size: 0.78rem;
+    font-weight: 700;
     letter-spacing: -0.01em;
-    transition: color 180ms ease, background 180ms ease, transform 180ms ease;
+    transition: color 180ms ease, background 180ms ease;
     white-space: nowrap;
   }
 
   a:hover {
     background: rgba(255, 255, 255, 0.05);
     color: $c-white;
-    transform: translateY(-1px);
   }
 }
 
 .active {
-  background: rgba($c-accent, 0.12);
+  background: rgba($c-accent, 0.1);
   color: $c-accent !important;
 }
+
+// ─── Actions ──────────────────────────────────────
 
 .actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 0.45rem;
-  padding: 0.18rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(255, 255, 255, 0.03);
+  gap: 0.35rem;
+  flex-shrink: 0;
 }
 
 .secondaryAction,
 .desktopCta {
   display: none;
   align-items: center;
-  gap: 0.45rem;
-  min-height: 2.42rem;
-  padding: 0 0.84rem;
+  gap: 0.4rem;
+  min-height: 2.1rem;
+  padding: 0 0.75rem;
   border-radius: 999px;
-  font-weight: 800;
-  font-size: 0.88rem;
-  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, color 180ms ease;
+  font-weight: 700;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
 }
 
 .secondaryAction {
-  border: 1px solid rgba($c-accent, 0.16);
-  background: rgba($c-accent, 0.08);
+  border: 1px solid rgba($c-accent, 0.14);
+  background: rgba($c-accent, 0.06);
   color: $c-white;
 }
 
@@ -217,7 +190,7 @@
   border: 1px solid rgba($c-accent-warm, 0.22);
   background: linear-gradient(135deg, rgba($c-accent-warm, 0.18), rgba($c-accent-secondary, 0.12));
   color: $c-white;
-  box-shadow: $shadow-warm;
+  box-shadow: 0 2px 12px rgba($c-accent-warm, 0.12);
 }
 
 .secondaryAction:hover,
@@ -225,12 +198,14 @@
   transform: translateY(-1px);
 }
 
+// ─── Mobile menu ──────────────────────────────────
+
 .menuButton {
   @include button-reset;
   @include flex-center;
-  width: 2.7rem;
-  height: 2.7rem;
-  border-radius: 16px;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
   color: $c-white;
@@ -238,7 +213,7 @@
 
 .mobilePanel {
   position: fixed;
-  inset: calc(#{$header-height} + 1.8rem) 1rem auto;
+  inset: calc(#{$header-height} + 1.2rem) 1rem auto;
   z-index: 58;
   opacity: 0;
   pointer-events: none;
@@ -264,8 +239,8 @@
     position: absolute;
     inset: 0;
     background:
-      linear-gradient(135deg, rgba($c-accent, 0.08), transparent 46%),
-      radial-gradient(circle at 88% 14%, rgba($c-accent-warm, 0.14), transparent 26%);
+      linear-gradient(135deg, rgba($c-accent, 0.06), transparent 46%),
+      radial-gradient(circle at 88% 14%, rgba($c-accent-warm, 0.10), transparent 26%);
     pointer-events: none;
   }
 }
@@ -319,6 +294,8 @@
   margin-top: 1rem;
 }
 
+// ─── Responsive ───────────────────────────────────
+
 @media (min-width: 1024px) {
   .nav {
     display: flex;
@@ -339,16 +316,27 @@
   .wordmark small {
     display: block;
   }
+
+  .nav a {
+    padding: 0 0.72rem;
+    font-size: 0.82rem;
+  }
+
+  .secondaryAction,
+  .desktopCta {
+    font-size: 0.82rem;
+    min-height: 2.2rem;
+    padding: 0 0.85rem;
+  }
 }
 
 @media (max-width: 1023px) {
   .shell {
-    padding: 0.6rem 0.72rem;
+    padding: 0.5rem 0.6rem;
   }
 
   .inner {
-    grid-template-columns: minmax(0, 1fr) auto;
-    min-height: calc(#{$header-height} - 2.15rem);
+    min-height: 2.4rem;
   }
 
   .wordmark small,
@@ -356,21 +344,21 @@
   .desktopCta {
     display: none;
   }
-
-  .actions {
-    padding: 0;
-    border: 0;
-    background: transparent;
-  }
 }
 
-@media (max-width: 1260px) {
+@media (max-width: 1260px) and (min-width: 1024px) {
   .wordmark small {
     display: none;
   }
 
   .nav a {
-    padding: 0 0.64rem;
-    font-size: 0.8rem;
+    padding: 0 0.5rem;
+    font-size: 0.74rem;
+  }
+
+  .secondaryAction,
+  .desktopCta {
+    font-size: 0.74rem;
+    padding: 0 0.6rem;
   }
 }

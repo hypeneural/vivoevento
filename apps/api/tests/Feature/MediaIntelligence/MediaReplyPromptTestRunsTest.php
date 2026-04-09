@@ -283,6 +283,21 @@ it('rejects prompt tests with more than three images', function () {
     $this->assertApiValidationError($response, ['images']);
 });
 
+it('rejects non-image uploads in the laboratory because the contextual homologation scope is image only', function () {
+    [$user] = $this->actingAsSuperAdmin();
+
+    $response = $this->withHeaders(['Accept' => 'application/json'])
+        ->post('/api/v1/ia/respostas-de-midia/testes', [
+            'provider_key' => 'vllm',
+            'model_key' => 'Qwen/Qwen2.5-VL-3B-Instruct',
+            'images' => [
+                UploadedFile::fake()->create('clip.mp4', 256, 'video/mp4'),
+            ],
+        ]);
+
+    $this->assertApiValidationError($response, ['images.0']);
+});
+
 it('keeps the laboratory observable when a policy layer fails and returns a partial result', function () {
     [$user] = $this->actingAsSuperAdmin();
 

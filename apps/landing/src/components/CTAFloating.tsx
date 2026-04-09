@@ -6,43 +6,19 @@ import { buildCTAUrl } from "@/utils/routing";
 import styles from "./CTAFloating.module.scss";
 
 export interface CTAFloatingProps {
-  /**
-   * Callback para rastrear interações com o CTA flutuante
-   * @param action - Tipo de ação: 'primary' | 'secondary' | 'close'
-   */
   onInteraction?: (action: 'primary' | 'secondary' | 'close') => void;
 }
 
-/**
- * Componente de CTA flutuante
- * 
- * Implementa requisitos 20, 36, 22:
- * - Aparece após 80% de scroll sem clicar CTA (Req 20)
- * - Microconversão para reduzir fricção (Req 36)
- * - Acessibilidade: não bloqueia conteúdo, permite fechar, navegação por teclado (Req 22)
- * 
- * Design discreto e não intrusivo, posicionado no canto inferior direito.
- * Respeita escolha do usuário de dispensar (persiste em sessionStorage).
- */
 export default function CTAFloating({ onInteraction }: CTAFloatingProps) {
   const { showFloatingCTA } = useScrollUI();
   const { utmParams } = useAttribution();
   const [isDismissed, setIsDismissed] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
 
-  // Check if user has dismissed the floating CTA in this session
-  useEffect(() => {
-    const dismissed = sessionStorage.getItem('ev_floating_cta_dismissed');
-    if (dismissed === 'true') {
-      setIsDismissed(true);
-    }
-  }, []);
-
   // Show/hide based on scroll position and dismissal state
   useEffect(() => {
     if (showFloatingCTA && !isDismissed) {
-      // Small delay for smooth entrance
-      const timer = setTimeout(() => setIsVisible(true), 100);
+      const timer = setTimeout(() => setIsVisible(true), 200);
       return () => clearTimeout(timer);
     } else {
       setIsVisible(false);
@@ -51,14 +27,13 @@ export default function CTAFloating({ onInteraction }: CTAFloatingProps) {
 
   const handleClose = () => {
     setIsVisible(false);
-    setIsDismissed(true);
-    sessionStorage.setItem('ev_floating_cta_dismissed', 'true');
+    // Delay dismiss to allow exit animation
+    setTimeout(() => setIsDismissed(true), 350);
     onInteraction?.('close');
   };
 
   const handlePrimaryClick = () => {
     onInteraction?.('primary');
-    // Track conversion in analytics
     if (typeof window !== 'undefined' && (window as any).gtag) {
       (window as any).gtag('event', 'click', {
         event_category: 'CTA',
@@ -70,7 +45,6 @@ export default function CTAFloating({ onInteraction }: CTAFloatingProps) {
 
   const handleSecondaryClick = () => {
     onInteraction?.('secondary');
-    // Track conversion in analytics
     if (typeof window !== 'undefined' && (window as any).gtag) {
       (window as any).gtag('event', 'click', {
         event_category: 'CTA',
@@ -80,7 +54,6 @@ export default function CTAFloating({ onInteraction }: CTAFloatingProps) {
     }
   };
 
-  // Build CTA URLs with UTM params
   const primaryUrl = buildCTAUrl(
     'https://eventovivo.com/agendar-demonstracao',
     utmParams
@@ -91,7 +64,7 @@ export default function CTAFloating({ onInteraction }: CTAFloatingProps) {
     utmParams
   );
 
-  // Don't render if dismissed
+  // Don't render at all only if dismissed (after animation)
   if (isDismissed) {
     return null;
   }
@@ -108,9 +81,9 @@ export default function CTAFloating({ onInteraction }: CTAFloatingProps) {
           type="button"
           className={styles.closeButton}
           onClick={handleClose}
-          aria-label="Fechar CTA flutuante"
+          aria-label="Fechar"
         >
-          <X size={18} aria-hidden="true" />
+          <X size={16} aria-hidden="true" />
         </button>
 
         {/* Content */}

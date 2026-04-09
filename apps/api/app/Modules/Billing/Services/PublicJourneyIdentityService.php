@@ -9,6 +9,28 @@ use Illuminate\Validation\ValidationException;
 
 class PublicJourneyIdentityService
 {
+    /**
+     * @return array{phone_exists: bool, email_exists: bool, exists: bool}
+     */
+    public function detectExistingIdentity(string $phone, ?string $email): array
+    {
+        $legacyVariant = str_starts_with($phone, '55') ? substr($phone, 2) : $phone;
+
+        $phoneExists = User::query()
+            ->where('phone', $phone)
+            ->orWhere('phone', $legacyVariant)
+            ->exists();
+
+        $emailExists = $email !== null
+            && User::query()->whereRaw('LOWER(email) = ?', [$email])->exists();
+
+        return [
+            'phone_exists' => $phoneExists,
+            'email_exists' => $emailExists,
+            'exists' => $phoneExists || $emailExists,
+        ];
+    }
+
     public function normalizePhone(string $phone): string
     {
         return PhoneNumber::normalizeBrazilianWhatsApp($phone);
@@ -23,20 +45,15 @@ class PublicJourneyIdentityService
 
     public function ensureIdentityAvailable(string $phone, ?string $email): void
     {
-        $legacyVariant = str_starts_with($phone, '55') ? substr($phone, 2) : $phone;
+        $identity = $this->detectExistingIdentity($phone, $email);
 
-        $phoneExists = User::query()
-            ->where('phone', $phone)
-            ->orWhere('phone', $legacyVariant)
-            ->exists();
-
-        if ($phoneExists) {
+        if ($identity['phone_exists']) {
             throw ValidationException::withMessages([
                 'whatsapp' => ['Este WhatsApp ja possui cadastro. Faca login para continuar.'],
             ]);
         }
 
-        if ($email !== null && User::query()->whereRaw('LOWER(email) = ?', [$email])->exists()) {
+        if ($identity['email_exists']) {
             throw ValidationException::withMessages([
                 'email' => ['Este e-mail ja possui cadastro. Faca login para continuar.'],
             ]);
