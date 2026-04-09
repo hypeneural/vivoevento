@@ -12,6 +12,7 @@ import { ChannelBadge, MediaStatusBadge } from '@/shared/components/StatusBadges
 
 import type { ModerationMediaAction } from './ModerationMediaCard';
 import { MediaActionButton } from './ModerationMediaCard';
+import { ModerationMediaSurface, resolveModerationSurfaceAsset } from './ModerationMediaSurface';
 import { formatDateTime, getAspectRatio, getOrientationLabel, isVideoAsset } from '../utils';
 
 interface ModerationReviewPanelProps {
@@ -71,8 +72,8 @@ export function ModerationReviewPanel({
 
   const canApprove = media.status !== 'approved' && media.status !== 'published';
   const canReject = media.status !== 'rejected';
-  const surfaceUrl = media.thumbnail_url ?? media.preview_url;
-  const showsVideoPreview = isVideoAsset(media, surfaceUrl);
+  const surfaceAsset = resolveModerationSurfaceAsset(media, 'preview');
+  const showsVideoPreview = isVideoAsset(media, media.preview_url);
   const aiEvaluations = hasAiEvaluations(media)
     ? {
         safety: media.latest_safety_evaluation ?? null,
@@ -93,33 +94,15 @@ export function ModerationReviewPanel({
   return (
     <div className="overflow-hidden rounded-[28px] border border-border/60 bg-background/90 shadow-sm">
       <button type="button" className="block w-full text-left" onClick={onOpenPreview}>
-        {surfaceUrl ? (
-          <div className="bg-muted">
-            <AspectRatio ratio={getAspectRatio(media)}>
-              {showsVideoPreview ? (
-                <video
-                  src={surfaceUrl}
-                  className="h-full w-full object-cover"
-                  muted
-                  playsInline
-                  preload="metadata"
-                />
-              ) : (
-                <img
-                  src={surfaceUrl}
-                  alt={media.caption || media.event_title || 'Preview da midia'}
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                  decoding="async"
-                />
-              )}
-            </AspectRatio>
-          </div>
-        ) : (
-          <div className="flex h-72 items-center justify-center bg-muted text-muted-foreground">
-            <ImageIcon className="h-12 w-12" />
-          </div>
-        )}
+        <div className="bg-muted">
+          <AspectRatio ratio={getAspectRatio(media)}>
+            <ModerationMediaSurface
+              media={media}
+              variant="preview"
+              className="h-full w-full"
+            />
+          </AspectRatio>
+        </div>
       </button>
 
       <div className="space-y-5 p-5">
@@ -427,7 +410,7 @@ export function ModerationReviewPanel({
           <Button asChild variant="outline" className="rounded-2xl">
             <Link to={`/events/${media.event_id}`}>Abrir evento</Link>
           </Button>
-          {surfaceUrl ? (
+          {surfaceAsset.url ? (
             <Button variant="ghost" className="rounded-2xl" onClick={onOpenPreview}>
               Ver ampliado
             </Button>

@@ -205,3 +205,177 @@ it('throws the underlying request exception when pagarme returns an error respon
         'code' => 'order-123',
     ]))->toThrow(RequestException::class);
 });
+
+it('adds recurring billing endpoints for plans subscriptions cycles invoices charges hooks and wallet cards', function () {
+    Http::preventStrayRequests();
+
+    Http::fake(function (Request $request) {
+        $url = $request->url();
+        $method = $request->method();
+
+        return match (true) {
+            $method === 'POST' && $url === 'https://api.pagar.me/core/v5/plans' => Http::response([
+                'id' => 'plan_test_123',
+                'name' => 'Eventovivo Pro Mensal',
+            ], 200),
+            $method === 'GET' && str_starts_with($url, 'https://api.pagar.me/core/v5/plans?') => Http::response([
+                'data' => [['id' => 'plan_test_123']],
+            ], 200),
+            $method === 'GET' && $url === 'https://api.pagar.me/core/v5/plans/plan_test_123' => Http::response([
+                'id' => 'plan_test_123',
+                'interval' => 'month',
+            ], 200),
+            $method === 'POST' && $url === 'https://api.pagar.me/core/v5/subscriptions' => Http::response([
+                'id' => 'sub_test_123',
+                'status' => 'active',
+            ], 200),
+            $method === 'GET' && $url === 'https://api.pagar.me/core/v5/subscriptions/sub_test_123' => Http::response([
+                'id' => 'sub_test_123',
+                'status' => 'active',
+            ], 200),
+            $method === 'GET' && str_starts_with($url, 'https://api.pagar.me/core/v5/subscriptions?') => Http::response([
+                'data' => [['id' => 'sub_test_123']],
+            ], 200),
+            $method === 'GET' && str_starts_with($url, 'https://api.pagar.me/core/v5/subscriptions/sub_test_123/cycles?') => Http::response([
+                'data' => [['id' => 'cycle_test_123']],
+            ], 200),
+            $method === 'GET' && str_starts_with($url, 'https://api.pagar.me/core/v5/invoices?') => Http::response([
+                'data' => [['id' => 'inv_test_123']],
+            ], 200),
+            $method === 'GET' && str_starts_with($url, 'https://api.pagar.me/core/v5/charges?') => Http::response([
+                'data' => [['id' => 'ch_test_123']],
+            ], 200),
+            $method === 'GET' && $url === 'https://api.pagar.me/core/v5/hooks/hook_test_123' => Http::response([
+                'id' => 'hook_test_123',
+                'status' => 'failed',
+            ], 200),
+            $method === 'GET' && $url === 'https://api.pagar.me/core/v5/customers/cus_test_123/cards' => Http::response([
+                'data' => [['id' => 'card_test_123']],
+            ], 200),
+            $method === 'DELETE' && $url === 'https://api.pagar.me/core/v5/subscriptions/sub_test_123' => Http::response([
+                'id' => 'sub_test_123',
+                'status' => 'canceled',
+            ], 200),
+            default => Http::response([
+                'message' => "Unexpected request: {$method} {$url}",
+            ], 500),
+        };
+    });
+
+    $client = app(PagarmeClient::class);
+
+    $plan = $client->createPlan([
+        'name' => 'Eventovivo Pro Mensal',
+    ], 'idem-plan-123');
+    $plans = $client->listPlans([
+        'page' => 1,
+        'size' => 20,
+    ]);
+    $fetchedPlan = $client->getPlan('plan_test_123');
+    $subscription = $client->createSubscription([
+        'plan_id' => 'plan_test_123',
+        'payment_method' => 'credit_card',
+    ], 'idem-sub-123');
+    $fetchedSubscription = $client->getSubscription('sub_test_123');
+    $subscriptions = $client->listSubscriptions([
+        'status' => 'active',
+        'page' => 1,
+        'size' => 20,
+    ]);
+    $cycles = $client->listSubscriptionCycles('sub_test_123', [
+        'page' => 1,
+        'size' => 20,
+    ]);
+    $invoices = $client->listInvoices([
+        'subscription_id' => 'sub_test_123',
+        'page' => 1,
+        'size' => 20,
+    ]);
+    $charges = $client->listCharges([
+        'customer_id' => 'cus_test_123',
+        'page' => 1,
+        'size' => 20,
+    ]);
+    $hook = $client->getHook('hook_test_123');
+    $cards = $client->listCustomerCards('cus_test_123');
+    $canceledSubscription = $client->cancelSubscription('sub_test_123', [
+        'cancel_pending_invoices' => true,
+    ]);
+
+    expect($plan['id'])->toBe('plan_test_123')
+        ->and(data_get($plans, 'data.0.id'))->toBe('plan_test_123')
+        ->and($fetchedPlan['interval'])->toBe('month')
+        ->and($subscription['id'])->toBe('sub_test_123')
+        ->and($fetchedSubscription['status'])->toBe('active')
+        ->and(data_get($subscriptions, 'data.0.id'))->toBe('sub_test_123')
+        ->and(data_get($cycles, 'data.0.id'))->toBe('cycle_test_123')
+        ->and(data_get($invoices, 'data.0.id'))->toBe('inv_test_123')
+        ->and(data_get($charges, 'data.0.id'))->toBe('ch_test_123')
+        ->and($hook['status'])->toBe('failed')
+        ->and(data_get($cards, 'data.0.id'))->toBe('card_test_123')
+        ->and($canceledSubscription['status'])->toBe('canceled');
+
+    Http::assertSent(function (Request $request) {
+        return $request->method() === 'GET'
+            && str_contains($request->url(), '/subscriptions/sub_test_123/cycles?')
+            && str_contains($request->url(), 'page=1')
+            && str_contains($request->url(), 'size=20');
+    });
+
+    Http::assertSent(function (Request $request) {
+        return $request->method() === 'GET'
+            && str_contains($request->url(), '/invoices?')
+            && str_contains($request->url(), 'subscription_id=sub_test_123');
+    });
+
+    Http::assertSent(function (Request $request) {
+        return $request->method() === 'GET'
+            && $request->url() === 'https://api.pagar.me/core/v5/customers/cus_test_123/cards';
+    });
+});
+
+it('applies idempotency keys across recurring write operations, not only orders', function () {
+    Http::preventStrayRequests();
+
+    Http::fake(function (Request $request) {
+        $url = $request->url();
+        $method = $request->method();
+
+        return match (true) {
+            $method === 'POST' && $url === 'https://api.pagar.me/core/v5/plans' => Http::response(['id' => 'plan_test_123'], 200),
+            $method === 'POST' && $url === 'https://api.pagar.me/core/v5/subscriptions' => Http::response(['id' => 'sub_test_123'], 200),
+            $method === 'PATCH' && $url === 'https://api.pagar.me/core/v5/subscriptions/sub_test_123/card' => Http::response(['id' => 'sub_test_123'], 200),
+            $method === 'PATCH' && $url === 'https://api.pagar.me/core/v5/subscriptions/sub_test_123/payment-method' => Http::response(['id' => 'sub_test_123'], 200),
+            $method === 'PATCH' && $url === 'https://api.pagar.me/core/v5/subscriptions/sub_test_123/start-at' => Http::response(['id' => 'sub_test_123'], 200),
+            $method === 'PATCH' && $url === 'https://api.pagar.me/core/v5/subscriptions/sub_test_123/metadata' => Http::response(['id' => 'sub_test_123'], 200),
+            default => Http::response([
+                'message' => "Unexpected request: {$method} {$url}",
+            ], 500),
+        };
+    });
+
+    $client = app(PagarmeClient::class);
+
+    $client->createPlan(['name' => 'Plano recorrente'], 'idem-plan-write');
+    $client->createSubscription(['plan_id' => 'plan_test_123'], 'idem-sub-write');
+    $client->updateSubscriptionCard('sub_test_123', ['card_token' => 'tok_123'], 'idem-card-write');
+    $client->updateSubscriptionPaymentMethod('sub_test_123', ['payment_method' => 'credit_card'], 'idem-payment-method-write');
+    $client->updateSubscriptionStartAt('sub_test_123', ['start_at' => '2026-04-10T12:00:00Z'], 'idem-start-write');
+    $client->updateSubscriptionMetadata('sub_test_123', ['metadata' => ['tenant_id' => '123']], 'idem-metadata-write');
+
+    $expectedHeaders = [
+        'https://api.pagar.me/core/v5/plans' => 'idem-plan-write',
+        'https://api.pagar.me/core/v5/subscriptions' => 'idem-sub-write',
+        'https://api.pagar.me/core/v5/subscriptions/sub_test_123/card' => 'idem-card-write',
+        'https://api.pagar.me/core/v5/subscriptions/sub_test_123/payment-method' => 'idem-payment-method-write',
+        'https://api.pagar.me/core/v5/subscriptions/sub_test_123/start-at' => 'idem-start-write',
+        'https://api.pagar.me/core/v5/subscriptions/sub_test_123/metadata' => 'idem-metadata-write',
+    ];
+
+    foreach ($expectedHeaders as $url => $idempotencyKey) {
+        Http::assertSent(function (Request $request) use ($url, $idempotencyKey) {
+            return $request->url() === $url
+                && ($request->header('Idempotency-Key')[0] ?? null) === $idempotencyKey;
+        });
+    }
+});

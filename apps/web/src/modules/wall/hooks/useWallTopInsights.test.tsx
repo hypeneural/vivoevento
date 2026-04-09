@@ -28,7 +28,7 @@ function makeInsightsResponse(overrides: Partial<ApiWallInsightsResponse> = {}):
       received: 12,
       approved: 10,
       queued: 7,
-      displayed: null,
+      displayed: 3,
     },
     recentItems: [
       {
@@ -105,6 +105,7 @@ describe('useWallTopInsights', () => {
 
     expect(getEventWallInsightsMock).toHaveBeenCalledWith('31');
     expect(result.current.data?.totals.received).toBe(12);
+    expect(result.current.data?.totals.displayed).toBe(3);
   });
 
   it('nao dispara a query quando o eventId ainda nao existe', async () => {
@@ -121,6 +122,12 @@ describe('useWallTopInsights', () => {
 
   it('mantem os dados anteriores visiveis enquanto a proxima chave ainda esta carregando', async () => {
     const previousInsights = makeInsightsResponse({
+      totals: {
+        received: 12,
+        approved: 10,
+        queued: 7,
+        displayed: 3,
+      },
       topContributor: {
         senderKey: 'whatsapp:5511999990001',
         displayName: 'Ana',
@@ -132,6 +139,12 @@ describe('useWallTopInsights', () => {
       },
     });
     const nextInsights = makeInsightsResponse({
+      totals: {
+        received: 14,
+        approved: 11,
+        queued: 8,
+        displayed: 4,
+      },
       topContributor: {
         senderKey: 'upload:galeria',
         displayName: 'Bruno',
@@ -167,11 +180,13 @@ describe('useWallTopInsights', () => {
     });
 
     expect(result.current.data?.topContributor?.displayName).toBe('Ana');
+    expect(result.current.data?.totals.displayed).toBe(3);
 
     deferred.resolve(nextInsights);
 
     await waitFor(() => {
       expect(result.current.data?.topContributor?.displayName).toBe('Bruno');
     });
+    expect(result.current.data?.totals.displayed).toBe(4);
   });
 });

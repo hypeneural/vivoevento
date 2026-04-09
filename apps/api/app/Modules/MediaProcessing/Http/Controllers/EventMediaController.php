@@ -128,7 +128,6 @@ class EventMediaController extends BaseController
             perPage: $perPage,
             cursor: $validated['cursor'] ?? null,
         );
-        $includeStats = empty($validated['cursor']);
 
         app(EventMediaSenderContextService::class)->hydrateCollection($page['items']);
 
@@ -140,12 +139,34 @@ class EventMediaController extends BaseController
                 'next_cursor' => $page['next_cursor'],
                 'prev_cursor' => null,
                 'has_more' => $page['has_more'],
-                'stats' => $includeStats
-                    ? $this->cachedModerationStats($query, $organizationId, $validated)
-                    : null,
+                'stats' => null,
                 'request_id' => 'req_' . Str::random(12),
             ],
         ]);
+    }
+
+    public function moderationFeedStats(ListModerationMediaRequest $request): JsonResponse
+    {
+        $organizationId = $request->user()?->currentOrganization()?->id;
+
+        abort_unless($organizationId, 422, 'Nenhuma organizacao ativa encontrada.');
+
+        $validated = $request->validated();
+
+        $query = new ListModerationMediaQuery(
+            organizationId: $organizationId,
+            eventId: $validated['event_id'] ?? null,
+            search: $validated['search'] ?? null,
+            status: $validated['status'] ?? null,
+            featured: array_key_exists('featured', $validated) ? (bool) $validated['featured'] : null,
+            pinned: array_key_exists('pinned', $validated) ? (bool) $validated['pinned'] : null,
+            senderBlocked: array_key_exists('sender_blocked', $validated) ? (bool) $validated['sender_blocked'] : null,
+            orientation: $validated['orientation'] ?? null,
+        );
+
+        return $this->success(
+            $this->cachedModerationStats($query, $organizationId, $validated)
+        );
     }
 
     public function index(

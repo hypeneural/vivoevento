@@ -7,6 +7,7 @@ use App\Modules\Wall\Models\EventWallSetting;
 use App\Modules\Wall\Models\WallPlayerRuntimeStatus;
 use App\Modules\Wall\Support\WallLayoutHintResolver;
 use App\Modules\Wall\Support\WallSourceNormalizer;
+use App\Modules\Wall\Support\WallVideoPolicyLabelResolver;
 use Illuminate\Support\Str;
 
 class WallLiveSnapshotService
@@ -15,6 +16,7 @@ class WallLiveSnapshotService
         private readonly WallDiagnosticsService $diagnostics,
         private readonly WallPayloadFactory $payloads,
         private readonly WallLayoutHintResolver $layoutHintResolver,
+        private readonly WallSimulationService $simulation,
     ) {}
 
     public function buildSnapshot(EventWallSetting $settings): array
@@ -22,6 +24,7 @@ class WallLiveSnapshotService
         $player = $this->resolveCurrentPlayer($settings);
         $playerPayload = $player ? $this->diagnostics->playerPayload($player) : null;
         $currentItem = $player ? $this->resolveCurrentItem($settings, $player) : null;
+        $nextItem = $currentItem ? $this->resolveNextItem($settings, $currentItem['id']) : null;
 
         return [
             'wallStatus' => $settings->status->value,
@@ -36,6 +39,7 @@ class WallLiveSnapshotService
                 'lastSeenAt' => $playerPayload['last_seen_at'],
             ] : null,
             'currentItem' => $currentItem,
+            'nextItem' => $nextItem,
             'advancedAt' => $player?->current_item_started_at?->toIso8601String(),
             'updatedAt' => $playerPayload['updated_at'] ?? $settings->updated_at?->toIso8601String(),
         ];
@@ -76,7 +80,7 @@ class WallLiveSnapshotService
             return null;
         }
 
-        $mediaPayload = $this->payloads->media($media);
+        $mediaPayload = $this->payloads->media($media, $settings);
 
         return [
             'id' => $mediaPayload['id'],
@@ -87,7 +91,42 @@ class WallLiveSnapshotService
             'caption' => $mediaPayload['caption'] ?? null,
             'layoutHint' => $this->layoutHintResolver->resolve($settings->layout->value, $mediaPayload),
             'isFeatured' => (bool) ($mediaPayload['is_featured'] ?? false),
+            'isVideo' => ($mediaPayload['type'] ?? 'image') === 'video',
+            'durationSeconds' => $mediaPayload['duration_seconds'] ?? null,
+            'videoPolicyLabel' => WallVideoPolicyLabelResolver::fromPayload($mediaPayload),
             'createdAt' => $mediaPayload['created_at'] ?? null,
+        ];
+    }
+
+    private function resolveNextItem(EventWallSetting $settings, string $currentItemId): ?array
+    {
+        $simulation = $this->simulation->simulate($settings, [], 2);
+        $preview = collect($simulation['sequence_preview'] ?? [])->values();
+
+        if ($preview->count() < 2) {
+            return null;
+        }
+
+        $firstPredictedItem = $preview->first();
+        $nextPredictedItem = $preview->get(1);
+
+        if (($firstPredictedItem['item_id'] ?? null) !== $currentItemId || ! is_array($nextPredictedItem)) {
+            return null;
+        }
+
+        return [
+            'id' => $nextPredictedItem['item_id'],
+            'previewUrl' => $nextPredictedItem['preview_url'] ?? null,
+            'senderName' => $nextPredictedItem['sender_name'] ?: 'Convidado',
+            'senderKey' => $nextPredictedItem['sender_key'] ?? $nextPredictedItem['item_id'],
+            'source' => WallSourceNormalizer::normalize($nextPredictedItem['source_type'] ?? null),
+            'caption' => $nextPredictedItem['caption'] ?? null,
+            'layoutHint' => $nextPredictedItem['layout_hint'] ?? null,
+            'isFeatured' => (bool) ($nextPredictedItem['is_featured'] ?? false),
+            'isVideo' => (bool) ($nextPredictedItem['is_video'] ?? false),
+            'durationSeconds' => $nextPredictedItem['duration_seconds'] ?? null,
+            'videoPolicyLabel' => $nextPredictedItem['video_policy_label'] ?? null,
+            'createdAt' => $nextPredictedItem['created_at'] ?? null,
         ];
     }
 

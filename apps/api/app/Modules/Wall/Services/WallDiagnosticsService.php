@@ -8,11 +8,16 @@ use App\Modules\Wall\Models\WallDiagnosticSummary;
 use App\Modules\Wall\Models\WallPlayerRuntimeStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Carbon;
 
 class WallDiagnosticsService
 {
     public const OFFLINE_AFTER_SECONDS = 60;
     public const PRUNE_AFTER_HOURS = 24;
+
+    public function __construct(
+        private readonly WallDisplayCounterService $displayCounters,
+    ) {}
 
     public function recordHeartbeat(EventWallSetting $settings, array $payload): WallPlayerRuntimeStatus
     {
@@ -27,8 +32,35 @@ class WallDiagnosticsService
             'runtime_status' => $payload['runtime_status'],
             'connection_status' => $payload['connection_status'],
             'current_item_id' => $currentItemId,
-            'current_item_started_at' => $this->resolveCurrentItemStartedAt($player, $currentItemId),
+            'current_item_started_at' => $this->resolveCurrentItemStartedAt(
+                $player,
+                $currentItemId,
+                $payload['current_item_started_at'] ?? null,
+            ),
             'current_sender_key' => $payload['current_sender_key'] ?? null,
+            'current_media_type' => $payload['current_media_type'] ?? null,
+            'current_video_phase' => $payload['current_video_phase'] ?? null,
+            'current_video_exit_reason' => $payload['current_video_exit_reason'] ?? null,
+            'current_video_failure_reason' => $payload['current_video_failure_reason'] ?? null,
+            'current_video_position_seconds' => $payload['current_video_position_seconds'] ?? null,
+            'current_video_duration_seconds' => $payload['current_video_duration_seconds'] ?? null,
+            'current_video_ready_state' => $payload['current_video_ready_state'] ?? null,
+            'current_video_stall_count' => (int) ($payload['current_video_stall_count'] ?? 0),
+            'current_video_poster_visible' => array_key_exists('current_video_poster_visible', $payload)
+                ? (bool) $payload['current_video_poster_visible']
+                : null,
+            'current_video_first_frame_ready' => array_key_exists('current_video_first_frame_ready', $payload)
+                ? (bool) $payload['current_video_first_frame_ready']
+                : null,
+            'current_video_playback_ready' => array_key_exists('current_video_playback_ready', $payload)
+                ? (bool) $payload['current_video_playback_ready']
+                : null,
+            'current_video_playing_confirmed' => array_key_exists('current_video_playing_confirmed', $payload)
+                ? (bool) $payload['current_video_playing_confirmed']
+                : null,
+            'current_video_startup_degraded' => array_key_exists('current_video_startup_degraded', $payload)
+                ? (bool) $payload['current_video_startup_degraded']
+                : null,
             'ready_count' => (int) ($payload['ready_count'] ?? 0),
             'loading_count' => (int) ($payload['loading_count'] ?? 0),
             'error_count' => (int) ($payload['error_count'] ?? 0),
@@ -47,7 +79,11 @@ class WallDiagnosticsService
 
         $player->save();
 
-        return $player->fresh();
+        $freshPlayer = $player->fresh() ?? $player;
+
+        $this->displayCounters->recordDisplayedMedia($settings, $freshPlayer);
+
+        return $freshPlayer;
     }
 
     public function diagnosticsPayload(EventWallSetting $settings): array
@@ -135,6 +171,19 @@ class WallDiagnosticsService
             'current_item_id' => $player->current_item_id,
             'current_item_started_at' => $player->current_item_started_at?->toIso8601String(),
             'current_sender_key' => $player->current_sender_key,
+            'current_media_type' => $player->current_media_type,
+            'current_video_phase' => $player->current_video_phase,
+            'current_video_exit_reason' => $player->current_video_exit_reason,
+            'current_video_failure_reason' => $player->current_video_failure_reason,
+            'current_video_position_seconds' => $player->current_video_position_seconds,
+            'current_video_duration_seconds' => $player->current_video_duration_seconds,
+            'current_video_ready_state' => $player->current_video_ready_state,
+            'current_video_stall_count' => (int) ($player->current_video_stall_count ?? 0),
+            'current_video_poster_visible' => $player->current_video_poster_visible,
+            'current_video_first_frame_ready' => $player->current_video_first_frame_ready,
+            'current_video_playback_ready' => $player->current_video_playback_ready,
+            'current_video_playing_confirmed' => $player->current_video_playing_confirmed,
+            'current_video_startup_degraded' => $player->current_video_startup_degraded,
             'ready_count' => (int) $player->ready_count,
             'loading_count' => (int) $player->loading_count,
             'error_count' => (int) $player->error_count,
@@ -305,6 +354,8 @@ class WallDiagnosticsService
             || $player->runtime_status === 'error'
             || (int) $player->error_count > 0
             || (int) $player->stale_count > 0
+            || ($player->current_media_type === 'video' && in_array($player->current_video_phase, ['waiting', 'stalled', 'failed_to_start'], true))
+            || filled($player->current_video_failure_reason)
         ) {
             return 'degraded';
         }
@@ -338,17 +389,35 @@ class WallDiagnosticsService
         return ! in_array($player->persistent_storage, ['none', 'unknown', 'unavailable', ''], true);
     }
 
-    private function resolveCurrentItemStartedAt(WallPlayerRuntimeStatus $player, ?string $currentItemId): ?\Illuminate\Support\Carbon
+    private function resolveCurrentItemStartedAt(
+        WallPlayerRuntimeStatus $player,
+        ?string $currentItemId,
+        ?string $providedStartedAt,
+    ): ?Carbon
     {
         if (! $currentItemId) {
             return null;
         }
 
+        $providedAt = filled($providedStartedAt)
+            ? Carbon::parse($providedStartedAt)
+            : null;
+
         if (! $player->exists || $player->current_item_id !== $currentItemId) {
-            return now();
+            return $providedAt ?? now();
         }
 
-        return $player->current_item_started_at ?? now();
+        if (! $player->current_item_started_at) {
+            return $providedAt ?? now();
+        }
+
+        if (! $providedAt) {
+            return $player->current_item_started_at;
+        }
+
+        return $providedAt->gt($player->current_item_started_at)
+            ? $providedAt
+            : $player->current_item_started_at;
     }
 
     private function hasMaterialSummaryChange(

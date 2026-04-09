@@ -44,5 +44,6 @@ class ReconcileAwsCollectionJob implements ShouldQueue
         }
 
         $backend->reconcileCollection($event, $settings);
+        SyncAwsUserVectorJob::dispatch($event->id);
     }
 }

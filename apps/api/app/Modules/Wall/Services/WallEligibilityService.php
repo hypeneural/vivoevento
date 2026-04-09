@@ -11,6 +11,10 @@ use Illuminate\Support\Collection;
 
 class WallEligibilityService
 {
+    public function __construct(
+        private readonly WallVideoAdmissionService $videoAdmission,
+    ) {}
+
     /**
      * Check if a media item can appear on the wall.
      * This is the single gate for wall eligibility.
@@ -21,7 +25,8 @@ class WallEligibilityService
             && $media->publication_status === PublicationStatus::Published
             && $media->moderation_status === ModerationStatus::Approved
             && in_array($media->media_type, ['image', 'video'], true)
-            && $this->matchesOrientationRule($media, $settings);
+            && $this->matchesOrientationRule($media, $settings)
+            && $this->passesMediaTypePolicy($media, $settings);
     }
 
     /**
@@ -64,6 +69,39 @@ class WallEligibilityService
         $acceptedOrientation = $settings->accepted_orientation ?? WallAcceptedOrientation::All;
 
         return $acceptedOrientation->matches($this->resolveMediaOrientation($media));
+    }
+
+    private function passesMediaTypePolicy(EventMedia $media, EventWallSetting $settings): bool
+    {
+        if ($media->media_type !== 'video') {
+            return true;
+        }
+
+        $admission = $this->videoAdmission->inspect($media, $settings);
+        $preferredVariant = $settings->resolvedVideoPreferredVariant();
+        $allowsOriginalFallback = $preferredVariant === 'original';
+
+        if ($admission['state'] === 'blocked') {
+            return false;
+        }
+
+        if (! $admission['has_minimum_metadata']) {
+            return false;
+        }
+
+        if (! $admission['preferred_variant_available']) {
+            return false;
+        }
+
+        if (! $admission['poster_available'] && ! $allowsOriginalFallback) {
+            return false;
+        }
+
+        if (! $allowsOriginalFallback && $admission['asset_source'] !== 'wall_variant') {
+            return false;
+        }
+
+        return true;
     }
 
     /**

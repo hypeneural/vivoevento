@@ -10,8 +10,36 @@ function mediaDateValue(media: ApiEventMediaItem) {
   return media.created_at ? new Date(media.created_at).getTime() : 0;
 }
 
+function mediaFreshnessValue(media: ApiEventMediaItem) {
+  return media.updated_at
+    ? new Date(media.updated_at).getTime()
+    : mediaDateValue(media);
+}
+
 function pendingPriority(media: ApiEventMediaItem) {
   return media.status === 'pending_moderation' ? 1 : 0;
+}
+
+export function pickFreshestModerationItem(
+  current: ApiEventMediaItem | undefined,
+  incoming: ApiEventMediaItem,
+) {
+  if (!current) {
+    return incoming;
+  }
+
+  const currentFreshness = mediaFreshnessValue(current);
+  const incomingFreshness = mediaFreshnessValue(incoming);
+
+  if (incomingFreshness > currentFreshness) {
+    return incoming;
+  }
+
+  if (incomingFreshness < currentFreshness) {
+    return current;
+  }
+
+  return incoming;
 }
 
 export function compareModerationMedia(a: ApiEventMediaItem, b: ApiEventMediaItem) {
@@ -81,11 +109,18 @@ export function moderationItemMatchesFilters(media: ApiEventMediaItem, filters: 
   return true;
 }
 
-function uniqueById(items: ApiEventMediaItem[]) {
+export function mergeModerationItemCollections(
+  currentItems: ApiEventMediaItem[],
+  incomingItems: ApiEventMediaItem[],
+) {
   const map = new Map<number, ApiEventMediaItem>();
 
-  items.forEach((item) => {
+  currentItems.forEach((item) => {
     map.set(item.id, item);
+  });
+
+  incomingItems.forEach((item) => {
+    map.set(item.id, pickFreshestModerationItem(map.get(item.id), item));
   });
 
   return Array.from(map.values());
@@ -133,14 +168,20 @@ export function upsertModerationItems(
   if (!current) return current;
 
   const currentItems = flattenModerationPages(current);
-  const incomingById = new Map(items.map((item) => [item.id, item] as const));
+  const incomingById = new Map<number, ApiEventMediaItem>();
 
-  const nextItems = uniqueById([
-    ...currentItems
-      .map((item) => incomingById.get(item.id) ?? item)
-      .filter((item) => !incomingById.has(item.id) || moderationItemMatchesFilters(item, filters)),
-    ...items.filter((item) => !currentItems.some((currentItem) => currentItem.id === item.id)),
-  ])
+  items.forEach((item) => {
+    incomingById.set(item.id, pickFreshestModerationItem(incomingById.get(item.id), item));
+  });
+
+  const currentIds = new Set(currentItems.map((item) => item.id));
+
+  const nextItems = mergeModerationItemCollections(
+    currentItems
+      .map((item) => pickFreshestModerationItem(item, incomingById.get(item.id) ?? item))
+      .filter((item) => moderationItemMatchesFilters(item, filters)),
+    Array.from(incomingById.values()).filter((item) => !currentIds.has(item.id)),
+  )
     .filter((item) => moderationItemMatchesFilters(item, filters))
     .sort(compareModerationMedia);
 
@@ -155,10 +196,12 @@ export function prependModerationItems(
 ) {
   if (!current) return current;
 
-  const merged = uniqueById([
-    ...items.filter((item) => moderationItemMatchesFilters(item, filters)),
-    ...flattenModerationPages(current),
-  ]).sort(compareModerationMedia);
+  const merged = mergeModerationItemCollections(
+    flattenModerationPages(current),
+    items.filter((item) => moderationItemMatchesFilters(item, filters)),
+  )
+    .filter((item) => moderationItemMatchesFilters(item, filters))
+    .sort(compareModerationMedia);
 
   return rebuildPages(current, merged, perPage);
 }

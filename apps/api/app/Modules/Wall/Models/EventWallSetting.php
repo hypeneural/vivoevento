@@ -39,6 +39,13 @@ class EventWallSetting extends Model
         'event_phase',
         'selection_policy',
         'accepted_orientation',
+        'video_enabled',
+        'video_playback_mode',
+        'video_max_seconds',
+        'video_resume_mode',
+        'video_audio_policy',
+        'video_multi_layout_policy',
+        'video_preferred_variant',
         'ad_mode',
         'ad_frequency',
         'ad_interval_minutes',
@@ -66,6 +73,8 @@ class EventWallSetting extends Model
         'event_phase' => WallEventPhase::class,
         'selection_policy' => 'array',
         'accepted_orientation' => WallAcceptedOrientation::class,
+        'video_enabled' => 'boolean',
+        'video_max_seconds' => 'integer',
         'show_qr' => 'boolean',
         'show_branding' => 'boolean',
         'show_neon' => 'boolean',
@@ -106,6 +115,52 @@ class EventWallSetting extends Model
             if (empty($setting->selection_policy)) {
                 $setting->selection_policy = WallSelectionPreset::defaultsFor($setting->selection_mode);
             }
+
+            if ($setting->video_enabled === null) {
+                $setting->video_enabled = (bool) config('media_processing.wall_video.enabled', true);
+            }
+
+            if (empty($setting->video_playback_mode)) {
+                $setting->video_playback_mode = (string) config(
+                    'media_processing.wall_video.default_playback_mode',
+                    'play_to_end_if_short_else_cap',
+                );
+            }
+
+            if (empty($setting->video_max_seconds)) {
+                $setting->video_max_seconds = max(
+                    1,
+                    (int) config('media_processing.wall_video.max_duration_seconds', 30),
+                );
+            }
+
+            if (empty($setting->video_resume_mode)) {
+                $setting->video_resume_mode = (string) config(
+                    'media_processing.wall_video.default_resume_mode',
+                    'resume_if_same_item_else_restart',
+                );
+            }
+
+            if (empty($setting->video_audio_policy)) {
+                $setting->video_audio_policy = (string) config(
+                    'media_processing.wall_video.default_audio_policy',
+                    'muted',
+                );
+            }
+
+            if (empty($setting->video_multi_layout_policy)) {
+                $setting->video_multi_layout_policy = (string) config(
+                    'media_processing.wall_video.default_multi_layout_policy',
+                    'disallow',
+                );
+            }
+
+            if (empty($setting->video_preferred_variant)) {
+                $setting->video_preferred_variant = (string) config(
+                    'media_processing.wall_video.default_preferred_variant',
+                    'wall_video_720p',
+                );
+            }
         });
     }
 
@@ -122,6 +177,11 @@ class EventWallSetting extends Model
     public function diagnosticSummary(): HasOne
     {
         return $this->hasOne(WallDiagnosticSummary::class, 'event_wall_setting_id');
+    }
+
+    public function displayCounter(): HasOne
+    {
+        return $this->hasOne(WallDisplayCounter::class, 'event_wall_setting_id');
     }
 
     public function ads(): HasMany
@@ -191,6 +251,59 @@ class EventWallSetting extends Model
         } while (static::query()->where('wall_code', $candidate)->exists());
 
         return $candidate;
+    }
+
+    public function resolvedVideoEnabled(): bool
+    {
+        return (bool) ($this->video_enabled ?? config('media_processing.wall_video.enabled', true));
+    }
+
+    public function resolvedVideoPlaybackMode(): string
+    {
+        return (string) ($this->video_playback_mode ?: config(
+            'media_processing.wall_video.default_playback_mode',
+            'play_to_end_if_short_else_cap',
+        ));
+    }
+
+    public function resolvedVideoMaxSeconds(): int
+    {
+        return max(1, (int) ($this->video_max_seconds ?? config(
+            'media_processing.wall_video.max_duration_seconds',
+            30,
+        )));
+    }
+
+    public function resolvedVideoResumeMode(): string
+    {
+        return (string) ($this->video_resume_mode ?: config(
+            'media_processing.wall_video.default_resume_mode',
+            'resume_if_same_item_else_restart',
+        ));
+    }
+
+    public function resolvedVideoAudioPolicy(): string
+    {
+        return (string) ($this->video_audio_policy ?: config(
+            'media_processing.wall_video.default_audio_policy',
+            'muted',
+        ));
+    }
+
+    public function resolvedVideoMultiLayoutPolicy(): string
+    {
+        return (string) ($this->video_multi_layout_policy ?: config(
+            'media_processing.wall_video.default_multi_layout_policy',
+            'disallow',
+        ));
+    }
+
+    public function resolvedVideoPreferredVariant(): string
+    {
+        return (string) ($this->video_preferred_variant ?: config(
+            'media_processing.wall_video.default_preferred_variant',
+            'wall_video_720p',
+        ));
     }
 
     private function eventAllowsWall(): bool

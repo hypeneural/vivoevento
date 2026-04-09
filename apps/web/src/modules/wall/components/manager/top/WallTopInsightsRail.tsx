@@ -35,7 +35,7 @@ export function WallTopInsightsRail({
       received: 0,
       approved: 0,
       queued: 0,
-      displayed: null,
+      displayed: 0,
     },
     recentItems: [],
     sourceMix: [],

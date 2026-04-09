@@ -80,4 +80,35 @@ describe('WallPlayerDetailsSheet', () => {
     expect(await screen.findByTestId('wall-player-details-drawer')).toBeInTheDocument();
     expect(screen.getByText(/Detalhes da tela conectada/i)).toBeInTheDocument();
   });
+
+  it('mostra diagnostico de video quando a tela esta com playback ativo', async () => {
+    useIsMobileMock.mockReturnValue(false);
+
+    render(
+      <WallPlayerDetailsSheet
+        open
+        player={makePlayer({
+          current_media_type: 'video',
+          current_video_phase: 'waiting',
+          current_video_exit_reason: 'stalled_timeout',
+          current_video_failure_reason: 'network_error',
+          current_video_position_seconds: 9,
+          current_video_duration_seconds: 22,
+          current_video_ready_state: 2,
+          current_video_stall_count: 2,
+          current_video_poster_visible: true,
+          current_video_first_frame_ready: true,
+          current_video_playback_ready: false,
+          current_video_playing_confirmed: false,
+          current_video_startup_degraded: true,
+        })}
+        onOpenChange={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findAllByText(/Playback do video/i)).toHaveLength(2);
+    expect(screen.getByText(/^Waiting$/)).toBeInTheDocument();
+    expect(screen.getByText(/^9s de 22s$/)).toBeInTheDocument();
+    expect(screen.getByText(/Stalled timeout/i)).toBeInTheDocument();
+  });
 });

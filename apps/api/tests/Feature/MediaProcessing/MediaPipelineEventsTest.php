@@ -71,6 +71,93 @@ it('does not broadcast a wall publish event when media orientation mismatches th
     EventFacade::assertNotDispatched(WallMediaPublished::class);
 });
 
+it('does not broadcast a wall publish event for original-only videos when strict wall video gate is enabled', function () {
+    $domainEvent = Event::factory()->active()->create();
+
+    EventModule::query()->create([
+        'event_id' => $domainEvent->id,
+        'module_key' => 'wall',
+        'is_enabled' => true,
+    ]);
+
+    EventWallSetting::factory()->live()->create([
+        'event_id' => $domainEvent->id,
+    ]);
+
+    $media = EventMedia::factory()->published()->create([
+        'event_id' => $domainEvent->id,
+        'media_type' => 'video',
+        'mime_type' => 'video/mp4',
+        'width' => 1920,
+        'height' => 1080,
+        'duration_seconds' => 18,
+        'video_codec' => 'h264',
+        'container' => 'mp4',
+    ]);
+
+    EventFacade::fake([WallMediaPublished::class]);
+
+    event(MediaPublished::fromMedia($media));
+
+    EventFacade::assertNotDispatched(WallMediaPublished::class);
+});
+
+it('broadcasts the chosen wall variant and poster for eligible wall videos', function () {
+    $domainEvent = Event::factory()->active()->create();
+
+    EventModule::query()->create([
+        'event_id' => $domainEvent->id,
+        'module_key' => 'wall',
+        'is_enabled' => true,
+    ]);
+
+    $settings = EventWallSetting::factory()->live()->create([
+        'event_id' => $domainEvent->id,
+    ]);
+
+    $media = EventMedia::factory()->published()->create([
+        'event_id' => $domainEvent->id,
+        'media_type' => 'video',
+        'mime_type' => 'video/mp4',
+        'width' => 1280,
+        'height' => 720,
+        'duration_seconds' => 18,
+        'video_codec' => 'h264',
+        'audio_codec' => 'aac',
+        'container' => 'mp4',
+    ]);
+
+    $media->variants()->create([
+        'variant_key' => 'wall_video_720p',
+        'disk' => 'public',
+        'path' => "events/{$domainEvent->id}/variants/{$media->id}/wall_video_720p.mp4",
+        'mime_type' => 'video/mp4',
+        'width' => 1280,
+        'height' => 720,
+    ]);
+
+    $media->variants()->create([
+        'variant_key' => 'wall_video_poster',
+        'disk' => 'public',
+        'path' => "events/{$domainEvent->id}/variants/{$media->id}/wall_video_poster.jpg",
+        'mime_type' => 'image/jpeg',
+        'width' => 1280,
+        'height' => 720,
+    ]);
+
+    EventFacade::fake([WallMediaPublished::class]);
+
+    event(MediaPublished::fromMedia($media->fresh(['variants'])));
+
+    EventFacade::assertDispatched(WallMediaPublished::class, function (WallMediaPublished $event) use ($settings, $media, $domainEvent) {
+        return $event->wallCode === $settings->wall_code
+            && $event->payload['id'] === 'media_'.$media->id
+            && $event->payload['served_variant_key'] === 'wall_video_720p'
+            && $event->payload['preview_variant_key'] === 'wall_video_poster'
+            && $event->payload['url'] === rtrim((string) config('app.url'), '/')."/storage/events/{$domainEvent->id}/variants/{$media->id}/wall_video_720p.mp4";
+    });
+});
+
 it('dispatches a media published domain event when approving already published media', function () {
     [$user, $organization] = $this->actingAsOwner();
 

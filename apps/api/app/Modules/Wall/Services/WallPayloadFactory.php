@@ -15,14 +15,23 @@ class WallPayloadFactory
     public function __construct(
         private readonly MediaAssetUrlService $mediaAssets,
         private readonly AssetUrlService $assets,
+        private readonly WallVideoAdmissionService $videoAdmission,
     ) {}
 
-    public function media(EventMedia $media): array
+    public function media(EventMedia $media, ?EventWallSetting $settings = null): array
     {
+        $preferredVariant = $settings?->resolvedVideoPreferredVariant();
+
         return [
             'id' => $this->mediaIdentifier($media),
-            'url' => $this->mediaAssets->wall($media),
-            'preview_url' => $this->mediaAssets->thumbnail($media),
+            'url' => $this->mediaAssets->wall($media, $preferredVariant),
+            'served_variant_key' => $this->mediaAssets->wallVariantKey($media, $preferredVariant),
+            'preview_url' => $media->media_type === 'video'
+                ? $this->mediaAssets->poster($media)
+                : $this->mediaAssets->thumbnail($media),
+            'preview_variant_key' => $media->media_type === 'video'
+                ? $this->mediaAssets->posterVariantKey($media)
+                : null,
             'original_url' => $this->mediaAssets->original($media),
             'type' => $media->media_type ?? 'image',
             'sender_name' => $this->resolveSenderName($media),
@@ -33,6 +42,15 @@ class WallPayloadFactory
             'is_featured' => (bool) $media->is_featured,
             'width' => $media->width,
             'height' => $media->height,
+            'duration_seconds' => $media->duration_seconds,
+            'has_audio' => $media->has_audio,
+            'video_codec' => $media->video_codec,
+            'audio_codec' => $media->audio_codec,
+            'bitrate' => $media->bitrate,
+            'container' => $media->container,
+            'video_admission' => $media->media_type === 'video'
+                ? $this->videoAdmission->inspect($media, $settings)
+                : null,
             'orientation' => $this->resolveOrientation($media),
             'created_at' => ($media->published_at ?? $media->created_at)?->toIso8601String(),
         ];
@@ -74,6 +92,13 @@ class WallPayloadFactory
             'show_sender_credit' => (bool) $settings->show_sender_credit,
             'show_side_thumbnails' => (bool) ($settings->show_side_thumbnails ?? true),
             'accepted_orientation' => $settings->accepted_orientation?->value ?? 'all',
+            'video_enabled' => $settings->resolvedVideoEnabled(),
+            'video_playback_mode' => $settings->resolvedVideoPlaybackMode(),
+            'video_max_seconds' => $settings->resolvedVideoMaxSeconds(),
+            'video_resume_mode' => $settings->resolvedVideoResumeMode(),
+            'video_audio_policy' => $settings->resolvedVideoAudioPolicy(),
+            'video_multi_layout_policy' => $settings->resolvedVideoMultiLayoutPolicy(),
+            'video_preferred_variant' => $settings->resolvedVideoPreferredVariant(),
             'ad_mode' => $settings->ad_mode ?? 'disabled',
             'ad_frequency' => (int) ($settings->ad_frequency ?? 5),
             'ad_interval_minutes' => (int) ($settings->ad_interval_minutes ?? 3),

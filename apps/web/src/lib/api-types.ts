@@ -205,6 +205,26 @@ export interface PublicEventCheckoutResponse {
     created_at: string | null;
     updated_at: string | null;
     confirmed_at: string | null;
+    summary?: {
+      state: 'idle' | 'pending' | 'processing' | 'paid' | 'failed' | 'refunded' | string;
+      tone: 'idle' | 'info' | 'success' | 'warning' | 'error' | string;
+      payment_status_title: string | null;
+      order_status_label: string | null;
+      payment_status_label: string | null;
+      payment_status_description: string | null;
+      next_action:
+        | 'continue_checkout'
+        | 'complete_payment'
+        | 'wait_payment_confirmation'
+        | 'open_event'
+        | 'retry_payment'
+        | 'contact_support'
+        | string
+        | null;
+      expires_in_seconds: number | null;
+      is_waiting_payment: boolean;
+      can_retry: boolean;
+    } | null;
     payment: {
       provider: string | null;
       method: 'pix' | 'credit_card' | string | null;
@@ -1466,6 +1486,13 @@ export interface ApiWallSettings {
   show_sender_credit: boolean;
   show_side_thumbnails: boolean;
   accepted_orientation: 'all' | 'landscape' | 'portrait';
+  video_enabled: boolean;
+  video_playback_mode: ApiWallVideoPlaybackMode;
+  video_max_seconds: number;
+  video_resume_mode: ApiWallVideoResumeMode;
+  video_audio_policy: ApiWallVideoAudioPolicy;
+  video_multi_layout_policy: ApiWallVideoMultiLayoutPolicy;
+  video_preferred_variant: ApiWallVideoPreferredVariant;
   ad_mode?: ApiWallAdMode;
   ad_frequency?: number;
   ad_interval_minutes?: number;
@@ -1473,6 +1500,11 @@ export interface ApiWallSettings {
 }
 
 export type ApiWallAdMode = 'disabled' | 'by_photos' | 'by_minutes';
+export type ApiWallVideoPlaybackMode = 'fixed_interval' | 'play_to_end' | 'play_to_end_if_short_else_cap';
+export type ApiWallVideoResumeMode = 'resume_if_same_item' | 'restart_from_zero' | 'resume_if_same_item_else_restart';
+export type ApiWallVideoAudioPolicy = 'muted';
+export type ApiWallVideoMultiLayoutPolicy = 'disallow' | 'one' | 'all';
+export type ApiWallVideoPreferredVariant = 'wall_video_720p' | 'wall_video_1080p' | 'original';
 
 export interface ApiWallAdItem {
   id: number;
@@ -1525,7 +1557,21 @@ export interface ApiWallHeartbeatPayload {
   runtime_status: 'booting' | 'idle' | 'playing' | 'paused' | 'stopped' | 'expired' | 'error';
   connection_status: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error';
   current_item_id?: string | null;
+  current_item_started_at?: string | null;
   current_sender_key?: string | null;
+  current_media_type?: 'image' | 'video' | null;
+  current_video_phase?: 'idle' | 'probing' | 'primed' | 'starting' | 'playing' | 'waiting' | 'stalled' | 'paused_by_wall' | 'completed' | 'capped' | 'interrupted' | 'failed_to_start' | null;
+  current_video_exit_reason?: 'ended' | 'cap_reached' | 'paused_by_operator' | 'play_rejected' | 'stalled_timeout' | 'replaced_by_command' | 'media_deleted' | 'visibility_degraded' | 'startup_timeout' | 'poster_then_skip' | 'startup_waiting_timeout' | 'startup_play_rejected' | null;
+  current_video_failure_reason?: 'network_error' | 'unsupported_format' | 'autoplay_blocked' | 'decode_degraded' | 'src_missing' | 'variant_missing' | null;
+  current_video_position_seconds?: number | null;
+  current_video_duration_seconds?: number | null;
+  current_video_ready_state?: number | null;
+  current_video_stall_count?: number | null;
+  current_video_poster_visible?: boolean | null;
+  current_video_first_frame_ready?: boolean | null;
+  current_video_playback_ready?: boolean | null;
+  current_video_playing_confirmed?: boolean | null;
+  current_video_startup_degraded?: boolean | null;
   ready_count: number;
   loading_count: number;
   error_count: number;
@@ -1568,6 +1614,20 @@ export interface ApiWallDiagnosticsPlayer {
   runtime_status: ApiWallHeartbeatPayload['runtime_status'];
   connection_status: ApiWallHeartbeatPayload['connection_status'];
   current_item_id?: string | null;
+  current_item_started_at?: string | null;
+  current_media_type?: ApiWallHeartbeatPayload['current_media_type'];
+  current_video_phase?: ApiWallHeartbeatPayload['current_video_phase'];
+  current_video_exit_reason?: ApiWallHeartbeatPayload['current_video_exit_reason'];
+  current_video_failure_reason?: ApiWallHeartbeatPayload['current_video_failure_reason'];
+  current_video_position_seconds?: number | null;
+  current_video_duration_seconds?: number | null;
+  current_video_ready_state?: number | null;
+  current_video_stall_count?: number | null;
+  current_video_poster_visible?: boolean | null;
+  current_video_first_frame_ready?: boolean | null;
+  current_video_playback_ready?: boolean | null;
+  current_video_playing_confirmed?: boolean | null;
+  current_video_startup_degraded?: boolean | null;
   current_sender_key?: string | null;
   ready_count: number;
   loading_count: number;
@@ -1618,6 +1678,9 @@ export interface ApiWallSimulationPreviewItem {
   layout_hint?: ApiWallResolvedLayout | null;
   duplicate_cluster_key?: string | null;
   is_featured: boolean;
+  is_video?: boolean;
+  duration_seconds?: number | null;
+  video_policy_label?: string | null;
   is_replay: boolean;
   created_at?: string | null;
 }
@@ -1638,6 +1701,15 @@ export interface ApiWallSettingsResponse {
   public_url: string;
   settings: ApiWallSettings;
   diagnostics_summary: ApiWallDiagnosticsSummary;
+  video_pipeline: {
+    ffmpeg_bin: string;
+    ffprobe_bin: string;
+    ffmpeg_available: boolean;
+    ffprobe_available: boolean;
+    ffmpeg_resolved_path: string | null;
+    ffprobe_resolved_path: string | null;
+    ready: boolean;
+  };
   expires_at: string | null;
   created_at: string | null;
   updated_at: string | null;
@@ -1688,7 +1760,7 @@ export interface ApiWallInsightsTotals {
   received: number;
   approved: number;
   queued: number;
-  displayed: number | null;
+  displayed: number;
 }
 
 export type ApiWallRecentItemStatus =
@@ -1709,6 +1781,9 @@ export interface ApiWallInsightsRecentItem {
   displayedAt?: string | null;
   status: ApiWallRecentItemStatus;
   isFeatured?: boolean;
+  isVideo?: boolean;
+  durationSeconds?: number | null;
+  videoPolicyLabel?: string | null;
   isReplay?: boolean;
 }
 
@@ -1754,6 +1829,9 @@ export interface ApiWallLiveSnapshotItem {
   caption?: string | null;
   layoutHint?: ApiWallResolvedLayout | null;
   isFeatured?: boolean;
+  isVideo?: boolean;
+  durationSeconds?: number | null;
+  videoPolicyLabel?: string | null;
   createdAt?: string | null;
 }
 
@@ -1764,6 +1842,7 @@ export interface ApiWallLiveSnapshotResponse {
   transitionEffect: ApiWallTransition;
   currentPlayer: ApiWallLiveSnapshotPlayer | null;
   currentItem: ApiWallLiveSnapshotItem | null;
+  nextItem?: ApiWallLiveSnapshotItem | null;
   advancedAt?: string | null;
   updatedAt?: string | null;
 }
@@ -1826,9 +1905,16 @@ export interface ApiEventMediaItem {
   sender_media_count?: number | null;
   caption: string | null;
   thumbnail_url: string | null;
+  thumbnail_source?: string | null;
   preview_url?: string | null;
+  preview_source?: string | null;
+  moderation_thumbnail_url?: string | null;
+  moderation_thumbnail_source?: string | null;
+  moderation_preview_url?: string | null;
+  moderation_preview_source?: string | null;
   original_url?: string | null;
   created_at: string | null;
+  updated_at?: string | null;
   published_at: string | null;
   is_featured: boolean;
   is_pinned?: boolean;
@@ -2444,6 +2530,9 @@ export interface PublicEventUploadBootstrap {
     reason: string | null;
     message: string;
     accepts_multiple: boolean;
+    accepts_video: boolean;
+    video_single_only: boolean;
+    video_max_duration_seconds: number | null;
     max_files: number;
     max_file_size_mb: number;
     accept_hint: string;

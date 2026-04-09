@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { CircleHelp, FolderTree, Loader2, Plus, Save, Sparkles, TestTube2, Trash2 } from 'lucide-react';
+import { CircleHelp, FolderTree, Loader2, Plus, Save, ShieldCheck, Sparkles, TestTube2, Trash2 } from 'lucide-react';
 
 import { useAuth } from '@/app/providers/AuthProvider';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -21,6 +22,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { ApiError } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import { PageHeader } from '@/shared/components/PageHeader';
 
 import { aiMediaRepliesService } from './api';
@@ -394,14 +396,102 @@ function emptyCategoryForm(): SaveMediaReplyPromptCategoryPayload {
 
 type ManagementMode = 'basico' | 'avancado' | 'auditoria';
 type ManagementSection = 'visao-geral' | 'safety' | 'configuracao' | 'teste' | 'catalogo' | 'historico';
+type ModeSectionMemory = Record<ManagementMode, ManagementSection>;
+
+const MODE_STORAGE_KEY = 'ai-media-moderation.management-mode';
+const SECTION_STORAGE_KEY = 'ai-media-moderation.mode-sections';
+const DEFAULT_MODE: ManagementMode = 'basico';
+const DEFAULT_SECTIONS: ModeSectionMemory = {
+  basico: 'visao-geral',
+  avancado: 'safety',
+  auditoria: 'teste',
+};
+
+function isManagementMode(value: string | null): value is ManagementMode {
+  return value === 'basico' || value === 'avancado' || value === 'auditoria';
+}
+
+function isManagementSection(value: string | null): value is ManagementSection {
+  return value === 'visao-geral'
+    || value === 'safety'
+    || value === 'configuracao'
+    || value === 'teste'
+    || value === 'catalogo'
+    || value === 'historico';
+}
+
+function readStoredMode(): ManagementMode {
+  if (typeof window === 'undefined') {
+    return DEFAULT_MODE;
+  }
+
+  try {
+    const stored = window.localStorage.getItem(MODE_STORAGE_KEY);
+    return isManagementMode(stored) ? stored : DEFAULT_MODE;
+  } catch {
+    return DEFAULT_MODE;
+  }
+}
+
+function readStoredSections(): ModeSectionMemory {
+  if (typeof window === 'undefined') {
+    return DEFAULT_SECTIONS;
+  }
+
+  try {
+    const stored = window.localStorage.getItem(SECTION_STORAGE_KEY);
+
+    if (!stored) {
+      return DEFAULT_SECTIONS;
+    }
+
+    const parsed = JSON.parse(stored) as Partial<Record<ManagementMode, string>>;
+
+    return {
+      basico: isManagementSection(parsed.basico ?? null) ? parsed.basico : DEFAULT_SECTIONS.basico,
+      avancado: isManagementSection(parsed.avancado ?? null) ? parsed.avancado : DEFAULT_SECTIONS.avancado,
+      auditoria: isManagementSection(parsed.auditoria ?? null) ? parsed.auditoria : DEFAULT_SECTIONS.auditoria,
+    };
+  } catch {
+    return DEFAULT_SECTIONS;
+  }
+}
+
+function getSectionsForMode(mode: ManagementMode): Array<{ value: ManagementSection; label: string }> {
+  switch (mode) {
+    case 'avancado':
+      return [
+        { value: 'safety', label: 'Seguranca objetiva' },
+        { value: 'configuracao', label: 'Contexto do evento' },
+        { value: 'catalogo', label: 'Catalogo' },
+      ];
+    case 'auditoria':
+      return [
+        { value: 'teste', label: 'Laboratorio' },
+        { value: 'historico', label: 'Historico' },
+      ];
+    case 'basico':
+    default:
+      return [
+        { value: 'visao-geral', label: 'Visao geral' },
+        { value: 'safety', label: 'Seguranca objetiva' },
+        { value: 'configuracao', label: 'Contexto do evento' },
+      ];
+  }
+}
 
 export default function MediaAutomaticRepliesPage() {
-  const { meUser: user } = useAuth();
+  const auth = useAuth();
+  const user = auth.meUser;
+  const can = typeof auth.can === 'function' ? auth.can : () => false;
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const canManageGlobalAi = user?.role.key === 'super-admin' || user?.role.key === 'platform-admin';
-  const [managementMode, setManagementMode] = useState<ManagementMode>('basico');
-  const [activeSection, setActiveSection] = useState<ManagementSection>('visao-geral');
+  const canUseAdvancedMode = canManageGlobalAi;
+  const canUseAuditMode = canManageGlobalAi || can('audit.view');
+  const [managementMode, setManagementMode] = useState<ManagementMode>(() => readStoredMode());
+  const [activeSection, setActiveSection] = useState<ManagementSection>(() => readStoredSections()[readStoredMode()]);
+  const [modeSections, setModeSections] = useState<ModeSectionMemory>(() => readStoredSections());
 
   const [standardInstruction, setStandardInstruction] = useState('');
   const [standardFixedTemplates, setStandardFixedTemplates] = useState('');
@@ -479,6 +569,9 @@ export default function MediaAutomaticRepliesPage() {
   const [realHistoryDateFrom, setRealHistoryDateFrom] = useState('');
   const [realHistoryDateTo, setRealHistoryDateTo] = useState('');
   const [selectedRealHistoryId, setSelectedRealHistoryId] = useState<number | null>(null);
+  const isBasicMode = managementMode === 'basico';
+  const isAdvancedMode = managementMode === 'avancado';
+  const isAuditMode = managementMode === 'auditoria';
 
   const configurationQuery = useQuery({
     queryKey: ['ia', 'respostas-de-midia', 'configuracao'],
@@ -505,6 +598,7 @@ export default function MediaAutomaticRepliesPage() {
   const eventOptionsQuery = useQuery({
     queryKey: ['ia', 'respostas-de-midia', 'eventos'],
     queryFn: () => aiMediaRepliesService.listEventOptions(),
+    enabled: canUseAuditMode && isAuditMode,
     placeholderData: (previousData) => previousData,
   });
   const historyQuery = useQuery({
@@ -515,6 +609,7 @@ export default function MediaAutomaticRepliesPage() {
       status: historyStatus !== 'all' ? historyStatus : null,
       per_page: 15,
     }),
+    enabled: canUseAuditMode && isAuditMode,
     placeholderData: (previousData) => previousData,
   });
   const realHistoryQuery = useQuery({
@@ -548,20 +643,22 @@ export default function MediaAutomaticRepliesPage() {
       date_to: realHistoryDateTo.trim() !== '' ? realHistoryDateTo : null,
       per_page: 15,
     }),
+    enabled: canUseAuditMode && isAuditMode,
     placeholderData: (previousData) => previousData,
   });
   const historyDetailQuery = useQuery({
     queryKey: ['ia', 'respostas-de-midia', 'testes', 'detalhe', selectedHistoryId],
     queryFn: () => aiMediaRepliesService.getPromptTest(selectedHistoryId as number),
-    enabled: selectedHistoryId !== null,
+    enabled: canUseAuditMode && isAuditMode && selectedHistoryId !== null,
     placeholderData: (previousData) => previousData,
   });
   const realHistoryDetailQuery = useQuery({
     queryKey: ['ia', 'respostas-de-midia', 'historico-eventos', 'detalhe', selectedRealHistoryId],
     queryFn: () => aiMediaRepliesService.getEventHistoryItem(selectedRealHistoryId as number),
-    enabled: selectedRealHistoryId !== null,
+    enabled: canUseAuditMode && isAuditMode && selectedRealHistoryId !== null,
     placeholderData: (previousData) => previousData,
   });
+  const eventOptionsData = eventOptionsQuery.data ?? [];
 
   const availableSections = useMemo<Array<{ value: ManagementSection; label: string }>>(() => {
     switch (managementMode) {
@@ -585,6 +682,156 @@ export default function MediaAutomaticRepliesPage() {
         ];
     }
   }, [managementMode]);
+
+  const modeOptions = useMemo<Array<{
+    value: ManagementMode;
+    label: string;
+    description: string;
+    helper: string;
+    available: boolean;
+    badgeLabel: string;
+    icon: typeof Sparkles;
+  }>>(() => ([
+    {
+      value: 'basico',
+      label: 'Basico',
+      description: 'Operacao leiga com resumo rapido e decisoes mais frequentes.',
+      helper: 'Ideal para ligar, desligar e validar a politica ativa.',
+      available: true,
+      badgeLabel: 'Operacao',
+      icon: Sparkles,
+    },
+    {
+      value: 'avancado',
+      label: 'Avancado',
+      description: 'Ajuste fino global de escopos, fallbacks, thresholds e catalogo.',
+      helper: canUseAdvancedMode ? 'Disponivel para plataforma.' : 'Somente plataforma.',
+      available: canUseAdvancedMode,
+      badgeLabel: canUseAdvancedMode ? 'Plataforma' : 'Restrito',
+      icon: FolderTree,
+    },
+    {
+      value: 'auditoria',
+      label: 'Auditoria',
+      description: 'Laboratorio, historico real, payload tecnico e evidencias da politica.',
+      helper: canUseAuditMode ? 'Disponivel para auditoria.' : 'Requer audit.view.',
+      available: canUseAuditMode,
+      badgeLabel: canUseAuditMode ? 'Auditoria' : 'Restrito',
+      icon: TestTube2,
+    },
+  ]), [canUseAdvancedMode, canUseAuditMode]);
+
+  const currentModeMeta = useMemo(
+    () => modeOptions.find((modeOption) => modeOption.value === managementMode) ?? modeOptions[0],
+    [managementMode, modeOptions],
+  );
+
+  const activeRealHistoryFilters = useMemo(() => {
+    const filters: string[] = [];
+
+    if (realHistoryEventId !== 'all') {
+      const eventTitle = eventOptionsData.find((eventOption) => String(eventOption.id) === realHistoryEventId)?.title;
+      filters.push(`Evento: ${eventTitle ?? realHistoryEventId}`);
+    }
+
+    if (realHistoryProviderKey !== 'all') {
+      filters.push(`Provedor: ${providerLabel(realHistoryProviderKey)}`);
+    }
+
+    if (realHistoryStatus !== 'all') {
+      filters.push(`Status: ${runStatusLabel(realHistoryStatus)}`);
+    }
+
+    if (realHistoryModelKey.trim() !== '') {
+      filters.push(`Modelo: ${realHistoryModelKey.trim()}`);
+    }
+
+    if (realHistoryPresetName.trim() !== '') {
+      filters.push(`Preset: ${realHistoryPresetName.trim()}`);
+    }
+
+    if (realHistorySenderQuery.trim() !== '') {
+      filters.push(`Remetente: ${realHistorySenderQuery.trim()}`);
+    }
+
+    if (realHistoryReasonCode.trim() !== '') {
+      filters.push(`Motivo: ${realHistoryReasonCode.trim()}`);
+    }
+
+    if (realHistoryPublishEligibility !== 'all') {
+      filters.push(`Elegibilidade: ${publishEligibilityLabel(realHistoryPublishEligibility)}`);
+    }
+
+    if (realHistoryEffectiveState !== 'all') {
+      filters.push(`Estado: ${effectiveStateLabel(realHistoryEffectiveState)}`);
+    }
+
+    if (realHistoryDateFrom.trim() !== '') {
+      filters.push(`De: ${realHistoryDateFrom}`);
+    }
+
+    if (realHistoryDateTo.trim() !== '') {
+      filters.push(`Ate: ${realHistoryDateTo}`);
+    }
+
+    return filters;
+  }, [
+    eventOptionsData,
+    realHistoryDateFrom,
+    realHistoryDateTo,
+    realHistoryEffectiveState,
+    realHistoryEventId,
+    realHistoryModelKey,
+    realHistoryPresetName,
+    realHistoryProviderKey,
+    realHistoryPublishEligibility,
+    realHistoryReasonCode,
+    realHistorySenderQuery,
+    realHistoryStatus,
+  ]);
+
+  useEffect(() => {
+    if (managementMode === 'avancado' && !canUseAdvancedMode) {
+      setManagementMode('basico');
+      return;
+    }
+
+    if (managementMode === 'auditoria' && !canUseAuditMode) {
+      setManagementMode('basico');
+    }
+  }, [canUseAdvancedMode, canUseAuditMode, managementMode]);
+
+  useEffect(() => {
+    const allowedSections = availableSections.map((section) => section.value);
+    const rememberedSection = modeSections[managementMode];
+
+    if (allowedSections.includes(activeSection)) {
+      return;
+    }
+
+    if (allowedSections.includes(rememberedSection)) {
+      setActiveSection(rememberedSection);
+      return;
+    }
+
+    setActiveSection(allowedSections[0]);
+  }, [activeSection, availableSections, managementMode, modeSections]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.setItem(MODE_STORAGE_KEY, managementMode);
+  }, [managementMode]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.setItem(SECTION_STORAGE_KEY, JSON.stringify(modeSections));
+  }, [modeSections]);
 
   useEffect(() => {
     setStandardInstruction(configurationQuery.data?.reply_text_prompt ?? '');
@@ -1037,7 +1284,7 @@ export default function MediaAutomaticRepliesPage() {
 
   const categories = categoriesQuery.data ?? [];
   const presets = presetsQuery.data ?? [];
-  const eventOptions = eventOptionsQuery.data ?? [];
+  const eventOptions = eventOptionsData;
   const historyItems = historyQuery.data?.data ?? [];
   const realHistoryItems = realHistoryQuery.data?.data ?? [];
   const activeHistoryDetail = latestTestRun && latestTestRun.id === selectedHistoryId
@@ -1076,9 +1323,6 @@ export default function MediaAutomaticRepliesPage() {
       return matchesCategory && matchesSearch;
     });
   }, [catalogCategoryFilter, catalogPresetSearch, presets]);
-  const isBasicMode = managementMode === 'basico';
-  const isAdvancedMode = managementMode === 'avancado';
-  const isAuditMode = managementMode === 'auditoria';
   const modeDescription = useMemo(() => {
     switch (managementMode) {
       case 'avancado':
@@ -1105,6 +1349,42 @@ export default function MediaAutomaticRepliesPage() {
     });
   };
 
+  const clearRealHistoryFilters = () => {
+    setRealHistoryEventId('all');
+    setRealHistoryProviderKey('all');
+    setRealHistoryStatus('all');
+    setRealHistoryModelKey('');
+    setRealHistoryPresetName('');
+    setRealHistorySenderQuery('');
+    setRealHistoryReasonCode('');
+    setRealHistoryPublishEligibility('all');
+    setRealHistoryEffectiveState('all');
+    setRealHistoryDateFrom('');
+    setRealHistoryDateTo('');
+  };
+
+  const handleManagementModeChange = (value: string) => {
+    const nextMode = value as ManagementMode;
+    const nextSections = getSectionsForMode(nextMode);
+    const rememberedSection = modeSections[nextMode];
+    const nextSection = nextSections.some((section) => section.value === rememberedSection)
+      ? rememberedSection
+      : nextSections[0].value;
+
+    setManagementMode(nextMode);
+    setActiveSection(nextSection);
+  };
+
+  const handleSectionChange = (value: string) => {
+    const nextSection = value as ManagementSection;
+
+    setActiveSection(nextSection);
+    setModeSections((current) => ({
+      ...current,
+      [managementMode]: nextSection,
+    }));
+  };
+
   return (
     <motion.div initial={false} animate={{ opacity: 1 }} className="space-y-6">
       <PageHeader
@@ -1112,31 +1392,155 @@ export default function MediaAutomaticRepliesPage() {
         description="Centralize a seguranca automatica, o bloqueio por contexto, o laboratorio e o historico tecnico da IA em uma unica area."
       />
 
-      <div className="glass rounded-xl p-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-1">
-            <div className="text-sm font-medium">Modo da tela</div>
-            <p className="text-sm text-muted-foreground">{modeDescription}</p>
-          </div>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.9fr)]">
+        <Card className="border-border/60 shadow-sm">
+          <CardContent className="space-y-5 p-5">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="rounded-full border-primary/30 bg-primary/5 text-primary">
+                    Modo ativo: {currentModeMeta.label}
+                  </Badge>
+                  <Badge variant="secondary" className="rounded-full">
+                    {currentModeMeta.badgeLabel}
+                  </Badge>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-sm font-medium">Como voce quer gerenciar esta tela</div>
+                  <p className="text-sm text-muted-foreground">{modeDescription}</p>
+                </div>
+              </div>
 
-          <Tabs
-            value={managementMode}
-            onValueChange={(value) => setManagementMode(value as ManagementMode)}
-            className="w-full lg:w-auto"
-          >
-            <TabsList className="grid w-full grid-cols-3 lg:w-auto">
-              <TabsTrigger value="basico">Básico</TabsTrigger>
-              <TabsTrigger value="avancado">Avançado</TabsTrigger>
-              <TabsTrigger value="auditoria">Auditoria</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
+              <div className="rounded-2xl border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                A tela lembra o ultimo modo usado e a ultima aba aberta dentro de cada contexto.
+              </div>
+            </div>
+
+            <Tabs
+              value={managementMode}
+              onValueChange={handleManagementModeChange}
+              className="w-full"
+            >
+              <TabsList className="grid h-auto w-full grid-cols-1 gap-3 bg-transparent p-0 md:grid-cols-3">
+                {modeOptions.map((modeOption) => {
+                  const Icon = modeOption.icon;
+
+                  return (
+                    <TabsTrigger
+                      key={modeOption.value}
+                      value={modeOption.value}
+                      disabled={!modeOption.available}
+                      aria-label={
+                        modeOption.value === 'basico'
+                          ? 'Básico'
+                          : modeOption.value === 'avancado'
+                            ? 'Avançado'
+                            : 'Auditoria'
+                      }
+                      className={cn(
+                        'h-auto min-h-[122px] flex-col items-start gap-3 rounded-2xl border border-border/60 bg-background/80 p-4 text-left shadow-sm',
+                        'data-[state=active]:border-primary/40 data-[state=active]:bg-primary/5 data-[state=active]:shadow-md',
+                      )}
+                    >
+                      <div className="flex w-full items-start justify-between gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <Badge
+                          variant={modeOption.available ? 'secondary' : 'outline'}
+                          className={cn(
+                            'rounded-full',
+                            !modeOption.available && 'border-amber-300 bg-amber-50 text-amber-900',
+                          )}
+                        >
+                          {modeOption.available ? modeOption.badgeLabel : 'Sem acesso'}
+                        </Badge>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="font-semibold">{modeOption.label}</div>
+                        <div className="whitespace-normal text-xs leading-relaxed text-muted-foreground">
+                          {modeOption.description}
+                        </div>
+                      </div>
+
+                      <div className="whitespace-normal text-[11px] leading-relaxed text-muted-foreground">
+                        {modeOption.available ? modeOption.helper : `Acesso restrito: ${modeOption.helper}`}
+                      </div>
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/60 shadow-sm">
+          <CardContent className="space-y-4 p-5">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              <div className="text-sm font-semibold">Seu acesso nesta tela</div>
+            </div>
+
+            <div className="grid gap-3">
+              <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium">Operacao basica</div>
+                    <div className="text-xs text-muted-foreground">Resumo rapido e decisao do dia a dia.</div>
+                  </div>
+                  <Badge variant="secondary" className="rounded-full">Liberado</Badge>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium">Ajuste fino global</div>
+                    <div className="text-xs text-muted-foreground">Escopos, thresholds, fallbacks e catalogo.</div>
+                  </div>
+                  <Badge
+                    variant={canUseAdvancedMode ? 'secondary' : 'outline'}
+                    className={cn('rounded-full', !canUseAdvancedMode && 'border-amber-300 bg-amber-50 text-amber-900')}
+                  >
+                    {canUseAdvancedMode ? 'Plataforma' : 'Somente plataforma'}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium">Auditoria tecnica</div>
+                    <div className="text-xs text-muted-foreground">Laboratorio, historico real e evidencias tecnicas.</div>
+                  </div>
+                  <Badge
+                    variant={canUseAuditMode ? 'secondary' : 'outline'}
+                    className={cn('rounded-full', !canUseAuditMode && 'border-amber-300 bg-amber-50 text-amber-900')}
+                  >
+                    {canUseAuditMode ? 'Liberado' : 'Requer audit.view'}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+
+            {(!canUseAdvancedMode || !canUseAuditMode) ? (
+              <div className="rounded-2xl border border-dashed border-border/60 bg-muted/10 p-4 text-xs leading-relaxed text-muted-foreground">
+                Ajustes finos globais ficam restritos a administradores da plataforma, e a auditoria tecnica exige permissao explicita de leitura de auditoria.
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
       </div>
 
-      <Tabs value={activeSection} onValueChange={(value) => setActiveSection(value as ManagementSection)}>
-        <TabsList className="flex-wrap bg-muted/50">
+      <Tabs value={activeSection} onValueChange={handleSectionChange}>
+        <TabsList className="h-auto flex-wrap gap-2 rounded-2xl border border-border/60 bg-muted/30 p-2">
           {availableSections.map((section) => (
-            <TabsTrigger key={section.value} value={section.value}>
+            <TabsTrigger
+              key={section.value}
+              value={section.value}
+              className="rounded-xl px-4 py-2 data-[state=active]:border data-[state=active]:border-primary/20 data-[state=active]:bg-background"
+            >
               {section.label}
             </TabsTrigger>
           ))}
@@ -3057,9 +3461,9 @@ export default function MediaAutomaticRepliesPage() {
                   </div>
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="historico-real-data-inicial">Data inicial</Label>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="historico-real-data-inicial">Data inicial</Label>
                     <Input
                       id="historico-real-data-inicial"
                       type="date"
@@ -3080,7 +3484,44 @@ export default function MediaAutomaticRepliesPage() {
                 </div>
               </div>
 
+              <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="space-y-1">
+                    <div className="text-sm font-medium">Filtros ativos</div>
+                    <div className="text-xs text-muted-foreground">
+                      {activeRealHistoryFilters.length > 0
+                        ? `${activeRealHistoryFilters.length} filtro(s) refinando o historico real.`
+                        : 'Nenhum filtro extra aplicado. O historico mostra a leitura mais ampla deste ambiente.'}
+                    </div>
+                  </div>
+
+                  {activeRealHistoryFilters.length > 0 ? (
+                    <Button type="button" variant="outline" size="sm" onClick={clearRealHistoryFilters}>
+                      Limpar filtros
+                    </Button>
+                  ) : null}
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {activeRealHistoryFilters.length > 0 ? (
+                    activeRealHistoryFilters.map((filterLabel) => (
+                      <Badge key={filterLabel} variant="outline" className="rounded-full bg-background/70">
+                        {filterLabel}
+                      </Badge>
+                    ))
+                  ) : (
+                    <Badge variant="secondary" className="rounded-full">Visao ampla</Badge>
+                  )}
+                </div>
+              </div>
+
               <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <div className="font-medium">Resultados carregados</div>
+                  <Badge variant="secondary" className="rounded-full">
+                    {realHistoryItems.length} item(ns)
+                  </Badge>
+                </div>
                 {realHistoryQuery.isLoading ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />

@@ -1,5 +1,5 @@
 import type { MouseEvent } from 'react';
-import { Check, CheckCircle2, Copy, ImageIcon, Loader2, Pin, ShieldBan, Star, X, XCircle } from 'lucide-react';
+import { Check, CheckCircle2, Copy, Loader2, Pin, ShieldBan, Star, X, XCircle } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,8 @@ import type { ApiEventMediaItem } from '@/lib/api-types';
 import { ChannelBadge, MediaStatusBadge } from '@/shared/components/StatusBadges';
 import { cn } from '@/lib/utils';
 
-import { formatShortTime, getOrientationLabel, isVideoAsset } from '../utils';
+import { formatShortTime, getOrientationLabel } from '../utils';
+import { ModerationMediaSurface } from './ModerationMediaSurface';
 
 export type ModerationMediaAction = 'approve' | 'reject' | 'favorite' | 'pin';
 
@@ -97,7 +98,6 @@ export function ModerationMediaCard({
 }: ModerationMediaCardProps) {
   const canApprove = canModerate && media.status !== 'approved' && media.status !== 'published';
   const canReject = canModerate && media.status !== 'rejected';
-  const showsVideoPreview = isVideoAsset(media, media.thumbnail_url);
 
   return (
     <article
@@ -112,30 +112,13 @@ export function ModerationMediaCard({
     >
       <div className="relative overflow-hidden bg-muted">
         <button type="button" className="block h-60 w-full text-left sm:h-64" onClick={onOpen}>
-          {media.thumbnail_url ? (
-            showsVideoPreview ? (
-              <video
-                src={media.preview_url || media.thumbnail_url}
-                className="h-full w-full object-cover"
-                muted
-                playsInline
-                preload="metadata"
-              />
-            ) : (
-              <img
-                src={media.thumbnail_url}
-                alt={media.caption || media.event_title || 'Midia do evento'}
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.015]"
-                loading="lazy"
-                decoding="async"
-                sizes="(max-width: 640px) 100vw, (max-width: 1536px) 50vw, 33vw"
-              />
-            )
-          ) : (
-            <div className="flex h-60 items-center justify-center bg-gradient-to-br from-slate-200 via-slate-100 to-white text-slate-500 dark:from-slate-900 dark:via-slate-800 dark:to-slate-700 sm:h-64">
-              <ImageIcon className="h-10 w-10" />
-            </div>
-          )}
+          <ModerationMediaSurface
+            media={media}
+            variant="thumbnail"
+            className="h-60 w-full sm:h-64"
+            mediaClassName="transition-transform duration-300 group-hover:scale-[1.015]"
+            sizes="(max-width: 640px) 100vw, (max-width: 1536px) 50vw, 33vw"
+          />
         </button>
 
         <div className="absolute left-3 top-3 z-10 rounded-full border border-white/70 bg-black/45 p-1.5 text-white backdrop-blur">

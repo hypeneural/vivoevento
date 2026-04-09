@@ -11,6 +11,10 @@ import {
   formatPlayerHealthLabel,
   formatPlayerSituation,
   formatTimestampLabel,
+  formatVideoExitReason,
+  formatVideoFailureReason,
+  formatVideoPhase,
+  formatVideoProgress,
   healthBadgeClass,
   playerCardClass,
   playerSignalClass,
@@ -70,8 +74,10 @@ export function WallPlayerRuntimeCard({
         <RuntimeStat label="Conexao agora" value={formatConnectionStatus(player.connection_status)} />
         <RuntimeStat label="Quem esta na tela" value={formatCurrentSender(player.current_sender_key)} />
         <RuntimeStat
-          label="Fila pronta"
-          value={`${player.ready_count} prontas | ${player.loading_count} carregando`}
+          label={player.current_media_type === 'video' ? 'Playback do video' : 'Fila pronta'}
+          value={player.current_media_type === 'video'
+            ? `${formatVideoPhase(player.current_video_phase)} | ${formatVideoProgress(player)}`
+            : `${player.ready_count} prontas | ${player.loading_count} carregando`}
         />
       </div>
 
@@ -88,6 +94,16 @@ export function WallPlayerRuntimeCard({
         {player.last_sync_at ? (
           <span className="rounded-full border border-border/60 bg-background px-3 py-1">
             Ultima atualizacao {formatTimestampLabel(player.last_sync_at)}
+          </span>
+        ) : null}
+        {player.current_media_type === 'video' ? (
+          <span className="rounded-full border border-border/60 bg-background px-3 py-1">
+            Exit reason {formatVideoExitReason(player.current_video_exit_reason)}
+          </span>
+        ) : null}
+        {player.current_media_type === 'video' && player.current_video_failure_reason ? (
+          <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-amber-700">
+            Falha {formatVideoFailureReason(player.current_video_failure_reason)}
           </span>
         ) : null}
       </div>

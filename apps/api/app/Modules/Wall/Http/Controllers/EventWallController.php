@@ -34,7 +34,7 @@ class EventWallController extends BaseController
     {
         $this->authorize('viewWall', $event);
 
-        $settings = EventWallSetting::firstOrCreate(['event_id' => $event->id])->load('diagnosticSummary');
+        $settings = EventWallSetting::firstOrCreate(['event_id' => $event->id])->load(['diagnosticSummary', 'event']);
 
         return $this->success(
             (new WallSettingsResource($settings))->resolve(),
@@ -60,7 +60,7 @@ class EventWallController extends BaseController
         }
 
         $settings->update($data);
-        $settings->refresh()->load('diagnosticSummary');
+        $settings->refresh()->load(['diagnosticSummary', 'event']);
 
         $broadcaster->broadcastSettingsUpdated($settings);
 
@@ -215,7 +215,7 @@ class EventWallController extends BaseController
     ): JsonResponse {
         $this->authorize('viewWall', $event);
 
-        $settings = EventWallSetting::firstOrCreate(['event_id' => $event->id])->load('diagnosticSummary');
+        $settings = EventWallSetting::firstOrCreate(['event_id' => $event->id])->load(['diagnosticSummary', 'event']);
         $diagnostics->recalculateSummary($settings, broadcast: false);
 
         return $this->success(

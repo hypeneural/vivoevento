@@ -99,26 +99,75 @@ class PagarmeBillingGateway implements BillingGatewayInterface
 
         $validated = $validator->validated();
         $data = (array) $validated['data'];
+        $rawType = (string) $validated['type'];
         $gatewayOrderId = data_get($data, 'id');
         $gatewayChargeId = data_get($data, 'charges.0.id');
         $billingOrderUuid = data_get($data, 'metadata.billing_order_uuid') ?? data_get($data, 'code');
+        $gatewaySubscriptionId = data_get($data, 'subscription.id')
+            ?? data_get($data, 'subscription_id')
+            ?? data_get($data, 'invoice.subscription.id')
+            ?? data_get($data, 'invoice.subscription_id')
+            ?? data_get($data, 'metadata.gateway_subscription_id')
+            ?? data_get($data, 'metadata.subscription_id');
+        $gatewayInvoiceId = str_starts_with($rawType, 'invoice.')
+            ? data_get($data, 'id')
+            : (data_get($data, 'invoice.id')
+                ?? data_get($data, 'invoice_id')
+                ?? data_get($data, 'metadata.gateway_invoice_id'));
+        $gatewayCycleId = data_get($data, 'cycle.id')
+            ?? data_get($data, 'cycle_id')
+            ?? data_get($data, 'invoice.cycle.id')
+            ?? data_get($data, 'invoice.cycle_id')
+            ?? data_get($data, 'metadata.gateway_cycle_id');
+        $gatewayCustomerId = data_get($data, 'customer.id')
+            ?? data_get($data, 'customer_id')
+            ?? data_get($data, 'subscription.customer.id')
+            ?? data_get($data, 'subscription.customer_id')
+            ?? data_get($data, 'metadata.gateway_customer_id');
 
-        if (str_starts_with((string) $validated['type'], 'charge.')) {
+        if (str_starts_with($rawType, 'charge.')) {
             $gatewayChargeId = data_get($data, 'id');
             $gatewayOrderId = data_get($data, 'order.id') ?? data_get($data, 'order_id');
             $billingOrderUuid = data_get($data, 'metadata.billing_order_uuid')
                 ?? data_get($data, 'order.metadata.billing_order_uuid')
                 ?? $billingOrderUuid;
+            $gatewaySubscriptionId = data_get($data, 'subscription.id')
+                ?? data_get($data, 'subscription_id')
+                ?? data_get($data, 'invoice.subscription.id')
+                ?? data_get($data, 'invoice.subscription_id')
+                ?? data_get($data, 'metadata.gateway_subscription_id')
+                ?? $gatewaySubscriptionId;
+            $gatewayInvoiceId = data_get($data, 'invoice.id')
+                ?? data_get($data, 'invoice_id')
+                ?? data_get($data, 'metadata.gateway_invoice_id')
+                ?? $gatewayInvoiceId;
+            $gatewayCycleId = data_get($data, 'cycle.id')
+                ?? data_get($data, 'cycle_id')
+                ?? data_get($data, 'invoice.cycle.id')
+                ?? data_get($data, 'invoice.cycle_id')
+                ?? data_get($data, 'metadata.gateway_cycle_id')
+                ?? $gatewayCycleId;
+            $gatewayCustomerId = data_get($data, 'customer.id')
+                ?? data_get($data, 'customer_id')
+                ?? data_get($data, 'subscription.customer.id')
+                ?? data_get($data, 'subscription.customer_id')
+                ?? data_get($data, 'metadata.gateway_customer_id')
+                ?? $gatewayCustomerId;
         }
 
         return [
             'provider_key' => $this->providerKey(),
             'event_key' => $validated['id'],
-            'event_type' => $this->statusMapper->toInternalWebhookType((string) $validated['type']),
+            'hook_id' => data_get($headers, 'X-Hook-Id') ?? data_get($headers, 'x-hook-id'),
+            'event_type' => $this->statusMapper->toInternalWebhookType($rawType, $data),
             'billing_order_uuid' => $billingOrderUuid,
             'gateway_order_id' => $gatewayOrderId,
             'gateway_payment_id' => $gatewayChargeId,
             'gateway_charge_id' => $gatewayChargeId,
+            'gateway_subscription_id' => $gatewaySubscriptionId,
+            'gateway_invoice_id' => $gatewayInvoiceId,
+            'gateway_cycle_id' => $gatewayCycleId,
+            'gateway_customer_id' => $gatewayCustomerId,
             'gateway_transaction_id' => data_get($data, 'charges.0.last_transaction.id')
                 ?? data_get($data, 'last_transaction.id'),
             'occurred_at' => isset($validated['created_at']) ? Carbon::parse($validated['created_at']) : now(),

@@ -9,19 +9,30 @@ import type { ApiWallOptionsResponse, ApiWallSettings } from '@/lib/api-types';
 
 import { HelpLabel, HelpTooltip } from '../../WallManagerHelp';
 import { WallManagerSection } from '../../WallManagerSection';
-import { WALL_SLIDER_FIELDS, WALL_TOGGLE_FIELDS } from '../../../manager-config';
+import {
+  WALL_SLIDER_FIELDS,
+  WALL_TOGGLE_FIELDS,
+  WALL_VIDEO_AUDIO_POLICY_OPTIONS,
+  WALL_VIDEO_MAX_SECONDS_OPTIONS,
+  WALL_VIDEO_MULTI_LAYOUT_OPTIONS,
+  WALL_VIDEO_PLAYBACK_MODE_OPTIONS,
+  WALL_VIDEO_PREFERRED_VARIANT_OPTIONS,
+  WALL_VIDEO_RESUME_MODE_OPTIONS,
+} from '../../../manager-config';
 
 type UpdateDraft = <K extends keyof ApiWallSettings>(key: K, value: ApiWallSettings[K]) => void;
 
 interface WallAppearanceTabProps {
   wallSettings: ApiWallSettings;
   options: ApiWallOptionsResponse;
+  videoPolicySummary: string;
   onDraftChange: UpdateDraft;
 }
 
 export function WallAppearanceTab({
   wallSettings,
   options,
+  videoPolicySummary,
   onDraftChange,
 }: WallAppearanceTabProps) {
   return (
@@ -167,6 +178,158 @@ export function WallAppearanceTab({
               checked={wallSettings.show_side_thumbnails ?? true}
               onCheckedChange={(checked) => onDraftChange('show_side_thumbnails', checked)}
             />
+          </div>
+        </div>
+      </WallManagerSection>
+
+      <WallManagerSection
+        title={(
+          <span className="flex items-center gap-2">
+            Politica de video
+            <HelpTooltip helpKey="videoPolicySection" />
+          </span>
+        )}
+        description="Configure aqui como videos entram no wall, quando podem segurar a tela e qual variante o player deve priorizar."
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <HelpLabel helpKey="videoEnabled">Suportar videos no telao</HelpLabel>
+              <p className="text-[11px] text-muted-foreground">
+                Quando desligado, o wall publica apenas imagens e o upload publico bloqueia video para este evento.
+              </p>
+            </div>
+            <Switch
+              checked={wallSettings.video_enabled ?? true}
+              onCheckedChange={(checked) => onDraftChange('video_enabled', checked)}
+            />
+          </div>
+
+          <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
+            <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Resumo efetivo</p>
+            <p className="mt-2 text-sm leading-relaxed text-foreground/85">{videoPolicySummary}</p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <HelpLabel helpKey="videoPlaybackMode" className="text-sm">Modo de reproducao</HelpLabel>
+              <Select
+                value={wallSettings.video_playback_mode}
+                onValueChange={(value) => onDraftChange('video_playback_mode', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o modo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {WALL_VIDEO_PLAYBACK_MODE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {WALL_VIDEO_PLAYBACK_MODE_OPTIONS.find((option) => option.value === wallSettings.video_playback_mode)?.description}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <HelpLabel helpKey="videoMaxSeconds" className="text-sm">Duracao maxima</HelpLabel>
+              <Select
+                value={String(wallSettings.video_max_seconds)}
+                onValueChange={(value) => onDraftChange('video_max_seconds', Number(value))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o limite" />
+                </SelectTrigger>
+                <SelectContent>
+                  {WALL_VIDEO_MAX_SECONDS_OPTIONS.map((value) => (
+                    <SelectItem key={value} value={String(value)}>{value}s</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Videos acima desse cap so entram por excecao editorial ou serao interrompidos pela policy escolhida.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <HelpLabel helpKey="videoResumeMode" className="text-sm">Ao retomar apos pausa</HelpLabel>
+              <Select
+                value={wallSettings.video_resume_mode}
+                onValueChange={(value) => onDraftChange('video_resume_mode', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o comportamento" />
+                </SelectTrigger>
+                <SelectContent>
+                  {WALL_VIDEO_RESUME_MODE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {WALL_VIDEO_RESUME_MODE_OPTIONS.find((option) => option.value === wallSettings.video_resume_mode)?.description}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <HelpLabel helpKey="videoAudioPolicy" className="text-sm">Audio do video</HelpLabel>
+              <Select
+                value={wallSettings.video_audio_policy}
+                onValueChange={(value) => onDraftChange('video_audio_policy', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a politica" />
+                </SelectTrigger>
+                <SelectContent>
+                  {WALL_VIDEO_AUDIO_POLICY_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {WALL_VIDEO_AUDIO_POLICY_OPTIONS.find((option) => option.value === wallSettings.video_audio_policy)?.description}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <HelpLabel helpKey="videoMultiLayoutPolicy" className="text-sm">Video em multi-slot</HelpLabel>
+              <Select
+                value={wallSettings.video_multi_layout_policy}
+                onValueChange={(value) => onDraftChange('video_multi_layout_policy', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a regra" />
+                </SelectTrigger>
+                <SelectContent>
+                  {WALL_VIDEO_MULTI_LAYOUT_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {WALL_VIDEO_MULTI_LAYOUT_OPTIONS.find((option) => option.value === wallSettings.video_multi_layout_policy)?.description}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <HelpLabel helpKey="videoPreferredVariant" className="text-sm">Variante preferida</HelpLabel>
+              <Select
+                value={wallSettings.video_preferred_variant}
+                onValueChange={(value) => onDraftChange('video_preferred_variant', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a variante" />
+                </SelectTrigger>
+                <SelectContent>
+                  {WALL_VIDEO_PREFERRED_VARIANT_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {WALL_VIDEO_PREFERRED_VARIANT_OPTIONS.find((option) => option.value === wallSettings.video_preferred_variant)?.description}
+              </p>
+            </div>
           </div>
         </div>
       </WallManagerSection>

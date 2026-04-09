@@ -10,9 +10,11 @@ it('builds separated query and index client configs for aws rekognition', functi
         'retry_mode' => 'standard',
         'max_attempts_query' => 3,
         'max_attempts_index' => 5,
-        'connect_timeout' => 3.0,
-        'query_timeout' => 8.0,
-        'index_timeout' => 15.0,
+        'connect_timeout' => 4.0,
+        'connect_timeout_query' => 4.5,
+        'connect_timeout_index' => 6.0,
+        'query_timeout' => 10.0,
+        'index_timeout' => 20.0,
         'access_key_id' => 'test-key',
         'secret_access_key' => 'test-secret',
         'session_token' => '',
@@ -29,13 +31,16 @@ it('builds separated query and index client configs for aws rekognition', functi
         ->and($queryConfig['version'])->toBe('2016-06-27')
         ->and($queryConfig['retries']['mode'])->toBe('standard')
         ->and($queryConfig['retries']['max_attempts'])->toBe(3)
-        ->and($queryConfig['http']['connect_timeout'])->toBe(3.0)
-        ->and($queryConfig['http']['timeout'])->toBe(8.0)
+        ->and($queryConfig['http']['connect_timeout'])->toBe(4.5)
+        ->and($queryConfig['http']['timeout'])->toBe(10.0)
         ->and($queryConfig)->toHaveKey('credentials')
         ->and($indexConfig['retries']['max_attempts'])->toBe(5)
-        ->and($indexConfig['http']['timeout'])->toBe(15.0)
+        ->and($indexConfig['http']['connect_timeout'])->toBe(6.0)
+        ->and($indexConfig['http']['timeout'])->toBe(20.0)
         ->and($stsConfig['version'])->toBe('2011-06-15')
-        ->and($stsConfig['retries']['max_attempts'])->toBe(3);
+        ->and($stsConfig['retries']['max_attempts'])->toBe(3)
+        ->and($stsConfig['http']['connect_timeout'])->toBe(4.5)
+        ->and($stsConfig['http']['timeout'])->toBe(10.0);
 });
 
 it('omits explicit credentials when aws face search keys are not configured', function () {

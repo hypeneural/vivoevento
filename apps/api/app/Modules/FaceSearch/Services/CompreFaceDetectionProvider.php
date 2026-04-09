@@ -6,7 +6,9 @@ use App\Modules\FaceSearch\DTOs\DetectedFaceData;
 use App\Modules\FaceSearch\DTOs\FaceBoundingBoxData;
 use App\Modules\FaceSearch\Models\EventFaceSearchSetting;
 use App\Modules\MediaProcessing\Models\EventMedia;
+use Intervention\Image\Laravel\Facades\Image;
 use RuntimeException;
+use Throwable;
 
 class CompreFaceDetectionProvider implements FaceDetectionProviderInterface
 {
@@ -21,6 +23,7 @@ class CompreFaceDetectionProvider implements FaceDetectionProviderInterface
     ): array {
         $payload = $this->requestDetection($media, $binary);
         $results = $payload['result'] ?? [];
+        $imageDimensions = $this->imageDimensions($binary);
 
         if (! is_array($results)) {
             throw new RuntimeException('CompreFace detection response did not contain a valid result array.');
@@ -38,6 +41,7 @@ class CompreFaceDetectionProvider implements FaceDetectionProviderInterface
                 facePayload: $facePayload,
                 payload: $payload,
                 isPrimaryCandidate: $index === $primaryIndex,
+                imageDimensions: $imageDimensions,
             );
         }
 
@@ -101,11 +105,13 @@ class CompreFaceDetectionProvider implements FaceDetectionProviderInterface
     /**
      * @param array<string, mixed> $facePayload
      * @param array<string, mixed> $payload
+     * @param array{width:int,height:int}|null $imageDimensions
      */
     private function mapFace(
         array $facePayload,
         array $payload,
         bool $isPrimaryCandidate,
+        ?array $imageDimensions = null,
     ): DetectedFaceData {
         $box = $facePayload['box'] ?? null;
 
@@ -123,11 +129,17 @@ class CompreFaceDetectionProvider implements FaceDetectionProviderInterface
         }
 
         $confidence = round($this->numeric($box['probability'] ?? null, 0.0), 6);
+        $imageWidth = $imageDimensions['width'] ?? null;
+        $imageHeight = $imageDimensions['height'] ?? null;
+        $faceAreaRatio = is_int($imageWidth) && is_int($imageHeight) && $imageWidth > 0 && $imageHeight > 0
+            ? ($width * $height) / ($imageWidth * $imageHeight)
+            : null;
 
         return new DetectedFaceData(
             boundingBox: new FaceBoundingBoxData($x, $y, $width, $height),
             detectionConfidence: $confidence,
             qualityScore: $confidence,
+            faceAreaRatio: $faceAreaRatio,
             isPrimaryCandidate: $isPrimaryCandidate,
             landmarks: $this->normalizeLandmarks($facePayload['landmarks'] ?? []),
             providerEmbedding: $this->normalizeEmbedding($facePayload['embedding'] ?? []),
@@ -140,6 +152,8 @@ class CompreFaceDetectionProvider implements FaceDetectionProviderInterface
                 'embedding_dimension' => is_array($facePayload['embedding'] ?? null)
                     ? count($facePayload['embedding'])
                     : null,
+                'image_width' => $imageWidth,
+                'image_height' => $imageHeight,
             ],
         );
     }
@@ -208,5 +222,22 @@ class CompreFaceDetectionProvider implements FaceDetectionProviderInterface
     private function numeric(mixed $value, float $default): float
     {
         return is_numeric($value) ? (float) $value : $default;
+    }
+
+    /**
+     * @return array{width:int,height:int}|null
+     */
+    private function imageDimensions(string $binary): ?array
+    {
+        try {
+            $image = Image::decode($binary);
+
+            return [
+                'width' => $image->width(),
+                'height' => $image->height(),
+            ];
+        } catch (Throwable) {
+            return null;
+        }
     }
 }

@@ -18,7 +18,7 @@ describe('IdentityAssistInline', () => {
           title: 'Ja encontramos seu cadastro',
           description: 'Entrar agora costuma ser mais rapido para continuar sua compra.',
           action_label: 'Entrar para continuar',
-          login_url: '/login?returnTo=%2Fcheckout%2Fevento%3Fresume%3Dauth',
+          login_url: '/login?returnTo=%2Fcheckout%2Fevento%3Fv2%3D1%26resume%3Dauth',
           cooldown_seconds: null,
         }}
       />,
@@ -27,7 +27,7 @@ describe('IdentityAssistInline', () => {
     expect(screen.getByText(/ja encontramos seu cadastro/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /entrar para continuar/i })).toHaveAttribute(
       'href',
-      '/login?returnTo=%2Fcheckout%2Fevento%3Fresume%3Dauth',
+      '/login?returnTo=%2Fcheckout%2Fevento%3Fv2%3D1%26resume%3Dauth',
     );
   });
 

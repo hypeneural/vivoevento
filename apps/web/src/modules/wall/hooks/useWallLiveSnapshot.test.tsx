@@ -37,6 +37,19 @@ function makeLiveSnapshotResponse(overrides: Partial<ApiWallLiveSnapshotResponse
       isFeatured: false,
       createdAt: '2026-04-08T10:10:00Z',
     },
+    nextItem: {
+      id: 'media_11',
+      previewUrl: 'https://cdn.example.com/thumbs/media-11.jpg',
+      senderName: 'Bruno Costa',
+      senderKey: 'upload:bruno',
+      source: 'upload',
+      caption: 'Proxima foto da fila',
+      layoutHint: 'polaroid',
+      isFeatured: false,
+      isVideo: false,
+      durationSeconds: null,
+      createdAt: '2026-04-08T10:09:00Z',
+    },
     updatedAt: '2026-04-08T10:11:00Z',
     ...overrides,
   };
@@ -80,6 +93,7 @@ describe('useWallLiveSnapshot', () => {
       expect(result.current.data?.currentItem?.senderName).toBe('Juliana Ribeiro');
     });
 
+    expect(result.current.data?.nextItem?.senderName).toBe('Bruno Costa');
     expect(getEventWallLiveSnapshotMock).toHaveBeenCalledWith('31');
   });
 

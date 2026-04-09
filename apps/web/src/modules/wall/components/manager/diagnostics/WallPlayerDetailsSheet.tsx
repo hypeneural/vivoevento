@@ -15,6 +15,11 @@ import {
   formatPlayerHealthLabel,
   formatPlayerSituation,
   formatTimestampLabel,
+  formatVideoExitReason,
+  formatVideoFailureReason,
+  formatVideoPhase,
+  formatVideoProgress,
+  formatVideoRuntimeSummary,
   healthBadgeClass,
   shortPlayerId,
 } from './wall-player-runtime-copy';
@@ -66,6 +71,25 @@ function WallPlayerDetailsBody({ player }: { player: ApiWallDiagnosticsPlayer | 
         <DetailBlock label="Fila pronta" value={readinessSummary} detail="Mostra o quanto essa tela ja carregou para seguir sem travar." />
         <DetailBlock label="Aproveitamento do cache" value={formatPercentLabel(player.cache_hit_rate)} detail={`Acertos ${player.cache_hit_count} | Falhas ${player.cache_miss_count} | Desatualizadas ${player.cache_stale_fallback_count}`} />
         <DetailBlock label="Espaco usado no navegador" value={`${formatBytes(player.cache_usage_bytes)} de ${formatBytes(player.cache_quota_bytes)}`} detail={`Armazenamento ${formatPersistentStorage(player.persistent_storage)}`} />
+        {player.current_media_type === 'video' ? (
+          <>
+            <DetailBlock
+              label="Playback do video"
+              value={formatVideoPhase(player.current_video_phase)}
+              detail={formatVideoRuntimeSummary(player)}
+            />
+            <DetailBlock
+              label="Progresso atual"
+              value={formatVideoProgress(player)}
+              detail={`readyState ${player.current_video_ready_state ?? 'sem dado'} | stalls ${player.current_video_stall_count ?? 0}`}
+            />
+            <DetailBlock
+              label="Ultima saida"
+              value={formatVideoExitReason(player.current_video_exit_reason)}
+              detail={player.current_video_failure_reason ? `Falha ${formatVideoFailureReason(player.current_video_failure_reason).toLowerCase()}` : 'Sem falha registrada para este ciclo.'}
+            />
+          </>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">

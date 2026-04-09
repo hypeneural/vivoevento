@@ -77,6 +77,7 @@ import {
   applyWallSelectionPreset,
   areWallSettingsEqual,
   buildWallSelectionSummary,
+  buildWallVideoPolicySummary,
   cloneWallSettings,
   markWallSelectionAsCustom,
   prepareWallSettingsPayload,
@@ -301,6 +302,10 @@ export default function EventWallManagerPage() {
     () => (wallSettings ? buildWallSelectionSummary(wallSettings, selectionModes) : ''),
     [selectionModes, wallSettings],
   );
+  const videoPolicySummary = useMemo(
+    () => (wallSettings ? buildWallVideoPolicySummary(wallSettings) : ''),
+    [wallSettings],
+  );
   const normalizedWallSettings = useMemo(
     () => (wallSettings ? prepareWallSettingsPayload(cloneWallSettings(wallSettings)) : null),
     [wallSettings],
@@ -332,6 +337,7 @@ export default function EventWallManagerPage() {
   });
 
   const diagnosticsSummary = diagnosticsQuery.data?.summary ?? settings?.diagnostics_summary ?? null;
+  const videoPipeline = settings?.video_pipeline ?? null;
   const diagnosticsPlayers = diagnosticsQuery.data?.players ?? [];
   const selectedPlayer = diagnosticsPlayers.find((player) => player.player_instance_id === selectedPlayerId) ?? null;
   const insights = insightsQuery.data ?? null;
@@ -813,6 +819,39 @@ export default function EventWallManagerPage() {
                 </div>
               </div>
 
+              <div className="grid gap-3 xl:grid-cols-2">
+                <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
+                  <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Politica de video ativa</p>
+                  <p className="mt-2 text-sm leading-relaxed text-foreground/85">
+                    {videoPolicySummary}
+                  </p>
+                </div>
+                <div className={`rounded-2xl border p-4 ${videoPipeline?.ready ? 'border-emerald-500/25 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/8'}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Pipeline de variantes</p>
+                      <p className="mt-2 text-sm font-medium">
+                        {videoPipeline?.ready
+                          ? 'ffmpeg e ffprobe prontos para metadata e variantes de video.'
+                          : 'Os binarios de video ainda nao estao resolvidos neste ambiente.'}
+                      </p>
+                    </div>
+                    <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-medium ${videoPipeline?.ready ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700' : 'border-amber-500/30 bg-amber-500/10 text-amber-700'}`}>
+                      {videoPipeline?.ready ? 'Pronto' : 'Provisionar'}
+                    </span>
+                  </div>
+                  <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+                    <p>`ffmpeg`: {videoPipeline?.ffmpeg_resolved_path ?? videoPipeline?.ffmpeg_bin ?? 'Sem configuracao'}</p>
+                    <p>`ffprobe`: {videoPipeline?.ffprobe_resolved_path ?? videoPipeline?.ffprobe_bin ?? 'Sem configuracao'}</p>
+                    {!videoPipeline?.ready ? (
+                      <p>
+                        Sem esses binarios, o wall continua operando com o que ja foi gerado, mas nao fecha metadata nova nem variantes de video nos workers reais.
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
               {diagnosticsQuery.isLoading && !diagnosticsSummary ? (
                 <div className="flex min-h-[96px] items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 text-sm text-muted-foreground">
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -886,6 +925,7 @@ export default function EventWallManagerPage() {
             <WallAppearanceTab
               wallSettings={wallSettings}
               options={options}
+              videoPolicySummary={videoPolicySummary}
               onDraftChange={updateDraft}
             />
           ) : null}

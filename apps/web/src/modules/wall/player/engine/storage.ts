@@ -3,10 +3,11 @@ import type {
   WallPlayerState,
   WallSenderRuntimeStats,
   WallRuntimeItem,
+  WallVideoPlaybackState,
 } from '../types';
 import { mediaToRuntimeItem } from './selectors';
 
-const STORAGE_VERSION = 2;
+const STORAGE_VERSION = 4;
 const STORAGE_PREFIX = 'eventovivo:wall:runtime';
 const INDEXED_DB_NAME = 'eventovivo-wall-runtime';
 const INDEXED_DB_STORE = 'runtime';
@@ -26,8 +27,29 @@ interface PersistedWallRuntimeItem {
 interface PersistedWallRuntimeState {
   version: number;
   currentItemId?: string | null;
+  currentItemStartedAt?: string | null;
   senderStats: Record<string, WallSenderRuntimeStats>;
   items: PersistedWallRuntimeItem[];
+  videoPlayback?: Pick<
+    WallVideoPlaybackState,
+    | 'itemId'
+    | 'phase'
+    | 'currentTime'
+    | 'durationSeconds'
+    | 'readyState'
+    | 'exitReason'
+    | 'failureReason'
+    | 'stallCount'
+    | 'posterVisible'
+    | 'firstFrameReady'
+    | 'playbackReady'
+    | 'playingConfirmed'
+    | 'startupDegraded'
+    | 'playbackStartedAt'
+    | 'lastItemId'
+    | 'lastExitReason'
+    | 'lastFailureReason'
+  >;
 }
 
 function storageKey(code: string): string {
@@ -180,6 +202,7 @@ export function writeWallRuntimeStorage(code: string, state: WallPlayerState): v
   const payload: PersistedWallRuntimeState = {
     version: STORAGE_VERSION,
     currentItemId: state.currentItemId ?? null,
+    currentItemStartedAt: state.currentItemStartedAt ?? null,
     senderStats: state.senderStats,
     items: state.items.map((item) => ({
       id: item.id,
@@ -192,6 +215,25 @@ export function writeWallRuntimeStorage(code: string, state: WallPlayerState): v
       height: item.height ?? null,
       orientation: item.orientation ?? null,
     })),
+    videoPlayback: {
+      itemId: state.videoPlayback.itemId,
+      phase: state.videoPlayback.phase,
+      currentTime: state.videoPlayback.currentTime,
+      durationSeconds: state.videoPlayback.durationSeconds,
+      readyState: state.videoPlayback.readyState,
+      exitReason: state.videoPlayback.exitReason,
+      failureReason: state.videoPlayback.failureReason,
+      stallCount: state.videoPlayback.stallCount,
+      posterVisible: state.videoPlayback.posterVisible,
+      firstFrameReady: state.videoPlayback.firstFrameReady,
+      playbackReady: state.videoPlayback.playbackReady,
+      playingConfirmed: state.videoPlayback.playingConfirmed,
+      startupDegraded: state.videoPlayback.startupDegraded,
+      playbackStartedAt: state.videoPlayback.playbackStartedAt ?? null,
+      lastItemId: state.videoPlayback.lastItemId ?? null,
+      lastExitReason: state.videoPlayback.lastExitReason ?? null,
+      lastFailureReason: state.videoPlayback.lastFailureReason ?? null,
+    },
   };
 
   try {

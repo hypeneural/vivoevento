@@ -17,6 +17,7 @@ type SelectedUpload = {
   id: string;
   file: File;
   previewUrl: string;
+  mediaType: 'image' | 'video';
 };
 
 function formatBytes(bytes: number) {
@@ -36,6 +37,22 @@ function moderationFlowLabel(mode: string) {
     default:
       return 'Fila manual';
   }
+}
+
+function isVideoFile(file: File) {
+  return file.type.startsWith('video/');
+}
+
+function selectionSummary(items: SelectedUpload[]) {
+  if (items.length === 0) {
+    return 'Nenhuma midia selecionada ainda';
+  }
+
+  if (items.length === 1 && items[0]?.mediaType === 'video') {
+    return '1 video pronto para envio';
+  }
+
+  return `${items.length} imagem(ns) pronta(s) para envio`;
 }
 
 export default function PublicEventUploadPage() {
@@ -74,9 +91,13 @@ export default function PublicEventUploadPage() {
 
       const formData = new FormData();
 
-      selectedFiles.forEach((item) => {
-        formData.append('files[]', item.file);
-      });
+      if (selectedFiles.length === 1 && selectedFiles[0]?.mediaType === 'video') {
+        formData.append('file', selectedFiles[0].file);
+      } else {
+        selectedFiles.forEach((item) => {
+          formData.append('files[]', item.file);
+        });
+      }
 
       if (senderName.trim()) {
         formData.append('sender_name', senderName.trim());
@@ -95,7 +116,7 @@ export default function PublicEventUploadPage() {
       setLastResult(result);
 
       toast({
-        title: 'Fotos enviadas',
+        title: 'Envio concluido',
         description: result.message,
       });
     },
@@ -118,6 +139,9 @@ export default function PublicEventUploadPage() {
   const primaryColor = uploadData?.event.primary_color || '#5b3df5';
   const secondaryColor = uploadData?.event.secondary_color || '#1f8fff';
   const uploadEnabled = uploadData?.upload.enabled ?? false;
+  const acceptsVideo = uploadData?.upload.accepts_video ?? false;
+  const acceptHint = uploadData?.upload.accept_hint ?? 'image/*';
+  const videoMaxDurationSeconds = uploadData?.upload.video_max_duration_seconds ?? null;
 
   function openCamera() {
     if (!uploadEnabled) return;
@@ -132,25 +156,77 @@ export default function PublicEventUploadPage() {
   function appendFiles(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return;
 
-    const incoming = Array.from(fileList).filter((file) => file.type.startsWith('image/'));
+    const incoming = Array.from(fileList);
+    const supported = incoming.filter((file) => (
+      file.type.startsWith('image/')
+      || (acceptsVideo && isVideoFile(file))
+    ));
 
-    if (incoming.length === 0) {
+    if (supported.length === 0 || supported.length !== incoming.length) {
       toast({
         title: 'Formato invalido',
-        description: 'Selecione apenas imagens do seu celular.',
+        description: acceptsVideo
+          ? 'Selecione fotos ou 1 video curto do seu celular.'
+          : 'Selecione apenas imagens do seu celular.',
         variant: 'destructive',
       });
       return;
     }
 
     const maxFiles = uploadData?.upload.max_files ?? 10;
+    const incomingVideo = supported.find((file) => isVideoFile(file)) ?? null;
+    const hasCurrentVideo = selectedFiles.some((item) => item.mediaType === 'video');
+    const hasCurrentImages = selectedFiles.some((item) => item.mediaType === 'image');
 
     setLastResult(null);
+
+    if (incomingVideo) {
+      if (supported.length > 1) {
+        toast({
+          title: 'Selecao nao permitida',
+          description: 'Envie fotos em lote ou 1 video por vez, sem misturar os dois.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (hasCurrentImages) {
+        toast({
+          title: 'Selecao nao permitida',
+          description: 'Limpe as imagens atuais antes de escolher um video.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setSelectedFiles((current) => {
+        current.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+
+        return [{
+          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          file: incomingVideo,
+          previewUrl: URL.createObjectURL(incomingVideo),
+          mediaType: 'video',
+        }];
+      });
+
+      return;
+    }
+
+    if (hasCurrentVideo) {
+      toast({
+        title: 'Selecao nao permitida',
+        description: 'Envie o video atual ou limpe a selecao antes de adicionar imagens.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setSelectedFiles((current) => {
       const signatures = new Set(current.map((item) => `${item.file.name}-${item.file.size}-${item.file.lastModified}`));
       const next = [...current];
 
-      incoming.forEach((file) => {
+      supported.forEach((file) => {
         const signature = `${file.name}-${file.size}-${file.lastModified}`;
 
         if (signatures.has(signature) || next.length >= maxFiles) {
@@ -162,6 +238,7 @@ export default function PublicEventUploadPage() {
           id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
           file,
           previewUrl: URL.createObjectURL(file),
+          mediaType: 'image',
         });
       });
 
@@ -260,7 +337,7 @@ export default function PublicEventUploadPage() {
       <input
         ref={galleryInputRef}
         type="file"
-        accept="image/*"
+        accept={acceptHint}
         multiple
         className="hidden"
         onChange={handleGalleryChange}
@@ -319,7 +396,9 @@ export default function PublicEventUploadPage() {
                 <div className="rounded-2xl bg-white/12 p-3 backdrop-blur">
                   <p className="text-[11px] uppercase tracking-[0.16em] text-white/70">Limite</p>
                   <p className="mt-1 text-sm font-medium">
-                    {uploadData.upload.max_files} imagens de ate {uploadData.upload.max_file_size_mb} MB
+                    {acceptsVideo
+                      ? `${uploadData.upload.max_files} imagens ou 1 video curto`
+                      : `${uploadData.upload.max_files} imagens de ate ${uploadData.upload.max_file_size_mb} MB`}
                   </p>
                 </div>
               </div>
@@ -369,7 +448,9 @@ export default function PublicEventUploadPage() {
                 <div className="space-y-1">
                   <p className="text-base font-semibold">Escolher da galeria</p>
                   <p className="text-sm text-muted-foreground">
-                    Selecione uma ou mais imagens que ja estao salvas.
+                    {acceptsVideo
+                      ? `Selecione fotos ou 1 video curto${videoMaxDurationSeconds ? ` de ate ${videoMaxDurationSeconds}s` : ''}.`
+                      : 'Selecione uma ou mais imagens que ja estao salvas.'}
                   </p>
                 </div>
                 <ImagePlus className="h-6 w-6" />
@@ -391,7 +472,7 @@ export default function PublicEventUploadPage() {
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-emerald-900">Envio concluido</p>
                 <p className="text-sm text-emerald-800">
-                  {lastResult.uploaded_count} {lastResult.uploaded_count > 1 ? 'imagens foram recebidas.' : 'imagem foi recebida.'}
+                  {lastResult.message}
                 </p>
               </div>
             </CardContent>
@@ -430,11 +511,9 @@ export default function PublicEventUploadPage() {
           <CardContent className="space-y-4 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold">Imagens selecionadas</p>
+                <p className="text-sm font-semibold">Midias selecionadas</p>
                 <p className="text-sm text-muted-foreground">
-                  {selectedFiles.length > 0
-                    ? `${selectedFiles.length} pronta(s) para envio`
-                    : 'Nenhuma imagem selecionada ainda'}
+                  {selectionSummary(selectedFiles)}
                 </p>
               </div>
 
@@ -449,11 +528,21 @@ export default function PublicEventUploadPage() {
               <div className="grid grid-cols-2 gap-3">
                 {selectedFiles.map((item) => (
                   <div key={item.id} className="relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-100">
-                    <img
-                      src={item.previewUrl}
-                      alt={item.file.name}
-                      className="h-36 w-full object-cover"
-                    />
+                    {item.mediaType === 'video' ? (
+                      <video
+                        src={item.previewUrl}
+                        className="h-36 w-full object-cover"
+                        muted
+                        playsInline
+                        preload="metadata"
+                      />
+                    ) : (
+                      <img
+                        src={item.previewUrl}
+                        alt={item.file.name}
+                        className="h-36 w-full object-cover"
+                      />
+                    )}
                     <button
                       type="button"
                       onClick={() => removeFile(item.id)}
@@ -471,9 +560,13 @@ export default function PublicEventUploadPage() {
             ) : (
               <div className="rounded-3xl border border-dashed border-border bg-slate-50 px-4 py-10 text-center">
                 <ImagePlus className="mx-auto h-8 w-8 text-muted-foreground" />
-                <p className="mt-3 text-sm font-medium">Escolha fotos para comecar</p>
+                <p className="mt-3 text-sm font-medium">
+                  {acceptsVideo ? 'Escolha fotos ou 1 video curto para comecar' : 'Escolha fotos para comecar'}
+                </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Voce pode combinar imagens da camera e da galeria.
+                  {acceptsVideo
+                    ? 'Voce pode enviar varias imagens ou um unico video por vez.'
+                    : 'Voce pode combinar imagens da camera e da galeria.'}
                 </p>
               </div>
             )}
@@ -485,7 +578,9 @@ export default function PublicEventUploadPage() {
         <div className="mx-auto flex w-full max-w-md items-center gap-3 px-4 py-4">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold">
-              {selectedFiles.length > 0 ? `${selectedFiles.length} imagem(ns) pronta(s)` : 'Selecione suas imagens'}
+              {selectedFiles.length > 0
+                ? (selectedFiles[0]?.mediaType === 'video' ? '1 video pronto' : `${selectedFiles.length} imagem(ns) pronta(s)`)
+                : (acceptsVideo ? 'Selecione fotos ou 1 video curto' : 'Selecione suas imagens')}
             </p>
             <p className="truncate text-xs text-muted-foreground">
               {uploadEnabled

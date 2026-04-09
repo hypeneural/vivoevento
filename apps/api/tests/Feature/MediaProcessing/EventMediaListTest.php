@@ -94,8 +94,11 @@ it('shows detailed media payload with preview and original asset urls', function
     $response->assertJsonPath('data.id', $media->id)
         ->assertJsonPath('data.media_type', 'video')
         ->assertJsonPath('data.mime_type', 'video/mp4')
+        ->assertJsonPath('data.thumbnail_source', 'thumb')
+        ->assertJsonPath('data.preview_source', 'gallery')
         ->assertJsonPath('data.preview_url', rtrim((string) config('app.url'), '/')."/storage/events/{$event->id}/gallery/clip.mp4")
         ->assertJsonPath('data.original_url', rtrim((string) config('app.url'), '/')."/storage/events/{$event->id}/originals/clip.mp4")
+        ->assertJsonPath('data.updated_at', $media->updated_at?->toIso8601String())
         ->assertJsonPath('data.variants.0.variant_key', 'gallery');
 });
 
@@ -161,7 +164,11 @@ it('prefers fast preview assets and exposes enriched processing runs in the deta
     $response = $this->apiGet("/media/{$media->id}");
 
     $this->assertApiSuccess($response);
+    $media->refresh();
     $response->assertJsonPath('data.preview_url', rtrim((string) config('app.url'), '/')."/storage/events/{$event->id}/variants/{$media->id}/fast_preview.webp")
+        ->assertJsonPath('data.thumbnail_source', 'gallery')
+        ->assertJsonPath('data.preview_source', 'fast_preview')
+        ->assertJsonPath('data.updated_at', $media->updated_at?->toIso8601String())
         ->assertJsonPath('data.processing_runs.0.queue_name', 'media-audit')
         ->assertJsonPath('data.processing_runs.0.worker_ref', 'worker-a')
         ->assertJsonPath('data.processing_runs.0.provider_version', 'v4')

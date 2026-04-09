@@ -12,7 +12,7 @@
  */
 
 import { useMemo } from 'react';
-import MediaSurface from '../components/MediaSurface';
+import MediaSurface, { type MediaSurfaceVideoControlProps } from '../components/MediaSurface';
 import type { WallRuntimeItem } from '../types';
 import { resolveKenBurnsAnimationClass } from '../engine/motion';
 import './ken-burns.css';
@@ -21,6 +21,7 @@ interface KenBurnsLayoutProps {
   media: WallRuntimeItem;
   intervalMs?: number;
   reducedMotion?: boolean;
+  videoControl?: MediaSurfaceVideoControlProps | null;
 }
 
 let kbCounter = 0;
@@ -29,6 +30,7 @@ export function KenBurnsLayout({
   media,
   intervalMs = 8000,
   reducedMotion = false,
+  videoControl,
 }: KenBurnsLayoutProps) {
   const animationClass = useMemo(() => {
     const cls = resolveKenBurnsAnimationClass(kbCounter, reducedMotion);
@@ -49,7 +51,7 @@ export function KenBurnsLayout({
       >
         {isVideo ? (
           <div className="kb-media kb-video-zoom">
-            <MediaSurface media={media} fit="cover" />
+            <MediaSurface media={media} fit="cover" videoControl={videoControl} />
           </div>
         ) : (
           <div className={`kb-media ${animationClass ?? ''}`}>

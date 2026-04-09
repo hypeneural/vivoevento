@@ -3,6 +3,7 @@
 namespace App\Modules\MediaProcessing\Http\Resources;
 
 use App\Modules\MediaProcessing\Services\MediaAssetUrlService;
+use App\Modules\Wall\Services\WallVideoAdmissionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -11,6 +12,7 @@ class EventMediaDetailResource extends JsonResource
     public function toArray(Request $request): array
     {
         $assets = app(MediaAssetUrlService::class);
+        $videoAdmission = app(WallVideoAdmissionService::class);
 
         return array_merge(
             (new EventMediaResource($this->resource))->toArray($request),
@@ -25,6 +27,14 @@ class EventMediaDetailResource extends JsonResource
                 'mime_type' => $this->mime_type,
                 'size_bytes' => $this->size_bytes,
                 'duration_seconds' => $this->duration_seconds,
+                'has_audio' => $this->has_audio,
+                'video_codec' => $this->video_codec,
+                'audio_codec' => $this->audio_codec,
+                'bitrate' => $this->bitrate,
+                'container' => $this->container,
+                'wall_video_admission' => $this->media_type === 'video'
+                    ? $videoAdmission->inspect($this->resource)
+                    : null,
                 'caption_source_hint' => $this->resolveCaptionSourceHint(),
                 'preview_url' => $assets->preview($this->resource),
                 'original_url' => $assets->original($this->resource),

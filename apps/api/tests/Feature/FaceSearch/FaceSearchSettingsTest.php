@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Events\Models\Event;
+use App\Modules\FaceSearch\Jobs\BackfillEventFaceSearchGalleryJob;
 use App\Modules\FaceSearch\Models\EventFaceSearchSetting;
 use App\Modules\FaceSearch\Jobs\EnsureAwsCollectionJob;
 use Illuminate\Support\Facades\Bus;
@@ -150,7 +151,7 @@ it('forbids updating face search settings without permission in the event organi
     expect(EventFaceSearchSetting::query()->count())->toBe(0);
 });
 
-it('dispatches aws collection provisioning when the event activates the aws backend', function () {
+it('dispatches aws collection provisioning and legacy gallery backfill when the event activates the aws backend', function () {
     Bus::fake();
 
     [$user, $organization] = $this->actingAsOwner();
@@ -191,4 +192,5 @@ it('dispatches aws collection provisioning when the event activates the aws back
     $this->assertApiSuccess($response);
 
     Bus::assertDispatched(EnsureAwsCollectionJob::class, fn (EnsureAwsCollectionJob $job) => $job->eventId === $event->id);
+    Bus::assertDispatched(BackfillEventFaceSearchGalleryJob::class, fn (BackfillEventFaceSearchGalleryJob $job) => $job->eventId === $event->id);
 });

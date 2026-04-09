@@ -51,6 +51,7 @@ class SelfiePreflightService
         }
 
         $face = $detectedFaces[0];
+        $this->guardSelfieOnlyDominance($face);
         $assessment = $this->qualityGate->assess($face, $settings);
 
         return [
@@ -59,5 +60,38 @@ class SelfiePreflightService
             'face' => $face,
             'assessment' => $assessment,
         ];
+    }
+
+    private function guardSelfieOnlyDominance(DetectedFaceData $face): void
+    {
+        $minFaceAreaRatio = (float) config('face_search.preflight.min_selfie_face_area_ratio', 0.08);
+        $maxCenterOffsetRatio = (float) config('face_search.preflight.max_selfie_center_offset_ratio', 0.22);
+
+        if ($face->faceAreaRatio !== null && $face->faceAreaRatio < $minFaceAreaRatio) {
+            throw $this->selfieOnlyValidation();
+        }
+
+        $imageWidth = data_get($face->providerPayload, 'image_width');
+        $imageHeight = data_get($face->providerPayload, 'image_height');
+
+        if (! is_numeric($imageWidth) || ! is_numeric($imageHeight) || (float) $imageWidth <= 0 || (float) $imageHeight <= 0) {
+            return;
+        }
+
+        $faceCenterX = $face->boundingBox->x + ($face->boundingBox->width / 2);
+        $faceCenterY = $face->boundingBox->y + ($face->boundingBox->height / 2);
+        $centerOffsetX = abs($faceCenterX - ((float) $imageWidth / 2)) / (float) $imageWidth;
+        $centerOffsetY = abs($faceCenterY - ((float) $imageHeight / 2)) / (float) $imageHeight;
+
+        if (max($centerOffsetX, $centerOffsetY) > $maxCenterOffsetRatio) {
+            throw $this->selfieOnlyValidation();
+        }
+    }
+
+    private function selfieOnlyValidation(): ValidationException
+    {
+        return ValidationException::withMessages([
+            'selfie' => ['Envie uma selfie mais aproximada, centralizada e com apenas uma pessoa em destaque. Busca por foto de grupo ainda nao faz parte desta versao.'],
+        ]);
     }
 }

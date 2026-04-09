@@ -4,6 +4,11 @@ import type {
   ApiWallSelectionModeOption,
   ApiWallSelectionPolicy,
   ApiWallSettings,
+  ApiWallVideoAudioPolicy,
+  ApiWallVideoMultiLayoutPolicy,
+  ApiWallVideoPlaybackMode,
+  ApiWallVideoPreferredVariant,
+  ApiWallVideoResumeMode,
 } from '@/lib/api-types';
 
 export const DEFAULT_WALL_SELECTION_POLICY: ApiWallSelectionPolicy = {
@@ -104,6 +109,13 @@ export function cloneWallSettings(settings: ApiWallSettings): ApiWallSettings {
     ad_mode: settings.ad_mode ?? 'disabled',
     ad_frequency: clampInteger(settings.ad_frequency, 5, 1, 100),
     ad_interval_minutes: clampInteger(settings.ad_interval_minutes, 3, 1, 60),
+    video_enabled: settings.video_enabled ?? true,
+    video_playback_mode: normalizeVideoPlaybackMode(settings.video_playback_mode),
+    video_max_seconds: clampInteger(settings.video_max_seconds, 30, 5, 300),
+    video_resume_mode: normalizeVideoResumeMode(settings.video_resume_mode),
+    video_audio_policy: normalizeVideoAudioPolicy(settings.video_audio_policy),
+    video_multi_layout_policy: normalizeVideoMultiLayoutPolicy(settings.video_multi_layout_policy),
+    video_preferred_variant: normalizeVideoPreferredVariant(settings.video_preferred_variant),
     selection_policy: normalizeWallSelectionPolicy(settings.selection_policy),
   };
 }
@@ -115,6 +127,13 @@ export function prepareWallSettingsPayload(settings: ApiWallSettings): ApiWallSe
     ad_mode: settings.ad_mode ?? 'disabled',
     ad_frequency: clampInteger(settings.ad_frequency, 5, 1, 100),
     ad_interval_minutes: clampInteger(settings.ad_interval_minutes, 3, 1, 60),
+    video_enabled: settings.video_enabled ?? true,
+    video_playback_mode: normalizeVideoPlaybackMode(settings.video_playback_mode),
+    video_max_seconds: clampInteger(settings.video_max_seconds, 30, 5, 300),
+    video_resume_mode: normalizeVideoResumeMode(settings.video_resume_mode),
+    video_audio_policy: normalizeVideoAudioPolicy(settings.video_audio_policy),
+    video_multi_layout_policy: normalizeVideoMultiLayoutPolicy(settings.video_multi_layout_policy),
+    video_preferred_variant: normalizeVideoPreferredVariant(settings.video_preferred_variant),
     selection_policy: normalizeWallSelectionPolicy(settings.selection_policy),
     neon_text: blankToNull(settings.neon_text),
     instructions_text: blankToNull(settings.instructions_text),
@@ -161,6 +180,13 @@ export function areWallSettingsEqual(
     && (left.ad_mode ?? 'disabled') === (right.ad_mode ?? 'disabled')
     && clampInteger(left.ad_frequency, 5, 1, 100) === clampInteger(right.ad_frequency, 5, 1, 100)
     && clampInteger(left.ad_interval_minutes, 3, 1, 60) === clampInteger(right.ad_interval_minutes, 3, 1, 60)
+    && (left.video_enabled ?? true) === (right.video_enabled ?? true)
+    && normalizeVideoPlaybackMode(left.video_playback_mode) === normalizeVideoPlaybackMode(right.video_playback_mode)
+    && clampInteger(left.video_max_seconds, 30, 5, 300) === clampInteger(right.video_max_seconds, 30, 5, 300)
+    && normalizeVideoResumeMode(left.video_resume_mode) === normalizeVideoResumeMode(right.video_resume_mode)
+    && normalizeVideoAudioPolicy(left.video_audio_policy) === normalizeVideoAudioPolicy(right.video_audio_policy)
+    && normalizeVideoMultiLayoutPolicy(left.video_multi_layout_policy) === normalizeVideoMultiLayoutPolicy(right.video_multi_layout_policy)
+    && normalizeVideoPreferredVariant(left.video_preferred_variant) === normalizeVideoPreferredVariant(right.video_preferred_variant)
     && blankToNull(left.instructions_text) === blankToNull(right.instructions_text);
 }
 
@@ -223,6 +249,27 @@ export function resolveWallSelectionModeOption(
   return presets.find((preset) => preset.value === mode) ?? null;
 }
 
+export function buildWallVideoPolicySummary(
+  settings: Pick<ApiWallSettings, 'video_enabled' | 'video_playback_mode' | 'video_max_seconds' | 'video_resume_mode' | 'video_audio_policy' | 'video_multi_layout_policy' | 'video_preferred_variant'>,
+): string {
+  if (!settings.video_enabled) {
+    return 'Videos estao bloqueados neste telao. O wall segue aceitando apenas imagens na exibicao.';
+  }
+
+  const playbackMode = describePlaybackMode(settings.video_playback_mode, settings.video_max_seconds);
+  const resumeMode = describeResumeMode(settings.video_resume_mode);
+  const layoutPolicy = describeMultiLayoutPolicy(settings.video_multi_layout_policy);
+  const variantPolicy = describePreferredVariant(settings.video_preferred_variant);
+
+  return [
+    playbackMode,
+    `${resumeMode}.`,
+    `Audio ${settings.video_audio_policy === 'muted' ? 'sempre mudo' : 'com politica personalizada'}.`,
+    `${layoutPolicy}.`,
+    `${variantPolicy}.`,
+  ].join(' ');
+}
+
 function labelForMode(mode: ApiWallSelectionMode): string {
   switch (mode) {
     case 'live':
@@ -264,6 +311,90 @@ function describePhaseImpact(phase: ApiWallEventPhase): string {
     case 'flow':
     default:
       return 'A fase de fluxo mantem o comportamento padrao do modo escolhido.';
+  }
+}
+
+function normalizeVideoPlaybackMode(value?: ApiWallVideoPlaybackMode | string | null): ApiWallVideoPlaybackMode {
+  if (value === 'fixed_interval' || value === 'play_to_end' || value === 'play_to_end_if_short_else_cap') {
+    return value;
+  }
+
+  return 'play_to_end_if_short_else_cap';
+}
+
+function normalizeVideoResumeMode(value?: ApiWallVideoResumeMode | string | null): ApiWallVideoResumeMode {
+  if (value === 'resume_if_same_item' || value === 'restart_from_zero' || value === 'resume_if_same_item_else_restart') {
+    return value;
+  }
+
+  return 'resume_if_same_item_else_restart';
+}
+
+function normalizeVideoAudioPolicy(value?: ApiWallVideoAudioPolicy | string | null): ApiWallVideoAudioPolicy {
+  return value === 'muted' ? value : 'muted';
+}
+
+function normalizeVideoMultiLayoutPolicy(value?: ApiWallVideoMultiLayoutPolicy | string | null): ApiWallVideoMultiLayoutPolicy {
+  if (value === 'disallow' || value === 'one' || value === 'all') {
+    return value;
+  }
+
+  return 'disallow';
+}
+
+function normalizeVideoPreferredVariant(value?: ApiWallVideoPreferredVariant | string | null): ApiWallVideoPreferredVariant {
+  if (value === 'wall_video_720p' || value === 'wall_video_1080p' || value === 'original') {
+    return value;
+  }
+
+  return 'wall_video_720p';
+}
+
+function describePlaybackMode(mode: ApiWallVideoPlaybackMode | string | null | undefined, maxSeconds: number): string {
+  switch (normalizeVideoPlaybackMode(mode)) {
+    case 'fixed_interval':
+      return 'Videos seguem o mesmo tempo fixo do slide.';
+    case 'play_to_end':
+      return 'Videos tocam ate o fim natural.';
+    case 'play_to_end_if_short_else_cap':
+    default:
+      return `Videos curtos tocam ate o fim; acima disso o wall limita a ${maxSeconds}s.`;
+  }
+}
+
+function describeResumeMode(mode: ApiWallVideoResumeMode | string | null | undefined): string {
+  switch (normalizeVideoResumeMode(mode)) {
+    case 'resume_if_same_item':
+      return 'Ao pausar, o wall tenta retomar do ponto atual se o mesmo video continuar em foco';
+    case 'restart_from_zero':
+      return 'Ao pausar, o wall reinicia o video desde o comeco na retomada';
+    case 'resume_if_same_item_else_restart':
+    default:
+      return 'Ao pausar, o wall retoma do ponto atual se o mesmo video permanecer em foco e reinicia quando a fila mudar';
+  }
+}
+
+function describeMultiLayoutPolicy(mode: ApiWallVideoMultiLayoutPolicy | string | null | undefined): string {
+  switch (normalizeVideoMultiLayoutPolicy(mode)) {
+    case 'all':
+      return 'Layouts com varios slots podem receber videos quando a composicao permitir';
+    case 'one':
+      return 'Layouts com varios slots aceitam no maximo um video por vez';
+    case 'disallow':
+    default:
+      return 'Layouts com varios slots nao recebem video e o wall cai para exibicao single-item';
+  }
+}
+
+function describePreferredVariant(value: ApiWallVideoPreferredVariant | string | null | undefined): string {
+  switch (normalizeVideoPreferredVariant(value)) {
+    case 'wall_video_1080p':
+      return 'O wall prioriza a variante 1080p quando ela existir';
+    case 'original':
+      return 'O wall pode usar o arquivo original quando o runtime precisar';
+    case 'wall_video_720p':
+    default:
+      return 'O wall prioriza a variante 720p para manter startup e decode mais leves';
   }
 }
 

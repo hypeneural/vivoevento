@@ -1,7 +1,7 @@
 import Pusher from 'pusher-js';
 
 import { getToken } from '@/lib/api';
-import { shouldDisableRealtimeInDev } from '@/lib/realtime';
+import { clearRealtimeSocketId, setRealtimeSocketId, shouldDisableRealtimeInDev } from '@/lib/realtime';
 
 let pusherInstance: Pusher | null = null;
 
@@ -91,6 +91,14 @@ export function createModerationPusher() {
     });
   }
 
+  pusherInstance.connection.bind('connected', () => {
+    setRealtimeSocketId(pusherInstance?.connection.socket_id ?? null);
+  });
+
+  pusherInstance.connection.bind('disconnected', () => {
+    clearRealtimeSocketId();
+  });
+
   return pusherInstance;
 }
 
@@ -99,4 +107,6 @@ export function disconnectModerationPusher() {
     pusherInstance.disconnect();
     pusherInstance = null;
   }
+
+  clearRealtimeSocketId();
 }

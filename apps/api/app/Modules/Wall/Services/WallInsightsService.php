@@ -7,6 +7,7 @@ use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Services\MediaAssetUrlService;
 use App\Modules\Wall\Queries\BuildWallInsightsQuery;
 use App\Modules\Wall\Support\WallSourceNormalizer;
+use App\Modules\Wall\Support\WallVideoPolicyLabelResolver;
 use App\Shared\Support\PhoneNumber;
 use BackedEnum;
 use Illuminate\Support\Collection;
@@ -83,7 +84,9 @@ class WallInsightsService
         return $mediaItems
             ->map(fn (EventMedia $mediaItem) => [
                 'id' => (string) $mediaItem->id,
-                'previewUrl' => $this->mediaAssets->thumbnail($mediaItem),
+                'previewUrl' => $mediaItem->media_type === 'video'
+                    ? $this->mediaAssets->poster($mediaItem)
+                    : $this->mediaAssets->thumbnail($mediaItem),
                 'senderName' => $this->displayName($mediaItem),
                 'senderKey' => $this->senderKey($mediaItem),
                 'source' => WallSourceNormalizer::normalize($mediaItem->source_type),
@@ -94,6 +97,9 @@ class WallInsightsService
                 'displayedAt' => null,
                 'status' => $this->recentStatus($mediaItem),
                 'isFeatured' => (bool) $mediaItem->is_featured,
+                'isVideo' => $mediaItem->media_type === 'video',
+                'durationSeconds' => $mediaItem->duration_seconds,
+                'videoPolicyLabel' => WallVideoPolicyLabelResolver::fromMedia($mediaItem),
                 'isReplay' => false,
             ])
             ->values()

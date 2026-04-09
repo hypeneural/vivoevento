@@ -51,11 +51,46 @@ Leitura pratica:
 - a tela de `/plans` ja consome o historico financeiro corrigido
 - a V2 nao parte de um fluxo quebrado; ela parte de um fluxo funcional, mas com UX e composicao ruins
 
-### Limites da validacao atual
+### Bateria complementar da execucao da Fase 2
 
-- ainda nao existe suite E2E real em `apps/web/e2e`
-- `apps/web/playwright.config.ts` existe, mas `@playwright/test` nao esta instalado localmente na workspace do `apps/web`
-- os testes frontend atuais sao fortes em fluxo local e regressao, mas ainda nao cobrem botao voltar real, refresh de URL e navegacao mobile em navegador real
+Backend:
+
+- `php artisan test --filter=PublicCheckoutIdentityPrecheckTest`
+- `php artisan test --filter=PublicEventCheckoutTest`
+- `php artisan test --filter=EventPackageCatalogTest`
+
+Frontend:
+
+- `npm run test -- src/modules/billing/PublicEventCheckoutEntryPage.test.tsx src/modules/billing/public-checkout/hooks/usePublicCheckoutWizard.test.tsx src/modules/billing/public-checkout/PublicCheckoutPageV2.test.tsx src/modules/billing/public-checkout/components/IdentityAssistInline.test.tsx src/modules/billing/public-checkout/hooks/useCheckoutIdentityPrecheck.test.tsx src/modules/billing/public-checkout/services/public-checkout-identity.service.test.ts src/modules/billing/PublicEventCheckoutPage.test.tsx`
+- `npm run type-check`
+
+Resultado:
+
+- backend verde na trilha publica de identidade, catalogo e checkout
+- frontend verde na entry route, wizard, V2 base e regressao do checkout legado
+
+### Validacao complementar da Fase 7 e Fase 8
+
+Frontend:
+
+- `npm run test -- src/modules/billing/public-checkout`
+- `npm run test -- src/modules/billing/PublicEventCheckoutPage.test.tsx`
+- `npm run type-check`
+- `npx playwright test`
+
+Backend:
+
+- `php artisan test --filter=PublicCheckoutIdentityPrecheckTest`
+- `php artisan test --filter=PublicEventCheckoutTest`
+- `php artisan test --filter=PublicEventCheckoutPayloadContractTest`
+- `php artisan test --filter=EventPackageCatalogTest`
+- `php artisan test --filter=BillingTest`
+
+Resultado:
+
+- bateria V2 unit, component, flow, backend contract e E2E verde
+- mobile footer, drawer secundario, resume draft endurecido e polling seguem validados localmente
+- os riscos de botao voltar, refresh com `checkout.uuid` e retomada apos login passaram no navegador real
 
 ## Status De Execucao Em `2026-04-09`
 
@@ -74,21 +109,96 @@ Leitura pratica:
   - `IdentityAssistInline`
   - tipos de API para o pre-check
 
-- bateria automatizada da fase verde
-
-### Ainda pendente para fechar a Fase 1 no fluxo visivel
-
-- integrar o hook/componente na jornada nova da V2
-- ainda nao plugar o pre-check na tela antiga, porque a intencao e usar isso na V2, nao aumentar o monolito atual
-
-### Proximo passo recomendado
-
-- Fase 2: infra da jornada V2
+- Fase 2 base entregue em modo opt-in:
+  - `PublicEventCheckoutEntryPage`
   - `PublicCheckoutPageV2`
   - `PublicCheckoutShell`
   - `usePublicCheckoutWizard`
-  - sync de etapa com URL
-  - adapters iniciais de payload
+  - `CheckoutStepper`
+  - `CheckoutHeroSimple`
+  - `PackageSelectionStep`
+  - `PackageCard`
+  - `BuyerEventStep`
+  - `BuyerIdentityFields`
+  - `EventBasicsFields`
+  - `CheckoutSidebar`
+  - `OrderSummaryCard`
+  - `NextStepCard`
+  - `TrustSignalsCard`
+  - `packageCommercialCopy`
+
+- Fase 5 e Fase 6 frontend entregues em modo opt-in:
+  - `PaymentMethodTabs`
+  - `PixPaymentPanel`
+  - `CreditCardPaymentPanel`
+  - `PaymentStep`
+  - `PaymentStatusCard`
+  - `PixDeliveryNotice`
+  - `ResumeNoticeBanner`
+  - `CheckoutErrorBanner`
+  - `useCheckoutResumeDraft`
+  - `useCheckoutStatusPolling`
+  - `checkoutStatusViewModel`
+
+- Fase 7 entregue localmente:
+  - `checkoutResponseAdapters.ts`
+  - `MobileCheckoutFooter`
+  - `PublicCheckoutShell` com decisao responsiva real
+  - `useCheckoutResumeDraft` com preferencia por `sessionStorage`
+  - `useCheckoutStatusPolling.test.tsx`
+  - `PublicCheckoutMobileLayout.test.tsx`
+  - `CheckoutSidebar.test.tsx`
+
+- Fase 8 entregue localmente:
+  - `@playwright/test` instalado em `apps/web`
+  - `apps/web/e2e` criado
+  - `public-checkout-pix.spec.ts`
+  - `public-checkout-resume.spec.ts`
+  - `public-checkout-card.spec.ts`
+  - `public-checkout-mobile.spec.ts`
+  - `public-checkout-status-resume.spec.ts`
+
+- switch seguro de rollout entregue:
+  - `/checkout/evento` continua no fluxo legado por padrao
+  - `/checkout/evento?v2=1` ativa a nova V2
+  - a rota publica agora passa pelo entry page, preservando rollback rapido
+
+- bateria automatizada da fase verde
+- regressao legada do checkout verde em execucao isolada
+
+### Ainda pendente da Fase 1 fora da V2
+
+- o pre-check ja esta integrado na V2
+- ele continua fora da tela antiga de proposito, porque a intencao e migrar a jornada, nao aumentar o monolito legado
+
+### Estado real da Fase 2 agora
+
+Ja esta implementado:
+
+- wizard com estado proprio e sincronizacao de `step` na URL
+- `Accordion + Progress` apenas como camada visual
+- etapa 1 com pacote comercial e resumo lateral
+- etapa 2 com `Seus dados`, extras colapsados e `IdentityAssistInline`
+- CTA `Ja tenho conta` apontando para `returnTo=/checkout/evento?resume=auth`
+- etapa 3 real de pagamento com Pix default e cartao sob demanda
+- tokenizacao de cartao preservada no navegador com `card_token`
+- retomada segura de rascunho na V2 com auto-resume de Pix apos login
+- estado `status/post_submit` ja separado do accordion
+- `PaymentStatusCard` com QR Code, copia e cola, expiracao, aviso de WhatsApp e CTA de refresh
+- adapters/view-model no frontend para a UI nao ler `gateway_status` diretamente nos componentes
+
+Ainda segue pendente:
+
+- deep link por pacote
+- metadados comerciais nativos por pacote
+- estrategia de rollout para substituir o fluxo antigo com mais seguranca
+
+### Proximo passo recomendado
+
+- depois da Fase 8, a sequencia pragmatica fica:
+  - deep link por pacote
+  - metadados comerciais nativos de pacote
+  - rollout progressivo da V2 sobre o checkout antigo
 
 ## Validacao Do Toolkit De UI
 
@@ -178,8 +288,8 @@ Leitura pratica:
 - o projeto nao tem um `Stepper` pronto instalado
 - `FormProvider + useFormContext + useWatch + useFormState` e o caminho certo para quebrar o formulario sem rerender em cascata
 - `AbortSignal` em query/service precisa ser tratado como requisito real do pre-check
-- `Playwright` ja esta configurado, mas a pasta `apps/web/e2e` ainda precisa ser criada
-- o runner `@playwright/test` ainda precisa ser instalado antes da fase E2E
+- `Playwright` ja esta configurado e instalado localmente
+- a pasta `apps/web/e2e` ja existe com a bateria minima da jornada publica
 - o pre-check deve seguir resposta neutra e rate limit para nao virar enumeracao de conta
 
 ## Achados Confirmados No Checkout Atual
@@ -625,6 +735,27 @@ Cenarios:
 - pagamento nao aparece antes da etapa 2
 - lateral recebe resumos coerentes
 
+### Status atual da fase
+
+Concluido:
+
+- `PublicCheckoutPageV2.tsx`
+- `PublicCheckoutShell.tsx`
+- `usePublicCheckoutWizard.ts`
+- sincronizacao de `step` com URL
+- `CheckoutStepper.tsx`
+- fallback controlado via `PublicEventCheckoutEntryPage`
+- `PublicCheckoutEntryPage.test.tsx`
+- `usePublicCheckoutWizard.test.tsx`
+- `PublicCheckoutPageV2.test.tsx`
+
+Ainda falta nesta fase:
+
+- `CheckoutStepper.test.tsx`
+- adapters `checkoutResponseAdapters.ts`
+- `checkoutStatusViewModel.ts`
+- sincronizacao completa com `checkout=<uuid>` e `status/post_submit`
+
 ## Fase 3 - Etapa 1: Pacote Comercial
 
 Objetivo:
@@ -767,6 +898,21 @@ Backend de regressao:
 - `php artisan test --filter=PublicEventCheckoutTest`
 - `php artisan test --filter=BillingTest`
 
+### Status atual da fase
+
+Concluido localmente:
+
+- `PaymentMethodTabs`, `PixPaymentPanel`, `CreditCardPaymentPanel` e `PaymentStep`
+- `Pix` como default com CTA `Gerar meu Pix`
+- cartao revelado apenas quando escolhido
+- preservacao da tokenizacao atual com `card_token`
+- retomada segura continua sem restaurar `PAN/CVV`
+- cobertura automatizada de `PaymentMethodTabs`, `PaymentStep` e regressao da `PublicCheckoutPageV2`
+
+Ainda pendente nesta fase:
+
+- testes dedicados de `PixPaymentPanel` e `CreditCardPaymentPanel`
+
 ## Fase 6 - Pos-Submit E Payload Semantico
 
 Objetivo:
@@ -824,6 +970,28 @@ Cenarios:
 - UI publica nunca exibe `UUID`
 - UI publica nunca exibe `gateway status`
 - estado pos-submit deixa de renderizar o wizard como etapa ativa principal
+
+### Status atual da fase
+
+Concluido localmente no frontend:
+
+- estado `status` na jornada da V2
+- `PaymentStatusCard`
+- `PixDeliveryNotice`
+- `ResumeNoticeBanner`
+- `CheckoutErrorBanner`
+- `checkoutStatusViewModel` isolando a semantica exibida ao comprador
+- `CheckoutStepper` agora renderiza o pos-submit fora do accordion da etapa de pagamento
+- `checkoutResponseAdapters.ts`
+- `MobileCheckoutFooter`
+- `useCheckoutStatusPolling.test.tsx`
+
+Concluido localmente no backend:
+
+- payload semantico em `checkout.summary`
+- labels e proximo passo orientados a UX
+- `expires_in_seconds`, `is_waiting_payment` e `can_retry`
+- `PublicEventCheckoutPayloadContractTest.php`
 
 ## Fase 7 - Mobile, Hardening E Draft Seguro
 
@@ -888,6 +1056,13 @@ Infra existente:
 
 - `apps/web/playwright.config.ts`
 
+Status atual:
+
+- concluida localmente
+- `@playwright/test` instalado
+- `webServer` configurado para subir a SPA no proprio runner
+- cinco cenarios criticos do checkout V2 passaram em navegador real
+
 ### Subtarefas
 
 1. criar cenarios E2E em `apps/web/e2e`
@@ -951,6 +1126,7 @@ Frontend:
 
 - `npm run test -- PublicEventCheckoutPage.test.tsx public-event-packages.service.test.ts PlansPage.test.tsx`
 - `npm run test -- src/modules/billing/public-checkout`
+- `npm run test -- src/modules/billing/PublicEventCheckoutPage.test.tsx`
 - `npm run type-check`
 
 Frontend E2E:
@@ -964,6 +1140,12 @@ Backend:
 - `php artisan test --filter=EventPackageCatalogTest`
 - `php artisan test --filter=BillingTest`
 - `php artisan test --filter=PublicEventCheckoutPayloadContractTest`
+
+Observacao pratica:
+
+- a suite legada `PublicEventCheckoutPage.test.tsx` passa verde isolada
+- quando ela e batelada junto com a suite extensa da V2, o runtime local pode encostar no timeout de 5s por teste
+- isso foi observado como limitacao de execucao do runner local, nao como regressao funcional
 
 ## Sequencia Recomendada De PRs
 

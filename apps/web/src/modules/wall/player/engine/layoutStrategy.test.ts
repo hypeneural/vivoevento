@@ -31,6 +31,16 @@ describe('resolveRenderableLayout', () => {
     }
   });
 
+  it('forces a single-item layout when an explicit multi-slot layout receives a video', () => {
+    expect(resolveRenderableLayout('carousel', makeMedia({ type: 'video' }))).toBe('fullscreen');
+    expect(resolveRenderableLayout('mosaic', makeMedia({ type: 'video' }))).toBe('fullscreen');
+    expect(resolveRenderableLayout('grid', makeMedia({ type: 'video' }))).toBe('fullscreen');
+  });
+
+  it('keeps the requested multi-slot layout when policy explicitly allows video there', () => {
+    expect(resolveRenderableLayout('carousel', makeMedia({ type: 'video' }), 'one')).toBe('carousel');
+  });
+
   // ─── Horizontal ──────────────────────────────
   it('auto + horizontal + featured + no caption = kenburns', () => {
     const media = makeMedia({ orientation: 'horizontal', is_featured: true });

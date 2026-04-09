@@ -53,11 +53,33 @@ const engineMock = {
     senderStats: {},
     currentIndex: 0,
     currentItemId: 'media_1',
+    currentItemStartedAt: '2026-04-09T03:10:05.000Z',
+    videoPlayback: {
+      itemId: null,
+      phase: 'idle' as const,
+      currentTime: 0,
+      durationSeconds: null,
+      readyState: 0,
+      exitReason: null,
+      failureReason: null,
+      stallCount: 0,
+      posterVisible: false,
+      firstFrameReady: false,
+      playbackReady: false,
+      playingConfirmed: false,
+      startupDegraded: false,
+      playbackStartedAt: null,
+      lastItemId: null,
+      lastExitReason: null,
+      lastFailureReason: null,
+    },
   },
   currentItem: {
     id: 'media_1',
     senderKey: 'sender-maria',
+    type: 'image' as const,
   },
+  currentItemStartedAt: '2026-04-09T03:10:05.000Z',
   errorMessage: null,
   applySnapshot: vi.fn(),
   applySettings: vi.fn(),
@@ -67,10 +89,24 @@ const engineMock = {
   handleMediaDeleted: vi.fn(),
   handleAdsUpdated: vi.fn(),
   handleAdFinished: vi.fn(),
+  handleVideoStarting: vi.fn(),
+  handleVideoFirstFrame: vi.fn(),
+  handleVideoPlaybackReady: vi.fn(),
+  handleVideoPlaying: vi.fn(),
+  handleVideoProgress: vi.fn(),
+  handleVideoWaiting: vi.fn(),
+  handleVideoStalled: vi.fn(),
+  handleVideoEnded: vi.fn(),
+  handleVideoFailure: vi.fn(),
   markExpired: vi.fn(),
   markSyncError: vi.fn(),
   resetAssetStatuses: vi.fn(),
   resetRuntime: vi.fn(),
+  videoRuntimeConfig: {
+    startupDeadlineMs: 1200,
+    stallBudgetMs: 2500,
+    resumeMode: 'resume_if_same_item_else_restart' as const,
+  },
 };
 
 vi.mock('../api', () => ({
@@ -113,6 +149,14 @@ describe('useWallPlayer', () => {
     engineMock.state.ads = [];
     engineMock.state.currentAd = null;
     engineMock.state.adBaseItemId = null;
+    engineMock.state.currentItemId = 'media_1';
+    engineMock.state.currentItemStartedAt = '2026-04-09T03:10:05.000Z';
+    engineMock.currentItem = {
+      id: 'media_1',
+      senderKey: 'sender-maria',
+      type: 'image',
+    };
+    engineMock.currentItemStartedAt = '2026-04-09T03:10:05.000Z';
     engineMock.state.adScheduler = {
       mode: 'disabled',
       frequency: 5,
@@ -120,6 +164,25 @@ describe('useWallPlayer', () => {
       lastAdPlayedAt: null,
       lastAdIndex: -1,
       skipNextAdCheck: false,
+    };
+    engineMock.state.videoPlayback = {
+      itemId: null,
+      phase: 'idle',
+      currentTime: 0,
+      durationSeconds: null,
+      readyState: 0,
+      exitReason: null,
+      failureReason: null,
+      stallCount: 0,
+      posterVisible: false,
+      firstFrameReady: false,
+      playbackReady: false,
+      playingConfirmed: false,
+      startupDegraded: false,
+      playbackStartedAt: null,
+      lastItemId: null,
+      lastExitReason: null,
+      lastFailureReason: null,
     };
 
     getWallBootMock.mockResolvedValue({
@@ -160,6 +223,18 @@ describe('useWallPlayer', () => {
         neon_text: null,
         neon_color: '#ffffff',
         show_sender_credit: false,
+        show_side_thumbnails: true,
+        accepted_orientation: 'all' as const,
+        video_enabled: true,
+        video_playback_mode: 'play_to_end_if_short_else_cap' as const,
+        video_max_seconds: 15,
+        video_resume_mode: 'resume_if_same_item_else_restart' as const,
+        video_audio_policy: 'muted' as const,
+        video_multi_layout_policy: 'disallow' as const,
+        video_preferred_variant: 'wall_video_720p' as const,
+        ad_mode: 'disabled' as const,
+        ad_frequency: 5,
+        ad_interval_minutes: 3,
         instructions_text: null,
       },
       ads: [
@@ -211,6 +286,7 @@ describe('useWallPlayer', () => {
       runtime_status: 'playing',
       connection_status: 'connected',
       current_item_id: 'media_1',
+      current_item_started_at: '2026-04-09T03:10:05.000Z',
       current_sender_key: 'sender-maria',
       ready_count: 1,
       loading_count: 0,
@@ -233,6 +309,31 @@ describe('useWallPlayer', () => {
     });
 
     expect(sendWallHeartbeatMock.mock.calls.length).toBeGreaterThan(initialCallCount);
+  });
+
+  it('envia heartbeat imediato com o horario autoritativo quando a midia atual muda', async () => {
+    const { rerender } = renderHook(() => useWallPlayer('ABCD1234'));
+
+    await flushAsyncWork();
+
+    sendWallHeartbeatMock.mockClear();
+
+    engineMock.state.currentItemId = 'media_2';
+    engineMock.state.currentItemStartedAt = '2026-04-09T03:10:12.000Z';
+    engineMock.currentItem = {
+      id: 'media_2',
+      senderKey: 'sender-pedro',
+    };
+    engineMock.currentItemStartedAt = '2026-04-09T03:10:12.000Z';
+
+    rerender();
+    await flushAsyncWork();
+
+    expect(sendWallHeartbeatMock).toHaveBeenCalled();
+    expect(sendWallHeartbeatMock.mock.calls.at(-1)?.[1]).toEqual(expect.objectContaining({
+      current_item_id: 'media_2',
+      current_item_started_at: '2026-04-09T03:10:12.000Z',
+    }));
   });
 
   it('reports stale assets separately in the heartbeat payload', async () => {

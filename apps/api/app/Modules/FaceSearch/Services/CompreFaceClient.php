@@ -3,6 +3,7 @@
 namespace App\Modules\FaceSearch\Services;
 
 use App\Shared\Exceptions\ProviderMisconfiguredException;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
@@ -25,7 +26,7 @@ class CompreFaceClient
     {
         $config = $this->validatedConfig('detection');
 
-        $response = $this->baseRequest($config)
+        $response = $this->baseRequest($config, 'detection')
             ->contentType('application/json')
             ->post($this->detectionEndpoint($config, $options), [
                 'file' => $base64Image,
@@ -51,7 +52,7 @@ class CompreFaceClient
             $headers['Content-Type'] = $mimeType;
         }
 
-        $response = $this->baseRequest($config)
+        $response = $this->baseRequest($config, 'detection')
             ->asMultipart()
             ->attach('file', $binary, $filename, $headers)
             ->post($this->detectionEndpoint($config, $options));
@@ -68,7 +69,7 @@ class CompreFaceClient
     {
         $config = $this->validatedConfig('verification');
 
-        $response = $this->baseRequest($config)
+        $response = $this->baseRequest($config, 'verification')
             ->contentType('application/json')
             ->post(self::VERIFY_EMBEDDINGS_ENDPOINT, [
                 'source' => array_values($sourceEmbedding),
@@ -104,16 +105,81 @@ class CompreFaceClient
     /**
      * @param array<string, mixed> $config
      */
-    private function baseRequest(array $config): PendingRequest
+    private function baseRequest(array $config, string $profile): PendingRequest
     {
-        return $this->http
+        $request = $this->http
             ->baseUrl((string) $config['base_url'])
             ->withHeaders([
                 'x-api-key' => (string) $config['resolved_api_key'],
             ])
             ->acceptJson()
-            ->timeout((int) ($config['timeout'] ?? 15))
-            ->connectTimeout((int) ($config['connect_timeout'] ?? 5));
+            ->timeout($this->requestTimeout($config, $profile))
+            ->connectTimeout($this->requestConnectTimeout($config, $profile));
+
+        $retryTimes = $this->requestRetryTimes($config, $profile);
+
+        if ($retryTimes > 1) {
+            $request = $request->retry(
+                $retryTimes,
+                $this->requestRetrySleepMs($config, $profile),
+                fn (\Throwable $exception): bool => $this->shouldRetryRequest($exception),
+            );
+        }
+
+        return $request;
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    private function requestTimeout(array $config, string $profile): int
+    {
+        $key = $profile === 'verification' ? 'verification_timeout' : 'detection_timeout';
+
+        return (int) ($config[$key] ?? $config['timeout'] ?? 15);
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    private function requestConnectTimeout(array $config, string $profile): int
+    {
+        $key = $profile === 'verification' ? 'verification_connect_timeout' : 'detection_connect_timeout';
+
+        return (int) ($config[$key] ?? $config['connect_timeout'] ?? 5);
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    private function requestRetryTimes(array $config, string $profile): int
+    {
+        $key = $profile === 'verification' ? 'verification_retry_times' : 'detection_retry_times';
+
+        return max(1, (int) ($config[$key] ?? 1));
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    private function requestRetrySleepMs(array $config, string $profile): int
+    {
+        $key = $profile === 'verification' ? 'verification_retry_sleep_ms' : 'detection_retry_sleep_ms';
+
+        return max(0, (int) ($config[$key] ?? 0));
+    }
+
+    private function shouldRetryRequest(\Throwable $exception): bool
+    {
+        if ($exception instanceof ConnectionException) {
+            return true;
+        }
+
+        $message = strtolower($exception->getMessage());
+
+        return str_contains($message, 'timed out')
+            || str_contains($message, 'connection reset')
+            || str_contains($message, 'temporarily unavailable');
     }
 
     /**

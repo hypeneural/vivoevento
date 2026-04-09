@@ -18,10 +18,10 @@ class ModerationBroadcasterService
             return;
         }
 
-        event(new ModerationMediaCreated(
+        broadcast(new ModerationMediaCreated(
             organizationId: $media->event->organization_id,
             payload: $payload,
-        ));
+        ))->toOthers();
     }
 
     public function broadcastUpdated(EventMedia $media): void
@@ -32,10 +32,10 @@ class ModerationBroadcasterService
             return;
         }
 
-        event(new ModerationMediaUpdated(
+        broadcast(new ModerationMediaUpdated(
             organizationId: $media->event->organization_id,
             payload: $payload,
-        ));
+        ))->toOthers();
     }
 
     public function broadcastDeleted(EventMedia $media): void
@@ -46,13 +46,13 @@ class ModerationBroadcasterService
             return;
         }
 
-        event(new ModerationMediaDeleted(
+        broadcast(new ModerationMediaDeleted(
             organizationId: $media->event->organization_id,
             payload: [
                 'id' => $media->id,
                 'event_id' => $media->event_id,
             ],
-        ));
+        ))->toOthers();
     }
 
     private function payloadFromMedia(EventMedia $media): ?array

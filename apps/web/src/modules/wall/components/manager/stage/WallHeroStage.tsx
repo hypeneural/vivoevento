@@ -4,6 +4,7 @@ import { Check, Copy, Monitor } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
 import type {
   ApiWallInsightsRecentItem,
   ApiWallLiveSnapshotResponse,
@@ -15,7 +16,7 @@ import type {
 import { HelpTooltip } from '../../WallManagerHelp';
 import { WallManagerSection } from '../../WallManagerSection';
 import { WALL_INSIGHTS_COPY, formatWallRecentStatusLabel } from '../../../wall-copy';
-import { getWallSourceMeta } from '../../../wall-source-meta';
+import { getWallMediaSemanticMeta, getWallSourceMeta } from '../../../wall-source-meta';
 import { formatWallRelativeTime } from '../../../wall-view-models';
 import { WallAdvanceClock } from './WallAdvanceClock';
 import { WallDraftPreviewCard } from './WallDraftPreviewCard';
@@ -74,6 +75,33 @@ export function WallHeroStage({
 }: WallHeroStageProps) {
   const activeLiveItem = selectedMedia ?? liveSnapshot?.currentItem ?? null;
   const selectedMediaSourceMeta = activeLiveItem ? getWallSourceMeta(activeLiveItem.source) : null;
+  const activeLiveMediaMeta = activeLiveItem
+    ? getWallMediaSemanticMeta({
+        isVideo: activeLiveItem.isVideo,
+        durationSeconds: activeLiveItem.durationSeconds,
+        videoPolicyLabel: activeLiveItem.videoPolicyLabel,
+      })
+    : null;
+  const currentSnapshotSourceMeta = liveSnapshot?.currentItem
+    ? getWallSourceMeta(liveSnapshot.currentItem.source)
+    : null;
+  const currentSnapshotMediaMeta = liveSnapshot?.currentItem
+    ? getWallMediaSemanticMeta({
+        isVideo: liveSnapshot.currentItem.isVideo,
+        durationSeconds: liveSnapshot.currentItem.durationSeconds,
+        videoPolicyLabel: liveSnapshot.currentItem.videoPolicyLabel,
+      })
+    : null;
+  const nextSnapshotSourceMeta = liveSnapshot?.nextItem
+    ? getWallSourceMeta(liveSnapshot.nextItem.source)
+    : null;
+  const nextSnapshotMediaMeta = liveSnapshot?.nextItem
+    ? getWallMediaSemanticMeta({
+        isVideo: liveSnapshot.nextItem.isVideo,
+        durationSeconds: liveSnapshot.nextItem.durationSeconds,
+        videoPolicyLabel: liveSnapshot.nextItem.videoPolicyLabel,
+      })
+    : null;
   const activeLiveSenderName = activeLiveItem?.senderName || 'Convidado';
   const activeLiveCaption = activeLiveItem && 'caption' in activeLiveItem ? activeLiveItem.caption ?? null : null;
   const activeLiveRelativeTime = selectedMedia
@@ -182,6 +210,11 @@ export function WallHeroStage({
                               {selectedMediaSourceMeta.label}
                             </span>
                           ) : null}
+                          {activeLiveMediaMeta?.isVideo ? (
+                            <span className={`inline-flex rounded-full border px-2 py-1 font-medium ${activeLiveMediaMeta.chipClassName}`}>
+                              {activeLiveMediaMeta.badgeLabel}
+                            </span>
+                          ) : null}
                           <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-2 py-1 font-medium text-white/80">
                             {activeLiveStatusLabel}
                           </span>
@@ -211,7 +244,14 @@ export function WallHeroStage({
                       <div className="space-y-3">
                         <Monitor className="mx-auto h-14 w-14 text-orange-400/80" />
                         <p className="text-base font-medium text-white/80 sm:text-lg">
-                          {isLive ? 'Telao ativo exibindo as midias em tempo real.' : 'Telao pausado aguardando novo comando.'}
+                          {isLive
+                            ? 'Telao ativo aguardando a primeira confirmacao do player.'
+                            : 'Telao pausado aguardando novo comando.'}
+                        </p>
+                        <p className="mx-auto max-w-md text-sm leading-relaxed text-white/60">
+                          {isLive
+                            ? 'Assim que o player confirmar a midia atual, o palco mostra o item ao vivo e libera o relogio operacional.'
+                            : 'A ultima exibicao fica congelada ate um novo comando de retomada ou troca de status.'}
                         </p>
                       </div>
                     </motion.div>
@@ -250,6 +290,8 @@ export function WallHeroStage({
                     value={selectedMedia.senderName || 'Convidado'}
                     detail={[
                       selectedMediaSourceMeta?.label,
+                      activeLiveMediaMeta?.isVideo ? activeLiveMediaMeta.detailLabel : null,
+                      activeLiveMediaMeta?.isVideo ? activeLiveMediaMeta.operationalLabel : null,
                       formatWallRecentStatusLabel(selectedMedia.status),
                       formatWallRelativeTime(selectedMedia.createdAt, 'Agora'),
                     ].filter(Boolean).join(' - ')}
@@ -267,15 +309,46 @@ export function WallHeroStage({
                     )}
                   />
                 ) : null}
-                {!selectedMedia && liveSnapshot?.currentItem ? (
+                {liveSnapshot?.currentItem ? (
                   <InfoCard
                     label="Agora no telao"
                     value={liveSnapshot.currentItem.senderName || 'Convidado'}
                     detail={[
-                      selectedMediaSourceMeta?.label,
+                      currentSnapshotSourceMeta?.label,
+                      currentSnapshotMediaMeta?.isVideo ? currentSnapshotMediaMeta.detailLabel : null,
+                      currentSnapshotMediaMeta?.isVideo ? currentSnapshotMediaMeta.operationalLabel : null,
                       liveSnapshot.currentItem.caption,
                       formatWallRelativeTime(liveSnapshot.currentItem.createdAt, 'Agora'),
                     ].filter(Boolean).join(' - ')}
+                    tone="live"
+                  />
+                ) : isLive ? (
+                  <InfoCard
+                    label="Agora no telao"
+                    value="Sincronizando a midia atual do telao."
+                    detail="O player ainda nao confirmou qual item esta visivel neste instante."
+                    tone="live"
+                  />
+                ) : null}
+                {liveSnapshot?.nextItem ? (
+                  <InfoCard
+                    label="Proxima no telao"
+                    value={liveSnapshot.nextItem.senderName || 'Convidado'}
+                    detail={[
+                      nextSnapshotSourceMeta?.label,
+                      nextSnapshotMediaMeta?.isVideo ? nextSnapshotMediaMeta.detailLabel : null,
+                      nextSnapshotMediaMeta?.isVideo ? nextSnapshotMediaMeta.operationalLabel : null,
+                      liveSnapshot.nextItem.caption,
+                      liveSnapshot.nextItem.layoutHint ? `Layout ${formatLayoutHintLabel(liveSnapshot.nextItem.layoutHint)}` : null,
+                    ].filter(Boolean).join(' - ')}
+                    tone="next"
+                  />
+                ) : isLive ? (
+                  <InfoCard
+                    label="Proxima no telao"
+                    value="A proxima exibicao aparece assim que a fila confirmar a ordem."
+                    detail="Enquanto isso, a aba Proximas fotos continua mostrando a previsao mais provavel."
+                    tone="next"
                   />
                 ) : null}
                 <InfoCard label="Evento" value={eventTitle} detail={eventSchedule} />
@@ -317,24 +390,67 @@ export function WallHeroStage({
   );
 }
 
+function formatLayoutHintLabel(value: NonNullable<ApiWallLiveSnapshotResponse['currentItem']>['layoutHint']) {
+  switch (value) {
+    case 'cinematic':
+      return 'Cinematografico';
+    case 'fullscreen':
+      return 'Tela cheia';
+    case 'split':
+      return 'Tela dividida';
+    case 'polaroid':
+      return 'Polaroid';
+    case 'kenburns':
+      return 'Ken Burns';
+    case 'spotlight':
+      return 'Holofote';
+    case 'gallery':
+      return 'Galeria de arte';
+    case 'carousel':
+      return 'Carrossel';
+    case 'mosaic':
+      return 'Mosaico';
+    case 'grid':
+      return 'Grade';
+    default:
+      return value ?? 'Auto';
+  }
+}
+
 function InfoCard({
   label,
   value,
   detail,
   action,
   helpKey,
+  tone = 'default',
 }: {
   label: string;
   value: string;
   detail: string;
   action?: ReactNode;
   helpKey?: Parameters<typeof HelpTooltip>[0]['helpKey'];
+  tone?: 'default' | 'live' | 'next';
 }) {
+  const toneClasses =
+    tone === 'live'
+      ? 'border-emerald-500/30 bg-emerald-500/[0.07] shadow-[inset_0_1px_0_rgba(16,185,129,0.08)]'
+      : tone === 'next'
+        ? 'border-sky-500/30 bg-sky-500/[0.06] shadow-[inset_0_1px_0_rgba(14,165,233,0.08)]'
+        : 'border-border/60 bg-background/70';
+
+  const labelToneClasses =
+    tone === 'live'
+      ? 'text-emerald-700'
+      : tone === 'next'
+        ? 'text-sky-700'
+        : 'text-muted-foreground';
+
   return (
-    <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+    <div className={cn('rounded-2xl border p-4', toneClasses)}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
-          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+          <p className={cn('text-xs uppercase tracking-[0.16em]', labelToneClasses)}>{label}</p>
           {helpKey ? <HelpTooltip helpKey={helpKey} /> : null}
         </div>
         {action}

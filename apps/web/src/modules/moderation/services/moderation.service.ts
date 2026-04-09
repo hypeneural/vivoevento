@@ -1,5 +1,5 @@
 import { api } from '@/lib/api';
-import type { ApiEventMediaDetail, ApiEventMediaItem } from '@/lib/api-types';
+import type { ApiEventMediaDetail, ApiEventMediaItem, ModerationStatsMeta } from '@/lib/api-types';
 
 import type {
   ModerationBulkActionResponse,
@@ -8,14 +8,22 @@ import type {
 } from '../types';
 
 export const moderationService = {
-  async list(filters: ModerationListFilters = {}) {
+  async list(filters: ModerationListFilters = {}, signal?: AbortSignal) {
     return api.getRaw<ModerationFeedPage>('/media/feed', {
       params: filters,
+      signal,
     });
   },
 
-  async show(mediaId: number | string) {
-    return api.get<ApiEventMediaDetail>(`/media/${mediaId}`);
+  async listStats(filters: Omit<ModerationListFilters, 'per_page' | 'cursor'> = {}, signal?: AbortSignal) {
+    return api.get<ModerationStatsMeta>('/media/feed/stats', {
+      params: filters,
+      signal,
+    });
+  },
+
+  async show(mediaId: number | string, signal?: AbortSignal) {
+    return api.get<ApiEventMediaDetail>(`/media/${mediaId}`, { signal });
   },
 
   async approve(mediaId: number | string) {

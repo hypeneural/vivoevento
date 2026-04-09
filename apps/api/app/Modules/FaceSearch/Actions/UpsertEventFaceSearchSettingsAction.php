@@ -3,6 +3,7 @@
 namespace App\Modules\FaceSearch\Actions;
 
 use App\Modules\Events\Models\Event;
+use App\Modules\FaceSearch\Jobs\BackfillEventFaceSearchGalleryJob;
 use App\Modules\FaceSearch\Jobs\EnsureAwsCollectionJob;
 use App\Modules\FaceSearch\Models\EventFaceSearchSetting;
 use Illuminate\Support\Arr;
@@ -16,6 +17,9 @@ class UpsertEventFaceSearchSettingsAction
     {
         $existing = EventFaceSearchSetting::query()->where('event_id', $event->id)->first();
         $configurableKeys = EventFaceSearchSetting::configurableAttributeKeys();
+        $wasAwsActive = $existing?->enabled
+            && $existing->recognition_enabled
+            && $existing->search_backend_key === 'aws_rekognition';
 
         $attributes = array_replace(
             EventFaceSearchSetting::defaultAttributes(),
@@ -70,8 +74,16 @@ class UpsertEventFaceSearchSettingsAction
             ], array_merge(['event_id'], $configurableKeys)),
         );
 
-        if ($settings->enabled && $settings->recognition_enabled && $settings->search_backend_key === 'aws_rekognition') {
+        $isAwsActive = $settings->enabled
+            && $settings->recognition_enabled
+            && $settings->search_backend_key === 'aws_rekognition';
+
+        if ($isAwsActive) {
             EnsureAwsCollectionJob::dispatch($event->id);
+
+            if (! $wasAwsActive) {
+                BackfillEventFaceSearchGalleryJob::dispatch($event->id);
+            }
         }
 
         return $settings;

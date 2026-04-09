@@ -9,6 +9,9 @@ use App\Modules\Billing\Models\EventPurchase;
 use App\Modules\Billing\Models\Subscription;
 use App\Modules\Billing\Services\BillingGatewayInterface;
 use App\Modules\Billing\Services\BillingGatewayManager;
+use App\Modules\Billing\Services\BillingSubscriptionGatewayInterface;
+use App\Modules\Billing\Services\ManualSubscriptionGatewayService;
+use App\Modules\Billing\Services\Pagarme\PagarmeSubscriptionGatewayService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -19,6 +22,14 @@ class BillingServiceProvider extends ServiceProvider
     {
         $this->app->singleton(BillingGatewayManager::class, fn ($app) => new BillingGatewayManager($app));
         $this->app->bind(BillingGatewayInterface::class, fn ($app) => $app->make(BillingGatewayManager::class)->default());
+        $this->app->bind(BillingSubscriptionGatewayInterface::class, function ($app) {
+            $provider = config('billing.gateways.subscription', config('billing.gateways.default', 'manual'));
+
+            return match ($provider) {
+                'pagarme' => $app->make(PagarmeSubscriptionGatewayService::class),
+                default => $app->make(ManualSubscriptionGatewayService::class),
+            };
+        });
     }
 
     public function boot(): void

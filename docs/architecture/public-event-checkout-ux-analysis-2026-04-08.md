@@ -43,7 +43,11 @@ Conclusao pratica:
 - o backend atual ja sustenta bem uma primeira versao em etapas
 - boa parte da melhoria pode ser feita so no frontend
 - a etapa 2 nao deve ser "cadastro ou login" para todo mundo; ela deve ser "seus dados"
-- para uma versao realmente boa, vale adicionar um pre-check silencioso de identidade no backend e sugerir login so quando houver conta existente
+- o pre-check silencioso de identidade ja foi implementado no backend e ja esta plugado na V2 opt-in
+- a V2 ja tem wizard, pagamento real e estado proprio de acompanhamento em `/checkout/evento?v2=1`
+- o payload semantico do backend ja entrou no contrato publico
+- `checkoutResponseAdapters.ts`, hardening mobile/storage e suite E2E ja entraram no codigo
+- o principal gap que sobra agora e transformar a V2 em default com deep link por pacote e metadados comerciais nativos
 
 ## Validacao Complementar De `2026-04-09`
 
@@ -51,6 +55,7 @@ Conclusao pratica:
 
 Backend:
 
+- `php artisan test --filter=PublicEventCheckoutPayloadContractTest`
 - `php artisan test --filter=PublicEventCheckoutTest`
 - `php artisan test --filter=EventPackageCatalogTest`
 - `php artisan test --filter=BillingTest`
@@ -58,7 +63,9 @@ Backend:
 Frontend:
 
 - `npm run test -- PublicEventCheckoutPage.test.tsx public-event-packages.service.test.ts PlansPage.test.tsx`
+- `npm run test -- src/modules/billing/public-checkout`
 - `npm run type-check`
+- `npx playwright test`
 
 Resultado:
 
@@ -74,17 +81,49 @@ Leitura:
 
 - a retomada apos login para Pix esta validada no frontend e no backend
 - o rascunho seguro nao restaura PAN/CVV
+- o rascunho seguro agora prefere `sessionStorage` e remove o draft legado do `localStorage` quando a sessao atual consegue sustentar a retomada
 - a tela atual ainda depende fortemente de `gateway_status`
 - o formulario atual usa `form.watch(...)` em massa no page root
-- o checkout atual ainda persiste `last-uuid` e `resume-draft` em `localStorage`
+- a V2 ja moveu parte desse acoplamento para adapters e view-models dedicados
 - o checkout de cartao atual opera com `installments: 1`
-- `apps/web/playwright.config.ts` existe, mas o runner `@playwright/test` ainda nao esta instalado em `apps/web`
+- `apps/web/playwright.config.ts` ja esta funcional, o runner `@playwright/test` esta instalado e a pasta `apps/web/e2e` ja cobre os cinco cenarios criticos da jornada
 
 Implicacao:
 
 - o plano V2 continua correto
-- os pontos de hardening e a fase E2E continuam necessarios
+- os pontos de hardening mobile, storage e E2E deixaram de ser hipotese e passaram a estar validados localmente
 - a parte de UX precisa nascer junto com uma refatoracao estrutural do formulario, nao apenas com nova copy
+
+### Estado de execucao ja validado localmente
+
+Ja entrou no codigo:
+
+- `POST /api/v1/public/checkout-identity/check`
+- `PublicEventCheckoutEntryPage`
+- V2 opt-in em `/checkout/evento?v2=1`
+- wizard com `step` na URL
+- etapa 1 comercial de pacote
+- etapa 2 `Seus dados` com extras colapsados
+- `IdentityAssistInline` conectado ao pre-check
+- etapa 3 de pagamento com `Pix` default e cartao sob demanda
+- estado pos-submit/status fora do accordion principal
+- `checkoutStatusViewModel` isolando a semantica exibida ao comprador
+- payload semantico em `checkout.summary` vindo do backend
+- `PublicEventCheckoutPayloadContractTest.php` cobrindo Pix pendente, pago e cartao falho
+- `checkoutResponseAdapters.ts` reduzindo logica no page orchestrator
+- `MobileCheckoutFooter` + `Drawer` secundario no mobile
+- `useCheckoutStatusPolling.test.tsx`, `PublicCheckoutMobileLayout.test.tsx` e `CheckoutSidebar.test.tsx`
+- `apps/web/e2e/public-checkout-pix.spec.ts`
+- `apps/web/e2e/public-checkout-resume.spec.ts`
+- `apps/web/e2e/public-checkout-card.spec.ts`
+- `apps/web/e2e/public-checkout-mobile.spec.ts`
+- `apps/web/e2e/public-checkout-status-resume.spec.ts`
+
+Ainda nao entrou na V2:
+
+- deep link por pacote
+- metadados comerciais nativos do pacote
+- decisao final de rollout para substituir o fluxo antigo com mais seguranca
 
 ## Escopo Da Analise
 
@@ -385,25 +424,23 @@ Isso e bom para observabilidade e reconciliacao.
 
 Mas a UI publica nao deveria expor a maior parte disso diretamente ao comprador final.
 
-### 6. O backend ainda nao tem um endpoint proprio para pre-check silencioso de identidade
+### 6. O backend agora ja tem um endpoint proprio para pre-check silencioso de identidade
 
-Hoje, para descobrir se o usuario pode seguir normalmente ou se ja existe cadastro:
-
-o sistema depende de tentar criar o checkout.
-
-Falta um endpoint simples como:
+Agora, para descobrir se o usuario pode seguir normalmente ou se ja existe cadastro, existe:
 
 - `POST /api/v1/public/checkout-identity/check`
 
-com retorno do tipo:
+Esse endpoint entrega a base da etapa `Seus dados` da V2 com retorno do tipo:
 
 - `new_account`
 - `login_suggested`
-- `authenticated_account_can_continue`
+- `authenticated_match`
+- `authenticated_mismatch`
 
-Esse endpoint nao e obrigatorio para a primeira melhoria visual de UX.
+Leitura:
 
-Mas ele deixa a etapa "seus dados" muito melhor, porque permite sugerir login sem transformar autenticacao em etapa principal para todos.
+- esse gap de backend ja foi fechado
+- o valor agora migra para integrar o pagamento e o pos-submit na V2 sem reintroduzir acoplamento
 
 ## O Que Ja Da Para Melhorar So No Frontend
 
@@ -934,14 +971,13 @@ Ou seja:
 
 ## O Que Ainda Nao Fecha So Com Frontend
 
-Se quisermos uma etapa de `Seus dados` realmente inteligente, ainda falta:
-
-- pre-check de identidade antes do submit final
+O pre-check de identidade ja foi resolvido.
 
 Se quisermos uma experiencia comercial mais forte, ainda falta:
 
 - pacote com metadados de marketing
 - deep link por pacote
+- rollout progressivo da V2 como experiencia padrao
 
 ## Recomendacao De Implementacao
 
@@ -949,15 +985,15 @@ Se quisermos uma experiencia comercial mais forte, ainda falta:
 
 Prioridade alta:
 
-- criar `POST /api/v1/public/checkout-identity/check`
-- criar request validator
-- criar action dedicada de pre-check
-- reutilizar `PublicJourneyIdentityService`
-- garantir resposta neutra e rate limit
+- concluida localmente
+- `POST /api/v1/public/checkout-identity/check` implementado
+- request validator, action, resource e rate limit entregues
+- reutilizacao de `PublicJourneyIdentityService` entregue
 
 Resultado esperado:
 
 - a etapa 2 deixa de descobrir conta existente tarde demais
+- esse resultado ja foi validado nos testes
 
 ### Fase 2 - Frontend V2
 
@@ -976,6 +1012,15 @@ Prioridade alta:
 Resultado esperado:
 
 - a jornada passa a parecer compra curta e clara
+
+Status local:
+
+- majoritariamente concluida
+- hero, shell, wizard, etapa 1, etapa 2, etapa 3 e acompanhamento ja estao em `/checkout/evento?v2=1`
+- a V2 ja cobre o contrato real de Pix, cartao, retomada de Pix apos login e status pos-submit
+- o backend semantico ja cobre labels, descricao, proximo passo e expiracao no contrato publico
+- a V2 ja tem `checkoutResponseAdapters.ts`, footer mobile, `sessionStorage` first para draft seguro e bateria E2E verde
+- ainda falta deep link por pacote, metadados comerciais de pacote e rollout para virar padrao
 
 ### Fase 3 - Backend semantico e comercializacao
 
@@ -1018,6 +1063,14 @@ O melhor proximo passo e:
 3. fazer a etapa 2 ser `Seus dados`, nao `cadastro ou login`
 4. sugerir login apenas quando o contato ja existir
 5. deixar Pix e cartao como etapa final, simples e confiavel
+
+Atualizacao de execucao:
+
+- os itens `1`, `2`, `3`, `4` e `5` ja estao implementados na V2 opt-in
+- o bloco critico que resta agora passou a ser:
+  - deep link por pacote
+  - metadados comerciais do catalogo
+  - rollout seguro da V2 sobre o checkout antigo
 
 Em resumo:
 

@@ -58,7 +58,20 @@ export function useWallRealtimeSync(eventId: string) {
     };
 
     const applyLiveSnapshot = (payload: ApiWallLiveSnapshotResponse) => {
+      const previousSnapshot = queryClient.getQueryData<ApiWallLiveSnapshotResponse>(
+        queryKeys.wall.liveSnapshot(eventId),
+      );
+
       queryClient.setQueryData(queryKeys.wall.liveSnapshot(eventId), payload);
+
+      const previousCurrentItemId = previousSnapshot?.currentItem?.id ?? null;
+      const nextCurrentItemId = payload.currentItem?.id ?? null;
+      const previousAdvancedAt = previousSnapshot?.advancedAt ?? null;
+      const nextAdvancedAt = payload.advancedAt ?? null;
+
+      if (previousCurrentItemId !== nextCurrentItemId || previousAdvancedAt !== nextAdvancedAt) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.wall.insights(eventId) });
+      }
     };
 
     const handleStateChange = ({ current }: { current: string }) => {

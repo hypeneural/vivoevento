@@ -55,19 +55,35 @@ Este plano existe para responder 7 perguntas de execucao:
 - [x] `H7-T1` fechado com endpoints operacionais e painel AWS por evento.
 - [x] smoke real AWS com imagem validado para `IndexFaces + SearchFacesByImage + DeleteFaces`.
 - [x] preparacao operacional do piloto `H7-T2` documentada no plano.
-- [ ] user vectors AWS ainda nao implementados.
+- [x] piloto real `H7-T2` executado em `3` eventos unitarios com `aws_primary_local_shadow`.
+- [x] baseline local obrigatoria para shadow implementada no pipeline de indexacao.
+- [x] seed local do shadow travada em variante `gallery` no fluxo operacional e na bateria automatizada.
+- [x] envelope de rede AWS ajustado com `connect_timeout` e `timeout` menos agressivos por perfil.
+- [x] preflight de selfie mais rigido para duo/group edge cases implementado.
+- [x] rerodada real curta de `H7-T2` executada apos os ajustes do piloto.
+- [x] rerodada real de `H7-T2` executada com probes derivados elegiveis para o novo preflight.
+- [x] gate de faces pesquisaveis da baseline local alinhado ao resultado primario AWS quando a midia nao sobrevive ao gate remoto.
+- [x] rerodada real de `H7-T2` executada com probes saindo apenas de midias que sobreviveram ao gate primario AWS.
+- [x] detector local/CompreFace estabilizado para a janela curta do piloto com timeout e retry de deteccao mais tolerantes.
+- [x] `H7-T2` aprovado para promocao controlada de eventos estaveis para `aws_primary_local_fallback`.
+- [x] promocao controlada executada em `3` eventos estaveis com `aws_primary_local_fallback`, `sync-index`, `sync-reconcile` e rollback pronto.
+- [x] soak curto executado nos eventos `346`, `347` e `348` promovidos para `aws_primary_local_fallback`.
+- [x] validacao funcional de produto documentada para toggle por evento, reindex do acervo legado e latencia real observada apos envio da selfie.
+- [x] primeiro corte de user vectors AWS implementado com readiness gate, `CreateUser`, `AssociateFaces`, `SearchUsersByImage` e fallback seguro para `faces`.
 
 Ultima bateria executada:
 
 - comando:
-  - `php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch`
+  - `php artisan test tests/Feature/Events/CreateEventTest.php tests/Feature/FaceSearch tests/Unit/FaceSearch`
 - resultado:
-  - `118 passed`
+  - `153 passed`
   - `7 skipped`
-  - `841 assertions`
+  - `1103 assertions`
 - leitura:
-  - a trilha `H1 + H2 + H3 + H4 + H5 + H7-T1` continuou verde depois do smoke real com imagem;
-  - os `7 skipped` continuam sendo apenas os contratos TDD AWS em modo opt-in.
+  - a rodada final incluiu o `CRUD` de `Events` para validar persistencia do toggle base de `FaceSearch` no create/update do evento;
+  - a trilha `H1 + H2 + H3 + H4 + H5 + H6 + H7-T1 + H7-T2` continuou estavel depois da promocao controlada, do novo comando de soak curto e do backfill automatico na ativacao AWS;
+  - os `7 skipped` continuam sendo apenas os contratos TDD AWS em modo opt-in;
+  - a regressao ampla do modulo permaneceu totalmente verde nesta rodada, incluindo user vectors, `SearchUsersByImage`, backfill legado automatico e os comandos operacionais de promocao, rollback e soak.
 
 Bateria frontend executada:
 
@@ -80,6 +96,141 @@ Bateria frontend executada:
 - leitura:
   - o painel agora aceita o contrato AWS por evento e expoe operacao de `health/reindex/reconcile/delete collection` sem quebrar tipagem nem fluxo do form.
 
+Bateria executada apos a validacao funcional de produto:
+
+- backend:
+  - `php artisan test tests/Feature/Events/CreateEventTest.php tests/Feature/FaceSearch tests/Unit/FaceSearch`
+  - resultado:
+    - `146 passed`
+    - `7 skipped`
+    - `1054 assertions`
+- contratos opt-in:
+  - `$env:RUN_FACE_SEARCH_AWS_TDD='1'; php artisan test tests/Unit/FaceSearch/FaceSearchAwsConfigContractTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryContractTest.php tests/Unit/FaceSearch/FaceSearchRouterContractTest.php tests/Unit/FaceSearch/SelfiePreflightServiceContractTest.php tests/Feature/FaceSearch/FaceSearchAwsSettingsContractTest.php tests/Unit/FaceSearch/SearchFacesBySelfieAwsArchitectureContractTest.php tests/Unit/FaceSearch/FaceSearchProviderRecordContractTest.php`
+  - resultado:
+    - `7 passed`
+    - `42 assertions`
+- frontend:
+  - `npx.cmd vitest run src/modules/events/components/face-search/EventFaceSearchSettingsCard.test.tsx src/modules/events/components/face-search/EventFaceSearchSettingsForm.test.tsx`
+  - resultado:
+    - `7 passed`
+- type-check:
+  - `npm.cmd run type-check`
+  - resultado:
+    - `PASS`
+- leitura:
+  - a rodada final fechou o comportamento do produto em tres camadas:
+    - CRUD base do evento;
+    - painel dedicado de settings AWS por evento;
+    - operacao de query/indexacao do modulo `FaceSearch`.
+
+Bateria executada apos a implementacao de `H6` e do backfill automatico:
+
+- backend:
+  - `php artisan test tests/Feature/Events/CreateEventTest.php tests/Feature/FaceSearch tests/Unit/FaceSearch`
+  - resultado:
+    - `153 passed`
+    - `7 skipped`
+    - `1103 assertions`
+- contratos opt-in:
+  - `$env:RUN_FACE_SEARCH_AWS_TDD='1'; php artisan test tests/Unit/FaceSearch/FaceSearchAwsConfigContractTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryContractTest.php tests/Unit/FaceSearch/FaceSearchRouterContractTest.php tests/Unit/FaceSearch/SelfiePreflightServiceContractTest.php tests/Feature/FaceSearch/FaceSearchAwsSettingsContractTest.php tests/Unit/FaceSearch/SearchFacesBySelfieAwsArchitectureContractTest.php tests/Unit/FaceSearch/FaceSearchProviderRecordContractTest.php`
+  - resultado:
+    - `7 passed`
+    - `42 assertions`
+- frontend:
+  - `npx.cmd vitest run src/modules/events/components/face-search/EventFaceSearchSettingsCard.test.tsx src/modules/events/components/face-search/EventFaceSearchSettingsForm.test.tsx`
+  - resultado:
+    - `7 passed`
+- type-check:
+  - `npm.cmd run type-check`
+  - resultado:
+    - `PASS`
+- leitura:
+  - `H6-T1`, `H6-T2` e o primeiro corte de `H6-T3` ficaram implementados sem abrir regressao no modulo;
+  - a ativacao AWS por evento agora enfileira o backfill do acervo legado automaticamente, reduzindo o atrito operacional do go-live;
+  - a trilha de `users` continua com fallback transparente para `faces` quando o vetor de usuario ainda nao ficou pronto.
+
+Bateria executada apos a promocao controlada para `aws_primary_local_fallback`:
+
+- backend dirigido:
+  - `php artisan test tests/Feature/FaceSearch/PromoteAwsFallbackRolloutCommandTest.php tests/Feature/FaceSearch/RollbackAwsFallbackRolloutCommandTest.php`
+  - resultado:
+    - `3 passed`
+    - `23 assertions`
+- backend amplo:
+  - `php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch`
+  - resultado:
+    - `129 passed`
+    - `7 skipped`
+    - `907 assertions`
+- contratos opt-in:
+  - `$env:RUN_FACE_SEARCH_AWS_TDD='1'; php artisan test tests/Unit/FaceSearch/FaceSearchAwsConfigContractTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryContractTest.php tests/Unit/FaceSearch/FaceSearchRouterContractTest.php tests/Unit/FaceSearch/SelfiePreflightServiceContractTest.php tests/Feature/FaceSearch/FaceSearchAwsSettingsContractTest.php tests/Unit/FaceSearch/SearchFacesBySelfieAwsArchitectureContractTest.php tests/Unit/FaceSearch/FaceSearchProviderRecordContractTest.php`
+  - resultado:
+    - `7 passed`
+    - `42 assertions`
+- frontend:
+  - `npx.cmd vitest run src/modules/events/components/face-search/EventFaceSearchSettingsCard.test.tsx src/modules/events/components/face-search/EventFaceSearchSettingsForm.test.tsx`
+  - resultado:
+    - `7 passed`
+- type-check:
+  - `npm run type-check`
+  - resultado:
+    - `PASS`
+- leitura:
+  - a promocao controlada saiu acompanhada por cobertura real de rollout/rollback, sem abrir regressao no modulo nem no painel.
+
+Bateria executada apos o soak curto em `aws_primary_local_fallback`:
+
+- backend dirigido:
+  - `php artisan test tests/Unit/FaceSearch/RunAwsFallbackSoakActionTest.php tests/Feature/FaceSearch/RunAwsFallbackSoakCommandTest.php`
+  - resultado:
+    - `3 passed`
+    - `23 assertions`
+- backend amplo:
+  - `php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch`
+  - resultado:
+    - `132 passed`
+    - `7 skipped`
+    - `930 assertions`
+- contratos opt-in:
+  - `$env:RUN_FACE_SEARCH_AWS_TDD='1'; php artisan test tests/Unit/FaceSearch/FaceSearchAwsConfigContractTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryContractTest.php tests/Unit/FaceSearch/FaceSearchRouterContractTest.php tests/Unit/FaceSearch/SelfiePreflightServiceContractTest.php tests/Feature/FaceSearch/FaceSearchAwsSettingsContractTest.php tests/Unit/FaceSearch/SearchFacesBySelfieAwsArchitectureContractTest.php tests/Unit/FaceSearch/FaceSearchProviderRecordContractTest.php`
+  - resultado:
+    - `7 passed`
+    - `42 assertions`
+- frontend:
+  - `npx.cmd vitest run src/modules/events/components/face-search/EventFaceSearchSettingsCard.test.tsx src/modules/events/components/face-search/EventFaceSearchSettingsForm.test.tsx`
+  - resultado:
+    - `7 passed`
+- type-check:
+  - `npm run type-check`
+  - resultado:
+    - `PASS`
+- leitura:
+  - o soak curto entrou como operacao reproduzivel com cobertura automatizada e sem abrir regressao no modulo nem no painel.
+
+Bateria executada apos a rodada real de `H7-T2`:
+
+- backend:
+  - `php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch`
+  - resultado:
+    - `118 passed`
+    - `7 skipped`
+    - `841 assertions`
+- contratos opt-in:
+  - `$env:RUN_FACE_SEARCH_AWS_TDD='1'; php artisan test tests/Unit/FaceSearch/FaceSearchAwsConfigContractTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryContractTest.php tests/Unit/FaceSearch/FaceSearchRouterContractTest.php tests/Unit/FaceSearch/SelfiePreflightServiceContractTest.php tests/Feature/FaceSearch/FaceSearchAwsSettingsContractTest.php tests/Unit/FaceSearch/SearchFacesBySelfieAwsArchitectureContractTest.php tests/Unit/FaceSearch/FaceSearchProviderRecordContractTest.php`
+  - resultado:
+    - `7 passed`
+    - `42 assertions`
+- frontend:
+  - `npx.cmd vitest run src/modules/events/components/face-search/EventFaceSearchSettingsCard.test.tsx src/modules/events/components/face-search/EventFaceSearchSettingsForm.test.tsx`
+  - resultado:
+    - `7 passed`
+- type-check:
+  - `npm run type-check`
+  - resultado:
+    - `PASS`
+- leitura:
+  - a rodada de validacao real do piloto nao abriu regressao automatizada no modulo nem no painel operacional.
+
 Bateria de contratos opt-in reexecutada apos o smoke real com imagem:
 
 - comando:
@@ -89,6 +240,116 @@ Bateria de contratos opt-in reexecutada apos o smoke real com imagem:
   - `42 assertions`
 - leitura:
   - a fundacao contratual da integracao AWS continuou intacta depois do rerun operacional e do smoke real com imagem.
+
+Bateria executada apos a correcao dos achados do piloto:
+
+- bateria dirigida:
+  - `php artisan test tests/Unit/FaceSearch/FaceSearchRouterTest.php tests/Unit/FaceSearch/SelfiePreflightServiceTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryTest.php tests/Unit/FaceSearch/CompreFaceDetectionProviderTest.php tests/Feature/FaceSearch/FaceIndexingPipelineTest.php tests/Feature/FaceSearch/FaceSearchSelfieEndpointsTest.php`
+  - resultado:
+    - `39 passed`
+    - `260 assertions`
+- regressao ampla:
+  - `php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch`
+  - resultado:
+    - `123 passed`
+    - `7 skipped`
+    - `1 failed`
+  - observacao:
+    - a unica falha restante continua externa a esta rodada: `FaceSearchLocalDatasetManifestTest` depende do fixture local `C:\Users\Usuario\Desktop\vipsocial\55159264527_7f683b08f6_o.jpg`, ausente no contexto atual do workspace.
+- contratos opt-in:
+  - `$env:RUN_FACE_SEARCH_AWS_TDD='1'; php artisan test tests/Unit/FaceSearch/FaceSearchAwsConfigContractTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryContractTest.php tests/Unit/FaceSearch/FaceSearchRouterContractTest.php tests/Unit/FaceSearch/SelfiePreflightServiceContractTest.php tests/Feature/FaceSearch/FaceSearchAwsSettingsContractTest.php tests/Unit/FaceSearch/SearchFacesBySelfieAwsArchitectureContractTest.php tests/Unit/FaceSearch/FaceSearchProviderRecordContractTest.php`
+  - resultado:
+    - `7 passed`
+    - `42 assertions`
+- leitura:
+  - as correcoes do piloto ficaram verdes em TDD;
+  - a regressao ampla do modulo continuou estavel, com apenas o fixture local externo ainda falhando.
+
+Bateria executada apos a rerodada real com probes elegiveis:
+
+- regressao ampla:
+  - `php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch`
+  - resultado:
+    - `124 passed`
+    - `7 skipped`
+    - `875 assertions`
+- contratos opt-in:
+  - `$env:RUN_FACE_SEARCH_AWS_TDD='1'; php artisan test tests/Unit/FaceSearch/FaceSearchAwsConfigContractTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryContractTest.php tests/Unit/FaceSearch/FaceSearchRouterContractTest.php tests/Unit/FaceSearch/SelfiePreflightServiceContractTest.php tests/Feature/FaceSearch/FaceSearchAwsSettingsContractTest.php tests/Unit/FaceSearch/SearchFacesBySelfieAwsArchitectureContractTest.php tests/Unit/FaceSearch/FaceSearchProviderRecordContractTest.php`
+  - resultado:
+    - `7 passed`
+    - `42 assertions`
+- frontend:
+  - `npx.cmd vitest run src/modules/events/components/face-search/EventFaceSearchSettingsCard.test.tsx src/modules/events/components/face-search/EventFaceSearchSettingsForm.test.tsx`
+  - resultado:
+    - `7 passed`
+- type-check:
+  - `npm run type-check`
+  - resultado:
+    - `PASS`
+- leitura:
+  - a rerodada real do piloto nao abriu regressao no modulo;
+  - a bateria contratual AWS continuou verde apos a calibracao de shadow baseline, preflight e envelope de rede;
+  - o painel operacional de `FaceSearch` continuou verde depois da rerodada real do piloto.
+
+Bateria executada apos o alinhamento do gate de shadow baseline:
+
+- bateria dirigida:
+  - `php artisan test tests/Feature/FaceSearch/FaceIndexingPipelineTest.php tests/Unit/FaceSearch/FaceSearchRouterTest.php`
+  - resultado:
+    - `16 passed`
+    - `76 assertions`
+- regressao ampla:
+  - `php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch`
+  - resultado:
+    - `125 passed`
+    - `7 skipped`
+    - `882 assertions`
+- contratos opt-in:
+  - `$env:RUN_FACE_SEARCH_AWS_TDD='1'; php artisan test tests/Unit/FaceSearch/FaceSearchAwsConfigContractTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryContractTest.php tests/Unit/FaceSearch/FaceSearchRouterContractTest.php tests/Unit/FaceSearch/SelfiePreflightServiceContractTest.php tests/Feature/FaceSearch/FaceSearchAwsSettingsContractTest.php tests/Unit/FaceSearch/SearchFacesBySelfieAwsArchitectureContractTest.php tests/Unit/FaceSearch/FaceSearchProviderRecordContractTest.php`
+  - resultado:
+    - `7 passed`
+    - `42 assertions`
+- frontend:
+  - `npx.cmd vitest run src/modules/events/components/face-search/EventFaceSearchSettingsCard.test.tsx src/modules/events/components/face-search/EventFaceSearchSettingsForm.test.tsx`
+  - resultado:
+    - `7 passed`
+- type-check:
+  - `npm run type-check`
+  - resultado:
+    - `PASS`
+- leitura:
+  - o gate alignment entrou sem quebrar a pipeline do modulo;
+  - a bateria completa continuou verde antes da nova leitura do piloto real.
+
+Bateria executada apos estabilizar o detector local/CompreFace:
+
+- unit direcionada:
+  - `php artisan test tests/Unit/FaceSearch/CompreFaceClientTest.php tests/Unit/FaceSearch/CompreFaceDetectionProviderTest.php`
+  - resultado:
+    - `12 passed`
+    - `38 assertions`
+- regressao ampla:
+  - `php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch`
+  - resultado:
+    - `125 passed`
+    - `7 skipped`
+    - `882 assertions`
+- contratos opt-in:
+  - `$env:RUN_FACE_SEARCH_AWS_TDD='1'; php artisan test tests/Unit/FaceSearch/FaceSearchAwsConfigContractTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryContractTest.php tests/Unit/FaceSearch/FaceSearchRouterContractTest.php tests/Unit/FaceSearch/SelfiePreflightServiceContractTest.php tests/Feature/FaceSearch/FaceSearchAwsSettingsContractTest.php tests/Unit/FaceSearch/SearchFacesBySelfieAwsArchitectureContractTest.php tests/Unit/FaceSearch/FaceSearchProviderRecordContractTest.php`
+  - resultado:
+    - `7 passed`
+    - `42 assertions`
+- frontend:
+  - `npx.cmd vitest run src/modules/events/components/face-search/EventFaceSearchSettingsCard.test.tsx src/modules/events/components/face-search/EventFaceSearchSettingsForm.test.tsx`
+  - resultado:
+    - `7 passed`
+- type-check:
+  - `npm run type-check`
+  - resultado:
+    - `PASS`
+- leitura:
+  - o novo envelope do detector local ficou verde em TDD;
+  - a bateria completa do modulo continuou estavel antes da rerodada real `3/3` do piloto.
 
 Bateria dirigida executada para `H2-T3` e `H3`:
 
@@ -285,6 +546,62 @@ Smoke real AWS com imagem validado em `2026-04-09`:
     - `SearchFacesByImage`
     - `DeleteFaces`
     - `DeleteCollection`
+
+Piloto real `H7-T2` executado em `2026-04-09`:
+
+- script operacional criado:
+  - `apps/api/scripts/face-search-aws-h7-pilot.php`
+- variaveis necessarias para o modulo real:
+  - `FACE_SEARCH_AWS_ACCESS_KEY_ID`
+  - `FACE_SEARCH_AWS_SECRET_ACCESS_KEY`
+  - `FACE_SEARCH_AWS_REGION`
+- descoberta operacional:
+  - o app real nao estava lendo as credenciais do smoke anterior, porque o smoke usava `FACE_SEARCH_AWS_SMOKE_*` e o modulo usa `FACE_SEARCH_AWS_*`;
+  - foi necessario alinhar o `.env` local do modulo para a rodada real.
+- descoberta operacional adicional:
+  - para o shadow local com `CompreFace`, o piloto precisou usar variante `gallery` normalizada;
+  - com originais maiores, o `CompreFace` respondeu `413 Request Entity Too Large` durante a seed local.
+- relatorios bem-sucedidos:
+  - `storage/app/private/face-search-aws-pilot/20260409-042658-face-search-aws-h7-pilot.json`
+  - `storage/app/private/face-search-aws-pilot/20260409-043515-face-search-aws-h7-pilot.json`
+  - `storage/app/private/face-search-aws-pilot/20260409-043548-face-search-aws-h7-pilot.json`
+- consolidado:
+  - `storage/app/private/face-search-aws-pilot/20260409-aggregate-face-search-aws-h7-pilot.json`
+- lote em batch tambem executado:
+  - `storage/app/private/face-search-aws-pilot/20260409-043401-face-search-aws-h7-pilot.json`
+  - leitura:
+    - o lote de `3` eventos consecutivos registrou `cURL error 28` em `CreateCollection` e `IndexFaces` com `connect_timeout=3s`;
+    - isso reforca que o piloto pequeno deve continuar serializado e observado antes de qualquer ampliacao.
+
+Resumo consolidado dos `3` eventos unitarios bem-sucedidos:
+
+- `events_executed=3`
+- `estimated_processing_cost_usd=0.013`
+- `estimated_storage_cost_usd_monthly_if_kept=0.00006`
+- `total_queries_attempted=4`
+- `total_queries_blocked_by_preflight=2`
+- `fallback_count=0`
+- `avg_fallback_rate=0.0`
+- `searchable_remote_faces=6`
+- `total_unindexed_faces=0`
+- `shadow_queries_completed=4`
+- `avg_shadow_divergence=0.875`
+- `shadow_top_match_same_rate=0.0`
+- `avg_response_duration_ms=1883.75`
+- `p95_response_duration_ms=1891`
+
+Leitura do piloto:
+
+- custo de processamento ficou baixo no recorte pequeno;
+- fallback nao foi acionado nas queries que chegaram ao backend AWS;
+- `UnindexedFaces` ficou zerado nesse recorte pequeno;
+- a divergencia do shadow ficou alta demais para aprovar ampliacao:
+  - `avg_shadow_divergence=0.875`
+  - `shadow_top_match_same_rate=0.0`
+- o gate de qualidade da AWS no modulo atual rejeitou varias faces que o lane local aceitou como pesquisaveis;
+- a enforcement de selfie-only nao e absoluta no mundo real:
+  - em `1` dos pilotos, uma imagem de duas pessoas passou pelo preflight e virou query com `0` resultado;
+  - isso mostra que o bloqueio de foto de grupo hoje depende do recall do detector local.
 
 Bateria executada apos a implementacao inicial de `H1`:
 
@@ -1100,6 +1417,16 @@ Definicao de pronto:
 
 ### H6-T1. Criar readiness gate para `SearchUsersByImage`
 
+Status atual:
+
+- [x] readiness gate implementado em `AwsUserVectorReadinessService`.
+- [x] o gate agora exige:
+  - minimo de `5` faces boas por cluster;
+  - variacao minima de `yaw`;
+  - variacao minima de `pitch`;
+  - match local por bounding box para reaproveitar embeddings ja existentes no lane local.
+- [x] cobertura criada em `AwsUserVectorReadinessTest`.
+
 Objetivo:
 
 - so liberar fase 2 quando houver base suficiente por pessoa.
@@ -1119,6 +1446,16 @@ Definicao de pronto:
 - o sistema nao cria `user vectors` em cima de material fraco.
 
 ### H6-T2. Implementar `CreateUser` e `AssociateFaces`
+
+Status atual:
+
+- [x] `SyncAwsUserVectorJob` criado.
+- [x] `CreateUser` com `ClientRequestToken` deterministico implementado no backend AWS.
+- [x] `AssociateFaces` em lotes de ate `100` faces implementado.
+- [x] sucesso e falha por face agora ficam persistidos em `provider_payload_json.aws_user_vector`.
+- [x] cobertura criada em:
+  - `SyncAwsUserVectorJobTest`
+  - `AwsRekognitionFaceSearchBackendTest`
 
 Objetivo:
 
@@ -1142,6 +1479,16 @@ Definicao de pronto:
 
 ### H6-T3. Habilitar `SearchUsersByImage`
 
+Status atual:
+
+- [x] `searchBySelfie()` agora respeita `aws_search_mode=users`.
+- [x] quando ainda nao existem user vectors prontos, o backend cai automaticamente para `faces`.
+- [x] o audit payload da query agora registra:
+  - `search_mode_requested`
+  - `search_mode_resolved`
+  - `search_mode_fallback_reason`
+- [ ] ainda falta um soak real dedicado de alta cardinalidade para validar esse modo em evento grande antes de liberar rollout amplo.
+
 Objetivo:
 
 - subir precisao em pessoas recorrentes.
@@ -1154,8 +1501,9 @@ Subtarefas:
 
 Testes obrigatorios:
 
-- expandir `FaceSearchSelfieEndpointsTest`
-- `AwsUserSearchModeTest`
+- [x] cobertura inicial absorvida por `AwsRekognitionFaceSearchBackendTest`
+- [ ] expandir `FaceSearchSelfieEndpointsTest` com asserts especificos de `users` quando a surface publica/admin precisar expor esse detalhe
+- [ ] `AwsUserSearchModeTest` dedicado continua opcional para a proxima rodada, se o fluxo de `users` ganhar mais branching proprio
 
 Definicao de pronto:
 
@@ -1209,8 +1557,22 @@ Status atual:
 
 - [x] smoke real de imagem validado no fluxo completo `IndexFaces + SearchFacesByImage + DeleteFaces`.
 - [x] checklist operacional do piloto definido neste plano.
-- [ ] piloto com eventos reais ainda nao executado.
-- [ ] metas reais de custo/latencia/fallback ainda nao foram medidas em producao.
+- [x] piloto real executado em `3` eventos unitarios com `aws_primary_local_shadow`.
+- [x] metricas reais de custo, latencia, fallback, `UnindexedFaces` e divergencia foram capturadas.
+- [x] baseline local obrigatoria para shadow agora roda junto com a indexacao primaria.
+- [x] seed local do shadow agora usa variante `gallery` no proprio pipeline.
+- [x] envelope de rede AWS ficou menos agressivo para burst com timeouts por perfil.
+- [x] preflight de selfie ficou mais rigido para duo/group edge cases.
+- [x] rerodada real curta apos as correcoes executada com collection saudavel antes/depois.
+- [x] rerodada real com probes derivados elegiveis voltou a medir query-side shadow em `3` eventos.
+- [x] baseline local agora despromove `searchable=true` quando a midia nao sobrevive ao gate primario AWS.
+- [x] rerodada real priorizou probes de query apenas em midias que sobreviveram ao gate remoto.
+- [x] detector local/CompreFace estabilizado para a janela curta do piloto com timeout e retry de deteccao mais tolerantes.
+- [x] piloto pequeno agora atende as metas recomendadas desta fase.
+- [x] `H7-T2` aprovado para promocao controlada de eventos estaveis para `aws_primary_local_fallback`.
+- [x] promocao controlada executada em `3` eventos estaveis com `aws_primary_local_fallback`, `sync-index`, `sync-reconcile` e rollback pronto.
+- [x] soak curto executado em `346`, `347` e `348` ja promovidos, sem fallback e sem drift apos `reconcile`.
+- [x] a calibracao minima do pool de selfies do piloto foi destravada com probes derivados elegiveis.
 
 Objetivo:
 
@@ -1242,6 +1604,7 @@ Preparacao recomendada do piloto:
   - `face_search_provider_records`
   - `UnindexedFaces`
   - `shadow divergence`
+  - seed local do shadow com baseline local real
 
 Metas iniciais recomendadas para aceitar o piloto:
 
@@ -1258,6 +1621,320 @@ Criticos de rollback:
 - shadow divergence alta sem explicacao operacional;
 - custo por evento acima da banda aprovada para o piloto;
 - aumento de reclamacao de selfie sem retorno no conjunto correto.
+
+Resultado real desta rodada:
+
+- `3` eventos unitarios serializados rodaram com cleanup remoto ao final;
+- um lote separado de `3` eventos consecutivos falhou parcialmente com `cURL error 28`, indicando que o envelope atual de rede continua apertado para bursts;
+- o custo do recorte pequeno ficou aceitavel;
+- a latencia de query ficou aceitavel;
+- o shadow ainda nao ficou aceitavel para rollout:
+  - divergencia media alta
+  - `top_match_same` zerado
+  - parte do acervo considerado pesquisavel localmente nao sobreviveu ao gate AWS atual.
+
+Rerodada curta apos as correcoes em `2026-04-09`:
+
+- relatorio:
+  - `apps/api/storage/app/private/face-search-aws-pilot/20260409-050119-face-search-aws-h7-pilot.json`
+- o pipeline passou a registrar baseline local obrigatoria em `pipeline.shadow` para todos os itens indexados;
+- o `source_ref` do shadow local ficou preso na variante `gallery`, sem voltar ao original bruto;
+- a collection ficou `healthy` antes e depois da rodada;
+- nesta rerodada de `1` evento nao apareceu novo `cURL error 28`;
+- a foto de grupo do piloto passou a ser bloqueada no preflight;
+- em compensacao, as `3` selfies candidatas do piloto tambem foram bloqueadas pelo guard rail novo;
+- por isso, a rodada nao mediu divergencia de query nem `top_match_same`, apenas estabilizou a parte de indexacao/shadow baseline.
+
+Rerodada com probes derivados elegiveis em `2026-04-09`:
+
+- relatorio:
+  - `apps/api/storage/app/private/face-search-aws-pilot/20260409-051854-face-search-aws-h7-pilot.json`
+- estrategia:
+  - a query valida deixou de depender do pool bruto e passou a usar um crop derivado da face dominante, validado pelo proprio `SelfiePreflightService`
+  - a query de foto de grupo continuou existindo como caso de bloqueio explicito
+- resumo consolidado:
+  - `events_executed=3`
+  - `estimated_processing_cost_usd=0.012`
+  - `estimated_storage_cost_usd_monthly_if_kept=0.00011`
+  - `avg_fallback_rate=0`
+  - `avg_shadow_divergence=0.388889`
+  - `total_unindexed_faces=0`
+  - `total_queries_attempted=3`
+  - `total_queries_blocked_by_preflight=3`
+- resultado por evento:
+  - `event_id=340`
+    - `valid_selfie_status=completed`
+    - `response_duration_ms=667`
+    - `match_count=1`
+    - `shadow_divergence_ratio=0.5`
+    - `shadow_top_match_same=false`
+    - `group_photo=blocked_validation`
+  - `event_id=341`
+    - `valid_selfie_status=completed`
+    - `response_duration_ms=599`
+    - `match_count=3`
+    - `shadow_divergence_ratio=0`
+    - `shadow_top_match_same=true`
+    - `group_photo=blocked_validation`
+  - `event_id=342`
+    - `valid_selfie_status=completed`
+    - `response_duration_ms=585`
+    - `match_count=1`
+    - `shadow_divergence_ratio=0.666667`
+    - `shadow_top_match_same=false`
+    - `group_photo=blocked_validation`
+- leitura:
+  - a medicao de query-side shadow voltou a existir;
+  - o preflight bloqueou foto de grupo nos `3` eventos;
+  - nao houve fallback em nenhuma query valida da rerodada;
+  - a divergencia media caiu de `0.875` no piloto anterior para `0.388889`, mas ainda nao esta confortavel para promocao.
+
+Rerodada com gate alinhado e probes saindo apenas de midias aprovadas pelo primario em `2026-04-09`:
+
+- relatorio:
+  - `apps/api/storage/app/private/face-search-aws-pilot/20260409-123336-face-search-aws-h7-pilot.json`
+- estrategia:
+  - a baseline local passou a ser despromovida para `searchable=false` quando o primario AWS fecha a midia com `faces_indexed=0`
+  - a query valida do piloto passou a ser derivada apenas de midias que sobreviveram ao gate remoto
+- resumo consolidado:
+  - `events_executed=3`
+  - `estimated_processing_cost_usd=0.008`
+  - `estimated_storage_cost_usd_monthly_if_kept=0.00007`
+  - `avg_fallback_rate=0`
+  - `avg_shadow_divergence=0`
+  - `total_unindexed_faces=0`
+  - `total_queries_attempted=2`
+  - `total_queries_blocked_by_preflight=2`
+- resultado por evento:
+  - `event_id=343`
+    - indexacao completou com alignment local:
+      - `55159264527_7f683b08f6_o.jpg`
+        - AWS: `faces_indexed=0`, `dominant_rejection_reason=low_quality`
+        - shadow local: `searchable_faces_before=1`, `searchable_faces_after=0`
+      - `55160322273_dc03572778_o.jpg`
+        - AWS: `faces_indexed=0`, `dominant_rejection_reason=low_quality`
+        - shadow local: `searchable_faces_before=6`, `searchable_faces_after=0`
+    - query nao executada por timeout real no detector local:
+      - `Illuminate\Http\Client\ConnectionException`
+      - `cURL error 28`
+  - `event_id=344`
+    - `valid_selfie_status=completed`
+    - `response_duration_ms=666`
+    - `match_count=3`
+    - `shadow_divergence_ratio=0`
+    - `shadow_top_match_same=true`
+    - `fallback_triggered=false`
+    - `group_photo=blocked_validation`
+  - `event_id=345`
+    - `valid_selfie_status=completed`
+    - `response_duration_ms=1118`
+    - `match_count=1`
+    - `shadow_divergence_ratio=0`
+    - `shadow_top_match_same=true`
+    - `fallback_triggered=false`
+    - `group_photo=blocked_validation`
+- leitura:
+  - a divergencia caiu de `0.388889` para `0` nas `2` queries validas desta rerodada;
+  - o bloqueio de foto de grupo se manteve consistente;
+  - o alinhamento do gate resolveu o caso em que a baseline local mantinha como pesquisavel uma midia que a AWS tinha descartado;
+  - a rodada ainda nao basta para promover rollout porque `1/3` eventos perdeu a query por timeout do detector local, reduzindo a amostra efetiva.
+
+Rerodada apos estabilizar o detector local/CompreFace em `2026-04-09`:
+
+- relatorio:
+  - `apps/api/storage/app/private/face-search-aws-pilot/20260409-125057-face-search-aws-h7-pilot.json`
+- ajuste tecnico aplicado antes da rodada:
+  - `detection_timeout=25`
+  - `detection_retry_times=3`
+  - `detection_retry_sleep_ms=250`
+  - retry explicito para `ConnectionException` e timeouts transientes no `CompreFaceClient`
+- resumo consolidado:
+  - `events_executed=3`
+  - `estimated_processing_cost_usd=0.012`
+  - `estimated_storage_cost_usd_monthly_if_kept=0.00011`
+  - `avg_fallback_rate=0`
+  - `avg_shadow_divergence=0`
+  - `total_unindexed_faces=0`
+  - `total_queries_attempted=3`
+  - `total_queries_blocked_by_preflight=3`
+- resultado por evento:
+  - `event_id=346`
+    - `valid_selfie_status=completed`
+    - `response_duration_ms=933`
+    - `match_count=1`
+    - `shadow_divergence_ratio=0`
+    - `shadow_top_match_same=true`
+    - `fallback_triggered=false`
+    - `group_photo=blocked_validation`
+  - `event_id=347`
+    - `valid_selfie_status=completed`
+    - `response_duration_ms=601`
+    - `match_count=3`
+    - `shadow_divergence_ratio=0`
+    - `shadow_top_match_same=true`
+    - `fallback_triggered=false`
+    - `group_photo=blocked_validation`
+  - `event_id=348`
+    - `valid_selfie_status=completed`
+    - `response_duration_ms=913`
+    - `match_count=1`
+    - `shadow_divergence_ratio=0`
+    - `shadow_top_match_same=true`
+    - `fallback_triggered=false`
+    - `group_photo=blocked_validation`
+- leitura:
+  - a amostra curta do piloto voltou a completar `3/3` eventos sem quebra no detector local;
+  - o `p95` observado ficou bem abaixo da meta de `4000 ms`;
+  - fallback permaneceu em zero;
+  - o bloqueio de foto de grupo se manteve consistente;
+  - a divergencia do shadow ficou zerada nesta rodada curta, o que habilita promocao controlada dos eventos estaveis.
+
+Promocao controlada para `aws_primary_local_fallback` em `2026-04-09`:
+
+- comando executado:
+  - `php artisan face-search:promote-aws-fallback 346 347 348 --sync-index --sync-reconcile`
+- relatorio:
+  - `apps/api/storage/app/private/face-search-rollout/20260409-142612-face-search-aws-fallback-rollout.json`
+- rollback pronto:
+  - `php artisan face-search:rollback-aws-fallback --report="C:\laragon\www\eventovivo\apps\api\storage\app/private/face-search-rollout/20260409-142612-face-search-aws-fallback-rollout.json"`
+- resumo consolidado:
+  - `promoted=3`
+  - `skipped=0`
+  - `rolled_back=0`
+  - `failed=0`
+- verificacoes por evento:
+  - `event_id=346`
+    - `routing_policy`: `aws_primary_local_shadow -> aws_primary_local_fallback`
+    - `health_pre_promotion=healthy`
+    - `health_post_promotion=healthy`
+    - `faces_indexed=4`
+    - `remote_face_count=4`
+    - `queries_total=1`
+    - `avg_shadow_divergence=0`
+  - `event_id=347`
+    - `routing_policy`: `aws_primary_local_shadow -> aws_primary_local_fallback`
+    - `health_pre_promotion=healthy`
+    - `health_post_promotion=healthy`
+    - `faces_indexed=3`
+    - `remote_face_count=3`
+    - `queries_total=1`
+    - `avg_shadow_divergence=0`
+  - `event_id=348`
+    - `routing_policy`: `aws_primary_local_shadow -> aws_primary_local_fallback`
+    - `health_pre_promotion=healthy`
+    - `health_post_promotion=healthy`
+    - `faces_indexed=4`
+    - `remote_face_count=4`
+    - `queries_total=1`
+    - `avg_shadow_divergence=0`
+- leitura:
+  - a promocao controlada reaproveitou exatamente os `3` eventos estaveis que tinham passado pela rerodada curta do piloto;
+  - o rollout saiu com collection refeita, `sync-index`, `sync-reconcile`, health pre/post e snapshot completo de rollback no report;
+  - nesta rodada nao houve fallback, erro de health nem rollback automatico.
+
+Soak curto apos a promocao controlada em `2026-04-09`:
+
+- comando executado:
+  - `php artisan face-search:soak-aws-fallback 346 347 348 --queries-per-event=2`
+- relatorio:
+  - `apps/api/storage/app/private/face-search-soak/20260409-145200-face-search-aws-fallback-soak.json`
+- resumo consolidado:
+  - `completed=3`
+  - `skipped=0`
+  - `failed=0`
+  - `avg_fallback_rate=0`
+  - `avg_response_duration_ms=537`
+  - `events_with_drift_after=0`
+- resultado por evento:
+  - `event_id=346`
+    - `health_before=healthy`
+    - `health_after=healthy`
+    - `queries_completed=1`
+    - `fallback_count=0`
+    - `avg_response_duration_ms=850`
+    - `drift_detected_after=false`
+  - `event_id=347`
+    - `health_before=healthy`
+    - `health_after=healthy`
+    - `queries_completed=2`
+    - `fallback_count=0`
+    - `avg_response_duration_ms=401`
+    - `drift_detected_after=false`
+  - `event_id=348`
+    - `health_before=healthy`
+    - `health_after=healthy`
+    - `queries_completed=1`
+    - `fallback_count=0`
+    - `avg_response_duration_ms=360`
+    - `drift_detected_after=false`
+- leitura:
+  - o soak curto confirmou o backend em `aws_primary_local_fallback` sem abrir fallback nem drift depois de `reconcile`;
+  - os `4` requests reais concluidos ficaram com latencia confortavelmente abaixo da meta recomendada;
+  - `346` e `348` produziram apenas `1` probe elegivel cada nesta rodada, enquanto `347` sustentou `2` probes completos;
+  - o estado atual ja nao esta bloqueado por saude, drift ou fallback para seguir para o gate final antes de `H6`.
+
+Validacao funcional de produto em `2026-04-09`:
+
+- toggle base do CRUD do evento continua nascendo desligado no frontend:
+  - `apps/web/src/modules/events/components/EventEditorPage.tsx`
+  - defaults:
+    - `enabled=false`
+    - `allow_public_selfie_search=false`
+    - `selfie_retention_hours=24`
+- o CRUD simples do evento persiste apenas a camada basica de `FaceSearch`:
+  - `enabled`
+  - `allow_public_selfie_search`
+  - `selfie_retention_hours`
+  - `search_strategy`
+- a configuracao operacional da AWS por evento continua no card dedicado de `FaceSearch`:
+  - `recognition_enabled=true`
+  - `search_backend_key=aws_rekognition`
+  - `routing_policy`
+  - `aws_search_mode`
+  - thresholds e filtros AWS
+- leitura funcional importante:
+  - ativar apenas o toggle simples do CRUD base do evento continua mexendo so na camada basica de `FaceSearch`; ele nao ativa sozinho o lane AWS;
+  - quando a ativacao AWS acontece no card dedicado de `FaceSearch`, o sistema agora:
+    - garante a collection AWS;
+    - enfileira automaticamente o backfill do acervo legado;
+    - continua indexando novas imagens no pipeline normal com `face_index_status=queued`.
+  - isso esta alinhado ao codigo atual:
+    - `UpsertEventFaceSearchSettingsAction` agora despacha `EnsureAwsCollectionJob` e `BackfillEventFaceSearchGalleryJob` quando o lane AWS fica ativo pela primeira vez;
+    - `QueueEventFaceSearchReindexAction` continua sendo a rotina que varre e enfileira todas as imagens ja existentes do evento;
+    - novas imagens que entram depois da ativacao seguem o pipeline normal e ja nascem prontas para indexacao em background antes de qualquer busca futura.
+- impacto pratico para o usuario final:
+  - a consulta por selfie nao deveria esperar a indexacao da galeria no momento do upload da selfie;
+  - o usuario consulta apenas contra o subconjunto que ja estiver indexado e `searchable` na collection;
+  - portanto, com o acervo legado ja entrando no backfill automatico da ativacao AWS ou com o evento nascendo com `FaceSearch` ativo desde o inicio, a experiencia de busca fica praticamente imediata no submit da selfie.
+- latencia real mais recente em producao controlada:
+  - soak curto em `aws_primary_local_fallback`:
+    - `avg_response_duration_ms=537`
+    - faixa observada nas queries concluidas: `360 ms` a `850 ms`
+    - `avg_fallback_rate=0`
+    - `events_with_drift_after=0`
+- limite desta validacao:
+  - o recorte real mais recente ainda foi feito em `3` eventos piloto pequenos;
+  - ele prova que o caminho de busca por `faces` esta rapido e estavel quando o acervo ja esta indexado;
+  - ele ainda nao certifica com a mesma evidencia uma galeria unica com aproximadamente `2000` pessoas pesquisaveis no mesmo evento;
+  - para afirmar isso com seguranca, ainda falta um soak real dedicado de alta cardinalidade.
+- leitura executiva atual:
+  - para o MVP atual de `SearchFacesByImage` e para o primeiro corte de `SearchUsersByImage`, a AWS ja esta operacional;
+  - para dizer que a integracao AWS esta `100%` no modulo inteiro ainda faltam:
+    - validacao real especifica para evento grande com acervo na faixa de `2000` pessoas indexadas;
+    - janela curta de observacao operacional do modo `users`;
+    - UX final no CRUD simples do evento com o CTA direto `Ativar Reconhecimento Facial`, deixando o card AWS avancado para operacao e ajuste fino.
+
+Principais descobertas operacionais:
+
+- a comparacao de shadow so faz sentido com baseline local pronta para a mesma galeria; isso agora ficou embutido no pipeline;
+- o shadow local precisa continuar preso a variante `gallery` ou outra derivada normalizada; o contrato automatizado agora garante isso;
+- o envelope de rede menos agressivo reduziu o risco imediato de burst e sustentou a promocao controlada em `3` eventos;
+- o novo guard rail de preflight protegeu foto de grupo em `3/3` eventos na rerodada com probes elegiveis;
+- a estrategia de probe derivado destravou a medicao de query-side shadow sem reabrir o caso duo/group;
+- o alinhamento do gate entre primario AWS e baseline local eliminou o principal falso positivo de shadow visto no piloto anterior;
+- nesta rodada curta a divergencia residual caiu para zero nas queries efetivamente executadas;
+- o ajuste de timeout + retry no `CompreFaceClient` removeu a quebra observada na rodada anterior e devolveu amostra `3/3`;
+- o soak curto confirmou que o risco imediato deixou de ser estabilidade tecnica do fallback e passou a ser apenas janela de observacao operacional antes do proximo bloco.
 
 Testes obrigatorios:
 
@@ -1405,10 +2082,11 @@ Leitura:
 
 ## Proximo Passo Recomendado
 
-Com `H1`, `H2`, `H3`, `H4`, `H5` e `H7-T1` fechados, o proximo bloco deve ser:
+Com `H1`, `H2`, `H3`, `H4`, `H5`, `H6`, `H7-T1` e o soak curto de `H7-T2` concluido, o proximo bloco deve ser:
 
-1. executar o piloto operacional de `H7-T2` em `1` a `3` eventos com `aws_primary_local_shadow`;
-2. medir custo por evento, latencia por query, taxa de fallback, taxa de `UnindexedFaces` e divergencia do shadow;
-3. promover apenas eventos estaveis para `aws_primary_local_fallback`;
-4. manter `H6` fora do caminho critico ate o piloto AWS estabilizar com shadow e reconciliacao ativos;
-5. so depois abrir `SearchUsersByImage` e user vectors.
+1. rodar uma janela curta de observacao operacional do modo `users` em eventos estaveis com AWS:
+   - acompanhando `face_search_queries`, `search_mode_resolved`, fallback, latencia e `healthCheck`
+   - mantendo `reindex`, `reconcile` e o rollback reverso do report `20260409-142612-face-search-aws-fallback-rollout.json` prontos
+2. executar uma validacao real dedicada para evento grande, com acervo na faixa de `2000` pessoas pesquisaveis, antes de declarar a trilha AWS como `100%` pronta;
+3. se essa observacao continuar limpa, consolidar o rollout do modo `users` como opcao operacional segura por evento;
+4. no fechamento de UX do rollout, simplificar o CRUD base do evento com o CTA direto `Ativar Reconhecimento Facial`, mantendo o card avancado de `FaceSearch` para backend, thresholds e operacao.

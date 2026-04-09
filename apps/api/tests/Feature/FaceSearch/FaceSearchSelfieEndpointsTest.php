@@ -264,6 +264,46 @@ it('returns a clear validation error when the upload is a group photo instead of
     $response->assertJsonPath('errors.selfie.0', 'Envie uma selfie com apenas uma pessoa visivel. Busca por foto de grupo ainda nao faz parte desta versao.');
 });
 
+it('rejects a single detected face that is too small to be treated as a real selfie query', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+    ]);
+
+    app()->instance(FaceDetectionProviderInterface::class, new class implements FaceDetectionProviderInterface
+    {
+        public function detect(\App\Modules\MediaProcessing\Models\EventMedia $media, \App\Modules\FaceSearch\Models\EventFaceSearchSetting $settings, string $binary): array
+        {
+            return [
+                new DetectedFaceData(
+                    boundingBox: new FaceBoundingBoxData(80, 50, 120, 120),
+                    qualityScore: 0.94,
+                    faceAreaRatio: 0.03,
+                    providerPayload: [
+                        'image_width' => 1200,
+                        'image_height' => 900,
+                    ],
+                ),
+            ];
+        }
+    });
+
+    $response = $this->withHeaders(['Accept' => 'application/json'])->post(
+        "/api/v1/events/{$event->id}/face-search/search",
+        [
+            'selfie' => UploadedFile::fake()->image('quase-grupo.jpg'),
+        ],
+    );
+
+    $this->assertApiValidationError($response, ['selfie']);
+    $response->assertJsonPath('errors.selfie.0', 'Envie uma selfie mais aproximada, centralizada e com apenas uma pessoa em destaque. Busca por foto de grupo ainda nao faz parte desta versao.');
+});
+
 it('stores reject tier and reason when the selfie fails the quality gate', function () {
     [$user, $organization] = $this->actingAsOwner();
 

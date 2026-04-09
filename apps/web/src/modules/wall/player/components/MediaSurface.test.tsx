@@ -40,12 +40,29 @@ describe('MediaSurface', () => {
     expect(video).not.toBeNull();
     expect(video?.autoplay).toBe(true);
     expect(video?.muted).toBe(true);
-    expect(video?.loop).toBe(true);
+    expect(video?.loop).toBe(false);
     expect(video?.hasAttribute('playsinline')).toBe(true);
     expect(video?.hasAttribute('controls')).toBe(false);
     expect(video?.hasAttribute('poster')).toBe(false);
     expect(video?.className).toContain('object-cover');
     expect(video?.getAttribute('src')).toContain('media-1.mp4');
+  });
+
+  it('renders poster-only surfaces for video background copies', () => {
+    const { container } = render(
+      <MediaSurface
+        media={makeMedia({
+          preview_url: 'https://cdn.example.com/media-1-poster.jpg',
+        })}
+        renderVideoPosterOnly
+      />,
+    );
+
+    const image = container.querySelector('img');
+    const video = container.querySelector('video');
+
+    expect(image?.getAttribute('src')).toContain('media-1-poster.jpg');
+    expect(video).toBeNull();
   });
 
   it('renders slideshow images with contain fit by default', () => {

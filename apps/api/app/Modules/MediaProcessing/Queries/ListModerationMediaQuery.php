@@ -2,20 +2,17 @@
 
 namespace App\Modules\MediaProcessing\Queries;
 
-use App\Modules\MediaProcessing\Enums\MediaProcessingStatus;
-use App\Modules\MediaProcessing\Enums\ModerationStatus;
-use App\Modules\MediaProcessing\Enums\PublicationStatus;
 use App\Modules\MediaProcessing\Models\EventMedia;
+use App\Modules\MediaProcessing\Support\ModerationFeedStateProjection;
 use App\Shared\Concerns\HasPortableLike;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ListModerationMediaQuery
 {
     use HasPortableLike;
-
-    private const PENDING_PRIORITY_SQL = 'case when moderation_status = ? then 1 else 0 end';
 
     public function __construct(
         private readonly int $organizationId,
@@ -26,30 +23,49 @@ class ListModerationMediaQuery
         private readonly ?bool $pinned = null,
         private readonly ?bool $senderBlocked = null,
         private readonly ?string $orientation = null,
+        private readonly ?ModerationFeedStateProjection $projection = null,
     ) {}
 
     public function query(bool $withStatusFilter = true): Builder
     {
+        $projection = $this->projection();
+        $effectiveStateSql = $projection->effectiveStateExpression();
+        $pendingPrioritySql = $projection->pendingPriorityExpression();
+        $sortOrderSql = $this->sortOrderExpression();
+        $createdAtOrderSql = $this->createdAtOrderExpression();
+
         $query = EventMedia::query()
             ->select('event_media.*')
-            ->whereHas('event', fn (Builder $builder) => $builder->where('organization_id', $this->organizationId))
+            ->addSelect([
+                'moderation_feed_sort_order' => DB::raw($sortOrderSql),
+                'moderation_feed_created_at_order' => DB::raw($createdAtOrderSql),
+                'moderation_feed_effective_state' => DB::raw($effectiveStateSql),
+                'moderation_feed_priority' => DB::raw($pendingPrioritySql),
+            ])
+            ->join('events', 'events.id', '=', 'event_media.event_id')
+            ->leftJoin('event_content_moderation_settings', 'event_content_moderation_settings.event_id', '=', 'event_media.event_id')
+            ->leftJoin('event_media_intelligence_settings', 'event_media_intelligence_settings.event_id', '=', 'event_media.event_id')
+            ->where('events.organization_id', $this->organizationId)
+            ->whereNull('events.deleted_at')
             ->with([
-                'event:id,title,slug,status',
+                'event:id,title,slug,status,moderation_mode',
+                'event.contentModerationSettings:event_id,enabled,mode',
+                'event.mediaIntelligenceSettings:event_id,enabled,mode',
                 'variants',
                 'inboundMessage',
             ])
-            ->when($this->eventId, fn (Builder $builder) => $builder->where('event_id', $this->eventId))
+            ->when($this->eventId, fn (Builder $builder) => $builder->where('event_media.event_id', $this->eventId))
             ->when($this->search !== null && trim($this->search) !== '', function (Builder $builder) {
                 $term = '%' . trim((string) $this->search) . '%';
                 $like = $this->likeOperator();
 
                 $builder->where(function (Builder $nested) use ($term, $like) {
                     $nested
-                        ->where('caption', $like, $term)
-                        ->orWhere('title', $like, $term)
-                        ->orWhere('source_label', $like, $term)
-                        ->orWhere('original_filename', $like, $term)
-                        ->orWhereHas('event', fn (Builder $query) => $query->where('title', $like, $term))
+                        ->where('event_media.caption', $like, $term)
+                        ->orWhere('event_media.title', $like, $term)
+                        ->orWhere('event_media.source_label', $like, $term)
+                        ->orWhere('event_media.original_filename', $like, $term)
+                        ->orWhere('events.title', $like, $term)
                         ->orWhereHas('inboundMessage', function (Builder $query) use ($like, $term) {
                             $query->where('sender_name', $like, $term)
                                 ->orWhere('sender_phone', $like, $term)
@@ -58,10 +74,10 @@ class ListModerationMediaQuery
                         });
                 });
             })
-            ->when($this->featured !== null, fn (Builder $builder) => $builder->where('is_featured', $this->featured))
+            ->when($this->featured !== null, fn (Builder $builder) => $builder->where('event_media.is_featured', $this->featured))
             ->when($this->pinned !== null, function (Builder $builder) {
                 $operator = $this->pinned ? '>' : '=';
-                $builder->where('sort_order', $operator, 0);
+                $builder->where('event_media.sort_order', $operator, 0);
             })
             ->when($this->senderBlocked !== null, function (Builder $builder) {
                 $method = $this->senderBlocked ? 'whereHas' : 'whereDoesntHave';
@@ -103,9 +119,9 @@ class ListModerationMediaQuery
             })
             ->when($this->orientation, function (Builder $builder) {
                 match ($this->orientation) {
-                    'portrait' => $builder->whereColumn('height', '>', 'width'),
-                    'landscape' => $builder->whereColumn('width', '>', 'height'),
-                    'square' => $builder->whereColumn('width', '=', 'height'),
+                    'portrait' => $builder->whereColumn('event_media.height', '>', 'event_media.width'),
+                    'landscape' => $builder->whereColumn('event_media.width', '>', 'event_media.height'),
+                    'square' => $builder->whereColumn('event_media.width', '=', 'event_media.height'),
                     default => null,
                 };
             });
@@ -115,10 +131,10 @@ class ListModerationMediaQuery
         }
 
         return $query
-            ->orderByDesc('sort_order')
-            ->orderByRaw(self::PENDING_PRIORITY_SQL . ' desc', [ModerationStatus::Pending->value])
-            ->orderByDesc('created_at')
-            ->orderByDesc('id');
+            ->orderByRaw("{$sortOrderSql} desc")
+            ->orderByRaw("{$pendingPrioritySql} desc")
+            ->orderByRaw("{$createdAtOrderSql} desc")
+            ->orderByDesc('event_media.id');
     }
 
     public function fetchCursorPage(int $perPage, ?string $cursor = null): array
@@ -146,29 +162,25 @@ class ListModerationMediaQuery
 
     public function stats(): array
     {
-        $baseQuery = $this->query(withStatusFilter: false);
+        $baseQuery = $this->query(withStatusFilter: true);
+        $effectiveStateSql = $this->projection()->effectiveStateExpression();
 
         return [
-            'total' => (clone $baseQuery)->count(),
-            'pending' => (clone $baseQuery)->where('moderation_status', ModerationStatus::Pending)->count(),
-            'approved' => (clone $baseQuery)->where('moderation_status', ModerationStatus::Approved)->count(),
-            'rejected' => (clone $baseQuery)->where('moderation_status', ModerationStatus::Rejected)->count(),
-            'featured' => (clone $baseQuery)->where('is_featured', true)->count(),
-            'pinned' => (clone $baseQuery)->where('sort_order', '>', 0)->count(),
+            'total' => (clone $baseQuery)->count('event_media.id'),
+            'pending' => (clone $baseQuery)->whereRaw("({$effectiveStateSql}) = 'pending_moderation'")->count('event_media.id'),
+            'approved' => (clone $baseQuery)->whereRaw("({$effectiveStateSql}) in ('approved', 'published')")->count('event_media.id'),
+            'rejected' => (clone $baseQuery)->whereRaw("({$effectiveStateSql}) = 'rejected'")->count('event_media.id'),
+            'featured' => (clone $baseQuery)->where('event_media.is_featured', true)->count('event_media.id'),
+            'pinned' => (clone $baseQuery)->where('event_media.sort_order', '>', 0)->count('event_media.id'),
         ];
     }
 
     private function applyStatusFilter(Builder $builder, string $status): void
     {
-        match ($status) {
-            'published' => $builder->where('publication_status', PublicationStatus::Published),
-            'approved' => $builder->where('moderation_status', ModerationStatus::Approved),
-            'rejected' => $builder->where('moderation_status', ModerationStatus::Rejected),
-            'pending_moderation' => $builder->where('moderation_status', ModerationStatus::Pending),
-            'processing' => $builder->whereIn('processing_status', [MediaProcessingStatus::Downloaded, MediaProcessingStatus::Processed]),
-            'error' => $builder->where('processing_status', MediaProcessingStatus::Failed),
-            default => $builder->where('processing_status', MediaProcessingStatus::Received),
-        };
+        $builder->whereRaw(
+            '(' . $this->projection()->effectiveStateExpression() . ') = ?',
+            [$status],
+        );
     }
 
     private function applyCursor(Builder $builder, ?string $cursor): void
@@ -188,51 +200,76 @@ class ListModerationMediaQuery
 
         $sortOrder = (int) ($payload['sort_order'] ?? 0);
         $moderationPriority = (int) ($payload['moderation_priority'] ?? 0);
-        $createdAt = isset($payload['created_at']) ? (string) $payload['created_at'] : null;
+        $createdAtOrder = isset($payload['created_at_order']) ? (int) $payload['created_at_order'] : null;
         $id = isset($payload['id']) ? (int) $payload['id'] : null;
 
-        if (! $createdAt || ! $id) {
+        if ($createdAtOrder === null || ! $id) {
             throw ValidationException::withMessages([
                 'cursor' => ['Cursor de moderacao invalido.'],
             ]);
         }
 
-        $builder->where(function (Builder $nested) use ($sortOrder, $moderationPriority, $createdAt, $id) {
-            $nested->where('sort_order', '<', $sortOrder)
-                ->orWhere(function (Builder $query) use ($sortOrder, $moderationPriority, $createdAt, $id) {
-                    $query->where('sort_order', $sortOrder)
-                        ->whereRaw(self::PENDING_PRIORITY_SQL . ' < ?', [
-                            ModerationStatus::Pending->value,
-                            $moderationPriority,
-                        ]);
+        $pendingPrioritySql = $this->projection()->pendingPriorityExpression();
+        $sortOrderSql = $this->sortOrderExpression();
+        $createdAtOrderSql = $this->createdAtOrderExpression();
+
+        $builder->where(function (Builder $nested) use ($sortOrder, $moderationPriority, $createdAtOrder, $id, $pendingPrioritySql, $sortOrderSql, $createdAtOrderSql) {
+            $nested->whereRaw("({$sortOrderSql}) < ?", [$sortOrder])
+                ->orWhere(function (Builder $query) use ($sortOrder, $moderationPriority, $pendingPrioritySql, $sortOrderSql) {
+                    $query->whereRaw("({$sortOrderSql}) = ?", [$sortOrder])
+                        ->whereRaw('(' . $pendingPrioritySql . ') < ?', [$moderationPriority]);
                 })
-                ->orWhere(function (Builder $query) use ($sortOrder, $moderationPriority, $createdAt, $id) {
-                    $query->where('sort_order', $sortOrder)
-                        ->whereRaw(self::PENDING_PRIORITY_SQL . ' = ?', [
-                            ModerationStatus::Pending->value,
-                            $moderationPriority,
-                        ])
-                        ->where('created_at', '<', $createdAt);
+                ->orWhere(function (Builder $query) use ($sortOrder, $moderationPriority, $createdAtOrder, $pendingPrioritySql, $sortOrderSql, $createdAtOrderSql) {
+                    $query->whereRaw("({$sortOrderSql}) = ?", [$sortOrder])
+                        ->whereRaw('(' . $pendingPrioritySql . ') = ?', [$moderationPriority])
+                        ->whereRaw("({$createdAtOrderSql}) < ?", [$createdAtOrder]);
                 })
-                ->orWhere(function (Builder $query) use ($sortOrder, $moderationPriority, $createdAt, $id) {
-                    $query->where('sort_order', $sortOrder)
-                        ->whereRaw(self::PENDING_PRIORITY_SQL . ' = ?', [
-                            ModerationStatus::Pending->value,
-                            $moderationPriority,
-                        ])
-                        ->where('created_at', $createdAt)
-                        ->where('id', '<', $id);
+                ->orWhere(function (Builder $query) use ($sortOrder, $moderationPriority, $createdAtOrder, $id, $pendingPrioritySql, $sortOrderSql, $createdAtOrderSql) {
+                    $query->whereRaw("({$sortOrderSql}) = ?", [$sortOrder])
+                        ->whereRaw('(' . $pendingPrioritySql . ') = ?', [$moderationPriority])
+                        ->whereRaw("({$createdAtOrderSql}) = ?", [$createdAtOrder])
+                        ->where('event_media.id', '<', $id);
                 });
         });
     }
 
     private function encodeCursor(EventMedia $media): string
     {
+        $sortOrder = $media->getAttribute('moderation_feed_sort_order');
+        $createdAtOrder = $media->getAttribute('moderation_feed_created_at_order');
+        $effectiveState = $media->getAttribute('moderation_feed_effective_state');
+
+        if (! is_string($effectiveState) || $effectiveState === '') {
+            $effectiveState = app(\App\Modules\MediaProcessing\Services\MediaEffectiveStateResolver::class)
+                ->resolve($media->loadMissing('event.contentModerationSettings', 'event.mediaIntelligenceSettings'))['effective_media_state'];
+        }
+
+        $moderationPriority = (int) ($effectiveState === 'pending_moderation');
+
         return base64_encode((string) json_encode([
-            'sort_order' => (int) ($media->sort_order ?? 0),
-            'moderation_priority' => $media->moderation_status === ModerationStatus::Pending ? 1 : 0,
-            'created_at' => $media->created_at?->format('Y-m-d H:i:s.u'),
+            'sort_order' => (int) ($sortOrder ?? $media->sort_order ?? 0),
+            'moderation_priority' => $moderationPriority,
+            'created_at_order' => (int) ($createdAtOrder ?? $media->created_at?->getTimestamp() ?? 0),
             'id' => $media->id,
         ]));
+    }
+
+    private function projection(): ModerationFeedStateProjection
+    {
+        return $this->projection ?? new ModerationFeedStateProjection();
+    }
+
+    private function sortOrderExpression(): string
+    {
+        return 'coalesce(event_media.sort_order, 0)';
+    }
+
+    private function createdAtOrderExpression(): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'pgsql' => "cast(extract(epoch from event_media.created_at) as bigint)",
+            'sqlite' => "cast(strftime('%s', event_media.created_at) as integer)",
+            default => 'unix_timestamp(event_media.created_at)',
+        };
     }
 }

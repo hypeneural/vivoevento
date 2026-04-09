@@ -86,10 +86,10 @@ Testes automatizados executados nesta rodada:
 
 Achados reais da implementacao:
 
-- `totals.displayed` continua `null` nesta fase:
-  - o backend atual nao possui telemetria acumulada de exibidas;
-  - so existe dado operacional de runtime atual por player;
-  - portanto o contrato precisa manter esse campo como `nullable` ate entrar snapshot ou historico autoritativo.
+- `totals.displayed` saiu de `null` na `Etapa 3`:
+  - o backend agora persiste historico agregado em `wall_display_counters`;
+  - a contagem nasce do `heartbeat` com `current_item_id` + `current_item_started_at`;
+  - a trilha tem dedupe para nao contar a mesma exibicao duas vezes em reconexao ou repeticao do mesmo sinal.
 - o trilho recente ficou melhor com `ScrollArea` e clique explicito:
   - sem autoplay;
   - sem deslocamento automatico brigando com leitura;
@@ -1739,6 +1739,47 @@ Frontend:
 - o palco continua estavel durante a troca da origem temporal
 - fallback por `heartbeat` continua funcionando
 
+### Implementado nesta primeira fatia da Etapa 1
+
+- o player passou a enviar `current_item_started_at` no `heartbeat`
+- o `current_item_started_at` agora nasce no engine do player quando o item atual muda
+- o backend passou a preferir esse timestamp quando ele vier do player
+- o backend agora ignora regressao temporal quando chegar um timestamp mais antigo para a mesma midia
+- o fallback anterior continua funcionando quando o player nao enviar `current_item_started_at`
+
+### Testes executados nesta primeira fatia da Etapa 1
+
+- backend:
+  - `cd apps/api && php artisan test --filter=WallLiveSnapshotTest`
+  - `4` testes passando
+- backend:
+  - `cd apps/api && php artisan test --filter=WallDiagnosticsTest`
+  - `6` testes passando
+- backend:
+  - `cd apps/api && php artisan test --filter=Wall`
+  - `71` testes passando
+- frontend:
+  - `cd apps/web && npm run test -- src/modules/wall/player/hooks/useWallPlayer.test.tsx`
+  - `5` testes passando
+- frontend:
+  - `cd apps/web && npm run test -- src/modules/wall/hooks/useWallLiveSnapshot.test.tsx src/modules/wall/hooks/useWallRealtimeSync.test.tsx src/modules/wall/components/manager/stage/WallAdvanceClock.test.tsx src/modules/wall/pages/EventWallManagerPage.test.tsx`
+  - `20` testes passando
+- frontend:
+  - `cd apps/web && npm run test -- src/modules/wall`
+  - `202` testes passando
+- frontend:
+  - `cd apps/web && npm run type-check`
+  - sem erros
+
+### Check de conclusao desta fatia
+
+- [x] `current_item_started_at` saiu do engine do player
+- [x] `heartbeat` passou a carregar `current_item_started_at`
+- [x] backend passou a preferir timestamp autoritativo vindo do player
+- [x] backend impede regressao temporal para a mesma midia
+- [x] clock do manager continua operando com fallback seguro
+- [x] regressao do modulo `Wall` ficou verde apos a mudanca
+
 ## Etapa 2. Snapshot com proxima midia
 
 ### Objetivo
@@ -1791,53 +1832,120 @@ Frontend:
 - a timeline continua complementar, nao redundante
 - selecao manual do operador continua mandando no palco
 
+### Implementado nesta primeira fatia da Etapa 2
+
+- o backend passou a devolver `nextItem` no `liveSnapshot` quando a previsao da fila confirma a mesma midia atual do player como primeira posicao prevista
+- quando essa confirmacao nao existe, o backend mantem `nextItem = null` para nao inventar a proxima exibicao
+- o contrato do snapshot passou a carregar no item atual e no proximo:
+  - `isVideo`
+  - `durationSeconds`
+- o palco ganhou bloco `Agora no telao`
+- o palco ganhou bloco `Proxima no telao`
+- a selecao manual do operador continua com prioridade apenas na midia principal, sem esconder o monitor de `Agora` e `Proxima`
+
+### Testes executados nesta primeira fatia da Etapa 2
+
+- backend:
+  - `cd apps/api && php artisan test --filter=WallLiveSnapshotTest`
+  - `6` testes passando
+- backend:
+  - `cd apps/api && php artisan test --filter=WallDiagnosticsTest`
+  - `6` testes passando
+- backend:
+  - `cd apps/api && php artisan test --filter=Wall`
+  - `77` testes passando
+- frontend:
+  - `cd apps/web && npm run test -- src/modules/wall/hooks/useWallLiveSnapshot.test.tsx src/modules/wall/pages/EventWallManagerPage.test.tsx src/modules/wall/hooks/useWallRealtimeSync.test.tsx src/modules/wall/components/manager/stage/WallAdvanceClock.test.tsx`
+  - `21` testes passando
+- frontend:
+  - `cd apps/web && npm run test -- src/modules/wall`
+  - `203` testes passando
+- frontend:
+  - `cd apps/web && npm run type-check`
+  - sem erros
+
 ## Etapa 3. Historico confiavel de exibidas
 
 ### Objetivo
 
 Destravar `totals.displayed` com um numero autoritativo e acumulado.
 
-### Backend
-
-- escolher a estrategia de persistencia:
-  - tabela agregada por wall
-  - contador incremental por evento
-  - historico por `advance` com agregacao derivada
-- criar a trilha de escrita no ponto certo do `advance`
-- expor `displayed` preenchido no `wall/insights`
-- garantir idempotencia para nao contar a mesma exibicao duas vezes
-
-### Frontend
-
-- remover fallback `null` quando o backend ja entregar valor real
-- atualizar `WallTotalMediaCard` para refletir exibidas sem regra local
-- manter `placeholderData` sem sumico visual durante refetch
-
-### Arquivos provaveis
-
-- `apps/api/app/Modules/Wall/Services/WallInsightsService.php`
-- `apps/api/app/Modules/Wall/Http/Resources/WallInsightsResource.php`
-- `apps/api/database/migrations/*displayed*`
-- `apps/web/src/modules/wall/components/manager/top/WallTotalMediaCard.tsx`
-- `apps/web/src/modules/wall/hooks/useWallTopInsights.ts`
-
-### TDD obrigatorio
+### Implementado nesta etapa
 
 Backend:
 
-- criar teste garantindo que `displayed` sobe quando a exibicao avanca
-- criar teste garantindo idempotencia da contagem
-- criar teste garantindo isolamento por evento
+- criada a tabela agregada `wall_display_counters`;
+- criada a trilha `WallDisplayCounterService`;
+- a contagem passa a ser escrita no `heartbeat`, usando:
+  - `current_item_id`
+  - `current_item_started_at`
+  - tolerancia derivada de `interval_ms` para dedupe;
+- o contador sobe em avancos reais e em replay legitimo da mesma midia mais tarde;
+- o contador ignora repeticao do mesmo display e regressao temporal do sinal;
+- `wall/insights` agora devolve `totals.displayed` preenchido com numero.
 
 Frontend:
 
-- criar teste do `WallTotalMediaCard` com `displayed` preenchido
-- criar teste garantindo que refetch nao apaga o numero da tela
+- `ApiWallInsightsTotals.displayed` deixou de ser `nullable`;
+- `WallTotalMediaCard` parou de usar fallback local `'-'`;
+- `useWallRealtimeSync` invalida `wall.insights(eventId)` quando o snapshot muda de item ou de `advancedAt`;
+- `useWallTopInsights` continua com `placeholderData` para evitar sumico visual durante refetch.
+
+### Arquivos provaveis
+
+- `apps/api/app/Modules/Wall/Services/WallDisplayCounterService.php`
+- `apps/api/app/Modules/Wall/Services/WallDiagnosticsService.php`
+- `apps/api/app/Modules/Wall/Queries/BuildWallInsightsQuery.php`
+- `apps/api/app/Modules/Wall/Http/Resources/WallInsightsResource.php`
+- `apps/api/database/migrations/2026_04_09_040000_create_wall_display_counters_table.php`
+- `apps/web/src/modules/wall/components/manager/top/WallTotalMediaCard.tsx`
+- `apps/web/src/modules/wall/hooks/useWallRealtimeSync.ts`
+- `apps/web/src/modules/wall/hooks/useWallTopInsights.ts`
+
+### TDD executado
+
+Backend:
+
+- `WallInsightsTest`
+  - garante que `displayed` sobe quando a exibicao avanca;
+  - garante idempotencia da contagem;
+  - garante isolamento por evento.
+
+Frontend:
+
+- `WallTotalMediaCard.test.tsx`
+  - garante renderizacao de `displayed` preenchido;
+- `useWallTopInsights.test.tsx`
+  - garante que refetch nao apaga o numero anterior;
+- `useWallRealtimeSync.test.tsx`
+  - garante invalidaçao de `insights` quando o snapshot realmente muda.
+
+### Validacao executada
+
+Backend:
+
+- `cd apps/api && php artisan test --filter=WallInsightsTest`
+- `6` testes passando
+- `cd apps/api && php artisan test --filter=WallLiveSnapshotTest`
+- `6` testes passando
+- `cd apps/api && php artisan test --filter=WallDiagnosticsTest`
+- `6` testes passando
+- `cd apps/api && php artisan test --filter=Wall`
+- `80` testes passando
+
+Frontend:
+
+- `cd apps/web && npm run test -- src/modules/wall/hooks/useWallTopInsights.test.tsx src/modules/wall/components/manager/top/WallTotalMediaCard.test.tsx src/modules/wall/hooks/useWallRealtimeSync.test.tsx`
+- `8` testes passando
+- `cd apps/web && npm run test -- src/modules/wall`
+- `204` testes passando
+- `cd apps/web && npm run type-check`
+- sem erros
 
 ### Criterio de pronto
 
 - `totals.displayed` deixa de ser `null`
-- a contagem nao duplica em reprocessamento ou reconexao
+- a contagem nao duplica em reconexao ou repeticao do mesmo display
 - o card superior passa a usar numero autoritativo
 
 ## Etapa 4. Semantica final de origem e video
@@ -1846,49 +1954,91 @@ Frontend:
 
 Fechar a leitura operacional de origem e preparar o cockpit para a proxima fase de video.
 
-### Backend
+### Implementado nesta etapa
 
-- decidir se origem final vai por:
-  - `source`
-  - `sourceLabel`
-  - `sourceIconKey`
-- enriquecer `liveSnapshot` e `sequence_preview` com:
+Backend:
+
+- `liveSnapshot.currentItem` e `liveSnapshot.nextItem` agora carregam:
   - `isVideo`
   - `durationSeconds`
-  - `videoPolicyLabel`, quando aplicavel
+  - `videoPolicyLabel`
+- `sequence_preview` agora carrega:
+  - `is_video`
+  - `duration_seconds`
+  - `video_policy_label`
+- a normalizacao de origem continua unica no backend via `WallSourceNormalizer`
+- `wall/insights` recente tambem passou a expor:
+  - `isVideo`
+  - `durationSeconds`
+  - `videoPolicyLabel`
 
-### Frontend
+Frontend:
 
-- consolidar mapper unico de origem
-- exibir badge final de origem no palco, timeline e detalhe
-- destacar video com selo discreto e duracao quando existir
-- preparar copy operacional para:
-  - video curto
-  - video com politica especial
-  - exibicao com duracao diferenciada
+- `wall-source-meta.ts` virou o mapper unico de semantica visual:
+  - origem
+  - tipo de midia
+  - label de duracao
+  - copy operacional de video
+- o palco passou a mostrar badge final de video e leitura operacional em `Agora` e `Proxima`
+- a timeline horizontal passou a destacar video com selo e copy curta
+- o detalhe lateral da midia recente agora mostra:
+  - origem
+  - tipo de midia
+  - copy operacional de playback no telao
 
 ### Arquivos provaveis
 
+- `apps/api/app/Modules/Wall/Support/WallVideoPolicyLabelResolver.php`
 - `apps/web/src/modules/wall/wall-source-meta.ts`
 - `apps/web/src/modules/wall/components/manager/stage/WallHeroStage.tsx`
 - `apps/web/src/modules/wall/components/manager/stage/WallUpcomingTimeline.tsx`
 - `apps/web/src/modules/wall/components/manager/recent/WallRecentMediaDetailsSheet.tsx`
 - `apps/web/src/lib/api-types.ts`
+- `packages/shared-types/src/wall.ts`
+- `apps/api/app/Modules/Wall/Services/WallInsightsService.php`
 - `apps/api/app/Modules/Wall/Services/WallSimulationService.php`
 - `apps/api/app/Modules/Wall/Services/WallLiveSnapshotService.php`
 
-### TDD obrigatorio
+### TDD executado
 
 Backend:
 
-- criar teste garantindo `isVideo` e `durationSeconds` no snapshot e na simulacao quando a midia for video
-- criar teste garantindo normalizacao consistente da origem
+- `WallLiveSnapshotTest`
+  - garante normalizacao de origem no item atual;
+  - garante `isVideo`, `durationSeconds` e `videoPolicyLabel` no snapshot;
+  - garante `nextItem` com semantica de video quando a previsao for confiavel.
+- `WallDiagnosticsTest`
+  - garante `source_type` normalizado na simulacao;
+  - garante `is_video`, `duration_seconds` e `video_policy_label` no `sequence_preview`.
 
 Frontend:
 
-- criar teste da timeline com badge final de origem
-- criar teste do palco com selo de video e duracao
-- criar teste do detalhe lateral com copy operacional de video
+- `WallUpcomingTimeline.test.tsx`
+  - garante badge final de origem e selo de video na timeline;
+- `WallHeroStage.test.tsx`
+  - garante selo de video e duracao no palco atual e no proximo;
+- `WallRecentMediaDetailsSheet.test.tsx`
+  - garante copy operacional de video no detalhe lateral.
+
+### Validacao executada
+
+Backend:
+
+- `cd apps/api && php artisan test --filter=WallLiveSnapshotTest`
+- `7` testes passando
+- `cd apps/api && php artisan test --filter=WallDiagnosticsTest`
+- `6` testes passando
+- `cd apps/api && php artisan test --filter=Wall`
+- `82` testes passando
+
+Frontend:
+
+- `cd apps/web && npm run test -- src/modules/wall/components/manager/stage/WallHeroStage.test.tsx src/modules/wall/components/manager/stage/WallUpcomingTimeline.test.tsx src/modules/wall/components/manager/recent/WallRecentMediaDetailsSheet.test.tsx`
+- `4` testes passando
+- `cd apps/web && npm run test -- src/modules/wall`
+- `206` testes passando
+- `cd apps/web && npm run type-check`
+- sem erros
 
 ### Criterio de pronto
 
@@ -1902,13 +2052,13 @@ Frontend:
 
 Fechar a rodada sem regressao e com semantica consistente entre palco, timeline, topo e diagnostico.
 
-### Tarefas
+### Implementado nesta etapa
 
-- revisar copy operacional final
-- revisar estados vazios
-- revisar loading sem flicker
-- revisar mobile para detalhe e palco
-- revisar contraste e prioridade visual entre `Agora`, `Proxima` e timeline
+- o palco agora mantem contexto operacional quando o player ainda nao confirmou `currentItem` ou `nextItem`
+- `Agora` e `Proxima` ganharam hierarquia visual propria, reduzindo leitura plana no bloco lateral
+- a timeline horizontal agora usa estado de loading estavel com placeholders, evitando salto visual enquanto a previsao recalcula
+- os cards da timeline ficaram menores no mobile para manter scroll horizontal mais previsivel
+- a copy de estados vazios e loading foi revisada para linguagem mais operacional
 
 ### Suite final obrigatoria
 
@@ -1937,6 +2087,40 @@ npm run test -- src/modules/wall
 npm run type-check
 ```
 
+### TDD executado
+
+Frontend:
+
+- `WallHeroStage.test.tsx`
+  - garante contexto operacional quando o player ainda nao confirmou item atual e proximo;
+- `WallUpcomingTimeline.test.tsx`
+  - garante loading estavel com placeholders durante a recalculacao da previsao;
+- `EventWallManagerPage.test.tsx`
+  - continua validando integracao do palco com `Agora`, `Proxima`, toolbar, inspector e detalhe do player.
+
+### Validacao executada
+
+Backend:
+
+- `cd apps/api && php artisan test --filter=WallLiveSnapshotTest`
+- `7` testes passando
+- `cd apps/api && php artisan test --filter=WallInsightsTest`
+- `6` testes passando
+- `cd apps/api && php artisan test --filter=WallDiagnosticsTest`
+- `7` testes passando
+- `cd apps/api && php artisan test --filter=Wall`
+- `92` testes passando
+- `1` `todo` ja existente fora deste escopo em `PagarmeClientTest`
+
+Frontend:
+
+- `cd apps/web && npm run test -- src/modules/wall/hooks/useWallLiveSnapshot.test.tsx src/modules/wall/hooks/useWallRealtimeSync.test.tsx src/modules/wall/components/manager/stage/WallAdvanceClock.test.tsx src/modules/wall/components/manager/stage/WallHeroStage.test.tsx src/modules/wall/components/manager/stage/WallUpcomingTimeline.test.tsx src/modules/wall/components/manager/top/WallTotalMediaCard.test.tsx src/modules/wall/pages/EventWallManagerPage.test.tsx`
+- `26` testes passando
+- `cd apps/web && npm run test -- src/modules/wall`
+- `208` testes passando
+- `cd apps/web && npm run type-check`
+- sem erros
+
 ### Criterio de aceite do bloco novo
 
 - `advancedAt` vem de fonte mais autoritativa que o heartbeat puro
@@ -1950,37 +2134,37 @@ npm run type-check
 
 ### Backend
 
-- [ ] fonte autoritativa para `advancedAt`
-- [ ] fallback por `heartbeat` mantido
-- [ ] `liveSnapshot.nextItem` ou `upcomingItem`
-- [ ] `totals.displayed` autoritativo
-- [ ] idempotencia da contagem de exibidas
-- [ ] `isVideo` no snapshot e na simulacao
-- [ ] `durationSeconds` no snapshot e na simulacao
-- [ ] normalizacao final de origem
+  - [x] fonte autoritativa para `advancedAt`
+  - [x] fallback por `heartbeat` mantido
+  - [x] `liveSnapshot.nextItem` ou `upcomingItem`
+  - [x] `totals.displayed` autoritativo
+  - [x] idempotencia da contagem de exibidas
+  - [x] `isVideo` no snapshot e na simulacao
+  - [x] `durationSeconds` no snapshot e na simulacao
+  - [x] normalizacao final de origem
 
 ### Frontend
 
-- [ ] `WallAdvanceClock` com origem temporal autoritativa
-- [ ] palco com bloco `Agora`
-- [ ] palco com bloco `Proxima`
-- [ ] `WallTotalMediaCard` com exibidas reais
-- [ ] mapper unico de origem
-- [ ] badge final de video e duracao
-- [ ] detalhe lateral com copy operacional para video
-- [ ] responsividade validada do palco com `Agora` e `Proxima`
+  - [x] `WallAdvanceClock` com origem temporal autoritativa
+  - [x] palco com bloco `Agora`
+  - [x] palco com bloco `Proxima`
+  - [x] `WallTotalMediaCard` com exibidas reais
+  - [x] mapper unico de origem
+  - [x] badge final de video e duracao
+  - [x] detalhe lateral com copy operacional para video
+  - [x] responsividade validada do palco com `Agora` e `Proxima`
 
 ### Testes
 
-- [ ] testes de feature do snapshot autoritativo
-- [ ] testes de feature da contagem de exibidas
-- [ ] testes de unit ou feature da normalizacao de origem
-- [ ] testes do palco com `nextItem`
-- [ ] testes do relogio com correcao de `advancedAt`
-- [ ] testes da timeline com origem e video
-- [ ] regressao `Wall` no backend
-- [ ] regressao `Wall` no frontend
-- [ ] `type-check` verde
+  - [x] testes de feature do snapshot autoritativo
+  - [x] testes de feature da contagem de exibidas
+  - [x] testes de unit ou feature da normalizacao de origem
+  - [x] testes do palco com `nextItem`
+  - [x] testes do relogio com correcao de `advancedAt`
+  - [x] testes da timeline com origem e video
+  - [x] regressao `Wall` no backend
+  - [x] regressao `Wall` no frontend
+  - [x] `type-check` verde
 
 ## Fontes oficiais complementares para esta rodada
 

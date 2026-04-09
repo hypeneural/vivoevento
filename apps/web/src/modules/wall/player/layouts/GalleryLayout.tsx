@@ -11,10 +11,16 @@
  * Inspired by MomentLoop's Gallery template.
  */
 
-import MediaSurface from '../components/MediaSurface';
+import MediaSurface, { type MediaSurfaceVideoControlProps } from '../components/MediaSurface';
 import type { WallRuntimeItem } from '../types';
 
-export function GalleryLayout({ media }: { media: WallRuntimeItem }) {
+export function GalleryLayout({
+  media,
+  videoControl,
+}: {
+  media: WallRuntimeItem;
+  videoControl?: MediaSurfaceVideoControlProps | null;
+}) {
   return (
     <div
       className="relative flex min-h-screen items-center justify-center"
@@ -48,7 +54,7 @@ export function GalleryLayout({ media }: { media: WallRuntimeItem }) {
             height: 'clamp(200px, 55vh, 800px)',
           }}
         >
-          <MediaSurface media={media} fit="contain" />
+          <MediaSurface media={media} fit="contain" videoControl={videoControl} />
         </div>
 
         {/* Museum label — bottom of mat */}

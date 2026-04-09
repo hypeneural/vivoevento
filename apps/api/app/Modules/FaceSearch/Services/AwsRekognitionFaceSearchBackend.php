@@ -265,24 +265,36 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
             'max_bytes' => 5_242_880,
         ]);
         $collectionId = $this->resolveCollectionId($event, $settings);
+        $requestedMode = $settings->aws_search_mode === 'users' ? 'users' : 'faces';
+        $canUseUsers = $requestedMode === 'users' && $this->hasReadyUserVectors($event, $collectionId);
 
         try {
-            $response = $this->toArray($this->callAws(
-                operation: 'query',
-                callback: function () use ($collectionId, $prepared, $settings, $topK) {
-                    $client = $this->rekognitionClient($settings, 'query');
+            if ($canUseUsers) {
+                $response = $this->searchUsersByImage($collectionId, $prepared['binary'], $settings, $topK);
+                $matches = $this->resolveUserMatches($event, $collectionId, $response);
 
-                    return $client->searchFacesByImage([
-                        'CollectionId' => $collectionId,
-                        'Image' => [
-                            'Bytes' => $prepared['binary'],
+                if ($matches !== []) {
+                    return [
+                        'matches' => $matches,
+                        'provider_payload_json' => [
+                            ...$response,
+                            'search_mode_requested' => $requestedMode,
+                            'search_mode_resolved' => 'users',
                         ],
-                        'FaceMatchThreshold' => (float) $settings->aws_search_face_match_threshold,
-                        'MaxFaces' => max(1, min(4096, $topK)),
-                        'QualityFilter' => $settings->aws_search_faces_quality_filter,
-                    ]);
-                },
-            ));
+                    ];
+                }
+
+                return [
+                    'matches' => [],
+                    'provider_payload_json' => [
+                        ...$response,
+                        'search_mode_requested' => $requestedMode,
+                        'search_mode_resolved' => 'users',
+                    ],
+                ];
+            }
+
+            $response = $this->searchFacesByImage($collectionId, $prepared['binary'], $settings, $topK);
         } catch (AwsException $exception) {
             if ($this->isNoFaceFound($exception)) {
                 throw ValidationException::withMessages([
@@ -293,6 +305,207 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
             throw $exception;
         }
 
+        $matches = $this->resolveFaceMatches($event, $collectionId, $response);
+
+        return [
+            'matches' => $matches,
+            'provider_payload_json' => [
+                ...$response,
+                'search_mode_requested' => $requestedMode,
+                'search_mode_resolved' => 'faces',
+                'search_mode_fallback_reason' => $requestedMode === 'users' && ! $canUseUsers
+                    ? 'user_vector_not_ready'
+                    : null,
+            ],
+        ];
+    }
+
+    /**
+     * @param array<int, string> $faceIds
+     * @return array<string, mixed>
+     */
+    public function syncUserVector(
+        Event $event,
+        EventFaceSearchSetting $settings,
+        string $userId,
+        array $faceIds,
+    ): array {
+        $collectionId = $this->resolveCollectionId($event, $settings);
+        $requestedFaceIds = collect($faceIds)
+            ->filter(fn (mixed $faceId): bool => is_string($faceId) && trim($faceId) !== '')
+            ->map(fn (string $faceId): string => trim($faceId))
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($requestedFaceIds === []) {
+            return [
+                'user_id' => $userId,
+                'requested_face_count' => 0,
+                'associated_face_count' => 0,
+                'unsuccessful_face_count' => 0,
+                'user_status' => 'CREATED',
+            ];
+        }
+
+        $client = $this->rekognitionClient($settings, 'index');
+
+        try {
+            $this->callAws(
+                operation: 'index',
+                callback: fn () => $client->createUser([
+                    'CollectionId' => $collectionId,
+                    'UserId' => $userId,
+                    'ClientRequestToken' => $this->idempotencyToken('create-user', $collectionId, $userId),
+                ]),
+            );
+        } catch (AwsException $exception) {
+            if (($exception->getAwsErrorCode() ?? null) !== 'ConflictException') {
+                throw $exception;
+            }
+        }
+
+        $associatedFaceIds = [];
+        $unsuccessfulByFaceId = [];
+        $userStatus = 'CREATED';
+
+        foreach (array_chunk($requestedFaceIds, 100) as $chunkIndex => $chunkFaceIds) {
+            $response = $this->toArray($this->callAws(
+                operation: 'index',
+                callback: fn () => $client->associateFaces([
+                    'CollectionId' => $collectionId,
+                    'UserId' => $userId,
+                    'FaceIds' => $chunkFaceIds,
+                    'UserMatchThreshold' => (float) $settings->aws_associate_user_match_threshold,
+                    'ClientRequestToken' => $this->idempotencyToken(
+                        'associate-faces',
+                        $collectionId,
+                        $userId,
+                        (string) $chunkIndex,
+                        implode(',', $chunkFaceIds),
+                    ),
+                ]),
+            ));
+
+            $userStatus = is_string($response['UserStatus'] ?? null) ? $response['UserStatus'] : $userStatus;
+
+            foreach ((array) ($response['AssociatedFaces'] ?? []) as $associatedFace) {
+                $associatedFaceId = data_get($associatedFace, 'FaceId');
+
+                if (is_string($associatedFaceId) && $associatedFaceId !== '') {
+                    $associatedFaceIds[] = $associatedFaceId;
+                }
+            }
+
+            foreach ((array) ($response['UnsuccessfulFaceAssociations'] ?? []) as $unsuccessful) {
+                $faceId = data_get($unsuccessful, 'FaceId');
+
+                if (is_string($faceId) && $faceId !== '') {
+                    $unsuccessfulByFaceId[$faceId] = (array) $unsuccessful;
+                }
+            }
+        }
+
+        $records = FaceSearchProviderRecord::query()
+            ->where('event_id', $event->id)
+            ->where('backend_key', $this->key())
+            ->where('collection_id', $collectionId)
+            ->whereIn('face_id', $requestedFaceIds)
+            ->get();
+
+        $syncedAt = now()->toIso8601String();
+
+        foreach ($records as $record) {
+            $failure = $unsuccessfulByFaceId[$record->face_id] ?? null;
+            $payload = is_array($record->provider_payload_json) ? $record->provider_payload_json : [];
+            $awsUserVector = [
+                'status' => $failure === null ? 'synced' : 'failed',
+                'user_id' => $userId,
+                'synced_at' => $syncedAt,
+                'user_status' => $userStatus,
+                'requested_face_count' => count($requestedFaceIds),
+                'associated_face_count' => count(array_unique($associatedFaceIds)),
+                'unsuccessful_face_count' => count($unsuccessfulByFaceId),
+                'association' => [
+                    'result' => $failure === null ? 'associated' : 'failed',
+                    'confidence' => $failure['Confidence'] ?? null,
+                    'reasons' => array_values((array) ($failure['Reasons'] ?? [])),
+                    'reported_user_id' => $failure['UserId'] ?? $userId,
+                ],
+            ];
+
+            $record->forceFill([
+                'user_id' => $failure === null ? $userId : $record->user_id,
+                'provider_payload_json' => [
+                    ...$payload,
+                    'aws_user_vector' => $awsUserVector,
+                ],
+            ])->save();
+        }
+
+        return [
+            'user_id' => $userId,
+            'requested_face_count' => count($requestedFaceIds),
+            'associated_face_count' => count(array_unique($associatedFaceIds)),
+            'unsuccessful_face_count' => count($unsuccessfulByFaceId),
+            'user_status' => $userStatus,
+        ];
+    }
+
+    private function searchFacesByImage(
+        string $collectionId,
+        string $binary,
+        EventFaceSearchSetting $settings,
+        int $topK,
+    ): array {
+        return $this->toArray($this->callAws(
+            operation: 'query',
+            callback: function () use ($collectionId, $binary, $settings, $topK) {
+                $client = $this->rekognitionClient($settings, 'query');
+
+                return $client->searchFacesByImage([
+                    'CollectionId' => $collectionId,
+                    'Image' => [
+                        'Bytes' => $binary,
+                    ],
+                    'FaceMatchThreshold' => (float) $settings->aws_search_face_match_threshold,
+                    'MaxFaces' => max(1, min(4096, $topK)),
+                    'QualityFilter' => $settings->aws_search_faces_quality_filter,
+                ]);
+            },
+        ));
+    }
+
+    private function searchUsersByImage(
+        string $collectionId,
+        string $binary,
+        EventFaceSearchSetting $settings,
+        int $topK,
+    ): array {
+        return $this->toArray($this->callAws(
+            operation: 'query',
+            callback: function () use ($collectionId, $binary, $settings, $topK) {
+                $client = $this->rekognitionClient($settings, 'query');
+
+                return $client->searchUsersByImage([
+                    'CollectionId' => $collectionId,
+                    'Image' => [
+                        'Bytes' => $binary,
+                    ],
+                    'UserMatchThreshold' => (float) $settings->aws_search_user_match_threshold,
+                    'MaxUsers' => max(1, min(500, $topK)),
+                    'QualityFilter' => $settings->aws_search_users_quality_filter,
+                ]);
+            },
+        ));
+    }
+
+    /**
+     * @param array<string, mixed> $response
+     * @return array<int, FaceSearchMatchData>
+     */
+    private function resolveFaceMatches(Event $event, string $collectionId, array $response): array
+    {
         $faceIds = collect((array) ($response['FaceMatches'] ?? []))
             ->map(fn (mixed $match): ?string => data_get($match, 'Face.FaceId'))
             ->filter(fn (?string $faceId): bool => is_string($faceId) && $faceId !== '')
@@ -333,10 +546,97 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
             ->values()
             ->all();
 
-        return [
-            'matches' => $matches,
-            'provider_payload_json' => $response,
-        ];
+        return $matches;
+    }
+
+    /**
+     * @param array<string, mixed> $response
+     * @return array<int, FaceSearchMatchData>
+     */
+    private function resolveUserMatches(Event $event, string $collectionId, array $response): array
+    {
+        $userIds = collect((array) ($response['UserMatches'] ?? []))
+            ->map(fn (mixed $match): ?string => data_get($match, 'User.UserId'))
+            ->filter(fn (?string $userId): bool => is_string($userId) && $userId !== '')
+            ->values()
+            ->all();
+
+        $recordsByUserId = FaceSearchProviderRecord::query()
+            ->where('event_id', $event->id)
+            ->where('backend_key', $this->key())
+            ->where('collection_id', $collectionId)
+            ->where('searchable', true)
+            ->whereIn('user_id', $userIds)
+            ->get()
+            ->groupBy('user_id');
+
+        return collect((array) ($response['UserMatches'] ?? []))
+            ->map(function (mixed $match) use ($recordsByUserId): ?FaceSearchMatchData {
+                $userId = data_get($match, 'User.UserId');
+
+                if (! is_string($userId) || $userId === '' || ! $recordsByUserId->has($userId)) {
+                    return null;
+                }
+
+                /** @var FaceSearchProviderRecord|null $record */
+                $record = $recordsByUserId->get($userId)
+                    ?->sort(function (FaceSearchProviderRecord $left, FaceSearchProviderRecord $right): int {
+                        $leftQuality = is_array($left->quality_json) ? $left->quality_json : [];
+                        $rightQuality = is_array($right->quality_json) ? $right->quality_json : [];
+                        $tier = \App\Modules\FaceSearch\Enums\FaceQualityTier::rankFor($rightQuality['quality_tier'] ?? null)
+                            <=> \App\Modules\FaceSearch\Enums\FaceQualityTier::rankFor($leftQuality['quality_tier'] ?? null);
+
+                        if ($tier !== 0) {
+                            return $tier;
+                        }
+
+                        $quality = ((float) ($rightQuality['composed_quality_score'] ?? 0.0))
+                            <=> ((float) ($leftQuality['composed_quality_score'] ?? 0.0));
+
+                        if ($quality !== 0) {
+                            return $quality;
+                        }
+
+                        return ((int) $left->id) <=> ((int) $right->id);
+                    })
+                    ->first();
+
+                if (! $record instanceof FaceSearchProviderRecord) {
+                    return null;
+                }
+
+                $quality = is_array($record->quality_json) ? $record->quality_json : [];
+
+                return new FaceSearchMatchData(
+                    faceId: (int) $record->id,
+                    eventMediaId: (int) $record->event_media_id,
+                    distance: round(1 - (((float) data_get($match, 'Similarity', 0.0)) / 100), 6),
+                    qualityScore: isset($quality['composed_quality_score']) ? (float) $quality['composed_quality_score'] : null,
+                    faceAreaRatio: isset($quality['face_area_ratio']) ? (float) $quality['face_area_ratio'] : null,
+                    qualityTier: is_string($quality['quality_tier'] ?? null) ? $quality['quality_tier'] : null,
+                );
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function hasReadyUserVectors(Event $event, string $collectionId): bool
+    {
+        return FaceSearchProviderRecord::query()
+            ->where('event_id', $event->id)
+            ->where('backend_key', $this->key())
+            ->where('collection_id', $collectionId)
+            ->where('searchable', true)
+            ->whereNotNull('user_id')
+            ->exists();
+    }
+
+    private function idempotencyToken(string $prefix, string ...$parts): string
+    {
+        $hash = hash('sha256', implode('|', $parts));
+
+        return substr($prefix . '-' . $hash, 0, 64);
     }
 
     public function healthCheck(Event $event, EventFaceSearchSetting $settings): array
@@ -632,9 +932,12 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
         return [
             'sts:GetCallerIdentity',
             'rekognition:CreateCollection',
+            'rekognition:CreateUser',
             'rekognition:DescribeCollection',
             'rekognition:IndexFaces',
+            'rekognition:AssociateFaces',
             'rekognition:SearchFacesByImage',
+            'rekognition:SearchUsersByImage',
             'rekognition:ListFaces',
             'rekognition:DeleteFaces',
             'rekognition:DeleteCollection',

@@ -1,9 +1,15 @@
-import MediaSurface from '../components/MediaSurface';
+import MediaSurface, { type MediaSurfaceVideoControlProps } from '../components/MediaSurface';
 import type { WallRuntimeItem } from '../types';
 import { WALL_BADGE } from '../design/tokens';
 import { resolvePrimaryMediaFit } from '../engine/layoutStrategy';
 
-export function PolaroidLayout({ media }: { media: WallRuntimeItem }) {
+export function PolaroidLayout({
+  media,
+  videoControl,
+}: {
+  media: WallRuntimeItem;
+  videoControl?: MediaSurfaceVideoControlProps | null;
+}) {
   return (
     <div className="flex min-h-screen items-center justify-center px-[max(16px,2vw)] py-[max(16px,2vh)]">
       <div className="relative w-full max-w-[min(72vw,1080px)] rotate-[-1deg] rounded-[18px] bg-[#faf7f2] p-5 text-neutral-950 shadow-[0_35px_120px_rgba(0,0,0,0.45)] md:p-7">
@@ -12,7 +18,12 @@ export function PolaroidLayout({ media }: { media: WallRuntimeItem }) {
         ) : null}
 
         <div className="overflow-hidden rounded-[14px] bg-neutral-200 shadow-inner">
-          <MediaSurface media={media} fit={resolvePrimaryMediaFit('polaroid', media)} className="aspect-[4/3] bg-[#f2ede6]" />
+          <MediaSurface
+            media={media}
+            fit={resolvePrimaryMediaFit('polaroid', media)}
+            className="aspect-[4/3] bg-[#f2ede6]"
+            videoControl={videoControl}
+          />
         </div>
 
         <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">

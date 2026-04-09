@@ -25,19 +25,37 @@ Plano de execucao derivado desta analise:
 
 ## Resumo executivo
 
-Hoje o wall suporta `image` e `video` como itens normais da fila, mas o suporte a video ainda e "video como slide", nao "video como playback de primeira classe".
+Hoje o wall suporta `image` e `video` como itens normais da fila e a trilha de video ja deixou de ser "slide puro por timer". A Fase 2 do player agora colocou video comum dentro do runtime principal do wall.
 
 Na pratica:
 
-- video comum do slideshow toca com `autoplay`, `muted`, `playsInline` e `loop`;
-- o wall avanca por `interval_ms`, nao por `onEnded` do video;
-- video curto repete em loop ate a troca do slide;
-- video longo e interrompido quando o slide troca;
-- anuncios em video ja tem regra diferente e melhor: terminam por `onEnded`;
-- o player tem mecanismos de preload, metadata probe, cache local e fallback de sincronizacao;
-- isso melhora robustez, mas ainda nao resolve por completo travamento de videos pesados ou longos.
+- video comum agora sobe em `WallVideoSurface` controlado, com `autoPlay`, `muted`, `playsInline`, sem `loop` e com `poster` quando disponivel;
+- imagem continua avancando por `interval_ms`;
+- video comum agora sai por causa:
+  - `ended`
+  - `cap_reached`
+  - `play_rejected`
+  - `stalled_timeout`
+  - `startup_timeout` / `poster_then_skip`
+- a primeira execucao de video agora segue a trilha `poster-first`, `playback-gated`, `timeout-bounded` e `never-blocking`;
+- o wall agora chama `pause()` de verdade quando entra em `paused` e retoma pela semantica baseline `resume_if_same_item_else_restart`;
+- o reducer agora persiste estado `videoPlayback` com fase, `currentTime`, `durationSeconds`, `readyState`, `exitReason`, `failureReason` e `stallCount`;
+- `layoutStrategy` agora impede que o video corrente fique em layout multi-slot, derrubando para layout single-item;
+- anuncios em video continuam numa trilha propria e separada, com `loop = false` e saida por `onEnded`;
+- o backend persiste `duration_seconds`, `width`, `height` e metadata complementar de video quando o canal fornece hints canonicos ou quando `ffprobe` esta disponivel;
+- o boot do wall expoe `video_admission`, `served_variant_key` e `preview_variant_key`;
+- o payload de settings do wall agora expoe `video_enabled`, playback mode, cap, resume mode, audio policy, multi-layout policy e variante preferida;
+- o gate unico do wall usa a admissao explicita de video para bloquear video sem metadata minima, sem variante/poster exigidos ou acima da duracao permitida;
+- o pipeline agora gera `wall_video_720p`, `wall_video_1080p` opcional e `wall_video_poster` para os fluxos que executam `GenerateMediaVariantsJob` em ambiente com `ffmpeg`.
+- o manager agora mostra resumo da policy de video, readiness de `ffmpeg` / `ffprobe` e diagnostico operacional do playback atual;
+- o heartbeat agora leva fase de video, progresso, `readyState`, stall count, startup degraded, motivo de saida e motivo de falha.
 
-O principal gap do produto hoje e que o wall ainda nao tem politica especifica para video de `EventMedia`.
+Os gaps principais agora mudaram:
+
+- ainda falta provisionar `ffmpeg` / `ffprobe` de verdade fora do repositorio;
+- ainda faltam razoes de inelegibilidade do backend no manager e em superficies por item;
+- ainda falta reduzir a assimetria do intake privado e dos legados sem variantes;
+- ainda falta fechar a politica final de produto para duracao, rollout oficial e manager.
 
 ## Validacao externa da plataforma web
 
@@ -48,7 +66,7 @@ Conclusoes confirmadas:
 - `preload` em video e apenas uma dica para o navegador, nao uma garantia de buffer completo;
 - com `loop = true`, o navegador nao dispara `ended` no playback normal, entao um video comum em loop nunca entrega um "fim natural" ao player;
 - `muted` e `playsInline` fazem sentido na estrategia atual do wall, porque autoplay inline depende desse tipo de configuracao em varios navegadores;
-- `play()` retorna `Promise`, entao uma futura trilha playback-aware precisa tratar sucesso e falha de inicio do video;
+- `play()` retorna `Promise`, entao a trilha playback-aware atual precisa tratar sucesso e falha de inicio do video;
 - `pause()` e o mecanismo correto para congelar o video atual quando o wall entra em pausa;
 - `readyState` diferencia bem `metadata ready` de `future data` e `enough data`, entao ele e mais util do que apenas `loadedmetadata` para decidir readiness real;
 - `MediaCapabilities.decodingInfo()` faz sentido como guard rail futuro para decidir perfis/variantes de video com mais seguranca;
@@ -79,7 +97,10 @@ Implicacao:
 
 - no momento da inspecao o wall estava pausado;
 - por isso o boot nao trouxe fila de midias;
-- se esse mesmo wall voltar para `live` mantendo `interval_ms = 10000`, um video comum sera tratado como slide de `10s`.
+- se esse mesmo wall voltar para `live`, um video comum agora nao segue mais o `interval_ms` puro:
+  - imagem continua em `10000ms`;
+  - video entra na trilha controlada do player;
+  - no baseline atual do frontend, video longo tende a sair por cap em cerca de `15s`, nao mais em `10s`.
 
 ## Stack atual do wall
 
@@ -164,6 +185,7 @@ Para video inbound privado:
 - `video/*` vira `media_type = video`;
 - o arquivo original normalmente fica em `.mp4`;
 - o pipeline exclusivo de imagem nao e usado.
+- `DownloadInboundMediaJob` agora tenta persistir metadata real de video via `VideoMetadataExtractorService`, combinando hints canonicos do payload com `ffprobe` quando disponivel.
 
 ### 2. Upload publico
 
@@ -177,14 +199,26 @@ Estado atual do aceite:
 Observacao importante:
 
 - o backend aceita video unitario;
-- mas a UX publica ainda comunica "foto/imagem";
-- o payload ainda expoe `accept_hint = image/*`;
-- a pagina publica hoje usa `accept="image/*"`.
+- o payload agora expoe:
+  - `accept_hint = image/*,video/mp4,video/quicktime` quando a policy global permite video;
+  - `accepts_video = true`;
+  - `video_single_only = true`;
+  - `video_max_duration_seconds`;
+- a pagina publica agora respeita isso:
+  - galeria aceita fotos ou `1` video curto;
+  - camera continua foto-only;
+  - envio de video usa `file`;
+  - envio multiplo continua `files[]` apenas para imagens;
+- `storePublicUpload()` agora tambem usa `VideoMetadataExtractorService`, entao videos novos podem nascer com `duration_seconds`, `width`, `height`, codecs e `container` quando o ambiente consegue extrair isso.
+- o backend agora rejeita upload publico de video quando:
+  - a policy global de video esta desligada;
+  - nao foi possivel validar duracao e dimensoes;
+  - a duracao excede o limite global configurado.
 
 Ou seja:
 
-- existe suporte tecnico parcial para video no upload publico;
-- a experiencia de produto ainda nao esta alinhada com isso.
+- agora existe uma policy publica coerente para video curto;
+- ainda faltam flags por evento/wall e eventualmente uma decisao final de produto sobre rollout oficial.
 
 ### 3. Moderacao e publicacao
 
@@ -209,14 +243,103 @@ Hoje existem duas trilhas diferentes para video:
 
 - aceita upload unitario de video;
 - ainda despacha `GenerateMediaVariantsJob`;
-- o gerador de variantes retorna cedo para midia que nao e imagem, entao o job vira um no-op funcional.
+- o job agora gera variantes reais de wall quando o ambiente tem `ffmpeg`:
+  - `wall_video_720p`
+  - `wall_video_1080p` opcional
+  - `wall_video_poster`
 
 Implicacao:
 
-- o upload publico de video funciona;
-- mas o pipeline atual ainda carrega um passo desnecessario para esse tipo de midia.
+- o upload publico de video deixou de ter um `no-op` conceitual na etapa de variantes;
+- a trilha publica ja consegue preparar video para wall sem depender apenas do original;
+- a assimetria agora ficou mais explicita: o intake privado ainda nao passa pelo mesmo job de variantes.
 
-Esse e um gap pequeno, mas importante para a clareza da stack.
+Esse continua sendo um gap importante para a clareza e para a simetria da stack.
+
+## Metadata e admissao de video no backend
+
+Esta parte mudou de forma relevante.
+
+### Extracao de metadata
+
+Agora existe um servico unico:
+
+- `VideoMetadataExtractorService`
+
+Ele opera em duas camadas:
+
+- primeiro tenta aproveitar hints canonicos ja presentes no payload inbound, como `media.width`, `media.height`, `media.duration`, `has_audio`, codecs e `container`;
+- se isso nao for suficiente e o arquivo estiver disponivel localmente, tenta enriquecer a metadata com `ffprobe`.
+
+Hoje isso alimenta pelo menos:
+
+- `duration_seconds`
+- `width`
+- `height`
+- `has_audio`
+- `video_codec`
+- `audio_codec`
+- `bitrate`
+- `container`
+
+Limite importante do estado atual:
+
+- se o canal nao fornecer hints e o ambiente nao tiver `ffprobe`, a midia continua podendo entrar sem metadata completa;
+- ou seja, a stack melhorou bastante para videos novos, mas ainda nao existe garantia absoluta de metadata rica em todos os ambientes.
+
+### Admissao explicita de `wall-eligible video`
+
+Agora existe uma classificacao explicita no backend:
+
+- `WallVideoAdmissionService`
+
+Ela avalia video por:
+
+- metadata minima
+- duracao
+- `container` e `video_codec`
+- existencia de variante preferida
+- existencia de `poster`
+
+E retorna:
+
+- `eligible`
+- `eligible_with_fallback`
+- `blocked`
+
+Com motivos legiveis, por exemplo:
+
+- `missing_metadata`
+- `duration_over_limit`
+- `unsupported_format`
+- `variant_missing`
+- `poster_missing`
+
+Hoje essa classificacao ja e exposta:
+
+- no payload do boot do wall
+- no detalhe de `EventMedia`
+- no contrato compartilhado de wall types
+
+Estado atualizado desta trilha:
+
+- `WallEligibilityService` agora consome essa admissao explicita como gate final para video em:
+  - boot;
+  - realtime;
+  - simulacao.
+- o rollout global atual considera:
+  - `WALL_VIDEO_ENABLED`;
+  - `WALL_VIDEO_MAX_DURATION_SECONDS`;
+  - exigencia de metadata minima;
+  - exigencia de variante de wall;
+  - exigencia de poster;
+  - permissao ou nao de fallback para o original.
+
+Limite importante que continua aberto:
+
+- a admissao do wall ja usa settings reais por evento/wall para `video_enabled`, cap e variante preferida;
+- o manager ja expoe essa policy e o estado do pipeline;
+- o que continua global de ambiente hoje e principalmente o rollout do upload publico e a disponibilidade real de `ffmpeg` / `ffprobe`.
 
 ## Como o wall carrega e sincroniza
 
@@ -265,6 +388,19 @@ O player envia:
 - informacoes de cache e storage persistente
 - `last_sync_at`
 - motivo de fallback/erro quando existir
+- quando a midia atual e video:
+  - `current_video_phase`
+  - `current_video_exit_reason`
+  - `current_video_failure_reason`
+  - `current_video_position_seconds`
+  - `current_video_duration_seconds`
+  - `current_video_ready_state`
+  - `current_video_stall_count`
+  - `current_video_poster_visible`
+  - `current_video_first_frame_ready`
+  - `current_video_playback_ready`
+  - `current_video_playing_confirmed`
+  - `current_video_startup_degraded`
 
 Isso alimenta o diagnostico do wall no backend.
 
@@ -503,68 +639,92 @@ Desde que:
 
 ### Renderizacao do video normal
 
-`MediaSurface` renderiza video comum do slideshow com:
+`MediaSurface` agora separa tres trilhas:
+
+- imagem
+- video `poster-only`
+- video controlado por `WallVideoSurface`
+
+Para video comum do wall, o runtime atual usa:
 
 - `autoPlay`
 - `muted`
 - `playsInline`
-- `loop`
+- `preload="auto"`
+- sem `loop`
+- com `poster` quando `preview_url` existe
+- com `play()` e `pause()` imperativos
 
-E nao usa:
+O `WallVideoSurface` agora alimenta o reducer com callbacks distintos:
 
-- `controls`
+- `onStarting`
+- `onFirstFrame`
+- `onPlaybackReady`
+- `onPlaying`
+- `onProgress`
+- `onWaiting`
+- `onStalled`
 - `onEnded`
-- `poster`
+- `onFailure`
 
 ### Consequencia
 
 Video de `EventMedia` hoje se comporta assim:
 
-- toca automaticamente
-- sempre mudo
-- repete em loop enquanto continuar montado
-- nao controla o tempo do slide
-- com `loop = true`, nao entrega `ended` como sinal natural de troca
+- toca automaticamente, mas de forma controlada;
+- sempre mudo;
+- nao usa mais `loop` no wall principal;
+- entra com `poster-first` quando existe poster;
+- so promove o video para live quando existe readiness minima;
+- sai por causa explicita, e nao so por timeout fixo de slideshow.
 
 ### Regra de duracao atual
 
-O tempo do slideshow e determinado por:
+Hoje existem duas lanes diferentes:
 
-- `useWallEngine`
-- `setTimeout(interval_ms)`
+- imagem:
+  - continua em `useWallEngine + setTimeout(interval_ms)`
+- video:
+  - sai por `ended`, `cap_reached`, `play_rejected`, `stalled_timeout`, `startup_timeout` ou `poster_then_skip`
 
-O player nao usa `duration_seconds` da `EventMedia` para decidir troca de slide.
+No baseline atual da Fase 2:
+
+- videos curtos podem tocar ate o fim;
+- videos longos respeitam o `video_playback_mode` e o `video_max_seconds` resolvidos no payload de settings do wall;
+- o que continua em aberto nao e mais o transporte dessa policy, e sim o rollout oficial de produto sobre esses settings.
 
 ### Exemplo concreto: video de 60 segundos
 
 Se o wall estiver com `interval_ms = 10000`:
 
 1. o video entra na tela;
-2. comeca a tocar automaticamente;
-3. fica mudo;
-4. apos cerca de `10s` o engine dispara `advance`;
-5. o elemento de video e desmontado;
-6. o restante do arquivo nao continua naquele ciclo.
+2. o player mostra `poster` imediato quando disponivel;
+3. o `WallVideoSurface` tenta subir o playback em paralelo;
+4. o video so e promovido quando houver readiness minima;
+5. se tudo correr bem, ele comeca a tocar mudo;
+6. no baseline atual, esse video tende a sair por `cap_reached` perto de `15s`, e nao mais por `10s` de `interval_ms`;
+7. se o startup falhar ou engasgar cedo demais, ele sai por fallback operacional e a fila segue.
 
 Do ponto de vista de playback:
 
-- sim, existe corte.
+- ainda pode existir corte para video longo, mas agora ele acontece por politica explicita de cap/fallback, nao por heranca acidental do slideshow.
 
 Do ponto de vista visual:
 
-- esse corte pode ser suavizado pela transicao do layout;
-- mas ainda assim continua sendo um corte de exibicao, nao um fim natural do video.
+- o poster-first evita tela preta na entrada;
+- a saida continua curta e previsivel;
+- a fila nao fica refem de um video frio ou pesado.
 
 ### E se o video for curto
 
 Exemplo: video de `5s` com `interval_ms = 10000`.
 
-Como o video comum usa `loop`:
+Como o video comum nao usa mais `loop`:
 
 - ele toca;
 - termina;
-- recomeca;
-- repete ate o slide trocar.
+- dispara `ended`;
+- o reducer decide a saida natural.
 
 ### Audio
 
@@ -586,12 +746,14 @@ Se o wall ja estiver pausado no boot:
 Se o player ja estiver rodando e recebe `paused` via realtime:
 
 - o slideshow para de agendar `advance`;
-- mas o componente de video atualmente nao recebe comando imperativo para `pause()`.
+- o `WallVideoSurface` recebe `playerStatus = paused`;
+- o componente chama `pause()` no elemento atual.
 
 Na pratica:
 
 - o slideshow congela;
-- mas um video ja montado pode continuar tocando e loopando.
+- o video corrente tambem congela de verdade;
+- quando o wall volta para `playing`, o runtime tenta retomar pela semantica baseline `resume_if_same_item_else_restart`.
 
 ### Video de anuncio e diferente
 
@@ -604,8 +766,8 @@ Anuncio em video hoje e tratado de forma melhor:
 
 Ou seja:
 
-- anuncio em video ja e playback-aware;
-- video comum de `EventMedia` ainda nao e.
+- anuncio em video continua playback-aware;
+- video comum de `EventMedia` agora tambem entrou na trilha playback-aware do player.
 
 ## Comportamento por template
 
@@ -674,10 +836,10 @@ Ou seja:
 
 Nos 3 layouts multi-slot:
 
-- podem existir varios videos ao mesmo tempo;
-- todos seguem mudos;
-- todos podem loopar em paralelo;
-- a troca e por slot, nao pelo fim do video.
+- isso continua valendo para imagens;
+- para video corrente do wall, o `layoutStrategy` agora cai para `fullscreen`, impedindo que o playback-aware fique preso na lane multi-slot;
+- isso funciona hoje como guard rail minimo da Fase 2;
+- a policy definitiva de multi-slot para video ainda precisa virar setting real e regra de produto.
 
 ## Como o cache e o preload de video funcionam hoje
 
@@ -830,46 +992,65 @@ Mas ainda tem limites:
 
 ## Gaps e problemas do estado atual
 
-### 1. Video comum nao e playback-aware
+### 1. A trilha playback-aware entrou e a policy ja existe no wall, mas o rollout oficial ainda nao esta fechado
 
-Esse e o maior gap.
+Estado atualizado:
+
+- o player agora ja tem `videoPlayback`, `WallVideoSurface`, poster-first, exit reasons e cap;
+- o scheduler de video ja consome `video_playback_mode`, `video_max_seconds` e `video_resume_mode` vindos de `state.settings`.
+
+O que ainda falta:
+
+- fechar o rollout de produto em cima desses settings ja existentes;
+- reduzir os pontos que ainda dependem de policy global de ambiente;
+- evoluir de resumo de policy para decisao operacional por item no manager.
+
+### 2. O diagnostico do wall ainda nao expoe razoes operacionais ricas de video
+
+Estado atualizado:
+
+- o reducer ja classifica `exitReason` e `failureReason`;
+- o player ja sabe diferenciar startup ruim, waiting/stalled e cap.
+
+O que ainda falta:
+
+- evoluir de runtime atual para uma visao por item e por inelegibilidade do backend;
+- expor inelegibilidade detalhada no backend;
+- fechar analytics e telemetria operacional de video.
+
+### 3. O guard rail de multi-slot entrou, mas a policy definitiva ainda nao foi fechada
+
+Estado atualizado:
+
+- video corrente agora nao entra mais em `carousel`, `mosaic` ou `grid`;
+- o player derruba para layout single-item.
+
+O que ainda falta:
+
+- decidir se isso continuara travado por default ou se havera override controlado;
+- decidir se havera excecao futura para `1` video simultaneo;
+- refletir isso no manager e na homologacao real.
+
+### 4. Upload publico de video agora esta coerente na policy global, mas ainda nao por evento/wall
+
+Estado atualizado:
+
+- payload, copy e validacao do upload publico agora falam a mesma lingua;
+- video publico segue o caminho unitario;
+- lote continua imagens-only.
+
+O que ainda falta:
+
+- expor a politica por evento/wall no manager;
+- decidir rollout oficial, e nao apenas global por ambiente.
+
+### 5. Variantes reais de video ainda dependem do caminho de pipeline e do ambiente
 
 Efeito:
 
-- videos longos sao cortados;
-- videos curtos loopam;
-- o wall nao sabe quando um video acabou de verdade.
-
-### 2. Pausa do wall nao pausa o video ja montado
-
-Efeito:
-
-- operador enxerga "wall pausado";
-- mas o video pode continuar tocando em loop.
-
-### 3. Layouts multi-slot podem tocar varios videos ao mesmo tempo
-
-Efeito:
-
-- maior consumo de CPU/GPU;
-- maior pressao de rede/buffer;
-- experiencia visual menos previsivel;
-- pior para eventos com muitos videos verticais/longos.
-
-### 4. Upload publico de video ainda esta incoerente na UX
-
-Efeito:
-
-- backend aceita video unitario;
-- pagina e payload ainda orientam imagem/foto.
-
-### 5. Upload publico de video ainda despacha `GenerateMediaVariantsJob`
-
-Efeito:
-
-- custo conceitual desnecessario no pipeline;
-- torna a stack mais confusa;
-- passa a ideia de que existe estrategia real de variante para video quando hoje nao existe.
+- o upload publico agora ja consegue gerar `wall_video_*` e `wall_video_poster`, mas isso ainda depende de `GenerateMediaVariantsJob` rodar com `ffmpeg` disponivel;
+- o intake privado continua fora dessa trilha, entao ainda existe assimetria entre canais;
+- videos legados ou ambientes sem `ffmpeg` continuam caindo em `eligible_with_fallback` e podem depender do original.
 
 ### 6. Simetria base entre boot, realtime e simulacao foi corrigida
 
@@ -890,10 +1071,76 @@ Validacao:
 
 O que ainda falta nesta trilha:
 
-- a elegibilidade especifica de video ainda nao esta completa;
-- `video_enabled`, politica de duracao, variante obrigatoria e `poster` ainda nao fazem parte do gate unico.
+- expor razoes de inelegibilidade operacional de forma mais rica para diagnostico e manager;
+- fechar superfícies operacionais por item em cima do gate atual.
 
-### 7. Nao existe estrategia de wall-specific video variants
+### 7. A admissao explicita de video agora ja governa o gate final, mas com rollout global
+
+Estado atualizado:
+
+- `WallVideoAdmissionService` ja classifica cada video como `eligible`, `eligible_with_fallback` ou `blocked`;
+- `WallPayloadFactory` ja expoe `duration_seconds`, metadata complementar e `video_admission` no boot;
+- `PublicWallBootTest` agora valida essa saida explicitamente;
+- `WallEligibilityService` agora usa essa admissao como gate efetivo para boot, realtime e simulacao;
+- videos `fallback-only` deixaram de entrar no wall quando a policy global esta estrita.
+
+O que ainda falta nesta trilha:
+
+- completar o rollout publico e legado que ainda depende de policy global de ambiente;
+- expor razoes de inelegibilidade para operacao e manager;
+- alinhar os futuros settings do wall com esse gate sem duplicar regra.
+
+## Variantes reais de video no pipeline
+
+Esta parte mudou de forma relevante na etapa `1.4`.
+
+### O que agora e gerado
+
+`MediaVariantGeneratorService` agora gera para video, quando o fluxo passa por `GenerateMediaVariantsJob` e o ambiente tem `ffmpeg`:
+
+- `wall_video_720p`
+- `wall_video_1080p` quando a origem justifica
+- `wall_video_poster`
+
+Baseline aplicado hoje:
+
+- container `MP4`
+- video `H.264 / AVC`
+- audio `AAC`
+- `+faststart`
+
+### Como o resolutor de URLs se comporta agora
+
+`MediaAssetUrlService` passou a distinguir melhor as superficies:
+
+- `wall()` para video prefere `wall_video_720p`, depois `wall_video_1080p`, e so entao cai no original;
+- `thumbnail()` para video prefere `wall_video_poster`;
+- `preview()` para video continua retornando variante de video, e nao poster, para nao quebrar gallery/media que hoje renderizam `<video src={preview_url}>`;
+- `WallPayloadFactory` usa poster no `preview_url` do wall, entao o manager/simulacao nao ficam dependentes de tentar renderizar um mp4 em slots de imagem.
+
+### Limite operacional importante
+
+No ambiente local desta auditoria:
+
+- `ffmpeg` nao estava disponivel no `PATH`;
+- `ffprobe` tambem nao estava disponivel no `PATH`.
+
+Implicacao:
+
+- a implementacao de codigo desta etapa esta pronta;
+- os binarios agora sao configuraveis por:
+  - `MEDIA_FFMPEG_BIN`
+  - `MEDIA_FFPROBE_BIN`
+  - `apps/api/config/media_processing.php`
+- a validacao automatizada foi feita com `Process::fake`;
+- a geracao real em runtime ainda depende de instalar/provisionar `ffmpeg`/`ffprobe` nos workers/ambientes onde o pipeline roda.
+
+### 8. A estrategia de wall-specific video variants existe, mas ainda nao cobre toda a stack
+
+Estado mais preciso apos `1.4`:
+
+- isso deixou de ser verdade para videos novos que ja passaram pela geracao de `wall_video_*` + poster;
+- continua sendo verdade para intake privado, legados e ambientes sem `ffmpeg`.
 
 Efeito:
 
@@ -901,7 +1148,13 @@ Efeito:
 - videos grandes, pesados ou com bitrate alto podem travar mais;
 - o navegador carrega mais do que deveria para um telão.
 
-### 8. O cache atual ajuda, mas nao e um cache de playback de verdade
+### 9. O cache atual ajuda, mas nao e um cache de playback de verdade
+
+Observacao de rollout relacionada a variantes:
+
+- videos novos do fluxo que gera variantes ja podem sair do original e usar `wall_video_*` + poster;
+- ainda faltam cobertura para intake privado, legados e ambientes sem `ffmpeg`;
+- enquanto essa cobertura nao for completa, o player ainda pode cair no original em parte da base.
 
 Efeito:
 
@@ -909,7 +1162,7 @@ Efeito:
 - nao garante fluidez para videos longos/pesados;
 - ainda depende muito da qualidade da rede e do arquivo original.
 
-### 9. Falta politica de produto para video
+### 10. Falta politica de produto para video
 
 Hoje nao existe definicao clara de perguntas como:
 
@@ -921,336 +1174,102 @@ Hoje nao existe definicao clara de perguntas como:
 
 Sem essas respostas, a stack continua ambigua.
 
-## Refino: os 5 gaps centrais da logica de video
+## Refino: os 5 gaps centrais remanescentes da logica de video
 
-Depois de validar a stack atual e o comportamento da plataforma web, o que realmente falta agora nao e mais "descobrir como o browser funciona". O que falta e transformar video em um fluxo com estados e causas de transicao proprios dentro do wall.
+Depois da Fase 2, os gaps centrais mudaram. A base playback-aware ja existe; o que falta agora e fechar produto, operacao e rollout.
 
-Os 5 gaps centrais sao estes:
+### 1. Falta fechar o rollout oficial da policy de video que ja existe por evento/wall
 
-### 1. Falta uma maquina de estados propria para video
+Hoje o wall ja tem policy implementada para:
 
-Hoje o wall conhece bem o estado do player, mas nao o estado de um item de video como entidade de runtime.
+- cap de video longo;
+- `resume_if_same_item_else_restart`;
+- audio mutado;
+- guard rail de multi-slot.
 
-Para a proxima fase, faz sentido modelar algo proximo de:
+O que ainda falta:
 
-- `idle`
-- `probing`
-- `primed`
-- `starting`
-- `playing`
-- `waiting`
-- `stalled`
-- `paused_by_wall`
-- `completed`
-- `capped`
-- `interrupted`
-- `failed_to_start`
+- fechar o rollout oficial de produto usando esses settings;
+- decidir como essa policy conversa com upload publico e intake privado;
+- sair do estado de baseline global nos pontos que ainda estao em config de ambiente.
 
-Isso nao descreve o estado atual do codigo; descreve a modelagem recomendada para a primeira entrega robusta de video.
+### 2. Falta expor diagnostico operacional rico de video
 
-### 2. Falta um scheduler por causa de saida
-
-Enquanto a troca continuar ancorada principalmente em `setTimeout(interval_ms)`, video continua sendo slide decorado.
-
-Para video, o engine precisa decidir a saida do item por causa:
+Hoje o reducer ja sabe diferenciar:
 
 - `ended`
 - `cap_reached`
-- `paused_by_operator`
 - `play_rejected`
+- `startup_timeout`
+- `poster_then_skip`
 - `stalled_timeout`
-- `replaced_by_command`
-- `media_deleted`
-- `visibility_degraded`
 
-Essa separacao e mais importante do que qualquer refinamento visual do layout.
+O que ainda falta:
 
-### 3. Falta readiness real de playback
+- expor no manager as razoes de inelegibilidade do backend por item;
+- fechar analytics/eventos de video;
+- evoluir de resumo operacional para um inspector por item mais rico.
 
-Hoje o probe atual resolve bem `metadata`, dimensao e orientacao. Isso e util, mas ainda nao prova que o item esta pronto para entrar na tela sem engasgar.
+### 3. Falta fechar a cobertura de variantes em toda a stack
 
-Para video, a proxima fase precisa distinguir pelo menos:
+Hoje:
 
-- `metadata_ready`
-- `playback_ready`
-- `buffering`
-- `stalled`
+- upload publico + `GenerateMediaVariantsJob` ja conseguem gerar `wall_video_*` + poster;
+- intake privado, legados e ambientes sem `ffmpeg` ainda podem cair no original.
 
-Na pratica:
+O que ainda falta:
 
-- `loadedmetadata` ajuda em orientacao/duracao;
-- `readyState >= HAVE_FUTURE_DATA` e um sinal muito melhor para candidato forte a entrar em cena;
-- `HAVE_ENOUGH_DATA` e sinal ainda mais forte;
-- `waiting` e `stalled` precisam alimentar a logica, nao so o diagnostico.
+- provisionar `ffmpeg` / `ffprobe` nos ambientes reais;
+- reduzir a assimetria do intake privado;
+- planejar normalizacao/backfill dos legados.
 
-### 4. Falta semantica fechada de pause/resume/falha de play
+### 4. Falta integrar melhor politica de video com politica de fila
 
-Hoje ja esta claro que o wall precisa pausar o video real quando entra em `paused`.
+Hoje o wall ja sabe sair de um video por causa, mas a fairness ainda pensa majoritariamente em contagem de exibicoes.
 
-O que ainda falta fechar de forma explicita:
+O que ainda falta:
 
-- `resume_from_position`
-- `restart_from_zero`
-- `resume_if_same_item_else_restart`
+- medir tempo consumido por video;
+- registrar `completed`, `capped` e `interrupted`;
+- evitar distorcao da fila por videos longos.
 
-Tambem falta assumir algo fundamental:
+### 5. Falta completar a trilha premium de cache, warming e homologacao real
 
-- comando do operador nao confirma playback;
-- quem confirma playback e o elemento de midia.
+Hoje:
 
-### 5. Falta integrar politica de video com politica de fila
+- existe `poster-first`;
+- existe `preload="auto"` oportunistico;
+- existe probe de metadata;
+- existe fallback operacional sem travar a fila.
 
-A fairness atual parece correta para imagem, mas video muda a economia da fila.
+O que ainda falta:
 
-Se um item pode ocupar `15s`, `20s` ou `30s`, a fila nao pode medir apenas:
+- warming mais forte do proximo video;
+- diagnostico de device/rede degradados;
+- homologacao real por classe de device e rede;
+- decidir se `Service Worker` e guard rails de plataforma entram depois.
 
-- `playCount`
+## Melhorias remanescentes recomendadas
 
-Ela precisa evoluir para algo mais proximo de:
+### P0 restante
 
-- `display_time_consumed_ms`
-- `completed_count`
-- `capped_count`
-- `interrupted_count`
+- provisionar `ffmpeg` / `ffprobe` nos ambientes reais;
+- expor razoes de inelegibilidade do backend no manager/diagnostico por item;
+- alinhar intake privado e legados com a estrategia de variantes.
 
-Essa parte ja entra no encontro entre produto e engenharia, mas faz sentido registrar porque e exatamente aqui que video deixa de ser "imagem com tag video".
+### P1 restante
 
-## Melhorias recomendadas
+- analytics de video;
+- manager com `Policy Summary`, `Video Decision Inspector` e avisos operacionais;
+- fairness considerando tempo consumido por video;
+- warming/cache operacional mais forte.
 
-## P0 - obrigatorias para tratar video corretamente
+### P2 restante
 
-### 1. Separar politica de playback para imagem, video comum e video de anuncio
-
-Precisamos de tres comportamentos explicitos:
-
-- imagem
-- video de `EventMedia`
-- video de anuncio
-
-Hoje apenas anuncio ja e tratado como tipo diferente.
-
-### 2. Introduzir maquina de estados propria para video no reducer/engine
-
-O player precisa sair do modelo "video como slide" e passar para "video como item com ciclo proprio".
-
-Estados recomendados para a proxima fase:
-
-- `idle`
-- `probing`
-- `primed`
-- `starting`
-- `playing`
-- `waiting`
-- `stalled`
-- `paused_by_wall`
-- `completed`
-- `capped`
-- `interrupted`
-- `failed_to_start`
-
-### 3. Tornar video comum playback-aware com scheduler por causa de saida
-
-Recomendacao:
-
-- o reducer precisa saber se o item atual e video;
-- o ciclo do slide precisa aceitar `video-ended`;
-- o scheduler precisa decidir por politica:
-  - tocar ate o fim
-  - tocar ate um cap
-  - aplicar max duration
-- a trilha de video precisa observar `play()`, `pause()`, `readyState`, `waiting`, `stalled` e falhas reais de playback
-- a saida do item precisa ser por causa, nao so por tempo fixo:
-  - `ended`
-  - `cap_reached`
-  - `paused_by_operator`
-  - `play_rejected`
-  - `stalled_timeout`
-  - `replaced_by_command`
-  - `media_deleted`
-  - `visibility_degraded`
-
-### 4. Definir readiness real de playback, nao so metadata
-
-O player precisa distinguir pelo menos:
-
-- `metadata_ready`
-- `playback_ready`
-- `buffering`
-- `stalled`
-
-Direcao recomendada:
-
-- `loadedmetadata` para dimensao/orientacao/duracao;
-- `readyState >= HAVE_FUTURE_DATA` como sinal de entrada forte;
-- `HAVE_ENOUGH_DATA` como sinal excelente;
-- `waiting` e `stalled` alimentando a logica de playback e fallback.
-
-### 5. Definir politica de produto para duracao
-
-Sugestao objetiva de baseline:
-
-- `0s a 15s`
-  - tocar ate o fim
-- `15s a 30s`
-  - tocar ate o fim ou cap configuravel por evento
-- `> 30s`
-  - bloquear no intake publico ou exigir politica especifica
-
-Sem isso, o wall sempre vai parecer "quebrado" para video longo.
-
-### 6. Pausar de verdade o elemento de video quando o wall entra em `paused`
-
-O player precisa:
-
-- chamar `pause()` no video atual;
-- manter tempo/estado coerentes;
-- decidir se `resume` continua ou reinicia.
-
-Detalhe importante:
-
-- quando a trilha playback-aware entrar, o `resume` precisa tratar a `Promise` retornada por `play()`.
-
-### 7. Definir fallback de playback quando o video falha
-
-O engine precisa ter saidas claras quando o video nao inicia ou degrada no meio:
-
-- `retry_same_source_once`
-- `fallback_to_poster`
-- `skip_and_penalize_asset`
-
-Sem isso, o wall corre o risco de travar ou de ficar semanticamente ambiguo quando um item falha.
-
-### 8. Criar variante otimizada para wall video
-
-Backend idealmente deve gerar, para video:
-
-- `wall_video`
-- `preview/poster`
-- metadata confiavel:
-  - `duration_seconds`
-  - `width`
-  - `height`
-
-Objetivo:
-
-- bitrate mais previsivel;
-- resolucao adequada ao telão;
-- menos travamento em notebooks/TV boxes fracos.
-- startup melhor em MP4 progressivo quando fizer sentido usar `+faststart`
-
-## P1 - importantes para fluidez e operacao
-
-### 9. Bloquear video em layouts multi-slot por padrao
-
-Politica recomendada para a primeira entrega seria:
-
-- `video_disallowed_in_multislot = true`
-
-Do ponto de vista de rollout, isso funciona como regra de seguranca do primeiro suporte serio a video, e nao como refinamento cosmetico.
-
-Excecao futura, se realmente necessária:
-
-- permitir no maximo `1` video simultaneo;
-- apenas quando existir variante otimizada e politica explicita.
-
-### 10. Integrar politica de video com politica de fila
-
-Para video virar first-class citizen, a fila precisa considerar tempo consumido, nao so contagem de exibicoes.
-
-Metricas candidatas:
-
-- `display_time_consumed_ms`
-- `completed_count`
-- `capped_count`
-- `interrupted_count`
-
-Essa parte e importante, mas vem depois da maquina de estados e do scheduler por causa.
-
-### 11. Melhorar o cache/preload de video
-
-Evolucoes recomendadas:
-
-- adicionar `poster`/thumbnail de video
-- warming mais explicito do proximo video
-- definir budget de cache e estrategia de limpeza
-- estudar object URL ou resposta cacheada como fonte controlada de playback quando houver necessidade real
-
-Observacao:
-
-- Service Worker pode entrar aqui no futuro, mas nao deveria ser tratado como P0 do wall video.
-
-### 12. Alinhar upload publico e UX de video
-
-Precisamos decidir:
-
-- video publico vai ser oficialmente suportado?
-- se sim, a tela publica precisa comunicar isso;
-- se nao, o backend unitario nao deveria aceitar silenciosamente.
-
-### 13. Remover dispatch desnecessario de `GenerateMediaVariantsJob` para video publico
-
-Isso simplifica a trilha do backend e evita confusao futuras.
-
-## P2 - evolucoes de produto
-
-### 14. Analytics de video
-
-Se video virar first-class citizen, precisamos registrar:
-
-- `video_start`
-- `video_first_frame`
-- `video_complete`
-- `video_interrupted_by_cap`
-- `video_interrupted_by_slide`
-- `video_interrupted_by_pause`
-- `video_waiting`
-- `video_stalled`
-- `video_play_rejected`
-
-### 15. Regras por evento
-
-Possiveis flags futuras:
-
-- `wall_video_policy`
-- `wall_video_max_seconds`
-- `wall_video_audio_policy`
-- `wall_allow_video_in_multi_layouts`
-
-### 16. Guard rails de plataforma
-
-Melhorias tecnicas futuras que fazem sentido, mas nao deveriam travar a primeira entrega:
-
-- `MediaCapabilities.decodingInfo()` para decidir perfil/variante mais segura em runtime
-- Service Worker para controle mais forte de fetch/cache de playback
-- readiness mais rica baseada em `readyState`, `canplay`, `waiting` e `stalled`
-- `requestVideoFrameCallback()` para telemetria de primeira frame, fluidez e dropped frames
-
-### 17. Cobertura de testes para a proxima fase
-
-Os testes adicionados nesta rodada caracterizam bem o estado atual. Para a proxima fase, a suite precisa provar o comportamento-alvo.
-
-Testes que realmente passam a importar:
-
-- video comum sem `loop`
-- avanco por `ended`
-- avanco por `cap_reached`
-- `pause()` ao receber `paused`
-- retomada com `play()` resolvido
-- fallback quando `play()` rejeita
-- downgrade por `waiting/stalled`
-- bloqueio de video em multi-slot
-- escolha de variante `wall_video`
-- fallback para `poster`
-- simetria entre boot e realtime quando a elegibilidade muda
-
-### 18. Ferramentas operacionais
-
-Adicionar no manager:
-
-- contagem de videos na fila
-- alerta de video longo
-- bitrate/dimensao quando disponivel
-- indicacao clara de "video suportado oficialmente" por canal de intake
+- `Service Worker` para playback cacheado de forma controlada;
+- `MediaCapabilities.decodingInfo()` para guard rail de runtime;
+- `requestVideoFrameCallback()` para telemetria premium;
+- politicas mais ricas por fase do evento, layout e device profile.
 
 ## O que o time precisa validar agora
 
@@ -1288,28 +1307,43 @@ Resultado observado:
 Executado:
 
 - `cd apps/api && php artisan test --filter=Wall`
-- `cd apps/api && php artisan test --filter=PublicUploadTest`
-- `cd apps/api && php artisan test tests/Feature/Wall/PublicWallBootTest.php`
-- `cd apps/api && php artisan test tests/Unit/Modules/Wall/WallEligibilityServiceTest.php`
-- `cd apps/api && php artisan test tests/Unit/Modules/MediaProcessing/MediaAssetUrlServiceTest.php tests/Unit/Modules/MediaProcessing/MediaVariantGeneratorServiceTest.php`
+- `cd apps/api && php artisan test --filter=InboundMedia`
+- `cd apps/api && php artisan test --filter=MediaProcessing`
+- `cd apps/api && php artisan test tests/Unit/Modules/MediaProcessing/VideoMetadataExtractorServiceTest.php tests/Unit/Modules/MediaProcessing/MediaVariantGeneratorServiceTest.php tests/Unit/Modules/Wall/WallEligibilityServiceTest.php tests/Feature/Wall/PublicWallBootTest.php tests/Feature/Wall/WallDiagnosticsTest.php tests/Feature/MediaProcessing/MediaPipelineEventsTest.php tests/Feature/InboundMedia/PublicUploadTest.php`
+- `cd packages/shared-types && C:\\laragon\\www\\eventovivo\\apps\\web\\node_modules\\.bin\\tsc.cmd --noEmit src\\index.ts src\\wall.ts`
+- `cd apps/web && npm run type-check`
+- `Get-Command ffmpeg`
+- `Get-Command ffprobe`
 
 Resultado:
 
-- `Wall` -> `PASS`, `66` testes, `301` assertions
-- `PublicUploadTest` -> `PASS`, `8` testes, `71` assertions
-- `PublicWallBootTest` -> `PASS`, `2` testes, `38` assertions
-- `WallEligibilityServiceTest` -> `PASS`, `7` testes, `11` assertions
-- `MediaAssetUrlServiceTest + MediaVariantGeneratorServiceTest` -> `PASS`, `3` testes, `3` assertions
+- `Wall` -> `PASS`, `92` testes, `497` assertions
+- `InboundMedia` -> `PASS`, `21` testes, `196` assertions
+- `MediaProcessing` -> `PASS`, `88` testes, `721` assertions
+- `VideoMetadataExtractorServiceTest + MediaVariantGeneratorServiceTest + WallEligibilityServiceTest + PublicWallBootTest + WallDiagnosticsTest + MediaPipelineEventsTest + PublicUploadTest` -> `PASS`, `51` testes, `361` assertions
+- `WallEligibilityServiceTest + PublicWallBootTest + MediaVariantGeneratorServiceTest + MediaToolingStatusServiceTest + WallDiagnosticsTest + WallAuthorizationTest + PublicUploadTest` -> `PASS`, `47` testes, `323` assertions
+- `Wall` suite mais recente -> `PASS`, `94` testes, `543` assertions
+- `shared-types tsc` -> `PASS`
+- `apps/web type-check` -> `PASS`
+- `ffmpeg` / `ffprobe` no `PATH` local -> ambos ausentes (`null`)
 
 Cobertura relevante confirmada:
 
 - upload publico multiplo de imagem
 - upload publico unitario de video
+- rejeicao de video publico acima do limite configurado
+- rejeicao de video publico quando a policy global desabilita video
+- bootstrap publico comunicando `accept_hint`, `accepts_video`, `video_single_only` e `video_max_duration_seconds`
+- enriquecimento de metadata de video via `ffprobe`
+- persistencia de metadata minima e complementar no intake privado de video
 - face indexing em imagem publica
 - indisponibilidade operacional do upload
-- boot, realtime e simulacao agora compartilham o mesmo gate atual de orientacao/playable
-- sem variante de video, o wall ainda cai no arquivo original
-- o gerador atual de variantes ainda nao produz `wall_video` nem `poster` para video
+- boot, realtime e simulacao agora compartilham o mesmo gate final de video com cap de duracao e exigencia de metadata/variante/poster
+- o boot publico agora expoe `video_admission` com estado e motivos
+- o boot publico agora expoe `served_variant_key` e `preview_variant_key`
+- quando as variantes existem, o wall agora serve `wall_video_*` e poster no boot/pipeline
+- sem variante de video, o wall bloqueia a entrada quando a policy global esta estrita
+- a lane `media-variants` agora usa timeout compativel com a trilha `ffmpeg`
 
 ### Testes frontend executados
 
@@ -1317,39 +1351,72 @@ Executado:
 
 - `cd apps/web && npx.cmd vitest run src/modules/wall/player`
 - `cd apps/web && npx.cmd vitest run src/modules/wall/player/engine/selectors.test.ts src/modules/wall/player/engine/cache.test.ts src/modules/wall/player/engine/preload.test.ts src/modules/wall/player/components/MediaSurface.test.tsx`
+- `cd apps/web && npx.cmd vitest run src/modules/upload/PublicEventUploadPage.test.tsx src/modules/wall/player/components/MediaSurface.test.tsx`
+- `cd apps/web && npx.cmd vitest run src/modules/wall/components/manager/diagnostics/WallPlayerDetailsSheet.test.tsx src/modules/wall/pages/EventWallManagerPage.test.tsx src/modules/wall/player/hooks/useWallEngine.test.tsx src/modules/wall/player/hooks/useWallPlayer.test.tsx src/modules/wall/player/components/WallPlayerRoot.test.tsx src/modules/wall/player/engine/autoplay.test.ts src/modules/wall/player/engine/layoutStrategy.test.ts`
 
 Resultado:
 
-- `PASS`, `22` arquivos, `155` testes
+- `PASS`, `23` arquivos, `170` testes
 - `PASS`, `4` arquivos, `24` testes
+- `PASS`, `6` arquivos, `54` testes
+- `PASS`, `7` arquivos, `75` testes
+- `PASS`, `npm run type-check`
 
 ### Novos testes adicionados nesta rodada
 
 Backend:
 
 - `apps/api/tests/Feature/InboundMedia/PublicUploadTest.php`
-  - valida upload publico unitario de video
+  - valida upload publico unitario de video, cap de duracao e policy global de video
+- `apps/api/tests/Feature/InboundMedia/InboundMediaPipelineTest.php`
+  - valida persistencia de metadata minima e complementar quando o intake privado ja traz hints canonicos
 - `apps/api/tests/Feature/Wall/PublicWallBootTest.php`
   - valida que boot agora exclui midia fora da orientacao aceita
+- `apps/api/tests/Feature/Wall/PublicWallBootTest.php`
+  - valida `video_admission` e metadata de video no boot publico
 - `apps/api/tests/Feature/MediaProcessing/MediaPipelineEventsTest.php`
   - valida que realtime nao broadcasta midia fora da orientacao aceita
 - `apps/api/tests/Feature/Wall/WallDiagnosticsTest.php`
   - valida que a simulacao tambem respeita a mesma elegibilidade
 - `apps/api/tests/Unit/Modules/MediaProcessing/MediaAssetUrlServiceTest.php`
-  - valida fallback atual de video para original e preferencia por variante quando existir
+  - valida fallback de video para original, preferencia por `wall_video_*` e poster dedicado
 - `apps/api/tests/Unit/Modules/MediaProcessing/MediaVariantGeneratorServiceTest.php`
-  - valida que o gerador atual ainda nao cria variantes reais para video
+  - valida geracao de `wall_video_720p`, `wall_video_1080p` opcional e `wall_video_poster`
+- `apps/api/tests/Unit/Modules/MediaProcessing/MediaToolingStatusServiceTest.php`
+  - valida readiness de `ffmpeg` / `ffprobe` configurados por ambiente
+- `apps/api/tests/Unit/Modules/MediaProcessing/VideoMetadataExtractorServiceTest.php`
+  - valida hints canonicos, enriquecimento por `ffprobe` e fallback quando `ffprobe` falha
+- `apps/api/tests/Unit/Modules/Wall/WallVideoAdmissionServiceTest.php`
+  - valida `eligible`, `eligible_with_fallback` e `blocked`
+- `apps/api/tests/Unit/Modules/Wall/WallEligibilityServiceTest.php`
+  - valida gate final de video com metadata minima, variante, poster e fallback global
+- `apps/api/tests/Feature/MediaProcessing/MediaPipelineJobsTest.php`
+  - valida que `GenerateMediaVariantsJob` usa a trilha `ffmpeg` para video e persiste `wall_video_720p` + `wall_video_poster`
+- `apps/api/tests/Unit/MediaProcessing/HorizonConfigTest.php`
+  - valida timeout alinhado da lane `media-variants`
 
 Frontend:
 
 - `apps/web/src/modules/wall/player/components/MediaSurface.test.tsx`
-  - valida que video comum do slideshow renderiza `autoplay + muted + loop + playsInline`
+  - valida que video comum do wall nao usa `loop` e que a lane `poster-only` renderiza o poster sem tocar outro video ao fundo
+- `apps/web/src/modules/wall/player/components/WallVideoSurface.test.tsx`
+  - valida `poster-first`, promocao por readiness minima, `play()` / `pause()` / `resume()`, `ended` e timeout bounded para `waiting/stalled`
+- `apps/web/src/modules/wall/player/hooks/useWallEngine.test.tsx`
+  - valida que imagem continua por timer, mas video agora sai por `ended` e por `cap_reached`
+- `apps/web/src/modules/wall/player/engine/layoutStrategy.test.ts`
+  - valida que video corrente nao fica em `carousel`, `mosaic` ou `grid`
+- `apps/web/src/modules/wall/pages/EventWallManagerPage.test.tsx`
+  - valida resumo da policy de video, readiness do pipeline e avisos operacionais no manager
+- `apps/web/src/modules/wall/components/manager/diagnostics/WallPlayerDetailsSheet.test.tsx`
+  - valida fase, progresso, motivo de saida e falha de playback no detalhe operacional
 - `apps/web/src/modules/wall/player/engine/selectors.test.ts`
   - valida que o engine atual prefere itens `ready`, mas ainda permite itens `idle` quando nao existe nenhum `ready`
 - `apps/web/src/modules/wall/player/engine/cache.test.ts`
   - valida probe de metadata de video com `preload="metadata"`
 - `apps/web/src/modules/wall/player/engine/preload.test.ts`
   - valida preload proativo de video com `preload="auto"`
+- `apps/web/src/modules/upload/PublicEventUploadPage.test.tsx`
+  - valida bootstrap de video curto, envio unitario via `file`, lote de imagens via `files[]` e rejeicao de batch misto
 
 ## Referencias de codigo
 
@@ -1364,8 +1431,10 @@ Arquivos centrais para entender a stack atual:
   - `apps/api/app/Modules/Wall/Support/WallSelectionPreset.php`
   - `apps/api/app/Modules/InboundMedia/Http/Controllers/PublicUploadController.php`
   - `apps/api/app/Modules/MediaProcessing/Jobs/DownloadInboundMediaJob.php`
+  - `apps/api/app/Modules/MediaProcessing/Services/VideoMetadataExtractorService.php`
   - `apps/api/app/Modules/MediaProcessing/Services/MediaVariantGeneratorService.php`
   - `apps/api/app/Modules/MediaProcessing/Services/MediaAssetUrlService.php`
+  - `apps/api/app/Modules/Wall/Services/WallVideoAdmissionService.php`
   - `apps/api/app/Modules/Wall/Services/WallDiagnosticsService.php`
 
 - frontend
@@ -1374,6 +1443,7 @@ Arquivos centrais para entender a stack atual:
   - `apps/web/src/modules/wall/player/hooks/useWallRealtime.ts`
   - `apps/web/src/modules/wall/player/components/WallPlayerRoot.tsx`
   - `apps/web/src/modules/wall/player/components/MediaSurface.tsx`
+  - `apps/web/src/modules/wall/player/components/WallVideoSurface.tsx`
   - `apps/web/src/modules/wall/player/components/AdOverlay.tsx`
   - `apps/web/src/modules/wall/player/engine/selectors.ts`
   - `apps/web/src/modules/wall/player/engine/preload.ts`
@@ -1422,16 +1492,19 @@ O telão atual ja tem uma base forte:
 - resiliencia via resync/heartbeat
 - preload e cache local de apoio
 
-Mas para video, a plataforma ainda esta em uma zona intermediaria:
+Para video, o estado atual ja saiu da zona de "slide com tag `<video>`" e entrou numa base tecnicamente bem mais madura:
 
 - aceita video;
-- exibe video;
-- nao trata video como citizen de primeira classe.
+- extrai metadata minima e complementar;
+- calcula admissao explicita;
+- gera variante de wall e poster quando o ambiente suporta;
+- trata video comum no reducer com playback-aware runtime;
+- usa `poster-first`, cap baseline, pause/resume reais e saida por causa.
 
-Se quisermos um wall premium e previsivel para video, o caminho tecnico mais correto agora e:
+O que ainda falta para chamar a trilha de video de premium e previsivel ponta a ponta e:
 
-1. fechar a politica de produto para video;
-2. levar playback-aware video para o reducer;
-3. gerar variante otimizada de video para wall;
-4. melhorar a estrategia de cache/preload;
-5. alinhar UX e intake com a politica final.
+1. provisionar `ffmpeg` / `ffprobe` nos ambientes reais e reduzir a assimetria do intake privado;
+2. expor inelegibilidade do backend e decisao por item de forma mais rica no manager;
+3. fechar a politica oficial de rollout para upload publico e videos longos;
+4. melhorar a estrategia de cache/preload para cenarios de device e rede degradados;
+5. homologar a matriz real de wall por classe de device e rede.

@@ -10,11 +10,17 @@
  * Inspired by MomentLoop's Spotlight template.
  */
 
-import MediaSurface from '../components/MediaSurface';
+import MediaSurface, { type MediaSurfaceVideoControlProps } from '../components/MediaSurface';
 import type { WallRuntimeItem } from '../types';
 import { resolvePrimaryMediaFit } from '../engine/layoutStrategy';
 
-export function SpotlightLayout({ media }: { media: WallRuntimeItem }) {
+export function SpotlightLayout({
+  media,
+  videoControl,
+}: {
+  media: WallRuntimeItem;
+  videoControl?: MediaSurfaceVideoControlProps | null;
+}) {
   return (
     <div
       className="relative flex min-h-screen items-center justify-center"
@@ -46,6 +52,7 @@ export function SpotlightLayout({ media }: { media: WallRuntimeItem }) {
         <MediaSurface
           media={media}
           fit={resolvePrimaryMediaFit('spotlight' as never, media)}
+          videoControl={videoControl}
         />
       </div>
 

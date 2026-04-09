@@ -10,6 +10,7 @@ use App\Modules\FaceSearch\Services\FaceSearchRouter;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use Aws\Command;
 use Aws\Exception\AwsException;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 it('routes to the configured aws backend when recognition is enabled', function () {
@@ -450,4 +451,127 @@ it('runs the configured local shadow backend without changing the aws primary re
             'status' => 'completed',
             'result_count' => 1,
         ]);
+});
+
+it('indexes a mandatory local baseline when aws shadow routing is enabled even if query shadow sampling is zero', function () {
+    Storage::fake('public');
+    Storage::disk('public')->put('events/1/variants/1/gallery.jpg', 'gallery-binary');
+
+    $calls = (object) [
+        'aws' => 0,
+        'local' => 0,
+    ];
+
+    $local = new class($calls) implements FaceSearchBackendInterface
+    {
+        public function __construct(private readonly object $calls) {}
+
+        public function key(): string
+        {
+            return 'local_pgvector';
+        }
+
+        public function ensureEventBackend(Event $event, EventFaceSearchSetting $settings): array
+        {
+            return [];
+        }
+
+        public function indexMedia(EventMedia $media, EventFaceSearchSetting $settings): array
+        {
+            $this->calls->local++;
+
+            return [
+                'status' => 'indexed',
+                'source_ref' => 'public:events/1/variants/1/gallery.jpg',
+                'faces_detected' => 1,
+                'faces_indexed' => 1,
+                'skipped_reason' => null,
+            ];
+        }
+
+        public function searchBySelfie(Event $event, EventFaceSearchSetting $settings, EventMedia $probeMedia, string $binary, DetectedFaceData $face, int $topK): array
+        {
+            return [];
+        }
+
+        public function healthCheck(Event $event, EventFaceSearchSetting $settings): array
+        {
+            return [];
+        }
+
+        public function deleteEventBackend(Event $event, EventFaceSearchSetting $settings): void {}
+    };
+
+    $aws = new class($calls) implements FaceSearchBackendInterface
+    {
+        public function __construct(private readonly object $calls) {}
+
+        public function key(): string
+        {
+            return 'aws_rekognition';
+        }
+
+        public function ensureEventBackend(Event $event, EventFaceSearchSetting $settings): array
+        {
+            return [];
+        }
+
+        public function indexMedia(EventMedia $media, EventFaceSearchSetting $settings): array
+        {
+            $this->calls->aws++;
+
+            return [
+                'status' => 'indexed',
+                'source_ref' => 'aws:collection/event-1',
+                'faces_detected' => 2,
+                'faces_indexed' => 2,
+                'skipped_reason' => null,
+            ];
+        }
+
+        public function searchBySelfie(Event $event, EventFaceSearchSetting $settings, EventMedia $probeMedia, string $binary, DetectedFaceData $face, int $topK): array
+        {
+            return [];
+        }
+
+        public function healthCheck(Event $event, EventFaceSearchSetting $settings): array
+        {
+            return [];
+        }
+
+        public function deleteEventBackend(Event $event, EventFaceSearchSetting $settings): void {}
+    };
+
+    $router = new FaceSearchRouter([$local, $aws]);
+    $settings = new EventFaceSearchSetting(array_merge(
+        EventFaceSearchSetting::defaultAttributes(),
+        [
+            'search_backend_key' => 'aws_rekognition',
+            'recognition_enabled' => true,
+            'routing_policy' => 'aws_primary_local_shadow',
+            'fallback_backend_key' => 'local_pgvector',
+            'shadow_mode_percentage' => 0,
+        ],
+    ));
+
+    $media = EventMedia::factory()->make();
+    $media->setRelation('variants', collect([
+        (object) [
+            'variant_key' => 'gallery',
+            'disk' => 'public',
+            'path' => 'events/1/variants/1/gallery.jpg',
+        ],
+    ]));
+
+    $result = $router->indexMedia($media, $settings);
+
+    expect($calls->aws)->toBe(1)
+        ->and($calls->local)->toBe(1)
+        ->and($result['status'])->toBe('indexed')
+        ->and($result['shadow'])->toMatchArray([
+            'backend_key' => 'local_pgvector',
+            'status' => 'completed',
+            'baseline_required' => true,
+        ])
+        ->and(data_get($result, 'shadow.result.source_ref'))->toBe('public:events/1/variants/1/gallery.jpg');
 });

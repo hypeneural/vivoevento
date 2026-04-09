@@ -8,6 +8,9 @@ import type {
   WallRuntimeItem,
   WallSettings,
   WallStatusChangedPayload,
+  WallVideoPlaybackExitReason,
+  WallVideoPlaybackFailureReason,
+  WallVideoPlaybackState,
 } from '../types';
 import {
   createAdSchedulerState,
@@ -35,6 +38,18 @@ type MediaStatusPayload = {
   errorMessage?: string | null;
 };
 
+type VideoMetricsPayload = {
+  itemId: string;
+  currentTime?: number;
+  durationSeconds?: number | null;
+  readyState?: number;
+};
+
+type VideoFailurePayload = VideoMetricsPayload & {
+  exitReason: WallVideoPlaybackExitReason;
+  failureReason?: WallVideoPlaybackFailureReason | null;
+};
+
 export type WallEngineAction =
   | { type: 'reset'; code: string }
   | { type: 'reset-assets'; ids?: string[] }
@@ -43,8 +58,10 @@ export type WallEngineAction =
       snapshot: WallBootData;
       items: WallRuntimeItem[];
       senderStats?: Record<string, WallSenderRuntimeStats>;
+      persistedVideoPlayback?: Partial<WallVideoPlaybackState> | null;
       fallbackStatus: WallPlayerStatus;
       preferredCurrentItemId?: string | null;
+      preferredCurrentItemStartedAt?: string | null;
     }
   | { type: 'apply-settings'; settings: WallSettings }
   | { type: 'status-changed'; payload: WallStatusChangedPayload }
@@ -55,6 +72,16 @@ export type WallEngineAction =
   | { type: 'media-asset-status'; payload: MediaStatusPayload }
   | { type: 'advance' }
   | { type: 'ad-finished' }
+  | { type: 'video-starting'; payload: VideoMetricsPayload }
+  | { type: 'video-first-frame'; payload: VideoMetricsPayload }
+  | { type: 'video-playback-ready'; payload: VideoMetricsPayload }
+  | { type: 'video-playing'; payload: VideoMetricsPayload }
+  | { type: 'video-progress'; payload: VideoMetricsPayload }
+  | { type: 'video-waiting'; payload: VideoMetricsPayload }
+  | { type: 'video-stalled'; payload: VideoMetricsPayload }
+  | { type: 'video-ended'; payload: VideoMetricsPayload }
+  | { type: 'video-cap-reached'; payload: VideoMetricsPayload }
+  | { type: 'video-failure'; payload: VideoFailurePayload }
   | { type: 'mark-expired' }
   | { type: 'sync-error' };
 
@@ -120,6 +147,117 @@ function mapWallStatusToPlayerStatus(
   return fallbackStatus;
 }
 
+function createEmptyVideoPlaybackState(
+  previous?: Partial<WallVideoPlaybackState> | null,
+): WallVideoPlaybackState {
+  return {
+    itemId: null,
+    phase: 'idle',
+    currentTime: 0,
+    durationSeconds: null,
+    readyState: 0,
+    exitReason: null,
+    failureReason: null,
+    stallCount: 0,
+    posterVisible: false,
+    firstFrameReady: false,
+    playbackReady: false,
+    playingConfirmed: false,
+    startupDegraded: false,
+    playbackStartedAt: null,
+    lastItemId: previous?.lastItemId ?? previous?.itemId ?? null,
+    lastExitReason: previous?.lastExitReason ?? previous?.exitReason ?? null,
+    lastFailureReason: previous?.lastFailureReason ?? previous?.failureReason ?? null,
+  };
+}
+
+function createVideoPlaybackForItem(
+  item: WallRuntimeItem,
+  previous?: Partial<WallVideoPlaybackState> | null,
+): WallVideoPlaybackState {
+  const baseline = createEmptyVideoPlaybackState(previous);
+
+  return {
+    ...baseline,
+    itemId: item.id,
+    phase: 'probing',
+    durationSeconds: item.duration_seconds ?? null,
+    posterVisible: Boolean(item.preview_url),
+  };
+}
+
+function isVideoEventForCurrentItem(
+  state: WallPlayerState,
+  itemId: string,
+): boolean {
+  return Boolean(
+    state.currentItemId
+    && state.currentItemId === itemId
+    && state.videoPlayback.itemId === itemId,
+  );
+}
+
+function mergeVideoMetrics(
+  current: WallVideoPlaybackState,
+  payload: VideoMetricsPayload,
+): WallVideoPlaybackState {
+  return {
+    ...current,
+    currentTime: payload.currentTime ?? current.currentTime,
+    durationSeconds: payload.durationSeconds ?? current.durationSeconds,
+    readyState: payload.readyState ?? current.readyState,
+  };
+}
+
+function finalizeVideoPlayback(
+  current: WallVideoPlaybackState,
+  payload: VideoFailurePayload,
+): WallVideoPlaybackState {
+  const next = mergeVideoMetrics(current, payload);
+  const phase = current.playingConfirmed
+    ? (payload.exitReason === 'cap_reached' ? 'capped' : 'interrupted')
+    : 'failed_to_start';
+
+  if (payload.exitReason === 'ended') {
+    return {
+      ...next,
+      phase: 'completed',
+      exitReason: 'ended',
+      failureReason: null,
+      posterVisible: false,
+      firstFrameReady: true,
+      playbackReady: true,
+      playingConfirmed: true,
+      lastItemId: current.itemId,
+      lastExitReason: 'ended',
+      lastFailureReason: null,
+    };
+  }
+
+  if (payload.exitReason === 'cap_reached') {
+    return {
+      ...next,
+      phase: 'capped',
+      exitReason: 'cap_reached',
+      failureReason: payload.failureReason ?? null,
+      lastItemId: current.itemId,
+      lastExitReason: 'cap_reached',
+      lastFailureReason: payload.failureReason ?? null,
+    };
+  }
+
+  return {
+    ...next,
+    phase,
+    exitReason: payload.exitReason,
+    failureReason: payload.failureReason ?? null,
+    startupDegraded: current.startupDegraded || payload.exitReason.startsWith('startup_'),
+    lastItemId: current.itemId,
+    lastExitReason: payload.exitReason,
+    lastFailureReason: payload.failureReason ?? null,
+  };
+}
+
 function markPlayback(
   items: WallRuntimeItem[],
   senderStats: Record<string, WallSenderRuntimeStats>,
@@ -173,17 +311,56 @@ function resolveStateWithCurrentItem(
   state: WallPlayerState,
   items: WallRuntimeItem[],
   currentItemId?: string | null,
+  currentItemStartedAt?: string | null,
 ): WallPlayerState {
   const resolvedCurrentItemId = currentItemId && items.some((item) => item.id === currentItemId)
     ? currentItemId
     : null;
+  const resolvedCurrentItemStartedAt = (() => {
+    if (!resolvedCurrentItemId) {
+      return null;
+    }
 
-  return {
+    if (currentItemStartedAt) {
+      return currentItemStartedAt;
+    }
+
+    if (state.currentItemId === resolvedCurrentItemId) {
+      return state.currentItemStartedAt ?? new Date().toISOString();
+    }
+
+    return new Date().toISOString();
+  })();
+
+  const nextState: WallPlayerState = {
     ...state,
     items,
     senderStats: state.senderStats,
     currentItemId: resolvedCurrentItemId,
+    currentItemStartedAt: resolvedCurrentItemStartedAt,
     currentIndex: findWallCurrentIndex(items, resolvedCurrentItemId),
+  };
+
+  const currentItem = resolvedCurrentItemId
+    ? items.find((item) => item.id === resolvedCurrentItemId) ?? null
+    : null;
+
+  if (!currentItem || currentItem.type !== 'video') {
+    return {
+      ...nextState,
+      videoPlayback: state.videoPlayback.itemId
+        ? createEmptyVideoPlaybackState(state.videoPlayback)
+        : state.videoPlayback,
+    };
+  }
+
+  if (state.videoPlayback.itemId === currentItem.id) {
+    return nextState;
+  }
+
+  return {
+    ...nextState,
+    videoPlayback: createVideoPlaybackForItem(currentItem, state.videoPlayback),
   };
 }
 
@@ -201,6 +378,76 @@ export function createEmptyState(code: string): WallPlayerState {
     senderStats: {},
     currentIndex: 0,
     currentItemId: null,
+    currentItemStartedAt: null,
+    videoPlayback: createEmptyVideoPlaybackState(),
+  };
+}
+
+function advanceWallPlayback(
+  state: WallPlayerState,
+  videoFailure?: VideoFailurePayload,
+): WallPlayerState {
+  if (state.currentAd || state.items.length === 0) {
+    return state;
+  }
+
+  const videoAwareState = videoFailure && state.videoPlayback.itemId === videoFailure.itemId
+    ? {
+        ...state,
+        videoPlayback: finalizeVideoPlayback(state.videoPlayback, videoFailure),
+      }
+    : state;
+  const nextAdScheduler = markPhotoAdvanced(syncAdSchedulerWithSettings(videoAwareState, videoAwareState.settings));
+
+  if (shouldPlayAd(nextAdScheduler, videoAwareState.ads.length)) {
+    const { ad, nextIndex } = selectNextAd(videoAwareState.ads, nextAdScheduler.lastAdIndex);
+
+    if (ad) {
+      return {
+        ...videoAwareState,
+        currentAd: ad,
+        adBaseItemId: videoAwareState.currentItemId ?? null,
+        adScheduler: {
+          ...nextAdScheduler,
+          lastAdIndex: nextIndex,
+        },
+      };
+    }
+  }
+
+  const nextCurrentItemId = pickNextWallItemId(
+    videoAwareState.items,
+    videoAwareState.currentItemId,
+    resolveWallSelectionPolicy(videoAwareState.settings),
+    videoAwareState.senderStats,
+  );
+
+  if (!nextCurrentItemId) {
+    return {
+      ...videoAwareState,
+      status: videoAwareState.status === 'playing' ? 'idle' : videoAwareState.status,
+      adScheduler: nextAdScheduler,
+      currentItemId: null,
+      currentItemStartedAt: null,
+      currentIndex: 0,
+      videoPlayback: createEmptyVideoPlaybackState(videoAwareState.videoPlayback),
+    };
+  }
+
+  const playbackState = markPlayback(videoAwareState.items, videoAwareState.senderStats, nextCurrentItemId);
+  const nextState = resolveStateWithCurrentItem(
+    {
+      ...videoAwareState,
+      adScheduler: nextAdScheduler,
+      senderStats: playbackState.senderStats,
+    },
+    playbackState.items,
+    nextCurrentItemId,
+  );
+
+  return {
+    ...nextState,
+    senderStats: playbackState.senderStats,
   };
 }
 
@@ -269,6 +516,12 @@ export function wallReducer(state: WallPlayerState, action: WallEngineAction): W
       const nextState = resolveStateWithCurrentItem(
         {
           ...state,
+          videoPlayback: action.persistedVideoPlayback
+            ? {
+                ...createEmptyVideoPlaybackState(action.persistedVideoPlayback),
+                ...action.persistedVideoPlayback,
+              }
+            : state.videoPlayback,
           status: resolvedStatus,
           event: action.snapshot.event,
           settings: action.snapshot.settings,
@@ -283,6 +536,9 @@ export function wallReducer(state: WallPlayerState, action: WallEngineAction): W
         },
         playbackState.items,
         resolvedCurrentItemId,
+        resolvedCurrentItemId === preferredCurrentItemId
+          ? action.preferredCurrentItemStartedAt ?? state.currentItemStartedAt ?? null
+          : null,
       );
 
       return {
@@ -313,6 +569,17 @@ export function wallReducer(state: WallPlayerState, action: WallEngineAction): W
         status: nextStatus,
         currentAd: nextStatus === 'playing' ? state.currentAd : null,
         adBaseItemId: nextStatus === 'playing' ? state.adBaseItemId ?? null : null,
+        videoPlayback: (
+          nextStatus === 'paused'
+          && state.currentItemId
+          && state.videoPlayback.itemId === state.currentItemId
+        )
+          ? {
+              ...state.videoPlayback,
+              phase: 'paused_by_wall',
+              exitReason: 'paused_by_operator',
+            }
+          : state.videoPlayback,
       };
     }
 
@@ -412,12 +679,22 @@ export function wallReducer(state: WallPlayerState, action: WallEngineAction): W
       const nextStatus = countQueueCandidates(playbackState.items) === 0 && state.status === 'playing'
         ? 'idle'
         : state.status;
+      const baseState = removedCurrentItem && state.videoPlayback.itemId === action.id
+        ? {
+            ...state,
+            status: nextStatus,
+            videoPlayback: finalizeVideoPlayback(state.videoPlayback, {
+              itemId: action.id,
+              exitReason: 'media_deleted',
+            }),
+          }
+        : {
+            ...state,
+            status: nextStatus,
+          };
 
       const nextState = resolveStateWithCurrentItem(
-        {
-          ...state,
-          status: nextStatus,
-        },
+        baseState,
         playbackState.items,
         nextCurrentItemId,
       );
@@ -512,60 +789,7 @@ export function wallReducer(state: WallPlayerState, action: WallEngineAction): W
     }
 
     case 'advance': {
-      if (state.currentAd) {
-        return state;
-      }
-
-      if (state.items.length === 0) {
-        return state;
-      }
-
-      const nextAdScheduler = markPhotoAdvanced(syncAdSchedulerWithSettings(state, state.settings));
-
-      if (shouldPlayAd(nextAdScheduler, state.ads.length)) {
-        const { ad, nextIndex } = selectNextAd(state.ads, nextAdScheduler.lastAdIndex);
-
-        if (ad) {
-          return {
-            ...state,
-            currentAd: ad,
-            adBaseItemId: state.currentItemId ?? null,
-            adScheduler: {
-              ...nextAdScheduler,
-              lastAdIndex: nextIndex,
-            },
-          };
-        }
-      }
-
-      const nextCurrentItemId = pickNextWallItemId(
-        state.items,
-        state.currentItemId,
-        resolveWallSelectionPolicy(state.settings),
-        state.senderStats,
-      );
-      if (!nextCurrentItemId) {
-        return {
-          ...state,
-          status: state.status === 'playing' ? 'idle' : state.status,
-          adScheduler: nextAdScheduler,
-        };
-      }
-
-      const playbackState = markPlayback(state.items, state.senderStats, nextCurrentItemId);
-      const nextState = resolveStateWithCurrentItem(
-        {
-          ...state,
-          adScheduler: nextAdScheduler,
-        },
-        playbackState.items,
-        nextCurrentItemId,
-      );
-
-      return {
-        ...nextState,
-        senderStats: playbackState.senderStats,
-      };
+      return advanceWallPlayback(state);
     }
 
     case 'ad-finished': {
@@ -613,8 +837,163 @@ export function wallReducer(state: WallPlayerState, action: WallEngineAction): W
       };
     }
 
+    case 'video-starting': {
+      if (!isVideoEventForCurrentItem(state, action.payload.itemId)) {
+        return state;
+      }
+
+      return {
+        ...state,
+        videoPlayback: {
+          ...mergeVideoMetrics(state.videoPlayback, action.payload),
+          phase: 'starting',
+          exitReason: null,
+          failureReason: null,
+        },
+      };
+    }
+
+    case 'video-first-frame': {
+      if (!isVideoEventForCurrentItem(state, action.payload.itemId)) {
+        return state;
+      }
+
+      return {
+        ...state,
+        videoPlayback: {
+          ...mergeVideoMetrics(state.videoPlayback, action.payload),
+          phase: state.videoPlayback.phase === 'probing' ? 'primed' : state.videoPlayback.phase,
+          firstFrameReady: true,
+        },
+      };
+    }
+
+    case 'video-playback-ready': {
+      if (!isVideoEventForCurrentItem(state, action.payload.itemId)) {
+        return state;
+      }
+
+      return {
+        ...state,
+        videoPlayback: {
+          ...mergeVideoMetrics(state.videoPlayback, action.payload),
+          phase: state.videoPlayback.playingConfirmed ? 'playing' : 'starting',
+          playbackReady: true,
+          posterVisible: false,
+        },
+      };
+    }
+
+    case 'video-playing': {
+      if (!isVideoEventForCurrentItem(state, action.payload.itemId)) {
+        return state;
+      }
+
+      return {
+        ...state,
+        videoPlayback: {
+          ...mergeVideoMetrics(state.videoPlayback, action.payload),
+          phase: 'playing',
+          playbackReady: true,
+          playingConfirmed: true,
+          posterVisible: false,
+          playbackStartedAt: state.videoPlayback.playbackStartedAt ?? new Date().toISOString(),
+        },
+      };
+    }
+
+    case 'video-progress': {
+      if (!isVideoEventForCurrentItem(state, action.payload.itemId)) {
+        return state;
+      }
+
+      const nextPlayback = mergeVideoMetrics(state.videoPlayback, action.payload);
+      return {
+        ...state,
+        videoPlayback: action.payload.readyState != null && action.payload.readyState >= 3
+          ? {
+              ...nextPlayback,
+              playbackReady: true,
+              posterVisible: false,
+            }
+          : nextPlayback,
+      };
+    }
+
+    case 'video-waiting': {
+      if (!isVideoEventForCurrentItem(state, action.payload.itemId)) {
+        return state;
+      }
+
+      return {
+        ...state,
+        videoPlayback: {
+          ...mergeVideoMetrics(state.videoPlayback, action.payload),
+          phase: 'waiting',
+          startupDegraded: true,
+        },
+      };
+    }
+
+    case 'video-stalled': {
+      if (!isVideoEventForCurrentItem(state, action.payload.itemId)) {
+        return state;
+      }
+
+      return {
+        ...state,
+        videoPlayback: {
+          ...mergeVideoMetrics(state.videoPlayback, action.payload),
+          phase: 'stalled',
+          startupDegraded: true,
+          stallCount: state.videoPlayback.stallCount + 1,
+        },
+      };
+    }
+
+    case 'video-ended': {
+      if (!isVideoEventForCurrentItem(state, action.payload.itemId)) {
+        return state;
+      }
+
+      return advanceWallPlayback(state, {
+        ...action.payload,
+        exitReason: 'ended',
+      });
+    }
+
+    case 'video-cap-reached': {
+      if (!isVideoEventForCurrentItem(state, action.payload.itemId)) {
+        return state;
+      }
+
+      return advanceWallPlayback(state, {
+        ...action.payload,
+        exitReason: 'cap_reached',
+      });
+    }
+
+    case 'video-failure': {
+      if (!isVideoEventForCurrentItem(state, action.payload.itemId)) {
+        return state;
+      }
+
+      return advanceWallPlayback(state, action.payload);
+    }
+
     case 'mark-expired':
-      return { ...state, status: 'expired', currentAd: null, adBaseItemId: null };
+      return {
+        ...state,
+        status: 'expired',
+        currentAd: null,
+        adBaseItemId: null,
+        videoPlayback: state.videoPlayback.itemId
+          ? finalizeVideoPlayback(state.videoPlayback, {
+              itemId: state.videoPlayback.itemId,
+              exitReason: 'replaced_by_command',
+            })
+          : state.videoPlayback,
+      };
 
     case 'sync-error':
       return countQueueCandidates(state.items) > 0 ? state : { ...state, status: 'error' };

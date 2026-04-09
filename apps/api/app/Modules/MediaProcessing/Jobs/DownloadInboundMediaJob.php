@@ -10,6 +10,7 @@ use App\Modules\MediaProcessing\Enums\ModerationStatus;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Services\ModerationBroadcasterService;
 use App\Modules\MediaProcessing\Services\RemoteInboundMediaDownloaderService;
+use App\Modules\MediaProcessing\Services\VideoMetadataExtractorService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -69,6 +70,15 @@ class DownloadInboundMediaJob implements ShouldQueue
 
         Storage::disk('public')->put($path, $body);
 
+        $videoMetadata = $mediaType === 'video'
+            ? app(VideoMetadataExtractorService::class)->extractFromStoredAsset(
+                disk: 'public',
+                path: $path,
+                mimeType: $mimeType,
+                hints: $this->videoMetadataHints($inboundMessage, $download),
+            )
+            : [];
+
         if ($mediaType === 'audio') {
             $inboundMessage->update([
                 'capture_target' => 'event_audio',
@@ -111,6 +121,7 @@ class DownloadInboundMediaJob implements ShouldQueue
             'face_index_status' => $this->shouldQueueFaceIndex($mediaType, $inboundMessage) ? 'queued' : 'skipped',
             'vlm_status' => $usesImagePipeline ? 'queued' : 'skipped',
             'pipeline_version' => 'media_ai_foundation_v1',
+            ...$videoMetadata,
         ]);
 
         $inboundMessage->update([
@@ -198,5 +209,20 @@ class DownloadInboundMediaJob implements ShouldQueue
     {
         return $mediaType === 'image'
             && (bool) ($inboundMessage->event?->isFaceSearchEnabled() ?? false);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function videoMetadataHints(InboundMessage $inboundMessage, array $download): array
+    {
+        $payload = is_array($inboundMessage->normalized_payload_json)
+            ? $inboundMessage->normalized_payload_json
+            : [];
+
+        return array_merge($payload, [
+            'mime_type' => $download['mime_type'] ?? $inboundMessage->mime_type,
+            'container' => $download['mime_type'] ?? $inboundMessage->mime_type,
+        ]);
     }
 }

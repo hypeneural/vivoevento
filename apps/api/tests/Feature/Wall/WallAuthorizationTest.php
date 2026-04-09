@@ -59,6 +59,13 @@ it('allows a same-organization manager to update wall settings', function () {
         'show_qr' => false,
         'selection_mode' => 'inclusive',
         'event_phase' => 'reception',
+        'video_enabled' => true,
+        'video_playback_mode' => 'play_to_end_if_short_else_cap',
+        'video_max_seconds' => 20,
+        'video_resume_mode' => 'restart_from_zero',
+        'video_audio_policy' => 'muted',
+        'video_multi_layout_policy' => 'disallow',
+        'video_preferred_variant' => 'wall_video_1080p',
         'selection_policy' => [
             'max_eligible_items_per_sender' => 3,
             'max_replays_per_item' => 1,
@@ -83,6 +90,13 @@ it('allows a same-organization manager to update wall settings', function () {
         ->and($settings->show_qr)->toBeFalse()
         ->and($settings->selection_mode->value)->toBe('inclusive')
         ->and($settings->event_phase->value)->toBe('reception')
+        ->and($settings->video_enabled)->toBeTrue()
+        ->and($settings->video_playback_mode)->toBe('play_to_end_if_short_else_cap')
+        ->and($settings->video_max_seconds)->toBe(20)
+        ->and($settings->video_resume_mode)->toBe('restart_from_zero')
+        ->and($settings->video_audio_policy)->toBe('muted')
+        ->and($settings->video_multi_layout_policy)->toBe('disallow')
+        ->and($settings->video_preferred_variant)->toBe('wall_video_1080p')
         ->and($settings->selection_policy['low_volume_max_items'])->toBe(5)
         ->and($settings->selection_policy['sender_cooldown_seconds'])->toBe(90);
 });

@@ -2,6 +2,7 @@
 
 use App\Modules\FaceSearch\Services\CompreFaceClient;
 use App\Shared\Exceptions\ProviderMisconfiguredException;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 
@@ -76,6 +77,38 @@ it('supports multipart detection requests as a technical fallback', function () 
             && $request->hasHeader('x-api-key', 'test-api-key')
             && str_contains((string) ($request->header('Content-Type')[0] ?? ''), 'multipart/form-data');
     });
+});
+
+it('retries transient connection failures on detection before failing the pilot flow', function () {
+    config()->set('face_search.providers.compreface', [
+        'base_url' => 'http://compreface.test',
+        'api_key' => 'test-api-key',
+        'face_plugins' => 'calculator,landmarks',
+        'status' => true,
+        'detection_timeout' => 25,
+        'detection_connect_timeout' => 5,
+        'detection_retry_times' => 3,
+        'detection_retry_sleep_ms' => 1,
+    ]);
+
+    $requests = 0;
+
+    Http::fake(function () use (&$requests) {
+        $requests++;
+
+        if ($requests < 3) {
+            throw new ConnectionException('timeout');
+        }
+
+        return Http::response([
+            'result' => [],
+        ]);
+    });
+
+    $payload = app(CompreFaceClient::class)->detectBase64('YmFzZTY0LWltYWdl');
+
+    expect($payload['result'])->toBe([])
+        ->and($requests)->toBe(3);
 });
 
 it('calls compreface embedding verification with the dedicated verification api key', function () {

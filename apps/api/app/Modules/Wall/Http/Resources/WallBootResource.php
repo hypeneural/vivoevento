@@ -20,7 +20,7 @@ class WallBootResource extends JsonResource
         $payloads = app(WallPayloadFactory::class);
 
         $files = $event && $event->relationLoaded('media')
-            ? WallMediaResource::collection($event->media)->resolve($request)
+            ? $event->media->map(fn ($media) => $payloads->media($media, $this->resource))->values()->all()
             : [];
 
         return [

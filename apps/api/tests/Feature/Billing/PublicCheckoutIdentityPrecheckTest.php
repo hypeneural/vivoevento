@@ -28,7 +28,7 @@ it('returns login_suggested when whatsapp already exists', function () {
     $this->assertApiSuccess($response);
     $response->assertJsonPath('data.identity_status', 'login_suggested');
     $response->assertJsonPath('data.action_label', 'Entrar para continuar');
-    $response->assertJsonPath('data.login_url', '/login?returnTo=%2Fcheckout%2Fevento%3Fresume%3Dauth');
+    $response->assertJsonPath('data.login_url', '/login?returnTo=%2Fcheckout%2Fevento%3Fv2%3D1%26resume%3Dauth');
 
     expect(mb_strtolower((string) $response->json('data.description')))
         ->not->toContain('whatsapp')

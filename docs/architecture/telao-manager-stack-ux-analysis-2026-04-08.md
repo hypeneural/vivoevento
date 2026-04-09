@@ -78,6 +78,12 @@ Leitura curta:
 - `Aparencia` e `Anuncios` ja sairam de blocos inline e passaram a componentes proprios do inspector;
 - `Proximas fotos` agora funciona como timeline horizontal com scroll, thumb e origem;
 - a simulacao agora tambem ja entrega `caption` e `layout_hint`, deixando a leitura da fila mais proxima do palco real;
+- o `liveSnapshot` agora tambem pode trazer `nextItem` quando a previsao da fila confirma a proxima midia com confianca;
+- o palco agora mostra blocos dedicados de `Agora no telao` e `Proxima no telao`;
+- o snapshot, a simulacao e os itens recentes agora expoem semantica final de foto/video com `isVideo`, duracao e `videoPolicyLabel`;
+- origem e video agora usam um mapper unico no frontend, evitando regra espalhada entre palco, timeline e detalhe;
+- o palco agora mantem placeholders operacionais quando o player ainda nao confirmou a midia atual ou a proxima;
+- a timeline prevista agora entra com loading estavel, sem colapsar a area enquanto a previsao recalcula;
 - os cards de player no diagnostico agora usam cor por saude operacional, facilitando leitura rapida de online, instabilidade e offline;
 - o palco agora exibe um relogio operacional de troca usando `advancedAt` do snapshot e `interval_ms` do wall;
 - o diagnostico por player agora abre um detalhe expandido em `Sheet` no desktop e `Drawer` no mobile, com copy mais orientada a operacao;
@@ -298,6 +304,13 @@ Nesta fase, o heartbeat tambem passou a alimentar um snapshot dedicado para o ma
 - o backend atualiza `current_item_started_at` por player;
 - monta o `liveSnapshot` mais recente;
 - e emite `wall.runtime.snapshot.updated` no canal privado do evento.
+
+Nesta primeira fatia do bloco novo:
+
+- o `current_item_started_at` passou a nascer no engine do player quando a midia atual muda;
+- o `heartbeat` passou a enviar esse timestamp explicitamente;
+- o backend passou a preferir esse valor quando ele vier do player;
+- quando o mesmo item continua em tela, o backend nao deixa `advancedAt` regredir para um horario mais antigo.
 
 #### Timings atuais do player
 
@@ -1056,6 +1069,7 @@ Leitura:
 
 - isso ja entrega item atual, origem, remetente e tempo restante estimado;
 - melhora muito a leitura operacional no manager;
+- nesta primeira fatia, isso ficou melhor porque o `advancedAt` pode nascer do proprio engine do player, e nao apenas do instante em que o heartbeat chegou;
 - mas ainda depende do ritmo do heartbeat e do ultimo player reportado.
 
 Para fechar isso de forma mais forte, ainda existem dois caminhos:
@@ -1070,6 +1084,7 @@ Payload atual do snapshot:
 - `current_source_type`
 - `current_layout`
 - `advanced_at`
+- `next_item`, apenas quando a simulacao do backend confirma a mesma midia atual como primeira posicao prevista da fila
 
 Hoje esse snapshot e atualizado a partir do player monitorado mais recente.
 
@@ -1842,7 +1857,7 @@ interface WallInsightsResponse {
     received: number
     approved: number
     queued: number
-    displayed: number | null
+    displayed: number
   }
   recentItems: Array<{
     id: string
@@ -1881,22 +1896,23 @@ Esse agregado resolve tres problemas de uma vez:
 - `recentItems` deve vir limitado para `10-20` itens, nao para feed infinito;
 - o endpoint deve continuar sob `viewWall`.
 
-### Achado validado na implementacao inicial
+### Achado validado na implementacao da Etapa 3
 
-Na primeira fatia realmente implementada do cockpit, uma duvida importante foi resolvida pelo codigo real:
+Essa duvida ja ficou resolvida no codigo real:
 
-- `totals.displayed` precisa continuar `nullable` por enquanto.
+- `totals.displayed` deixou de ser `nullable` no payload usado pelo cockpit.
 
 Motivo:
 
-- o backend atual do wall ainda nao guarda historico acumulado confiavel de quantas midias ja foram exibidas;
-- o que existe hoje e telemetria de runtime e item atual por player;
-- isso e suficiente para diagnostico e monitor imediato, mas nao para KPI consolidado de exibidas.
+- o backend agora persiste historico acumulado em `wall_display_counters`;
+- a escrita acontece na trilha do `heartbeat`, usando `current_item_id` + `current_item_started_at`;
+- a contagem aplica dedupe para reconexao, repeticao do mesmo display e regressao temporal do sinal.
 
 Leitura:
 
-- o agregado `wall/insights` ja e suficiente para topo vivo e trilho recente;
-- mas `displayed` so deve virar numero definitivo quando entrar snapshot live ou historico operacional dedicado.
+- o agregado `wall/insights` agora entrega um KPI autoritativo de exibidas para o topo;
+- a autoridade atual e operacional, derivada do runtime real dos players;
+- o proximo salto deixa de ser destravar esse numero e passa a ser enriquecer a semantica final de origem, video e historico de ciclo.
 
 ## 16.4 Enriquecer `sequence_preview`
 
@@ -2135,49 +2151,84 @@ Hoje o manager ja tem:
 - snapshot dedicado
 - evento privado de snapshot
 - clock estimado de troca
+- `advancedAt` mais forte porque o player agora envia `current_item_started_at` autoritativo no `heartbeat`
+- `nextItem` quando a previsao da fila bate com a midia atual do snapshot
+- palco com blocos `Agora no telao` e `Proxima no telao`
 
 O que ainda falta:
 
-- mover o `advancedAt` de uma leitura derivada do heartbeat para uma fonte mais proxima do `advance` real
-- decidir se o snapshot deve carregar tambem `nextItem`
+- completar a migracao de `advancedAt` para uma fonte ainda mais proxima do `advance` real, reduzindo a dependencia da cadencia do `heartbeat`
 - reduzir a diferenca entre `monitor live` e `simulacao`
 
 ### 2. Historico confiavel de exibidas
 
-Hoje:
+Estado atual:
 
-- `totals.displayed` ainda nao e numero autoritativo
-- o backend ainda nao guarda historico acumulado confiavel de exibidas
+- `totals.displayed` ja e numero autoritativo para o cockpit atual;
+- o backend agora guarda historico agregado em `wall_display_counters`;
+- a trilha sobe o contador quando a exibicao realmente avanca e evita duplicidade no mesmo display.
 
-Proximo passo:
+Leitura:
 
-- criar essa trilha no backend e devolver o valor pronto para UI
+- isso destrava o KPI superior e remove a dependencia de regra local no frontend;
+- a proxima etapa deixa de ser persistencia e passa a ser semantica final de origem e video.
 
 ### 3. Semantica visual final de origem e video
 
-Hoje:
+Estado atual:
 
-- a timeline ja tem thumb, origem textual, `caption` e `layout_hint`
-- o playback de video do wall continua com gaps especificos de produto e engine
+- `liveSnapshot`, `sequence_preview` e `wall/insights` recente agora carregam:
+  - normalizacao final de origem
+  - `isVideo`
+  - duracao
+  - `videoPolicyLabel`
+- palco, timeline horizontal e detalhe lateral agora consomem um mapper unico de semantica visual;
+- video curto, video com duracao diferenciada e video longo com politica especial agora aparecem com leitura consistente no cockpit;
+- o playback de video do wall continua com gaps especificos de produto e engine, mas a camada de leitura operacional do manager ficou fechada.
 
 Proximo passo:
 
-- consolidar badge e rotulo final de origem
-- destacar video de forma consistente entre timeline, monitor e detalhe
 - ligar essa evolucao ao plano proprio de video em:
   - `docs/architecture/wall-video-playback-current-state-2026-04-08.md`
   - `docs/architecture/wall-video-playback-execution-plan-2026-04-08.md`
+- seguir com o bloco seguinte do plano de continuidade, caso o time queira levar o monitor para uma fase ainda mais autoritativa de playback e video.
 
 ## Revalidacao complementar executada em 2026-04-09
 
 Cockpit do wall:
 
+- `cd apps/api && php artisan test --filter=WallLiveSnapshotTest`
+  - `7` testes passando
+- `cd apps/api && php artisan test --filter=WallDiagnosticsTest`
+  - `7` testes passando
+- `cd apps/api && php artisan test --filter=WallInsightsTest`
+  - `6` testes passando
 - `cd apps/api && php artisan test --filter=Wall`
-  - `62` testes passando
+  - `92` testes passando
+- `cd apps/web && npm run test -- src/modules/wall/components/manager/stage/WallHeroStage.test.tsx src/modules/wall/components/manager/stage/WallUpcomingTimeline.test.tsx src/modules/wall/components/manager/recent/WallRecentMediaDetailsSheet.test.tsx`
+  - `4` testes passando
+- `cd apps/web && npm run test -- src/modules/wall/hooks/useWallLiveSnapshot.test.tsx src/modules/wall/hooks/useWallRealtimeSync.test.tsx src/modules/wall/components/manager/stage/WallAdvanceClock.test.tsx src/modules/wall/components/manager/stage/WallHeroStage.test.tsx src/modules/wall/components/manager/stage/WallUpcomingTimeline.test.tsx src/modules/wall/components/manager/top/WallTotalMediaCard.test.tsx src/modules/wall/pages/EventWallManagerPage.test.tsx`
+  - `26` testes passando
 - `cd apps/web && npm run test -- src/modules/wall`
-  - `199` testes passando
+  - `208` testes passando
 - `cd apps/web && npm run type-check`
   - sem erros
+- `cd apps/web && npm run test -- src/modules/wall/hooks/useWallTopInsights.test.tsx src/modules/wall/components/manager/top/WallTotalMediaCard.test.tsx src/modules/wall/hooks/useWallRealtimeSync.test.tsx`
+  - `8` testes passando
+
+Detalhe importante desta revalidacao:
+
+- o snapshot ao vivo agora preserva `advancedAt` autoritativo vindo do player quando a mesma midia continua em tela;
+- timestamps mais antigos para a mesma midia sao ignorados no backend para evitar regressao visual do clock;
+- o snapshot agora tambem devolve `nextItem` quando a previsao do backend confirma a proxima midia com confianca;
+- `totals.displayed` agora sai de historico agregado por wall e nao depende mais de fallback `null` na UI;
+- snapshot, simulacao e itens recentes agora usam a mesma semantica de origem e video no contrato;
+- o detalhe lateral agora traduz playback de video para copy operacional, sem vazar regra tecnica crua;
+- o palco agora segura o contexto de `Agora` e `Proxima` com placeholders operacionais, mesmo antes da primeira confirmacao do player;
+- a timeline prevista agora preserva altura e contexto durante o loading, reduzindo a sensacao de piscada quando a previsao recarrega;
+- o palco agora continua obedecendo a selecao manual do operador na midia principal, sem perder os blocos `Agora` e `Proxima`;
+- a suite `Wall` do backend continua verde, com apenas um `TODO` ja existente fora deste escopo em `PagarmeClientTest`;
+- o warning restante de `React Router` nos testes do manager continua sendo apenas aviso de future flags, sem falha funcional.
 
 Baseline de video e intake:
 

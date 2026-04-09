@@ -4,7 +4,9 @@ use App\Modules\FaceSearch\Models\EventFaceSearchSetting;
 use App\Modules\FaceSearch\Services\CompreFaceDetectionProvider;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use Illuminate\Http\Client\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 
 it('maps compreface detection response into detected face data with calculator payload', function () {
     config()->set('face_search.providers.compreface', [
@@ -159,3 +161,53 @@ it('throws a clear exception when compreface returns an unmappable face', functi
         'fake-binary',
     );
 })->throws(RuntimeException::class, 'CompreFace detection response contains an invalid bounding box');
+
+it('captures image dimensions and face area ratio when the source image can be decoded', function () {
+    config()->set('face_search.providers.compreface', [
+        'base_url' => 'http://compreface.test',
+        'api_key' => 'test-api-key',
+        'face_plugins' => 'calculator,landmarks',
+        'status' => true,
+        'timeout' => 9,
+        'connect_timeout' => 3,
+        'use_base64' => true,
+    ]);
+
+    Http::fake([
+        'http://compreface.test/api/v1/detection/detect*' => Http::response([
+            'result' => [
+                [
+                    'box' => [
+                        'probability' => 0.99,
+                        'x_min' => 68,
+                        'y_min' => 77,
+                        'x_max' => 376,
+                        'y_max' => 479,
+                    ],
+                    'landmarks' => [],
+                    'embedding' => [0.10, -0.20, 0.30],
+                ],
+            ],
+        ]),
+    ]);
+
+    Storage::fake('public');
+
+    $path = UploadedFile::fake()
+        ->image('probe.jpg', 1200, 900)
+        ->store('tmp', 'public');
+    $binary = Storage::disk('public')->get($path);
+
+    $faces = app(CompreFaceDetectionProvider::class)->detect(
+        EventMedia::factory()->make(['id' => 456, 'media_type' => 'image']),
+        EventFaceSearchSetting::factory()->make(['provider_key' => 'compreface']),
+        (string) $binary,
+    );
+
+    expect($faces)->toHaveCount(1)
+        ->and($faces[0]->faceAreaRatio)->not->toBeNull()
+        ->and($faces[0]->faceAreaRatio)->toBeGreaterThan(0.11)
+        ->and($faces[0]->faceAreaRatio)->toBeLessThan(0.12)
+        ->and(data_get($faces[0]->providerPayload, 'image_width'))->toBe(1200)
+        ->and(data_get($faces[0]->providerPayload, 'image_height'))->toBe(900);
+});

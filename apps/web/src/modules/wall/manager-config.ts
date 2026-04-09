@@ -3,6 +3,11 @@ import type {
   ApiWallOptionsResponse,
   ApiWallSelectionModeOption,
   ApiWallSettings,
+  ApiWallVideoAudioPolicy,
+  ApiWallVideoMultiLayoutPolicy,
+  ApiWallVideoPlaybackMode,
+  ApiWallVideoPreferredVariant,
+  ApiWallVideoResumeMode,
 } from '@/lib/api-types';
 
 export const fallbackOptions: ApiWallOptionsResponse = {
@@ -324,6 +329,46 @@ export const HELP_TEXTS = {
     description: 'Exibe uma faixa com as proximas midias na lateral da tela principal. Mantem o publico curioso sobre o proximo conteudo.',
     why: 'Mostrar a fila de midias vindouras gera engajamento e transparencia sobre a ordem de exibicao.',
   },
+  videoPolicySection: {
+    title: 'Politica de video',
+    description: 'Controla quando videos entram, como eles tocam e quando o wall pode interromper para seguir a fila.',
+    why: 'Esse bloco evita cortes inesperados, travamentos por video pesado e configuracoes contraditorias entre upload, player e operador.',
+  },
+  videoEnabled: {
+    title: 'Suportar videos no telao',
+    description: 'Liga ou desliga a trilha oficial de video neste wall.',
+    why: 'Quando desligado, o player continua exibindo apenas imagens e o intake publico bloqueia video para este evento.',
+  },
+  videoPlaybackMode: {
+    title: 'Modo de reproducao do video',
+    description: 'Define se o wall trata video como tempo fixo, playback ate o fim ou playback ate um cap.',
+    why: 'Essa decisao muda o ritmo do telao e evita o comportamento de “video cortado do nada” em arquivos longos.',
+  },
+  videoMaxSeconds: {
+    title: 'Duracao maxima de video',
+    description: 'Cap operacional aplicado a videos comuns do wall.',
+    why: 'Serve para impedir que um unico video longo segure a fila inteira em momentos de pico.',
+  },
+  videoResumeMode: {
+    title: 'Comportamento ao retomar',
+    description: 'Escolhe se o wall continua do ponto atual ou reinicia o video quando sai da pausa.',
+    why: 'Essa regra precisa ser previsivel para o operador saber se uma pausa curta preserva o playback atual.',
+  },
+  videoAudioPolicy: {
+    title: 'Audio do video',
+    description: 'Define se o wall mantem o video mudo ou tenta outra politica no futuro.',
+    why: 'Autoplay confiavel em navegadores modernos depende de video mudo na grande maioria dos cenarios de telão.',
+  },
+  videoMultiLayoutPolicy: {
+    title: 'Video em layouts multi-slot',
+    description: 'Controla se mosaico, grade e carrossel podem receber video.',
+    why: 'Limitar ou bloquear video nesses layouts reduz decode paralelo, buffering e ruido visual.',
+  },
+  videoPreferredVariant: {
+    title: 'Variante preferida do video',
+    description: 'Escolhe qual variante o player tenta usar antes de cair em alternativas.',
+    why: 'Priorizar a variante certa reduz peso de rede, melhora startup e evita depender do original pesado.',
+  },
 } as const;
 
 export type WallHelpKey = keyof typeof HELP_TEXTS;
@@ -334,6 +379,107 @@ export const WALL_COOLDOWN_OPTIONS = [0, 30, 45, 60, 90, 120];
 export const WALL_WINDOW_MINUTE_OPTIONS = [5, 10, 15];
 export const WALL_VOLUME_THRESHOLD_OPTIONS = [4, 6, 8, 10, 12, 16, 20, 24, 30, 40, 50];
 export const WALL_REPLAY_MINUTE_OPTIONS = [5, 8, 10, 12, 14, 16, 20, 25, 30];
+export const WALL_VIDEO_MAX_SECONDS_OPTIONS = [10, 12, 15, 20, 30, 45, 60];
+
+export const WALL_VIDEO_PLAYBACK_MODE_OPTIONS: Array<{
+  value: ApiWallVideoPlaybackMode;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'fixed_interval',
+    label: 'Tempo fixo do slide',
+    description: 'O video respeita o mesmo intervalo das imagens.',
+  },
+  {
+    value: 'play_to_end',
+    label: 'Tocar ate o fim',
+    description: 'O wall espera o termino natural do video.',
+  },
+  {
+    value: 'play_to_end_if_short_else_cap',
+    label: 'Fim se curto, senao cap',
+    description: 'Videos curtos vao ate o fim e videos longos seguem o limite configurado.',
+  },
+];
+
+export const WALL_VIDEO_RESUME_MODE_OPTIONS: Array<{
+  value: ApiWallVideoResumeMode;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'resume_if_same_item_else_restart',
+    label: 'Retomar se for o mesmo item',
+    description: 'Continua do ponto atual quando o mesmo video segue em foco e reinicia se a fila mudar.',
+  },
+  {
+    value: 'resume_if_same_item',
+    label: 'Sempre tentar retomar',
+    description: 'Mantem o ponto atual sempre que o mesmo video continuar montado.',
+  },
+  {
+    value: 'restart_from_zero',
+    label: 'Reiniciar do comeco',
+    description: 'Volta o video para o inicio na retomada apos pausa.',
+  },
+];
+
+export const WALL_VIDEO_AUDIO_POLICY_OPTIONS: Array<{
+  value: ApiWallVideoAudioPolicy;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'muted',
+    label: 'Sempre mudo',
+    description: 'Politica segura para autoplay confiavel em Chrome e navegadores mobile.',
+  },
+];
+
+export const WALL_VIDEO_MULTI_LAYOUT_OPTIONS: Array<{
+  value: ApiWallVideoMultiLayoutPolicy;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'disallow',
+    label: 'Nao permitir',
+    description: 'Sempre cai para layout single-item quando a midia atual e video.',
+  },
+  {
+    value: 'one',
+    label: 'Permitir no maximo 1',
+    description: 'Abre espaco para um unico video simultaneo em layouts multi-slot.',
+  },
+  {
+    value: 'all',
+    label: 'Permitir todos',
+    description: 'Mantem layouts multi-slot livres para videos quando o device aguentar.',
+  },
+];
+
+export const WALL_VIDEO_PREFERRED_VARIANT_OPTIONS: Array<{
+  value: ApiWallVideoPreferredVariant;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'wall_video_720p',
+    label: '720p otimizado',
+    description: 'Padrao mais leve para startup rapido e decode previsivel.',
+  },
+  {
+    value: 'wall_video_1080p',
+    label: '1080p otimizado',
+    description: 'Usa a variante 1080p quando houver hardware e rede para isso.',
+  },
+  {
+    value: 'original',
+    label: 'Arquivo original',
+    description: 'Permite fallback para o arquivo original quando a policy aceitar.',
+  },
+];
 
 export const WALL_TOGGLE_FIELDS: Array<{
   key: keyof Pick<ApiWallSettings, 'show_qr' | 'show_branding' | 'show_sender_credit' | 'show_neon'>;

@@ -6,6 +6,8 @@ enum InvoiceStatus: string
 {
     case Open = 'open';
     case Paid = 'paid';
+    case Failed = 'failed';
+    case Canceled = 'canceled';
     case Void = 'void';
     case Refunded = 'refunded';
 

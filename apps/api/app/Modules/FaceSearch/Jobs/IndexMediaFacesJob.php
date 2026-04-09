@@ -3,6 +3,7 @@
 namespace App\Modules\FaceSearch\Jobs;
 
 use App\Modules\FaceSearch\Actions\IndexMediaFacesAction;
+use App\Modules\FaceSearch\Jobs\SyncAwsUserVectorJob;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Services\MediaPipelineDegradationPolicy;
 use App\Modules\MediaProcessing\Services\MediaProcessingRunService;
@@ -124,6 +125,15 @@ class IndexMediaFacesJob implements ShouldBeUnique, ShouldQueue
             $media->forceFill([
                 'face_index_status' => $result['status'],
             ])->save();
+
+            if (
+                $result['status'] === 'indexed'
+                && $settings?->enabled
+                && $settings->recognition_enabled
+                && $settings->search_backend_key === 'aws_rekognition'
+            ) {
+                SyncAwsUserVectorJob::dispatch($media->event_id);
+            }
 
             $runService->finishStage($run, [
                 'provider_key' => $settings?->provider_key ?? 'noop',

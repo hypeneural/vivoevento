@@ -28,7 +28,7 @@ class GenerateMediaVariantsJob implements ShouldBeUnique, ShouldQueue
     use SerializesModels;
 
     public int $tries = 3;
-    public int $timeout = 120;
+    public int $timeout = 360;
     public int $backoff = 10;
     public int $uniqueFor = 1800;
 
@@ -65,9 +65,13 @@ class GenerateMediaVariantsJob implements ShouldBeUnique, ShouldQueue
         $runService = app(MediaProcessingRunService::class);
         $variantGenerator = app(MediaVariantGeneratorService::class);
         $duplicateGrouping = app(SyncEventMediaDuplicateGroupAction::class);
+        $variantProvider = $media->media_type === 'video' ? 'ffmpeg' : 'intervention-image';
+        $variantModel = $media->media_type === 'video'
+            ? 'ffmpeg-h264-aac-faststart'
+            : 'intervention-image-v4';
         $run = $runService->startStage($media, 'variants', [
-            'provider_key' => 'intervention-image',
-            'model_key' => 'intervention-image-v4',
+            'provider_key' => $variantProvider,
+            'model_key' => $variantModel,
             'input_ref' => $media->originalStoragePath(),
             'idempotency_key' => "variants:{$media->id}",
             'queue_name' => 'media-variants',

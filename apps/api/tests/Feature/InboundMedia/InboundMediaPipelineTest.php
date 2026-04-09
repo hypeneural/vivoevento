@@ -13,6 +13,7 @@ use App\Modules\MediaProcessing\Jobs\RunModerationJob;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
@@ -169,6 +170,7 @@ it('normalizes video payloads without confusing scalar photo metadata with media
 it('downloads inbound video as video media and skips image-only stages', function () {
     Storage::fake('public');
     Queue::fake([GenerateMediaVariantsJob::class, RunModerationJob::class]);
+    Process::fake();
 
     Http::fake([
         'https://cdn.fixture.test/*' => Http::response(
@@ -207,6 +209,16 @@ it('downloads inbound video as video media and skips image-only stages', functio
                 'videoUrl' => 'https://cdn.fixture.test/zapi/private-video.mp4',
                 'mimeType' => 'video/mp4',
             ],
+            'media' => [
+                'width' => 1080,
+                'height' => 1920,
+                'duration' => 23,
+                'has_audio' => true,
+                'video_codec' => 'h264',
+                'audio_codec' => 'aac',
+                'bitrate' => 680000,
+                'container' => 'mp4',
+            ],
             '_event_context' => [
                 'event_id' => $event->id,
                 'event_channel_id' => $channel->id,
@@ -235,6 +247,14 @@ it('downloads inbound video as video media and skips image-only stages', functio
     expect($eventMedia->media_type)->toBe('video')
         ->and($eventMedia->mime_type)->toBe('video/mp4')
         ->and($eventMedia->original_path)->toContain('.mp4')
+        ->and($eventMedia->duration_seconds)->toBe(23)
+        ->and($eventMedia->width)->toBe(1080)
+        ->and($eventMedia->height)->toBe(1920)
+        ->and($eventMedia->has_audio)->toBeTrue()
+        ->and($eventMedia->video_codec)->toBe('h264')
+        ->and($eventMedia->audio_codec)->toBe('aac')
+        ->and($eventMedia->bitrate)->toBe(680000)
+        ->and($eventMedia->container)->toBe('mp4')
         ->and($eventMedia->processing_status)->toBe(MediaProcessingStatus::Processed)
         ->and($eventMedia->safety_status)->toBe('skipped')
         ->and($eventMedia->vlm_status)->toBe('skipped')
@@ -243,6 +263,7 @@ it('downloads inbound video as video media and skips image-only stages', functio
     Storage::disk('public')->assertExists($eventMedia->original_path);
     Queue::assertNotPushed(GenerateMediaVariantsJob::class);
     Queue::assertPushed(RunModerationJob::class, fn (RunModerationJob $job) => $job->eventMediaId === $eventMedia->id);
+    Process::assertNothingRan();
 });
 
 it('captures inbound audio on the event without creating gallery media', function () {

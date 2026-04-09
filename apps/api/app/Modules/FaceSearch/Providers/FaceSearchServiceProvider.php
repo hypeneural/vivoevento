@@ -13,6 +13,10 @@ use App\Modules\FaceSearch\Console\RunFaceIndexLaneThroughputCommand;
 use App\Modules\FaceSearch\Console\RunManifestFaceSizeThresholdSweepCommand;
 use App\Modules\FaceSearch\Console\RunFaceSizeThresholdSweepCommand;
 use App\Modules\FaceSearch\Console\RunLfwLocalLoaderCommand;
+use App\Modules\FaceSearch\Console\PromoteAwsFallbackRolloutCommand;
+use App\Modules\FaceSearch\Console\RunAwsFallbackSoakCommand;
+use App\Modules\FaceSearch\Console\RunAwsUsersHighCardinalityValidationCommand;
+use App\Modules\FaceSearch\Console\RollbackAwsFallbackRolloutCommand;
 use App\Modules\FaceSearch\Console\RunOrganizeLocalGalleryByFaceCommand;
 use App\Modules\FaceSearch\Console\RunSearchThresholdSweepCommand;
 use App\Modules\FaceSearch\Console\RunSmokeMinFaceSizeAnalysisCommand;
@@ -131,6 +135,10 @@ class FaceSearchServiceProvider extends ServiceProvider
                 RunFaceSizeThresholdSweepCommand::class,
                 RunLfwLocalLoaderCommand::class,
                 RunManifestFaceSizeThresholdSweepCommand::class,
+                PromoteAwsFallbackRolloutCommand::class,
+                RollbackAwsFallbackRolloutCommand::class,
+                RunAwsFallbackSoakCommand::class,
+                RunAwsUsersHighCardinalityValidationCommand::class,
                 RunOrganizeLocalGalleryByFaceCommand::class,
                 RunSearchThresholdSweepCommand::class,
                 RunSmokeMinFaceSizeAnalysisCommand::class,

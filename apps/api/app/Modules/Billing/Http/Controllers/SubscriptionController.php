@@ -101,6 +101,7 @@ class SubscriptionController extends BaseController
             $request->user(),
             $plan,
             $validated['billing_cycle'] ?? 'monthly',
+            $validated,
         );
 
         $subscription = $checkout['subscription'];

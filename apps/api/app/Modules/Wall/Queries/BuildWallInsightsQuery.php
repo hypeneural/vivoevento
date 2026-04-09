@@ -4,6 +4,8 @@ namespace App\Modules\Wall\Queries;
 
 use App\Modules\Events\Models\Event;
 use App\Modules\MediaProcessing\Models\EventMedia;
+use App\Modules\Wall\Models\EventWallSetting;
+use App\Modules\Wall\Models\WallDisplayCounter;
 use Illuminate\Support\Collection;
 
 class BuildWallInsightsQuery
@@ -21,8 +23,7 @@ class BuildWallInsightsQuery
             'received' => (int) ($row?->received_count ?? 0),
             'approved' => (int) ($row?->approved_count ?? 0),
             'queued' => (int) ($row?->queued_count ?? 0),
-            // The current runtime tables only expose current items, not cumulative displayed totals.
-            'displayed' => null,
+            'displayed' => $this->displayedCount($event),
         ];
     }
 
@@ -42,6 +43,7 @@ class BuildWallInsightsQuery
                 'inbound_message_id',
                 'uploaded_by_user_id',
                 'media_type',
+                'duration_seconds',
                 'source_type',
                 'source_label',
                 'processing_status',
@@ -90,5 +92,20 @@ class BuildWallInsightsQuery
             ->first(['created_at'])
             ?->created_at
             ?->toIso8601String();
+    }
+
+    private function displayedCount(Event $event): int
+    {
+        $wallSettingId = EventWallSetting::query()
+            ->where('event_id', $event->id)
+            ->value('id');
+
+        if (! $wallSettingId) {
+            return 0;
+        }
+
+        return (int) (WallDisplayCounter::query()
+            ->where('event_wall_setting_id', $wallSettingId)
+            ->value('displayed_count') ?? 0);
     }
 }

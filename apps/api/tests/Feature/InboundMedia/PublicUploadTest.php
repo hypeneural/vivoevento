@@ -4,7 +4,9 @@ use App\Modules\Events\Models\Event;
 use App\Modules\Events\Models\EventModule;
 use App\Modules\MediaProcessing\Jobs\GenerateMediaVariantsJob;
 use App\Modules\MediaProcessing\Models\EventMedia;
+use App\Modules\Wall\Models\EventWallSetting;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
@@ -26,6 +28,10 @@ it('returns the public upload payload for an active live event', function () {
     $response->assertJsonPath('data.event.title', 'Festival da Familia');
     $response->assertJsonPath('data.upload.enabled', true);
     $response->assertJsonPath('data.upload.status', 'available');
+    $response->assertJsonPath('data.upload.accepts_video', true);
+    $response->assertJsonPath('data.upload.video_single_only', true);
+    $response->assertJsonPath('data.upload.video_max_duration_seconds', 30);
+    $response->assertJsonPath('data.upload.accept_hint', 'image/*,video/mp4,video/quicktime');
     expect($response->json('data.links.upload_url'))->toContain('/upload/' . $event->upload_slug);
 });
 
@@ -47,9 +53,9 @@ it('returns moderation guidance for each supported event mode in the upload payl
     $response->assertJsonPath('data.upload.moderation_mode', $mode);
     $response->assertJsonPath('data.upload.instructions', $expectedInstruction);
 })->with([
-    ['none', 'As fotos entram no ar automaticamente apos o processamento base.'],
-    ['manual', 'As fotos enviadas passam por moderacao manual antes de aparecer no evento.'],
-    ['ai', 'As fotos passam por moderacao por IA antes de aparecer no evento.'],
+    ['none', 'As fotos e os videos curtos de ate 30s entram no ar automaticamente apos o processamento base.'],
+    ['manual', 'As fotos e os videos curtos de ate 30s passam por moderacao manual antes de aparecer no evento.'],
+    ['ai', 'As fotos e os videos curtos de ate 30s passam por moderacao por IA antes de aparecer no evento.'],
 ]);
 
 it('accepts multiple public image uploads for an active live event', function () {
@@ -110,6 +116,27 @@ it('accepts multiple public image uploads for an active live event', function ()
 it('accepts a single public video upload for an active live event', function () {
     Storage::fake('public');
     Queue::fake();
+    Process::fake([
+        '*' => Process::result(json_encode([
+            'streams' => [
+                [
+                    'codec_type' => 'video',
+                    'codec_name' => 'h264',
+                    'width' => 1280,
+                    'height' => 720,
+                ],
+                [
+                    'codec_type' => 'audio',
+                    'codec_name' => 'aac',
+                ],
+            ],
+            'format' => [
+                'duration' => '17.2',
+                'bit_rate' => '850000',
+                'format_name' => 'mov,mp4,m4a,3gp,3g2,mj2',
+            ],
+        ], JSON_THROW_ON_ERROR), '', 0),
+    ]);
 
     $event = Event::factory()->active()->create([
         'moderation_mode' => 'manual',
@@ -138,6 +165,7 @@ it('accepts a single public video upload for an active live event', function () 
 
     $this->assertApiSuccess($response, 201);
     $response->assertJsonPath('data.uploaded_count', 1);
+    $response->assertJsonPath('data.message', 'Video recebido com sucesso!');
     $response->assertJsonPath('data.moderation', 'pending');
 
     $media = EventMedia::query()->where('event_id', $event->id)->latest('id')->first();
@@ -146,12 +174,114 @@ it('accepts a single public video upload for an active live event', function () 
         ->and($media?->media_type)->toBe('video')
         ->and($media?->mime_type)->toBe('video/mp4')
         ->and($media?->original_disk)->toBe('public')
-        ->and($media?->client_filename)->toBe('entrada.mp4');
+        ->and($media?->client_filename)->toBe('entrada.mp4')
+        ->and($media?->duration_seconds)->toBe(18)
+        ->and($media?->width)->toBe(1280)
+        ->and($media?->height)->toBe(720)
+        ->and($media?->has_audio)->toBeTrue()
+        ->and($media?->video_codec)->toBe('h264')
+        ->and($media?->audio_codec)->toBe('aac')
+        ->and($media?->bitrate)->toBe(850000)
+        ->and($media?->container)->toBe('mp4');
 
     Storage::disk('public')->assertExists($media->original_path);
 
     Queue::assertPushed(GenerateMediaVariantsJob::class, 1);
     Queue::assertPushed(GenerateMediaVariantsJob::class, fn (GenerateMediaVariantsJob $job) => $job->queue === 'media-variants');
+    Process::assertRanTimes(fn ($process, $result) => $process->command[0] === 'ffprobe' && $result->successful(), times: 1);
+
+    @unlink($tmpPath);
+});
+
+it('rejects public video uploads that exceed the configured duration limit', function () {
+    Storage::fake('public');
+    Queue::fake();
+    Process::fake([
+        '*' => Process::result(json_encode([
+            'streams' => [
+                [
+                    'codec_type' => 'video',
+                    'codec_name' => 'h264',
+                    'width' => 1280,
+                    'height' => 720,
+                ],
+            ],
+            'format' => [
+                'duration' => '45.2',
+                'bit_rate' => '950000',
+                'format_name' => 'mov,mp4,m4a,3gp,3g2,mj2',
+            ],
+        ], JSON_THROW_ON_ERROR), '', 0),
+    ]);
+
+    $event = Event::factory()->active()->create([
+        'moderation_mode' => 'manual',
+    ]);
+
+    EventModule::create([
+        'event_id' => $event->id,
+        'module_key' => 'live',
+        'is_enabled' => true,
+    ]);
+
+    $tmpPath = tempnam(sys_get_temp_dir(), 'public_long_mp4_');
+    file_put_contents($tmpPath, "\x00\x00\x00\x18\x66\x74\x79\x70\x69\x73\x6F\x6D" . str_repeat("\x00", 1024));
+
+    $file = new UploadedFile($tmpPath, 'longo.mp4', 'video/mp4', null, true);
+
+    $response = $this->withHeaders(['Accept' => 'application/json'])->post(
+        "/api/v1/public/events/{$event->upload_slug}/upload",
+        [
+            'sender_name' => 'Marina',
+            'file' => $file,
+        ]
+    );
+
+    $response->assertStatus(422);
+    $response->assertJsonPath('errors.file.0', 'Envie um video curto de ate 30 segundos.');
+
+    expect(EventMedia::query()->where('event_id', $event->id)->count())->toBe(0);
+    Queue::assertNothingPushed();
+
+    @unlink($tmpPath);
+});
+
+it('rejects public video uploads when video support is disabled by policy', function () {
+    Storage::fake('public');
+    Queue::fake();
+
+    $event = Event::factory()->active()->create([
+        'moderation_mode' => 'manual',
+    ]);
+
+    EventModule::create([
+        'event_id' => $event->id,
+        'module_key' => 'live',
+        'is_enabled' => true,
+    ]);
+    EventWallSetting::factory()->live()->create([
+        'event_id' => $event->id,
+        'video_enabled' => false,
+    ]);
+
+    $tmpPath = tempnam(sys_get_temp_dir(), 'public_disabled_mp4_');
+    file_put_contents($tmpPath, "\x00\x00\x00\x18\x66\x74\x79\x70\x69\x73\x6F\x6D" . str_repeat("\x00", 1024));
+
+    $file = new UploadedFile($tmpPath, 'bloqueado.mp4', 'video/mp4', null, true);
+
+    $response = $this->withHeaders(['Accept' => 'application/json'])->post(
+        "/api/v1/public/events/{$event->upload_slug}/upload",
+        [
+            'sender_name' => 'Marina',
+            'file' => $file,
+        ]
+    );
+
+    $response->assertStatus(422);
+    $response->assertJsonPath('errors.file.0', 'O envio de video ainda nao esta habilitado para este evento.');
+
+    expect(EventMedia::query()->where('event_id', $event->id)->count())->toBe(0);
+    Queue::assertNothingPushed();
 
     @unlink($tmpPath);
 });
@@ -216,6 +346,6 @@ it('shows a closed state and rejects uploads when the event is not available', f
         ]
     );
 
-    $this->assertApiError($uploadResponse, 422);
-    $uploadResponse->assertJsonPath('message', 'O envio de imagens esta temporariamente indisponivel.');
+    $uploadResponse->assertStatus(422);
+    $uploadResponse->assertJsonPath('message', 'O envio de fotos e videos esta temporariamente indisponivel.');
 });

@@ -16,6 +16,7 @@ class WallLiveSnapshotResource extends JsonResource
             'transitionEffect' => $this->resource['transitionEffect'] ?? 'fade',
             'currentPlayer' => $this->resource['currentPlayer'] ?? null,
             'currentItem' => $this->resource['currentItem'] ?? null,
+            'nextItem' => $this->resource['nextItem'] ?? null,
             'advancedAt' => $this->resource['advancedAt'] ?? null,
             'updatedAt' => $this->resource['updatedAt'] ?? null,
         ];

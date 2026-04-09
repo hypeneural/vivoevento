@@ -1,10 +1,23 @@
 const realtimeWarnings = new Set<string>();
+let activeRealtimeSocketId: string | null = null;
 
 export interface ReverbRuntimeConfig {
   key: string;
   host: string;
   port: string;
   scheme: string;
+}
+
+export function getRealtimeSocketId(): string | null {
+  return activeRealtimeSocketId;
+}
+
+export function setRealtimeSocketId(socketId: string | null | undefined): void {
+  activeRealtimeSocketId = socketId ?? null;
+}
+
+export function clearRealtimeSocketId(): void {
+  activeRealtimeSocketId = null;
 }
 
 export function normalizeRealtimeScheme(value: string): 'http' | 'https' {

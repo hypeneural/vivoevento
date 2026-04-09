@@ -30,3 +30,5 @@ it('maps pagarme webhook types into the local billing event types', function () 
         ->and($mapper->toInternalWebhookType('charge.chargedback'))->toBe('payment.chargeback')
         ->and($mapper->toInternalWebhookType('order.canceled'))->toBe('checkout.canceled');
 });
+
+it('projects recurring provider signals into separate contract billing and access statuses')->todo();

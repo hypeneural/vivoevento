@@ -93,6 +93,13 @@ it('returns the public wall boot payload with media settings and sender identity
         ->assertJsonPath('data.settings.selection_policy.replay_interval_low_minutes', 4)
         ->assertJsonPath('data.settings.selection_policy.sender_cooldown_seconds', 45)
         ->assertJsonPath('data.settings.show_qr', false)
+        ->assertJsonPath('data.settings.video_enabled', true)
+        ->assertJsonPath('data.settings.video_playback_mode', 'play_to_end_if_short_else_cap')
+        ->assertJsonPath('data.settings.video_max_seconds', 30)
+        ->assertJsonPath('data.settings.video_resume_mode', 'resume_if_same_item_else_restart')
+        ->assertJsonPath('data.settings.video_audio_policy', 'muted')
+        ->assertJsonPath('data.settings.video_multi_layout_policy', 'disallow')
+        ->assertJsonPath('data.settings.video_preferred_variant', 'wall_video_720p')
         ->assertJsonPath('data.settings.instructions_text', 'Envie sua foto')
         ->assertJsonPath('data.files.0.id', 'media_'.$media->id)
         ->assertJsonPath('data.files.0.sender_name', 'Maria')
@@ -149,4 +156,167 @@ it('excludes orientation-mismatched media from the public boot payload', functio
 
     $response->assertJsonCount(0, 'data.files')
         ->assertJsonPath('data.settings.accepted_orientation', 'landscape');
+});
+
+it('includes explicit video admission metadata in the public wall boot payload when original fallback is explicitly enabled', function () {
+    Storage::fake('public');
+
+    $domainEvent = Event::factory()->active()->create([
+        'title' => 'Evento Wall Video',
+    ]);
+
+    EventModule::query()->create([
+        'event_id' => $domainEvent->id,
+        'module_key' => 'wall',
+        'is_enabled' => true,
+    ]);
+
+    $settings = EventWallSetting::factory()->live()->create([
+        'event_id' => $domainEvent->id,
+        'video_preferred_variant' => 'original',
+    ]);
+
+    $media = EventMedia::factory()->published()->create([
+        'event_id' => $domainEvent->id,
+        'media_type' => 'video',
+        'mime_type' => 'video/mp4',
+        'original_filename' => 'video-entrada.mp4',
+        'width' => 1920,
+        'height' => 1080,
+        'duration_seconds' => 20,
+        'has_audio' => true,
+        'video_codec' => 'h264',
+        'audio_codec' => 'aac',
+        'bitrate' => 880000,
+        'container' => 'mp4',
+    ]);
+
+    $response = $this->apiGet("/public/wall/{$settings->wall_code}/boot");
+
+    $this->assertApiSuccess($response);
+
+    $response->assertJsonPath('data.files.0.type', 'video')
+        ->assertJsonPath('data.files.0.duration_seconds', 20)
+        ->assertJsonPath('data.files.0.has_audio', true)
+        ->assertJsonPath('data.files.0.video_codec', 'h264')
+        ->assertJsonPath('data.files.0.audio_codec', 'aac')
+        ->assertJsonPath('data.files.0.bitrate', 880000)
+        ->assertJsonPath('data.files.0.container', 'mp4')
+        ->assertJsonPath('data.files.0.video_admission.state', 'eligible_with_fallback')
+        ->assertJsonPath('data.files.0.video_admission.reasons.0', 'poster_missing')
+        ->assertJsonPath('data.files.0.video_admission.asset_source', 'original')
+        ->assertJsonPath('data.files.0.video_admission.preferred_variant_key', 'original')
+        ->assertJsonPath('data.files.0.video_admission.duration_limit_seconds', 30)
+        ->assertJsonPath('data.files.0.served_variant_key', null)
+        ->assertJsonPath('data.files.0.preview_variant_key', null);
+});
+
+it('excludes original-only videos from the public wall boot payload when strict wall video gate is enabled', function () {
+    Storage::fake('public');
+
+    $domainEvent = Event::factory()->active()->create([
+        'title' => 'Evento Wall Video Estrito',
+    ]);
+
+    EventModule::query()->create([
+        'event_id' => $domainEvent->id,
+        'module_key' => 'wall',
+        'is_enabled' => true,
+    ]);
+
+    $settings = EventWallSetting::factory()->live()->create([
+        'event_id' => $domainEvent->id,
+    ]);
+
+    EventMedia::factory()->published()->create([
+        'event_id' => $domainEvent->id,
+        'media_type' => 'video',
+        'mime_type' => 'video/mp4',
+        'original_filename' => 'video-original.mp4',
+        'width' => 1920,
+        'height' => 1080,
+        'duration_seconds' => 20,
+        'video_codec' => 'h264',
+        'container' => 'mp4',
+    ]);
+
+    $response = $this->apiGet("/public/wall/{$settings->wall_code}/boot");
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonCount(0, 'data.files');
+});
+
+it('prefers wall video variants and poster in the public wall boot payload when available', function () {
+    Storage::fake('public');
+
+    $domainEvent = Event::factory()->active()->create([
+        'title' => 'Evento Wall Video Processado',
+    ]);
+
+    EventModule::query()->create([
+        'event_id' => $domainEvent->id,
+        'module_key' => 'wall',
+        'is_enabled' => true,
+    ]);
+
+    $settings = EventWallSetting::factory()->live()->create([
+        'event_id' => $domainEvent->id,
+    ]);
+
+    $media = EventMedia::factory()->published()->create([
+        'event_id' => $domainEvent->id,
+        'media_type' => 'video',
+        'mime_type' => 'video/mp4',
+        'original_filename' => 'video-processado.mp4',
+        'width' => 1280,
+        'height' => 720,
+        'duration_seconds' => 18,
+        'has_audio' => true,
+        'video_codec' => 'h264',
+        'audio_codec' => 'aac',
+        'bitrate' => 820000,
+        'container' => 'mp4',
+    ]);
+
+    EventMediaVariant::query()->create([
+        'event_media_id' => $media->id,
+        'variant_key' => 'wall_video_720p',
+        'disk' => 'public',
+        'path' => "events/{$domainEvent->id}/variants/{$media->id}/wall_video_720p.mp4",
+        'width' => 1280,
+        'height' => 720,
+        'mime_type' => 'video/mp4',
+    ]);
+
+    EventMediaVariant::query()->create([
+        'event_media_id' => $media->id,
+        'variant_key' => 'wall_video_poster',
+        'disk' => 'public',
+        'path' => "events/{$domainEvent->id}/variants/{$media->id}/wall_video_poster.jpg",
+        'width' => 1280,
+        'height' => 720,
+        'mime_type' => 'image/jpeg',
+    ]);
+
+    $response = $this->apiGet("/public/wall/{$settings->wall_code}/boot");
+
+    $this->assertApiSuccess($response);
+
+    $response->assertJsonPath(
+        'data.files.0.url',
+        rtrim((string) config('app.url'), '/')."/storage/events/{$domainEvent->id}/variants/{$media->id}/wall_video_720p.mp4"
+    )->assertJsonPath(
+        'data.files.0.preview_url',
+        rtrim((string) config('app.url'), '/')."/storage/events/{$domainEvent->id}/variants/{$media->id}/wall_video_poster.jpg"
+    )->assertJsonPath(
+        'data.files.0.served_variant_key',
+        'wall_video_720p'
+    )->assertJsonPath(
+        'data.files.0.preview_variant_key',
+        'wall_video_poster'
+    )->assertJsonPath('data.files.0.video_admission.state', 'eligible')
+        ->assertJsonCount(0, 'data.files.0.video_admission.reasons')
+        ->assertJsonPath('data.files.0.video_admission.asset_source', 'wall_variant')
+        ->assertJsonPath('data.files.0.video_admission.preferred_variant_key', 'wall_video_720p')
+        ->assertJsonPath('data.files.0.video_admission.poster_variant_key', 'wall_video_poster');
 });

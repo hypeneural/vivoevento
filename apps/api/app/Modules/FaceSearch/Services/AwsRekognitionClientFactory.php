@@ -67,7 +67,7 @@ class AwsRekognitionClientFactory
                     : (int) ($config['max_attempts_query'] ?? 3),
             ],
             'http' => [
-                'connect_timeout' => (float) ($config['connect_timeout'] ?? 3),
+                'connect_timeout' => $this->connectTimeoutForProfile($config, $profile),
                 'timeout' => $profile === 'index'
                     ? (float) ($config['index_timeout'] ?? 15)
                     : (float) ($config['query_timeout'] ?? 8),
@@ -93,7 +93,7 @@ class AwsRekognitionClientFactory
                 'max_attempts' => (int) ($config['max_attempts_query'] ?? 3),
             ],
             'http' => [
-                'connect_timeout' => (float) ($config['connect_timeout'] ?? 3),
+                'connect_timeout' => $this->connectTimeoutForProfile($config, 'query'),
                 'timeout' => (float) ($config['query_timeout'] ?? 8),
             ],
         ], static fn (mixed $value): bool => $value !== null);
@@ -121,5 +121,21 @@ class AwsRekognitionClientFactory
     private function nonEmptyString(mixed $value): ?string
     {
         return is_string($value) && trim($value) !== '' ? trim($value) : null;
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    private function connectTimeoutForProfile(array $config, string $profile): float
+    {
+        $profileSpecificKey = $profile === 'index'
+            ? 'connect_timeout_index'
+            : 'connect_timeout_query';
+
+        if (isset($config[$profileSpecificKey]) && is_numeric($config[$profileSpecificKey])) {
+            return (float) $config[$profileSpecificKey];
+        }
+
+        return (float) ($config['connect_timeout'] ?? 3);
     }
 }

@@ -115,6 +115,11 @@ class Organization extends Model
         return $this->hasMany(\App\Modules\Billing\Models\Invoice::class);
     }
 
+    public function billingProfile(): HasOne
+    {
+        return $this->hasOne(\App\Modules\Billing\Models\BillingProfile::class);
+    }
+
     public function partnerProfile(): HasOne
     {
         return $this->hasOne(PartnerProfile::class);

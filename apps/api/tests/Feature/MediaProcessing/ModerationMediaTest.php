@@ -118,9 +118,13 @@ it('returns the moderation feed using cursor pagination metadata', function () {
         'organization_id' => $organization->id,
     ]);
 
-    EventMedia::factory()->count(5)->create([
-        'event_id' => $event->id,
-    ]);
+    collect(range(1, 5))->each(function (int $offset) use ($event) {
+        EventMedia::factory()->create([
+            'event_id' => $event->id,
+            'sort_order' => 0,
+            'created_at' => now()->subSeconds($offset),
+        ]);
+    });
 
     $response = $this->apiGet('/media/feed?per_page=2');
 
@@ -129,7 +133,18 @@ it('returns the moderation feed using cursor pagination metadata', function () {
         ->assertJsonCount(2, 'data')
         ->assertJsonStructure([
             'success',
-            'data',
+            'data' => [[
+                'id',
+                'thumbnail_url',
+                'thumbnail_source',
+                'preview_url',
+                'preview_source',
+                'moderation_thumbnail_url',
+                'moderation_thumbnail_source',
+                'moderation_preview_url',
+                'moderation_preview_source',
+                'updated_at',
+            ]],
             'meta' => ['per_page', 'next_cursor', 'prev_cursor', 'has_more', 'stats', 'request_id'],
         ])
         ->assertJsonPath('meta.per_page', 2)
@@ -146,6 +161,72 @@ it('returns the moderation feed using cursor pagination metadata', function () {
         ->assertJsonCount(2, 'data')
         ->assertJsonPath('meta.per_page', 2)
         ->assertJsonPath('meta.stats', null);
+});
+
+it('returns moderation stats from a dedicated endpoint aligned to the active filter', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+        'moderation_mode' => 'ai',
+    ]);
+
+    \Database\Factories\EventContentModerationSettingFactory::new()->create([
+        'event_id' => $event->id,
+        'enabled' => true,
+        'mode' => 'enforced',
+    ]);
+
+    EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'moderation_status' => ModerationStatus::Pending->value,
+    ]);
+
+    EventMedia::factory()->approved()->create([
+        'event_id' => $event->id,
+        'publication_status' => \App\Modules\MediaProcessing\Enums\PublicationStatus::Published->value,
+        'safety_status' => 'pass',
+        'vlm_status' => 'completed',
+    ]);
+
+    EventMedia::factory()->approved()->create([
+        'event_id' => $event->id,
+        'safety_status' => 'review',
+        'vlm_status' => 'skipped',
+    ]);
+
+    EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'moderation_status' => ModerationStatus::Rejected->value,
+        'safety_status' => 'pass',
+        'vlm_status' => 'completed',
+    ]);
+
+    EventMedia::factory()->approved()->create([
+        'event_id' => $event->id,
+        'is_featured' => true,
+        'sort_order' => 7,
+        'safety_status' => 'pass',
+        'vlm_status' => 'completed',
+    ]);
+
+    $response = $this->apiGet('/media/feed/stats');
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.total', 5)
+        ->assertJsonPath('data.pending', 2)
+        ->assertJsonPath('data.approved', 2)
+        ->assertJsonPath('data.rejected', 1)
+        ->assertJsonPath('data.featured', 1)
+        ->assertJsonPath('data.pinned', 1);
+
+    $pendingResponse = $this->apiGet('/media/feed/stats?status=pending_moderation');
+
+    $this->assertApiSuccess($pendingResponse);
+    $pendingResponse->assertJsonPath('data.total', 2)
+        ->assertJsonPath('data.pending', 2)
+        ->assertJsonPath('data.approved', 0)
+        ->assertJsonPath('data.rejected', 0);
 });
 
 it('treats whatsapp group and direct sources as the whatsapp channel in catalog filters', function () {

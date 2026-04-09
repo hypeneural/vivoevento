@@ -8,6 +8,7 @@ use App\Modules\Wall\Models\EventWallSetting;
 use App\Modules\Wall\Support\WallLayoutHintResolver;
 use App\Modules\Wall\Support\WallSourceNormalizer;
 use App\Modules\Wall\Support\WallSelectionPreset;
+use App\Modules\Wall\Support\WallVideoPolicyLabelResolver;
 use Carbon\CarbonImmutable;
 use Throwable;
 
@@ -30,14 +31,15 @@ class WallSimulationService
             (int) ($resolvedSettings['interval_ms'] ?? 8000),
             $resolvedSettings['event_phase'] ?? null,
         );
+        $simulationSettings = $this->hydrateSimulationSettingsModel($settings, $resolvedSettings);
         $media = $this->runtimeMedia->loadPlayableMedia(
-            $settings,
+            $simulationSettings,
             queueLimit: (int) $resolvedSettings['queue_limit'],
         );
 
         $items = $media
             ->map(fn ($item) => $this->toSimulationItem(
-                $this->payloads->media($item),
+                $this->payloads->media($item, $simulationSettings),
                 (string) ($resolvedSettings['layout'] ?? 'auto'),
             ))
             ->values()
@@ -71,6 +73,9 @@ class WallSimulationService
                 'layout_hint' => $currentItem['layout_hint'],
                 'duplicate_cluster_key' => $currentItem['duplicateClusterKey'],
                 'is_featured' => (bool) $currentItem['is_featured'],
+                'is_video' => (bool) ($currentItem['is_video'] ?? false),
+                'duration_seconds' => $currentItem['duration_seconds'] ?? null,
+                'video_policy_label' => $currentItem['video_policy_label'] ?? null,
                 'is_replay' => (int) $currentItem['play_count'] > 1,
                 'created_at' => $currentItem['created_at'],
             ];
@@ -123,6 +128,36 @@ class WallSimulationService
         return $resolved;
     }
 
+    private function hydrateSimulationSettingsModel(EventWallSetting $settings, array $resolvedSettings): EventWallSetting
+    {
+        $simulationSettings = $settings->replicate();
+        $simulationSettings->exists = true;
+        $simulationSettings->event_id = $settings->event_id;
+        $simulationSettings->setRelation('event', $settings->relationLoaded('event')
+            ? $settings->getRelation('event')
+            : $settings->event()->first());
+
+        $simulationSettings->forceFill([
+            'interval_ms' => $resolvedSettings['interval_ms'] ?? $settings->interval_ms,
+            'queue_limit' => $resolvedSettings['queue_limit'] ?? $settings->queue_limit,
+            'selection_mode' => $resolvedSettings['selection_mode'] ?? $settings->selection_mode?->value,
+            'event_phase' => $resolvedSettings['event_phase'] ?? $settings->event_phase?->value,
+            'selection_policy' => $resolvedSettings['selection_policy'] ?? $settings->selection_policy,
+            'layout' => $resolvedSettings['layout'] ?? $settings->layout?->value,
+            'transition_effect' => $resolvedSettings['transition_effect'] ?? $settings->transition_effect?->value,
+            'accepted_orientation' => $resolvedSettings['accepted_orientation'] ?? $settings->accepted_orientation?->value,
+            'video_enabled' => $resolvedSettings['video_enabled'] ?? $settings->resolvedVideoEnabled(),
+            'video_playback_mode' => $resolvedSettings['video_playback_mode'] ?? $settings->resolvedVideoPlaybackMode(),
+            'video_max_seconds' => $resolvedSettings['video_max_seconds'] ?? $settings->resolvedVideoMaxSeconds(),
+            'video_resume_mode' => $resolvedSettings['video_resume_mode'] ?? $settings->resolvedVideoResumeMode(),
+            'video_audio_policy' => $resolvedSettings['video_audio_policy'] ?? $settings->resolvedVideoAudioPolicy(),
+            'video_multi_layout_policy' => $resolvedSettings['video_multi_layout_policy'] ?? $settings->resolvedVideoMultiLayoutPolicy(),
+            'video_preferred_variant' => $resolvedSettings['video_preferred_variant'] ?? $settings->resolvedVideoPreferredVariant(),
+        ]);
+
+        return $simulationSettings;
+    }
+
     private function resolvePolicy(array $settings): array
     {
         $policy = WallSelectionPreset::normalizePolicy(
@@ -165,6 +200,9 @@ class WallSimulationService
             'senderKey' => $payload['sender_key'] ?? $payload['id'],
             'duplicateClusterKey' => $payload['duplicate_cluster_key'] ?? null,
             'is_featured' => (bool) ($payload['is_featured'] ?? false),
+            'is_video' => ($payload['type'] ?? 'image') === 'video',
+            'duration_seconds' => $payload['duration_seconds'] ?? null,
+            'video_policy_label' => WallVideoPolicyLabelResolver::fromPayload($payload),
             'created_at' => $payload['created_at'] ?? null,
             'asset_status' => 'ready',
             'played_at' => null,

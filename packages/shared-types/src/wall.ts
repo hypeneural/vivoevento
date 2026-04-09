@@ -20,6 +20,12 @@ export type WallSelectionMode = 'balanced' | 'live' | 'inclusive' | 'editorial' 
 export type WallEventPhase = 'reception' | 'flow' | 'party' | 'closing';
 export type WallAcceptedOrientation = 'all' | 'landscape' | 'portrait';
 export type WallAdMode = 'disabled' | 'by_photos' | 'by_minutes';
+export type WallVideoPlaybackMode = 'fixed_interval' | 'play_to_end' | 'play_to_end_if_short_else_cap';
+export type WallVideoResumeMode = 'resume_if_same_item' | 'restart_from_zero' | 'resume_if_same_item_else_restart';
+export type WallVideoAudioPolicy = 'muted';
+export type WallVideoMultiLayoutPolicy = 'disallow' | 'one' | 'all';
+export type WallVideoPreferredVariant = 'wall_video_720p' | 'wall_video_1080p' | 'original';
+export type WallVideoAdmissionState = 'eligible' | 'eligible_with_fallback' | 'blocked';
 export type WallPersistentStorage =
   | 'none'
   | 'localstorage'
@@ -42,6 +48,9 @@ export type MediaOrientation = 'vertical' | 'horizontal' | 'squareish';
 export interface WallMediaItem {
   id: string;
   url: string | null;
+  served_variant_key?: string | null;
+  preview_url?: string | null;
+  preview_variant_key?: string | null;
   original_url?: string | null;
   type: WallMediaType;
   sender_name?: string | null;
@@ -52,8 +61,28 @@ export interface WallMediaItem {
   is_featured: boolean;
   width?: number | null;
   height?: number | null;
+  duration_seconds?: number | null;
+  has_audio?: boolean | null;
+  video_codec?: string | null;
+  audio_codec?: string | null;
+  bitrate?: number | null;
+  container?: string | null;
+  video_admission?: WallVideoAdmission | null;
   orientation?: MediaOrientation | null;
   created_at?: string | null;
+}
+
+export interface WallVideoAdmission {
+  state: WallVideoAdmissionState;
+  reasons: string[];
+  has_minimum_metadata: boolean;
+  supported_format: boolean;
+  preferred_variant_available: boolean;
+  preferred_variant_key?: string | null;
+  poster_available: boolean;
+  poster_variant_key?: string | null;
+  asset_source: 'wall_variant' | 'original';
+  duration_limit_seconds: number;
 }
 
 export interface WallSettings {
@@ -74,6 +103,13 @@ export interface WallSettings {
   show_sender_credit: boolean;
   show_side_thumbnails: boolean;
   accepted_orientation: WallAcceptedOrientation;
+  video_enabled: boolean;
+  video_playback_mode: WallVideoPlaybackMode;
+  video_max_seconds: number;
+  video_resume_mode: WallVideoResumeMode;
+  video_audio_policy: WallVideoAudioPolicy;
+  video_multi_layout_policy: WallVideoMultiLayoutPolicy;
+  video_preferred_variant: WallVideoPreferredVariant;
   ad_mode: WallAdMode;
   ad_frequency: number;
   ad_interval_minutes: number;
@@ -129,7 +165,21 @@ export interface WallHeartbeatPayload {
   runtime_status: 'booting' | 'idle' | 'playing' | 'paused' | 'stopped' | 'expired' | 'error';
   connection_status: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error';
   current_item_id?: string | null;
+  current_item_started_at?: string | null;
   current_sender_key?: string | null;
+  current_media_type?: WallMediaType | null;
+  current_video_phase?: 'idle' | 'probing' | 'primed' | 'starting' | 'playing' | 'waiting' | 'stalled' | 'paused_by_wall' | 'completed' | 'capped' | 'interrupted' | 'failed_to_start' | null;
+  current_video_exit_reason?: 'ended' | 'cap_reached' | 'paused_by_operator' | 'play_rejected' | 'stalled_timeout' | 'replaced_by_command' | 'media_deleted' | 'visibility_degraded' | 'startup_timeout' | 'poster_then_skip' | 'startup_waiting_timeout' | 'startup_play_rejected' | null;
+  current_video_failure_reason?: 'network_error' | 'unsupported_format' | 'autoplay_blocked' | 'decode_degraded' | 'src_missing' | 'variant_missing' | null;
+  current_video_position_seconds?: number | null;
+  current_video_duration_seconds?: number | null;
+  current_video_ready_state?: number | null;
+  current_video_stall_count?: number | null;
+  current_video_poster_visible?: boolean | null;
+  current_video_first_frame_ready?: boolean | null;
+  current_video_playback_ready?: boolean | null;
+  current_video_playing_confirmed?: boolean | null;
+  current_video_startup_degraded?: boolean | null;
   ready_count: number;
   loading_count: number;
   error_count: number;
@@ -172,6 +222,19 @@ export interface WallDiagnosticsPlayer {
   runtime_status: WallHeartbeatPayload['runtime_status'];
   connection_status: WallHeartbeatPayload['connection_status'];
   current_item_id?: string | null;
+  current_media_type?: WallMediaType | null;
+  current_video_phase?: WallHeartbeatPayload['current_video_phase'];
+  current_video_exit_reason?: WallHeartbeatPayload['current_video_exit_reason'];
+  current_video_failure_reason?: WallHeartbeatPayload['current_video_failure_reason'];
+  current_video_position_seconds?: number | null;
+  current_video_duration_seconds?: number | null;
+  current_video_ready_state?: number | null;
+  current_video_stall_count?: number | null;
+  current_video_poster_visible?: boolean | null;
+  current_video_first_frame_ready?: boolean | null;
+  current_video_playback_ready?: boolean | null;
+  current_video_playing_confirmed?: boolean | null;
+  current_video_startup_degraded?: boolean | null;
   current_sender_key?: string | null;
   ready_count: number;
   loading_count: number;
@@ -220,8 +283,13 @@ export interface WallSimulationPreviewItem {
   sender_name: string;
   sender_key: string;
   source_type?: 'whatsapp' | 'telegram' | 'upload' | 'manual' | 'gallery' | null;
+  caption?: string | null;
+  layout_hint?: WallLayout | null;
   duplicate_cluster_key?: string | null;
   is_featured: boolean;
+  is_video?: boolean;
+  duration_seconds?: number | null;
+  video_policy_label?: string | null;
   is_replay: boolean;
   created_at?: string | null;
 }

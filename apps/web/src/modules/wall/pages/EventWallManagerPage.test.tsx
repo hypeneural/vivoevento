@@ -120,6 +120,13 @@ describe('EventWallManagerPage', () => {
         show_sender_credit: false,
         show_side_thumbnails: true,
         accepted_orientation: 'all',
+        video_enabled: true,
+        video_playback_mode: 'play_to_end_if_short_else_cap',
+        video_max_seconds: 20,
+        video_resume_mode: 'resume_if_same_item_else_restart',
+        video_audio_policy: 'muted',
+        video_multi_layout_policy: 'disallow',
+        video_preferred_variant: 'wall_video_720p',
         ad_mode: 'by_photos' as const,
         ad_frequency: 5,
         ad_interval_minutes: 3,
@@ -143,6 +150,15 @@ describe('EventWallManagerPage', () => {
         cache_stale_fallback_count: 1,
         last_seen_at: '2026-04-02T21:00:00Z',
         updated_at: '2026-04-02T21:00:00Z',
+      },
+      video_pipeline: {
+        ffmpeg_bin: 'ffmpeg',
+        ffprobe_bin: 'ffprobe',
+        ffmpeg_available: false,
+        ffprobe_available: false,
+        ffmpeg_resolved_path: null,
+        ffprobe_resolved_path: null,
+        ready: false,
       },
       expires_at: null,
       created_at: '2026-04-02T20:00:00Z',
@@ -177,7 +193,7 @@ describe('EventWallManagerPage', () => {
         received: 24,
         approved: 20,
         queued: 14,
-        displayed: null,
+        displayed: 9,
       },
       recentItems: [
         {
@@ -236,6 +252,19 @@ describe('EventWallManagerPage', () => {
         isFeatured: false,
         createdAt: '2026-04-02T20:59:00Z',
       },
+      nextItem: {
+        id: 'media_100',
+        previewUrl: 'https://cdn.example.com/live-next.jpg',
+        senderName: 'Bruno Costa',
+        senderKey: 'upload:bruno',
+        source: 'upload',
+        caption: 'Proxima entrada da pista',
+        layoutHint: 'polaroid',
+        isFeatured: false,
+        isVideo: false,
+        durationSeconds: null,
+        createdAt: '2026-04-02T20:58:00Z',
+      },
       advancedAt: '2026-04-02T20:59:52Z',
       updatedAt: '2026-04-02T21:00:00Z',
     });
@@ -284,6 +313,19 @@ describe('EventWallManagerPage', () => {
           runtime_status: 'playing',
           connection_status: 'connected',
           current_item_id: 'media_1',
+          current_media_type: 'video',
+          current_video_phase: 'playing',
+          current_video_exit_reason: 'ended',
+          current_video_failure_reason: null,
+          current_video_position_seconds: 6,
+          current_video_duration_seconds: 18,
+          current_video_ready_state: 4,
+          current_video_stall_count: 0,
+          current_video_poster_visible: false,
+          current_video_first_frame_ready: true,
+          current_video_playback_ready: true,
+          current_video_playing_confirmed: true,
+          current_video_startup_degraded: false,
           current_sender_key: 'sender-maria',
           ready_count: 12,
           loading_count: 1,
@@ -393,9 +435,13 @@ describe('EventWallManagerPage', () => {
     expect(screen.getByText(/Ultimas chegadas/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Canvas da previa do rascunho/i)).toBeInTheDocument();
     expect(await screen.findByText(/Diagnostico operacional/i)).toBeInTheDocument();
+    expect(screen.getByText(/Videos curtos tocam ate o fim; acima disso o wall limita a 20s/i)).toBeInTheDocument();
+    expect(screen.getByText(/Os binarios de video ainda nao estao resolvidos neste ambiente/i)).toBeInTheDocument();
     expect(screen.getByText(/Tela player-alpha/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Agora no telao/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Juliana Ribeiro/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Proxima no telao/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Bruno Costa/i).length).toBeGreaterThan(0);
 
     await waitFor(() => {
       expect(simulateEventWallMock).toHaveBeenCalled();
@@ -417,6 +463,24 @@ describe('EventWallManagerPage', () => {
     await waitFor(() => {
       expect(screen.getAllByText(/Saudavel/i).length).toBeGreaterThan(0);
     });
+  }, 15000);
+
+  it('mantem a selecao manual no palco mesmo quando o snapshot traz agora e proxima', async () => {
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', {
+      name: /Selecionar midia recente de Carla/i,
+    }));
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Midia selecionada do topo/i).length).toBeGreaterThan(0);
+    });
+
+    expect(screen.getAllByText(/Carla/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Agora no telao/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Juliana Ribeiro/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Proxima no telao/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Bruno Costa/i).length).toBeGreaterThan(0);
   }, 15000);
 
   it('liga o trilho de ultimas chegadas ao palco atual quando uma midia e selecionada', async () => {

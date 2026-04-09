@@ -12,6 +12,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Media management
     Route::get('media', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'catalogIndex']);
     Route::get('media/feed', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'moderationFeed']);
+    Route::get('media/feed/stats', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'moderationFeedStats']);
     Route::get('events/{event}/media', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'index']);
     Route::get('media/{eventMedia}', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'show']);
     Route::get('media/{eventMedia}/ia-debug', [\App\Modules\MediaProcessing\Http\Controllers\EventMediaController::class, 'aiDebug']);

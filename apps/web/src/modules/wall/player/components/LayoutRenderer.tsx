@@ -12,6 +12,7 @@
 import { useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { WallRuntimeItem, WallSettings, WallTransition } from '../types';
+import type { MediaSurfaceVideoControlProps } from './MediaSurface';
 import CarouselLayout from '../layouts/CarouselLayout';
 import CinematicLayout from '../layouts/CinematicLayout';
 import FullscreenLayout from '../layouts/FullscreenLayout';
@@ -33,29 +34,31 @@ function renderSingleLayout(
   media: WallRuntimeItem,
   settings: WallSettings,
   reducedMotion: boolean,
+  videoControl?: MediaSurfaceVideoControlProps | null,
 ) {
   switch (layout) {
     case 'cinematic':
-      return <CinematicLayout media={media} />;
+      return <CinematicLayout media={media} videoControl={videoControl} />;
     case 'split':
-      return <SplitLayout media={media} />;
+      return <SplitLayout media={media} videoControl={videoControl} />;
     case 'polaroid':
-      return <PolaroidLayout media={media} />;
+      return <PolaroidLayout media={media} videoControl={videoControl} />;
     case 'kenburns':
       return (
         <KenBurnsLayout
           media={media}
           intervalMs={settings.interval_ms}
           reducedMotion={reducedMotion}
+          videoControl={videoControl}
         />
       );
     case 'spotlight':
-      return <SpotlightLayout media={media} />;
+      return <SpotlightLayout media={media} videoControl={videoControl} />;
     case 'gallery':
-      return <GalleryLayout media={media} />;
+      return <GalleryLayout media={media} videoControl={videoControl} />;
     case 'fullscreen':
     default:
-      return <FullscreenLayout media={media} />;
+      return <FullscreenLayout media={media} videoControl={videoControl} />;
   }
 }
 
@@ -118,6 +121,7 @@ interface LayoutRendererProps {
   reducedMotion?: boolean;
   /** Full items array, needed for multi-item layouts */
   allItems?: WallRuntimeItem[];
+  videoControl?: MediaSurfaceVideoControlProps | null;
 }
 
 export function LayoutRenderer({
@@ -125,8 +129,13 @@ export function LayoutRenderer({
   settings,
   reducedMotion = false,
   allItems = [],
+  videoControl = null,
 }: LayoutRendererProps) {
-  const resolvedLayout = resolveRenderableLayout(settings.layout, media);
+  const resolvedLayout = resolveRenderableLayout(
+    settings.layout,
+    media,
+    settings.video_multi_layout_policy ?? 'disallow',
+  );
   const isMulti = isMultiItemLayout(resolvedLayout);
 
   // Track advance triggers for multi-slot by counting media.id changes
@@ -166,11 +175,10 @@ export function LayoutRenderer({
         transition={{ duration: effectiveTransition === 'none' ? 0 : 0.4, ease: 'easeOut' }}
         className="absolute inset-0"
       >
-        {renderSingleLayout(resolvedLayout, media, settings, reducedMotion)}
+        {renderSingleLayout(resolvedLayout, media, settings, reducedMotion, videoControl)}
       </motion.div>
     </AnimatePresence>
   );
 }
 
 export default LayoutRenderer;
-

@@ -66,6 +66,6 @@ class CheckPublicCheckoutIdentityAction
 
     private function loginUrl(): string
     {
-        return '/login?returnTo=' . rawurlencode('/checkout/evento?resume=auth');
+        return '/login?returnTo=' . rawurlencode('/checkout/evento?v2=1&resume=auth');
     }
 }

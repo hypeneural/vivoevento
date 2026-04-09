@@ -50,9 +50,12 @@ const media: ApiEventMediaDetail = {
   sender_media_count: 4,
   caption: 'Legenda atual',
   thumbnail_url: 'https://example.test/thumb.jpg',
+  thumbnail_source: 'thumb',
   preview_url: 'https://example.test/preview.jpg',
+  preview_source: 'fast_preview',
   original_url: 'https://example.test/original.jpg',
   created_at: '2026-04-02T18:00:00Z',
+  updated_at: '2026-04-02T18:00:05Z',
   published_at: null,
   is_featured: false,
   is_pinned: false,
@@ -116,6 +119,54 @@ describe('ModerationReviewPanel', () => {
     expect(screen.getByText(/midias deste remetente/i)).toBeInTheDocument();
     expect(screen.getByText('11111111111111@lid')).toBeInTheDocument();
     expect(screen.getByText(/bloqueado ate/i)).toBeInTheDocument();
+  });
+
+  it('shows the sender name and normalized channel in the review surface', () => {
+    render(
+      <MemoryRouter>
+        <ModerationReviewPanel
+          media={media}
+          canModerate
+          isBusy={() => false}
+          onAction={vi.fn()}
+          onOpenPreview={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getAllByText('Maria').length).toBeGreaterThan(0);
+    expect(screen.getByText('Upload')).toBeInTheDocument();
+    expect(screen.getByText('11111111111111@lid')).toBeInTheDocument();
+  });
+
+  it('renders a video surface in the review panel when the selected media is a video', () => {
+    const videoMedia: ApiEventMediaDetail = {
+      ...media,
+      media_type: 'video',
+      mime_type: 'video/mp4',
+      thumbnail_url: 'https://example.test/poster.jpg',
+      preview_url: 'https://example.test/preview.mp4',
+      original_url: 'https://example.test/original.mp4',
+      duration_seconds: 12,
+    };
+
+    const { container } = render(
+      <MemoryRouter>
+        <ModerationReviewPanel
+          media={videoMedia}
+          canModerate
+          isBusy={() => false}
+          onAction={vi.fn()}
+          onOpenPreview={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    const previewVideo = container.querySelector('button video');
+
+    expect(previewVideo).not.toBeNull();
+    expect(previewVideo?.getAttribute('src')).toBe('https://example.test/preview.mp4');
+    expect(previewVideo?.getAttribute('poster')).toBe('https://example.test/poster.jpg');
   });
 
   it('allows toggling the sender block switch from the review panel', () => {

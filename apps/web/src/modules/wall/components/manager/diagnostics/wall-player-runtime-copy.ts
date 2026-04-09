@@ -96,6 +96,52 @@ export function formatFallbackReason(value?: string | null) {
   return formatLooseLabel(value, 'Sem detalhe');
 }
 
+export function formatVideoPhase(value?: ApiWallDiagnosticsPlayer['current_video_phase']) {
+  return formatLooseLabel(value, 'Sem fase');
+}
+
+export function formatVideoExitReason(value?: ApiWallDiagnosticsPlayer['current_video_exit_reason']) {
+  return formatLooseLabel(value, 'Sem saida registrada');
+}
+
+export function formatVideoFailureReason(value?: ApiWallDiagnosticsPlayer['current_video_failure_reason']) {
+  return formatLooseLabel(value, 'Sem falha registrada');
+}
+
+export function formatVideoProgress(player: ApiWallDiagnosticsPlayer) {
+  const current = player.current_video_position_seconds;
+  const duration = player.current_video_duration_seconds;
+
+  if (current == null && duration == null) {
+    return 'Sem progresso de video';
+  }
+
+  const currentLabel = current == null ? '--' : `${Math.max(0, Math.round(current))}s`;
+  const durationLabel = duration == null ? '--' : `${Math.max(0, Math.round(duration))}s`;
+
+  return `${currentLabel} de ${durationLabel}`;
+}
+
+export function formatVideoRuntimeSummary(player: ApiWallDiagnosticsPlayer) {
+  if (player.current_media_type !== 'video') {
+    return 'A tela nao esta com video em foco agora.';
+  }
+
+  const flags = [
+    player.current_video_poster_visible ? 'poster visivel' : null,
+    player.current_video_first_frame_ready ? 'primeira frame pronta' : null,
+    player.current_video_playback_ready ? 'playback pronto' : null,
+    player.current_video_playing_confirmed ? 'tocando de verdade' : null,
+    player.current_video_startup_degraded ? 'startup degradado' : null,
+  ].filter(Boolean);
+
+  return [
+    `Fase ${formatVideoPhase(player.current_video_phase).toLowerCase()}.`,
+    `Progresso ${formatVideoProgress(player)}.`,
+    flags.length > 0 ? `Sinais: ${flags.join(', ')}.` : null,
+  ].filter(Boolean).join(' ');
+}
+
 export function formatPersistentStorage(value: ApiWallPersistentStorage) {
   switch (value) {
     case 'localstorage':
@@ -148,6 +194,18 @@ export function formatCurrentSender(value?: string | null) {
 }
 
 export function formatOperationalGuidance(player: ApiWallDiagnosticsPlayer) {
+  if (player.current_media_type === 'video' && player.current_video_failure_reason) {
+    return `A tela falhou no playback do video por ${formatVideoFailureReason(player.current_video_failure_reason).toLowerCase()}. Vale revisar variante, rede ou compatibilidade.`;
+  }
+
+  if (player.current_media_type === 'video' && player.current_video_phase === 'stalled') {
+    return 'O video em foco estagnou esperando dados. Se isso se repetir, vale revisar a variante servida ou limpar o cache local.';
+  }
+
+  if (player.current_media_type === 'video' && player.current_video_phase === 'waiting') {
+    return 'O video em foco ainda responde, mas esta aguardando buffer. Observe se a tela sai sozinha do waiting ou entra em stall.';
+  }
+
   if (player.health_status === 'healthy') {
     return 'Tudo esta estavel nesta tela agora.';
   }
@@ -170,6 +228,20 @@ export function formatOperationalGuidance(player: ApiWallDiagnosticsPlayer) {
 export function formatPlayerSituation(player: ApiWallDiagnosticsPlayer) {
   if (player.health_status === 'offline') {
     return 'Sem resposta';
+  }
+
+  if (player.current_media_type === 'video' && player.runtime_status === 'playing') {
+    if (player.current_video_phase === 'playing') {
+      return 'Video tocando';
+    }
+
+    if (player.current_video_phase === 'waiting' || player.current_video_phase === 'stalled') {
+      return 'Video com buffer';
+    }
+
+    if (player.current_video_phase === 'starting' || player.current_video_phase === 'primed') {
+      return 'Video iniciando';
+    }
   }
 
   if (player.runtime_status === 'playing' && player.connection_status === 'connected') {

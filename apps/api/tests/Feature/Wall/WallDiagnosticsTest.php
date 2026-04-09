@@ -124,6 +124,66 @@ it('returns diagnostics summary and marks a player offline after sixty seconds w
         ->assertJsonPath('data.players.0.cache_quota_bytes', 8388608);
 });
 
+it('persists video runtime fields in diagnostics and marks waiting video playback as degraded', function () {
+    [$user, $organization] = $this->actingAsManager();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+    ]);
+    enableWallModule($event);
+
+    $settings = EventWallSetting::factory()->live()->create([
+        'event_id' => $event->id,
+    ]);
+
+    $this->postJson("/api/v1/public/wall/{$settings->wall_code}/heartbeat", [
+        'player_instance_id' => 'player-video',
+        'runtime_status' => 'playing',
+        'connection_status' => 'connected',
+        'current_item_id' => 'media_77',
+        'current_sender_key' => 'whatsapp:5511888888888',
+        'current_media_type' => 'video',
+        'current_video_phase' => 'waiting',
+        'current_video_exit_reason' => 'startup_waiting_timeout',
+        'current_video_failure_reason' => 'network_error',
+        'current_video_position_seconds' => 4.5,
+        'current_video_duration_seconds' => 18,
+        'current_video_ready_state' => 2,
+        'current_video_stall_count' => 1,
+        'current_video_poster_visible' => true,
+        'current_video_first_frame_ready' => true,
+        'current_video_playback_ready' => false,
+        'current_video_playing_confirmed' => false,
+        'current_video_startup_degraded' => true,
+        'ready_count' => 2,
+        'loading_count' => 1,
+        'error_count' => 0,
+        'stale_count' => 0,
+        'cache_enabled' => true,
+        'persistent_storage' => 'indexeddb',
+        'cache_usage_bytes' => 1048576,
+        'cache_quota_bytes' => 8388608,
+        'cache_hit_count' => 8,
+        'cache_miss_count' => 2,
+        'cache_stale_fallback_count' => 0,
+        'last_sync_at' => now()->toIso8601String(),
+        'last_fallback_reason' => null,
+    ])->assertOk();
+
+    $response = $this->apiGet("/events/{$event->id}/wall/diagnostics");
+
+    $this->assertApiSuccess($response);
+
+    $response->assertJsonPath('data.summary.health_status', 'degraded')
+        ->assertJsonPath('data.players.0.health_status', 'degraded')
+        ->assertJsonPath('data.players.0.current_media_type', 'video')
+        ->assertJsonPath('data.players.0.current_video_phase', 'waiting')
+        ->assertJsonPath('data.players.0.current_video_failure_reason', 'network_error')
+        ->assertJsonPath('data.players.0.current_video_stall_count', 1)
+        ->assertJsonPath('data.players.0.current_video_poster_visible', true)
+        ->assertJsonPath('data.players.0.current_video_startup_degraded', true);
+});
+
 it('broadcasts diagnostics updates on the private event wall channel when the aggregate changes', function () {
     $event = Event::factory()->active()->create();
     enableWallModule($event);
@@ -261,11 +321,36 @@ it('simulates the next wall slides using the real event queue and draft settings
         'published_at' => now()->subMinutes(2),
     ]);
 
-    \App\Modules\MediaProcessing\Models\EventMedia::factory()->published()->create([
+    $brunoPublished = \App\Modules\MediaProcessing\Models\EventMedia::factory()->published()->create([
         'event_id' => $event->id,
         'inbound_message_id' => $messageB->id,
+        'media_type' => 'video',
+        'mime_type' => 'video/mp4',
         'source_type' => 'public_upload',
+        'duration_seconds' => 18,
+        'video_codec' => 'h264',
+        'container' => 'mp4',
         'published_at' => now()->subMinute(),
+    ]);
+
+    $brunoPublished->variants()->create([
+        'variant_key' => 'wall_video_poster',
+        'disk' => 'public',
+        'path' => "events/{$event->id}/variants/{$brunoPublished->id}/wall_video_poster.webp",
+        'mime_type' => 'image/webp',
+        'width' => 720,
+        'height' => 1280,
+        'size_bytes' => 28145,
+    ]);
+
+    $brunoPublished->variants()->create([
+        'variant_key' => 'wall_video_720p',
+        'disk' => 'public',
+        'path' => "events/{$event->id}/variants/{$brunoPublished->id}/wall_video_720p.mp4",
+        'mime_type' => 'video/mp4',
+        'width' => 720,
+        'height' => 1280,
+        'size_bytes' => 1420000,
     ]);
 
     $carlaPublished = \App\Modules\MediaProcessing\Models\EventMedia::factory()->published()->create([
@@ -320,6 +405,10 @@ it('simulates the next wall slides using the real event queue and draft settings
         ->assertJsonPath('data.sequence_preview.0.layout_hint', 'cinematic')
         ->assertJsonPath('data.sequence_preview.0.preview_url', rtrim((string) config('app.url'), '/')."/storage/events/{$event->id}/variants/{$carlaPublished->id}/thumb.webp")
         ->assertJsonPath('data.sequence_preview.1.sender_name', 'Bruno')
+        ->assertJsonPath('data.sequence_preview.1.source_type', 'upload')
+        ->assertJsonPath('data.sequence_preview.1.is_video', true)
+        ->assertJsonPath('data.sequence_preview.1.duration_seconds', 18)
+        ->assertJsonPath('data.sequence_preview.1.video_policy_label', 'Video com duracao diferenciada')
         ->assertJsonPath('data.sequence_preview.2.sender_name', 'Ana');
 });
 
@@ -368,4 +457,78 @@ it('simulation excludes media that are not eligible for the current wall orienta
 
     expect($previewIds)->toContain('media_'.$landscape->id)
         ->and($previewIds)->not->toContain('media_'.$portrait->id);
+});
+
+it('simulation excludes original-only videos when strict wall video gate is enabled', function () {
+    [$user, $organization] = $this->actingAsManager();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+    ]);
+    enableWallModule($event);
+
+    EventWallSetting::factory()->live()->create([
+        'event_id' => $event->id,
+    ]);
+
+    $fallbackVideo = \App\Modules\MediaProcessing\Models\EventMedia::factory()->published()->create([
+        'event_id' => $event->id,
+        'media_type' => 'video',
+        'mime_type' => 'video/mp4',
+        'source_type' => 'public_upload',
+        'source_label' => 'Bia',
+        'width' => 1920,
+        'height' => 1080,
+        'duration_seconds' => 18,
+        'video_codec' => 'h264',
+        'container' => 'mp4',
+        'published_at' => now(),
+    ]);
+
+    $preparedVideo = \App\Modules\MediaProcessing\Models\EventMedia::factory()->published()->create([
+        'event_id' => $event->id,
+        'media_type' => 'video',
+        'mime_type' => 'video/mp4',
+        'source_type' => 'public_upload',
+        'source_label' => 'Carla',
+        'width' => 1280,
+        'height' => 720,
+        'duration_seconds' => 12,
+        'video_codec' => 'h264',
+        'container' => 'mp4',
+        'published_at' => now()->subSecond(),
+    ]);
+
+    $preparedVideo->variants()->create([
+        'variant_key' => 'wall_video_720p',
+        'disk' => 'public',
+        'path' => "events/{$event->id}/variants/{$preparedVideo->id}/wall_video_720p.mp4",
+        'mime_type' => 'video/mp4',
+        'width' => 1280,
+        'height' => 720,
+        'size_bytes' => 1420000,
+    ]);
+
+    $preparedVideo->variants()->create([
+        'variant_key' => 'wall_video_poster',
+        'disk' => 'public',
+        'path' => "events/{$event->id}/variants/{$preparedVideo->id}/wall_video_poster.jpg",
+        'mime_type' => 'image/jpeg',
+        'width' => 1280,
+        'height' => 720,
+        'size_bytes' => 32145,
+    ]);
+
+    $response = $this->apiPost("/events/{$event->id}/wall/simulate", [
+        'selection_mode' => 'balanced',
+        'event_phase' => 'flow',
+        'interval_ms' => 8000,
+    ]);
+
+    $this->assertApiSuccess($response);
+
+    $previewIds = collect($response->json('data.sequence_preview'))->pluck('item_id')->all();
+
+    expect($previewIds)->toContain('media_'.$preparedVideo->id)
+        ->and($previewIds)->not->toContain('media_'.$fallbackVideo->id);
 });

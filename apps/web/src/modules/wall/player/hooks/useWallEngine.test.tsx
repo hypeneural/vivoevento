@@ -55,6 +55,18 @@ function makeSnapshot(status: WallBootData['event']['status'], files: WallMediaI
       neon_text: null,
       neon_color: '#ffffff',
       show_sender_credit: false,
+      show_side_thumbnails: true,
+      accepted_orientation: 'all',
+      video_enabled: true,
+      video_playback_mode: 'play_to_end_if_short_else_cap',
+      video_max_seconds: 15,
+      video_resume_mode: 'resume_if_same_item_else_restart',
+      video_audio_policy: 'muted',
+      video_multi_layout_policy: 'disallow',
+      video_preferred_variant: 'wall_video_720p',
+      ad_mode: 'disabled',
+      ad_frequency: 5,
+      ad_interval_minutes: 3,
       instructions_text: null,
     },
   };
@@ -327,5 +339,166 @@ describe('useWallEngine', () => {
 
     expect((result.current.state as any).currentAd).toBeNull();
     expect(result.current.currentItem?.id).toBe('media_a');
+  });
+
+  it('does not advance a current video just because interval_ms elapsed', () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() => useWallEngine('ABCD1234'));
+
+    act(() => {
+      result.current.applySnapshot(makeSnapshot('live', [
+        makeMedia({
+          id: 'video_a',
+          sender_name: 'Ana',
+          sender_key: 'sender-ana',
+          type: 'video',
+          duration_seconds: 60,
+          created_at: '2026-04-01T10:03:00Z',
+        }),
+        makeMedia({
+          id: 'image_b',
+          sender_name: 'Bruno',
+          sender_key: 'sender-bruno',
+          type: 'image',
+          created_at: '2026-04-01T10:02:00Z',
+        }),
+      ]));
+    });
+
+    expect(result.current.currentItem?.id).toBe('video_a');
+
+    act(() => {
+      vi.advanceTimersByTime(8_000);
+    });
+
+    expect(result.current.currentItem?.id).toBe('video_a');
+  });
+
+  it('advances a video by ended instead of fixed interval', () => {
+    const { result } = renderHook(() => useWallEngine('ABCD1234'));
+
+    act(() => {
+      result.current.applySnapshot(makeSnapshot('live', [
+        makeMedia({
+          id: 'video_a',
+          sender_name: 'Ana',
+          sender_key: 'sender-ana',
+          type: 'video',
+          duration_seconds: 12,
+          created_at: '2026-04-01T10:03:00Z',
+        }),
+        makeMedia({
+          id: 'image_b',
+          sender_name: 'Bruno',
+          sender_key: 'sender-bruno',
+          type: 'image',
+          created_at: '2026-04-01T10:02:00Z',
+        }),
+      ]));
+    });
+
+    act(() => {
+      result.current.handleVideoEnded({
+        itemId: 'video_a',
+        currentTime: 12,
+        durationSeconds: 12,
+        readyState: 4,
+      });
+    });
+
+    expect(result.current.currentItem?.id).toBe('image_b');
+    expect(result.current.state.videoPlayback.lastExitReason).toBe('ended');
+  });
+
+  it('caps long videos after the configured baseline budget', () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() => useWallEngine('ABCD1234'));
+
+    act(() => {
+      result.current.applySnapshot(makeSnapshot('live', [
+        makeMedia({
+          id: 'video_a',
+          sender_name: 'Ana',
+          sender_key: 'sender-ana',
+          type: 'video',
+          duration_seconds: 60,
+          created_at: '2026-04-01T10:03:00Z',
+        }),
+        makeMedia({
+          id: 'image_b',
+          sender_name: 'Bruno',
+          sender_key: 'sender-bruno',
+          type: 'image',
+          created_at: '2026-04-01T10:02:00Z',
+        }),
+      ]));
+    });
+
+    act(() => {
+      result.current.handleVideoPlaying({
+        itemId: 'video_a',
+        currentTime: 0,
+        durationSeconds: 60,
+        readyState: 4,
+      });
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(15_000);
+    });
+
+    expect(result.current.currentItem?.id).toBe('image_b');
+    expect(result.current.state.videoPlayback.lastExitReason).toBe('cap_reached');
+  });
+
+  it('does not cap long videos when the wall policy is play_to_end', () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() => useWallEngine('ABCD1234'));
+
+    act(() => {
+      result.current.applySnapshot({
+        ...makeSnapshot('live', [
+          makeMedia({
+            id: 'video_a',
+            sender_name: 'Ana',
+            sender_key: 'sender-ana',
+            type: 'video',
+            duration_seconds: 60,
+            created_at: '2026-04-01T10:03:00Z',
+          }),
+          makeMedia({
+            id: 'image_b',
+            sender_name: 'Bruno',
+            sender_key: 'sender-bruno',
+            type: 'image',
+            created_at: '2026-04-01T10:02:00Z',
+          }),
+        ]),
+        settings: {
+          ...makeSnapshot('live').settings,
+          video_playback_mode: 'play_to_end',
+          video_max_seconds: 15,
+        },
+      });
+    });
+
+    act(() => {
+      result.current.handleVideoPlaying({
+        itemId: 'video_a',
+        currentTime: 0,
+        durationSeconds: 60,
+        readyState: 4,
+      });
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(20_000);
+    });
+
+    expect(result.current.currentItem?.id).toBe('video_a');
+    expect(result.current.state.videoPlayback.lastExitReason).not.toBe('cap_reached');
   });
 });

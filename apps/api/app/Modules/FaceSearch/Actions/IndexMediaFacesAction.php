@@ -47,6 +47,6 @@ class IndexMediaFacesAction
             ];
         }
 
-        return $this->router->backendForSettings($settings)->indexMedia($media, $settings);
+        return $this->router->indexMedia($media, $settings);
     }
 }

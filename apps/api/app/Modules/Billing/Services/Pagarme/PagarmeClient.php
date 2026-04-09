@@ -20,22 +20,110 @@ class PagarmeClient
         return $this->request()->post("/customers/{$customerId}/cards", $payload)->throw()->json() ?? [];
     }
 
+    public function listCustomerCards(string $customerId): array
+    {
+        return $this->request()->get("/customers/{$customerId}/cards")->throw()->json() ?? [];
+    }
+
     public function createOrder(array $payload, ?string $idempotencyKey = null): array
     {
-        $request = $this->request();
-
-        if (filled($idempotencyKey)) {
-            $request = $request->withHeaders([
-                'Idempotency-Key' => $idempotencyKey,
-            ]);
-        }
-
-        return $request->post('/orders', $payload)->throw()->json() ?? [];
+        return $this->requestWithIdempotency($idempotencyKey)
+            ->post('/orders', $payload)
+            ->throw()
+            ->json() ?? [];
     }
 
     public function getOrder(string $orderId): array
     {
         return $this->request()->get("/orders/{$orderId}")->throw()->json() ?? [];
+    }
+
+    public function createPlan(array $payload, ?string $idempotencyKey = null): array
+    {
+        return $this->requestWithIdempotency($idempotencyKey)
+            ->post('/plans', $payload)
+            ->throw()
+            ->json() ?? [];
+    }
+
+    public function listPlans(array $query = []): array
+    {
+        return $this->request()->get('/plans', $query)->throw()->json() ?? [];
+    }
+
+    public function getPlan(string $planId): array
+    {
+        return $this->request()->get("/plans/{$planId}")->throw()->json() ?? [];
+    }
+
+    public function createSubscription(array $payload, ?string $idempotencyKey = null): array
+    {
+        return $this->requestWithIdempotency($idempotencyKey)
+            ->post('/subscriptions', $payload)
+            ->throw()
+            ->json() ?? [];
+    }
+
+    public function getSubscription(string $subscriptionId): array
+    {
+        return $this->request()->get("/subscriptions/{$subscriptionId}")->throw()->json() ?? [];
+    }
+
+    public function listSubscriptions(array $query = []): array
+    {
+        return $this->request()->get('/subscriptions', $query)->throw()->json() ?? [];
+    }
+
+    public function listSubscriptionCycles(string $subscriptionId, array $query = []): array
+    {
+        return $this->request()->get("/subscriptions/{$subscriptionId}/cycles", $query)->throw()->json() ?? [];
+    }
+
+    public function cancelSubscription(string $subscriptionId, array $payload = []): array
+    {
+        return $this->request()->delete("/subscriptions/{$subscriptionId}", $payload)->throw()->json() ?? [];
+    }
+
+    public function updateSubscriptionCard(string $subscriptionId, array $payload, ?string $idempotencyKey = null): array
+    {
+        return $this->requestWithIdempotency($idempotencyKey)
+            ->patch("/subscriptions/{$subscriptionId}/card", $payload)
+            ->throw()
+            ->json() ?? [];
+    }
+
+    public function updateSubscriptionPaymentMethod(string $subscriptionId, array $payload, ?string $idempotencyKey = null): array
+    {
+        return $this->requestWithIdempotency($idempotencyKey)
+            ->patch("/subscriptions/{$subscriptionId}/payment-method", $payload)
+            ->throw()
+            ->json() ?? [];
+    }
+
+    public function updateSubscriptionStartAt(string $subscriptionId, array $payload, ?string $idempotencyKey = null): array
+    {
+        return $this->requestWithIdempotency($idempotencyKey)
+            ->patch("/subscriptions/{$subscriptionId}/start-at", $payload)
+            ->throw()
+            ->json() ?? [];
+    }
+
+    public function updateSubscriptionMetadata(string $subscriptionId, array $payload, ?string $idempotencyKey = null): array
+    {
+        return $this->requestWithIdempotency($idempotencyKey)
+            ->patch("/subscriptions/{$subscriptionId}/metadata", $payload)
+            ->throw()
+            ->json() ?? [];
+    }
+
+    public function listInvoices(array $query = []): array
+    {
+        return $this->request()->get('/invoices', $query)->throw()->json() ?? [];
+    }
+
+    public function listCharges(array $query = []): array
+    {
+        return $this->request()->get('/charges', $query)->throw()->json() ?? [];
     }
 
     public function getCharge(string $chargeId): array
@@ -46,6 +134,11 @@ class PagarmeClient
     public function listHooks(array $query = []): array
     {
         return $this->request()->get('/hooks', $query)->throw()->json() ?? [];
+    }
+
+    public function getHook(string $hookId): array
+    {
+        return $this->request()->get("/hooks/{$hookId}")->throw()->json() ?? [];
     }
 
     public function retryHook(string $hookId): array
@@ -61,6 +154,19 @@ class PagarmeClient
     public function captureCharge(string $chargeId, array $payload = []): array
     {
         return $this->request()->post("/charges/{$chargeId}/capture", $payload)->throw()->json() ?? [];
+    }
+
+    private function requestWithIdempotency(?string $idempotencyKey = null): PendingRequest
+    {
+        $request = $this->request();
+
+        if (! filled($idempotencyKey)) {
+            return $request;
+        }
+
+        return $request->withHeaders([
+            'Idempotency-Key' => $idempotencyKey,
+        ]);
     }
 
     private function request(): PendingRequest

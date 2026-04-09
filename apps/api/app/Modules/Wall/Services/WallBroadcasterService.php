@@ -32,7 +32,7 @@ class WallBroadcasterService
 
         event(new WallMediaPublished(
             $settings->wall_code,
-            $this->payloads->media($media),
+            $this->payloads->media($media, $settings),
         ));
     }
 
@@ -46,7 +46,7 @@ class WallBroadcasterService
 
         event(new WallMediaUpdated(
             $settings->wall_code,
-            $this->payloads->media($media),
+            $this->payloads->media($media, $settings),
         ));
     }
 

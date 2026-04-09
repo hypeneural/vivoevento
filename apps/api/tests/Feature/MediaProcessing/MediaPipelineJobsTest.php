@@ -16,6 +16,7 @@ use App\Modules\MediaProcessing\Models\EventMediaVariant;
 use App\Modules\MediaProcessing\Models\MediaProcessingRun;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event as EventFacade;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 
@@ -78,9 +79,11 @@ it('generate variants job marks media processed emits variants event and queues 
             ->sort()
             ->values()
             ->all()
-    )->toBe(['fast_preview', 'gallery', 'thumb', 'wall']);
+    )->toBe(['fast_preview', 'gallery', 'moderation_preview', 'moderation_thumb', 'thumb', 'wall']);
 
     Storage::disk('public')->assertExists("events/{$domainEvent->id}/variants/{$media->id}/fast_preview.webp");
+    Storage::disk('public')->assertExists("events/{$domainEvent->id}/variants/{$media->id}/moderation_thumb.webp");
+    Storage::disk('public')->assertExists("events/{$domainEvent->id}/variants/{$media->id}/moderation_preview.webp");
     Storage::disk('public')->assertExists("events/{$domainEvent->id}/variants/{$media->id}/thumb.webp");
     Storage::disk('public')->assertExists("events/{$domainEvent->id}/variants/{$media->id}/gallery.webp");
     Storage::disk('public')->assertExists("events/{$domainEvent->id}/variants/{$media->id}/wall.webp");
@@ -96,7 +99,7 @@ it('generate variants job marks media processed emits variants event and queues 
         ->and($variantsRun?->decision_key)->toBe('generated')
         ->and($variantsRun?->queue_name)->toBe('media-variants')
         ->and($variantsRun?->worker_ref)->not->toBe('')
-        ->and($variantsRun?->result_json['generated_count'] ?? null)->toBe(4)
+        ->and($variantsRun?->result_json['generated_count'] ?? null)->toBe(6)
         ->and($variantsRun?->result_json['perceptual_hash'] ?? null)->not->toBeNull()
         ->and($variantsRun?->result_json['fingerprint_status'] ?? null)->toBe('indexed');
 
@@ -157,6 +160,121 @@ it('groups visually identical images under the same duplicate key', function () 
     expect($variantsRun?->result_json['fingerprint_status'] ?? null)->toBe('grouped')
         ->and($variantsRun?->result_json['matched_media_id'] ?? null)->toBe($firstMedia->id)
         ->and($variantsRun?->result_json['match_type'] ?? null)->toBe('exact');
+});
+
+it('generate variants job transcodes wall video variants and poster for video media', function () {
+    Queue::fake();
+    Storage::fake('public');
+
+    $domainEvent = Event::factory()->active()->create([
+        'moderation_mode' => 'manual',
+    ]);
+
+    $path = "events/{$domainEvent->id}/originals/video-pista.mp4";
+    Storage::disk('public')->put($path, 'fake-video-binary');
+
+    $media = EventMedia::factory()->create([
+        'event_id' => $domainEvent->id,
+        'media_type' => 'video',
+        'mime_type' => 'video/mp4',
+        'original_filename' => 'video-pista.mp4',
+        'client_filename' => 'video-pista.mp4',
+        'original_disk' => 'public',
+        'original_path' => $path,
+        'processing_status' => MediaProcessingStatus::Downloaded->value,
+        'width' => 1280,
+        'height' => 720,
+        'duration_seconds' => 18,
+        'has_audio' => true,
+        'video_codec' => 'h264',
+        'audio_codec' => 'aac',
+        'bitrate' => 850000,
+        'container' => 'mp4',
+    ]);
+
+    $poster = UploadedFile::fake()->image('poster.jpg', 1280, 720);
+    $posterBinary = file_get_contents($poster->getPathname()) ?: '';
+
+    Process::fake(function ($process) use ($posterBinary) {
+        $command = $process->command;
+        $binary = $command[0] ?? null;
+        $outputPath = $command[array_key_last($command)] ?? null;
+
+        if ($binary === 'ffmpeg' && is_string($outputPath)) {
+            if (! is_dir(dirname($outputPath))) {
+                mkdir(dirname($outputPath), 0777, true);
+            }
+
+            if (str_ends_with($outputPath, '.jpg')) {
+                file_put_contents($outputPath, $posterBinary);
+            } else {
+                file_put_contents($outputPath, 'fake-wall-video-binary');
+            }
+
+            return Process::result('', '', 0);
+        }
+
+        if ($binary === 'ffprobe') {
+            return Process::result(json_encode([
+                'streams' => [
+                    [
+                        'codec_type' => 'video',
+                        'codec_name' => 'h264',
+                        'width' => 1280,
+                        'height' => 720,
+                    ],
+                    [
+                        'codec_type' => 'audio',
+                        'codec_name' => 'aac',
+                    ],
+                ],
+                'format' => [
+                    'duration' => '18',
+                    'bit_rate' => '850000',
+                    'format_name' => 'mov,mp4,m4a,3gp,3g2,mj2',
+                ],
+            ], JSON_THROW_ON_ERROR), '', 0);
+        }
+
+        return Process::result('', 'unexpected process', 1);
+    });
+
+    app(GenerateMediaVariantsJob::class, ['eventMediaId' => $media->id])->handle();
+
+    $media->refresh();
+
+    expect($media->processing_status)->toBe(MediaProcessingStatus::Processed);
+    expect(
+        EventMediaVariant::query()
+            ->where('event_media_id', $media->id)
+            ->pluck('variant_key')
+            ->sort()
+            ->values()
+            ->all()
+    )->toBe(['wall_video_720p', 'wall_video_poster']);
+
+    Storage::disk('public')->assertExists("events/{$domainEvent->id}/variants/{$media->id}/wall_video_720p.mp4");
+    Storage::disk('public')->assertExists("events/{$domainEvent->id}/variants/{$media->id}/wall_video_poster.jpg");
+
+    $variantsRun = MediaProcessingRun::query()
+        ->where('event_media_id', $media->id)
+        ->where('stage_key', 'variants')
+        ->latest('id')
+        ->first();
+
+    expect($variantsRun)->not->toBeNull()
+        ->and($variantsRun?->provider_key)->toBe('ffmpeg')
+        ->and($variantsRun?->model_key)->toBe('ffmpeg-h264-aac-faststart')
+        ->and($variantsRun?->status)->toBe('completed')
+        ->and($variantsRun?->decision_key)->toBe('generated')
+        ->and($variantsRun?->result_json['generated_count'] ?? null)->toBe(2)
+        ->and($variantsRun?->result_json['variant_keys'] ?? null)->toBe(['wall_video_720p', 'wall_video_poster'])
+        ->and($variantsRun?->result_json['perceptual_hash'] ?? null)->toBeNull()
+        ->and($variantsRun?->result_json['fingerprint_status'] ?? null)->toBe('skipped');
+
+    Queue::assertPushed(AnalyzeContentSafetyJob::class, fn (AnalyzeContentSafetyJob $job) => $job->eventMediaId === $media->id);
+    Process::assertRanTimes(fn ($process, $result) => ($process->command[0] ?? null) === 'ffmpeg' && $result->successful(), 2);
+    Process::assertRanTimes(fn ($process, $result) => ($process->command[0] ?? null) === 'ffprobe' && $result->successful(), 1);
 });
 
 it('run moderation job approves media and queues publication for no moderation events', function () {

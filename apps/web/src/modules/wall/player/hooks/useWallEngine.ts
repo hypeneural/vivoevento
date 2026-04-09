@@ -11,6 +11,13 @@ import type {
 } from '../types';
 import { primeWallAsset } from '../engine/cache';
 import { resolveNextPreloadItem, preloadNextItem } from '../engine/preload';
+import {
+  DEFAULT_EVENT_VIDEO_RESUME_MODE,
+  EVENT_VIDEO_STARTUP_DEADLINE_MS,
+  EVENT_VIDEO_STALL_BUDGET_MS,
+  resolveEventVideoCapMs,
+  resolveEventVideoResumeMode,
+} from '../engine/autoplay';
 import { createEmptyState, wallReducer } from '../engine/reducer';
 import {
   clearWallRuntimeStorage,
@@ -73,11 +80,36 @@ export function useWallEngine(code: string) {
     writeWallRuntimeStorage(code, state);
   }, [code, state]);
 
+  const currentItem = useMemo(() => {
+    if (!state.currentItemId) {
+      return state.items[state.currentIndex] ?? null;
+    }
+
+    return state.items.find((item) => item.id === state.currentItemId) ?? null;
+  }, [state.currentIndex, state.currentItemId, state.items]);
+
   // Track when the last advance happened (for drift compensation)
   const lastAdvanceAtRef = useRef<number>(Date.now());
+  const videoPolicyConfig = useMemo(() => ({
+    intervalMs: state.settings?.interval_ms ?? null,
+    playbackMode: state.settings?.video_playback_mode ?? null,
+    maxSeconds: state.settings?.video_max_seconds ?? null,
+    resumeMode: state.settings?.video_resume_mode ?? null,
+  }), [
+    state.settings?.interval_ms,
+    state.settings?.video_max_seconds,
+    state.settings?.video_playback_mode,
+    state.settings?.video_resume_mode,
+  ]);
 
   useEffect(() => {
-    if (state.status !== 'playing' || state.currentAd || !state.settings || state.items.length === 0) {
+    if (
+      state.status !== 'playing'
+      || state.currentAd
+      || !state.settings
+      || state.items.length === 0
+      || currentItem?.type === 'video'
+    ) {
       return;
     }
 
@@ -107,15 +139,77 @@ export function useWallEngine(code: string) {
       window.clearTimeout(timeout);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [state.currentAd, state.currentItemId, state.items.length, state.settings, state.status]);
+  }, [currentItem?.type, state.currentAd, state.currentItemId, state.items.length, state.settings, state.status]);
 
-  const currentItem = useMemo(() => {
-    if (!state.currentItemId) {
-      return state.items[state.currentIndex] ?? null;
+  useEffect(() => {
+    if (
+      state.status !== 'playing'
+      || state.currentAd
+      || !currentItem
+      || currentItem.type !== 'video'
+      || state.videoPlayback.itemId !== currentItem.id
+      || !state.videoPlayback.playingConfirmed
+    ) {
+      return;
     }
 
-    return state.items.find((item) => item.id === state.currentItemId) ?? null;
-  }, [state.currentIndex, state.currentItemId, state.items]);
+    const capMs = resolveEventVideoCapMs(
+      state.videoPlayback.durationSeconds ?? currentItem.duration_seconds ?? null,
+      videoPolicyConfig,
+    );
+
+    if (capMs == null) {
+      return;
+    }
+
+    const startedAt = state.videoPlayback.playbackStartedAt
+      ? Date.parse(state.videoPlayback.playbackStartedAt)
+      : NaN;
+    const elapsed = Number.isFinite(startedAt)
+      ? Math.max(0, Date.now() - startedAt)
+      : 0;
+    const remainingMs = Math.max(0, capMs - elapsed);
+
+    if (remainingMs === 0) {
+      dispatch({
+        type: 'video-cap-reached',
+        payload: {
+          itemId: currentItem.id,
+          currentTime: state.videoPlayback.currentTime,
+          durationSeconds: state.videoPlayback.durationSeconds ?? currentItem.duration_seconds ?? null,
+          readyState: state.videoPlayback.readyState,
+        },
+      });
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      dispatch({
+        type: 'video-cap-reached',
+        payload: {
+          itemId: currentItem.id,
+          currentTime: state.videoPlayback.currentTime,
+          durationSeconds: state.videoPlayback.durationSeconds ?? currentItem.duration_seconds ?? null,
+          readyState: state.videoPlayback.readyState,
+        },
+      });
+    }, remainingMs);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [
+    currentItem,
+    state.currentAd,
+    state.status,
+    state.videoPlayback.currentTime,
+    state.videoPlayback.durationSeconds,
+    state.videoPlayback.itemId,
+    state.videoPlayback.playbackStartedAt,
+    state.videoPlayback.playingConfirmed,
+    state.videoPlayback.readyState,
+    videoPolicyConfig,
+  ]);
 
   const itemsToPrime = useMemo(() => {
     const topQueueItems = state.items
@@ -179,13 +273,19 @@ export function useWallEngine(code: string) {
       stateRef.current.currentItemId
       ?? persistedState?.currentItemId
       ?? null;
+    const preferredCurrentItemStartedAt =
+      stateRef.current.currentItemStartedAt
+      ?? persistedState?.currentItemStartedAt
+      ?? null;
 
     dispatch({
       type: 'apply-snapshot',
       snapshot,
       items: runtimeItems,
       senderStats,
+      persistedVideoPlayback: persistedState?.videoPlayback ?? null,
       preferredCurrentItemId,
+      preferredCurrentItemStartedAt,
       fallbackStatus: 'playing' satisfies WallPlayerStatus,
     });
 
@@ -221,6 +321,91 @@ export function useWallEngine(code: string) {
     dispatch({ type: 'ad-finished' });
   }, []);
 
+  const handleVideoStarting = useCallback((payload: {
+    itemId: string;
+    currentTime?: number;
+    durationSeconds?: number | null;
+    readyState?: number;
+  }) => {
+    dispatch({ type: 'video-starting', payload });
+  }, []);
+
+  const handleVideoFirstFrame = useCallback((payload: {
+    itemId: string;
+    currentTime?: number;
+    durationSeconds?: number | null;
+    readyState?: number;
+  }) => {
+    dispatch({ type: 'video-first-frame', payload });
+  }, []);
+
+  const handleVideoPlaybackReady = useCallback((payload: {
+    itemId: string;
+    currentTime?: number;
+    durationSeconds?: number | null;
+    readyState?: number;
+  }) => {
+    dispatch({ type: 'video-playback-ready', payload });
+  }, []);
+
+  const handleVideoPlaying = useCallback((payload: {
+    itemId: string;
+    currentTime?: number;
+    durationSeconds?: number | null;
+    readyState?: number;
+  }) => {
+    dispatch({ type: 'video-playing', payload });
+  }, []);
+
+  const handleVideoProgress = useCallback((payload: {
+    itemId: string;
+    currentTime?: number;
+    durationSeconds?: number | null;
+    readyState?: number;
+  }) => {
+    dispatch({ type: 'video-progress', payload });
+  }, []);
+
+  const handleVideoWaiting = useCallback((payload: {
+    itemId: string;
+    currentTime?: number;
+    durationSeconds?: number | null;
+    readyState?: number;
+  }) => {
+    dispatch({ type: 'video-waiting', payload });
+  }, []);
+
+  const handleVideoStalled = useCallback((payload: {
+    itemId: string;
+    currentTime?: number;
+    durationSeconds?: number | null;
+    readyState?: number;
+  }) => {
+    dispatch({ type: 'video-stalled', payload });
+  }, []);
+
+  const handleVideoEnded = useCallback((payload: {
+    itemId: string;
+    currentTime?: number;
+    durationSeconds?: number | null;
+    readyState?: number;
+  }) => {
+    lastAdvanceAtRef.current = Date.now();
+    dispatch({ type: 'video-ended', payload });
+  }, []);
+
+  const handleVideoFailure = useCallback((payload: {
+    itemId: string;
+    exitReason: 'play_rejected' | 'stalled_timeout' | 'startup_timeout' | 'poster_then_skip' | 'startup_waiting_timeout' | 'startup_play_rejected';
+    failureReason?: 'network_error' | 'unsupported_format' | 'autoplay_blocked' | 'decode_degraded' | 'src_missing' | 'variant_missing' | null;
+    currentTime?: number;
+    durationSeconds?: number | null;
+    readyState?: number;
+  }) => {
+    lastAdvanceAtRef.current = Date.now();
+    dispatch({ type: 'video-failure', payload });
+  }, []);
+
   const markExpired = useCallback((message?: string | null) => {
     dispatch({ type: 'mark-expired' });
     setErrorMessage(message || 'O telao foi encerrado.');
@@ -254,10 +439,24 @@ export function useWallEngine(code: string) {
     handleMediaDeleted,
     handleAdsUpdated,
     handleAdFinished,
+    handleVideoStarting,
+    handleVideoFirstFrame,
+    handleVideoPlaybackReady,
+    handleVideoPlaying,
+    handleVideoProgress,
+    handleVideoWaiting,
+    handleVideoStalled,
+    handleVideoEnded,
+    handleVideoFailure,
     markExpired,
     markSyncError,
     resetAssetStatuses,
     resetRuntime,
+    videoRuntimeConfig: {
+      startupDeadlineMs: EVENT_VIDEO_STARTUP_DEADLINE_MS,
+      stallBudgetMs: EVENT_VIDEO_STALL_BUDGET_MS,
+      resumeMode: resolveEventVideoResumeMode(videoPolicyConfig) ?? DEFAULT_EVENT_VIDEO_RESUME_MODE,
+    },
   };
 }
 

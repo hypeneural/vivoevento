@@ -48,6 +48,9 @@ describe('WallUpcomingTimeline', () => {
             sender_name: 'Pedro',
             sender_key: 'sender-pedro',
             source_type: 'whatsapp',
+            is_video: true,
+            duration_seconds: 18,
+            video_policy_label: 'Video com duracao diferenciada',
             duplicate_cluster_key: null,
             is_featured: false,
             is_replay: true,
@@ -67,9 +70,30 @@ describe('WallUpcomingTimeline', () => {
     expect(screen.getByRole('img', { name: /Miniatura da proxima foto de Ana/i })).toBeInTheDocument();
     expect(screen.getByText(/^Upload$/i)).toBeInTheDocument();
     expect(screen.getByText(/^WhatsApp$/i)).toBeInTheDocument();
+    expect(screen.getByText(/Video 18s/i)).toBeInTheDocument();
+    expect(screen.getByText(/Video com duracao diferenciada/i)).toBeInTheDocument();
     expect(screen.getByText(/Entrada principal/i)).toBeInTheDocument();
     expect(screen.getByText(/Layout Cinematografico/i)).toBeInTheDocument();
     expect(screen.getByText(/Reprise/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Fila real/i).length).toBeGreaterThan(0);
+  });
+
+  it('mostra loading estavel enquanto a previsao ainda nao ficou pronta', () => {
+    render(
+      <WallUpcomingTimeline
+        selectionSummary="A fila alterna remetentes quando ha alternativa pronta."
+        simulationSummary={null}
+        simulationPreview={[]}
+        simulationExplanation={[]}
+        isLoading
+        isError={false}
+        isRefreshing={false}
+        isDraftPending
+      />,
+    );
+
+    expect(screen.getByText(/Preparando a timeline operacional do telao/i)).toBeInTheDocument();
+    expect(screen.getByText(/Mantendo a area estavel enquanto a fila prevista e calculada\./i)).toBeInTheDocument();
+    expect(screen.getAllByTestId('wall-upcoming-loading-card')).toHaveLength(3);
   });
 });

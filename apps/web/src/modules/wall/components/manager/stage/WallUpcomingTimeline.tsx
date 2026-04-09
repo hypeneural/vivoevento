@@ -1,9 +1,10 @@
 import { Image as ImageIcon, Loader2 } from 'lucide-react';
 
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { ApiWallSimulationPreviewItem, ApiWallSimulationResponse } from '@/lib/api-types';
 
-import { getWallSourceMeta } from '../../../wall-source-meta';
+import { getWallMediaSemanticMeta, getWallSourceMeta } from '../../../wall-source-meta';
 
 interface WallUpcomingTimelineProps {
   selectionSummary: string;
@@ -41,9 +42,39 @@ export function WallUpcomingTimeline({
       </div>
 
       {isLoading && !simulationSummary ? (
-        <div className="flex min-h-[120px] items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 text-sm text-muted-foreground">
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Calculando a proxima ordem de exibicao...
+        <div className="rounded-2xl border border-dashed border-border/60 bg-muted/15 p-4">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 p-2 text-amber-700">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </span>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">Preparando a timeline operacional do telao</p>
+              <p className="text-sm text-muted-foreground">
+                Mantendo a area estavel enquanto a fila prevista e calculada.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div
+                key={index}
+                data-testid="wall-upcoming-loading-card"
+                className="rounded-2xl border border-border/60 bg-background/70 p-3"
+              >
+                <div className="flex gap-2">
+                  <Skeleton className="h-6 w-14 rounded-full" />
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                </div>
+                <Skeleton className="mt-3 aspect-[4/3] w-full rounded-2xl" />
+                <div className="mt-3 space-y-2">
+                  <Skeleton className="h-4 w-3/5" />
+                  <Skeleton className="h-3 w-4/5" />
+                  <Skeleton className="h-3 w-2/3" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
 
@@ -97,9 +128,14 @@ export function WallUpcomingTimeline({
               <div className="flex gap-4 pb-4">
                 {simulationPreview.map((slide, index) => {
                   const sourceMeta = getWallSourceMeta(slide.source_type ?? 'whatsapp');
+                  const mediaMeta = getWallMediaSemanticMeta({
+                    isVideo: slide.is_video,
+                    durationSeconds: slide.duration_seconds,
+                    videoPolicyLabel: slide.video_policy_label,
+                  });
 
                   return (
-                    <div key={`${slide.position}-${slide.item_id}`} className="relative min-w-[272px] max-w-[272px] flex-none">
+                    <div key={`${slide.position}-${slide.item_id}`} className="relative min-w-[240px] max-w-[240px] flex-none sm:min-w-[272px] sm:max-w-[272px]">
                       <div className="rounded-2xl border border-border/60 bg-background/80 p-3 shadow-sm">
                         <div className="flex items-center gap-2">
                           <span className="inline-flex rounded-full border border-border/60 bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
@@ -109,6 +145,11 @@ export function WallUpcomingTimeline({
                             <sourceMeta.Icon className="h-3.5 w-3.5" />
                             {sourceMeta.label}
                           </span>
+                          {mediaMeta.isVideo ? (
+                            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium ${mediaMeta.chipClassName}`}>
+                              {mediaMeta.badgeLabel}
+                            </span>
+                          ) : null}
                         </div>
 
                         <div className="mt-3 overflow-hidden rounded-2xl border border-border/50 bg-muted/20">
@@ -136,6 +177,11 @@ export function WallUpcomingTimeline({
                             {slide.caption ? (
                               <p className="line-clamp-2 text-xs leading-relaxed text-foreground/80">
                                 {slide.caption}
+                              </p>
+                            ) : null}
+                            {mediaMeta.isVideo ? (
+                              <p className="text-xs leading-relaxed text-muted-foreground">
+                                {mediaMeta.operationalLabel}
                               </p>
                             ) : null}
                           </div>

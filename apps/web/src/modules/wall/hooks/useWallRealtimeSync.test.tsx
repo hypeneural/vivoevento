@@ -219,6 +219,33 @@ describe('useWallRealtimeSync', () => {
       wrapper: createWrapper(queryClient),
     });
 
+    queryClient.setQueryData(queryKeys.wall.liveSnapshot('31'), {
+      wallStatus: 'live',
+      wallStatusLabel: 'Ao vivo',
+      layout: 'auto',
+      transitionEffect: 'fade',
+      currentPlayer: {
+        playerInstanceId: 'player-live',
+        healthStatus: 'healthy',
+        runtimeStatus: 'playing',
+        connectionStatus: 'connected',
+        lastSeenAt: '2026-04-08T22:09:40Z',
+      },
+      currentItem: {
+        id: 'media_9',
+        previewUrl: 'https://cdn.example.com/previous.jpg',
+        senderName: 'Ana',
+        senderKey: 'whatsapp:5511999999998',
+        source: 'whatsapp',
+        caption: 'Anterior',
+        layoutHint: 'fullscreen',
+        isFeatured: false,
+        createdAt: '2026-04-08T22:09:20Z',
+      },
+      advancedAt: '2026-04-08T22:09:30Z',
+      updatedAt: '2026-04-08T22:09:40Z',
+    });
+
     invalidateQueriesSpy.mockClear();
 
     act(() => {
@@ -233,5 +260,6 @@ describe('useWallRealtimeSync', () => {
     });
 
     expect(invalidateQueriesSpy).not.toHaveBeenCalledWith({ queryKey: queryKeys.wall.liveSnapshot('31') });
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: queryKeys.wall.insights('31') });
   });
 });

@@ -17,6 +17,27 @@ export interface BillingInvoicesResponse {
 export interface BillingCheckoutPayload {
   plan_id: number;
   billing_cycle?: 'monthly' | 'yearly';
+  payment_method?: 'credit_card';
+  payer?: {
+    name: string;
+    email?: string;
+    document: string;
+    phone: string;
+    address: {
+      street: string;
+      number: string;
+      district: string;
+      zip_code: string;
+      city: string;
+      state: string;
+      country: string;
+      complement?: string;
+    };
+  };
+  credit_card?: {
+    card_token?: string;
+    card_id?: string;
+  };
 }
 
 export interface CancelSubscriptionPayload {

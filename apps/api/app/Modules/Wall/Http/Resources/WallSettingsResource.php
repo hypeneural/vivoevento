@@ -2,6 +2,7 @@
 
 namespace App\Modules\Wall\Http\Resources;
 
+use App\Modules\MediaProcessing\Services\MediaToolingStatusService;
 use App\Modules\Wall\Services\WallPayloadFactory;
 use App\Modules\Wall\Services\WallDiagnosticsService;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ class WallSettingsResource extends JsonResource
     {
         $payloads = app(WallPayloadFactory::class);
         $diagnostics = app(WallDiagnosticsService::class);
+        $tooling = app(MediaToolingStatusService::class);
 
         return [
             'id' => $this->id,
@@ -29,6 +31,7 @@ class WallSettingsResource extends JsonResource
             'public_url' => $this->publicUrl(),
             'settings' => $payloads->settings($this->resource),
             'diagnostics_summary' => $diagnostics->summaryPayloadForSettings($this->resource),
+            'video_pipeline' => $tooling->payload(),
             'expires_at' => $this->expires_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),

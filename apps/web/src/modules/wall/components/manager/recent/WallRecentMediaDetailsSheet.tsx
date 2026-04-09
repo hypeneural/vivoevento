@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { useIsMobile } from '@/hooks/use-mobile';
 
 import { formatWallRecentStatusLabel } from '@/modules/wall/wall-copy';
-import { getWallSourceMeta } from '@/modules/wall/wall-source-meta';
+import { getWallMediaSemanticMeta, getWallSourceMeta } from '@/modules/wall/wall-source-meta';
 import { formatWallRelativeTime } from '@/modules/wall/wall-view-models';
 
 interface WallRecentMediaDetailsSheetProps {
@@ -42,6 +42,13 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 function RecentMediaDetailsBody({ item }: { item: ApiWallInsightsRecentItem | null }) {
   const sourceMeta = item ? getWallSourceMeta(item.source) : null;
+  const mediaMeta = item
+    ? getWallMediaSemanticMeta({
+        isVideo: item.isVideo,
+        durationSeconds: item.durationSeconds,
+        videoPolicyLabel: item.videoPolicyLabel,
+      })
+    : null;
 
   return (
     <div className="mt-4 space-y-4">
@@ -66,6 +73,11 @@ function RecentMediaDetailsBody({ item }: { item: ApiWallInsightsRecentItem | nu
           <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-medium ${sourceMeta.chipClassName}`}>
             <sourceMeta.Icon className="h-3.5 w-3.5" />
             {sourceMeta.label}
+          </span>
+        ) : null}
+        {mediaMeta ? (
+          <span className={`inline-flex rounded-full border px-2.5 py-1 font-medium ${mediaMeta.chipClassName}`}>
+            {mediaMeta.detailLabel}
           </span>
         ) : null}
         {item?.isFeatured ? (
@@ -102,6 +114,16 @@ function RecentMediaDetailsBody({ item }: { item: ApiWallInsightsRecentItem | nu
           label="Origem"
           value={sourceMeta?.label ?? 'Sem origem'}
         />
+        <DetailRow
+          label="Tipo de midia"
+          value={mediaMeta?.detailLabel ?? 'Foto'}
+        />
+        {mediaMeta?.isVideo ? (
+          <DetailRow
+            label="Playback no telao"
+            value={mediaMeta.operationalLabel}
+          />
+        ) : null}
       </div>
     </div>
   );

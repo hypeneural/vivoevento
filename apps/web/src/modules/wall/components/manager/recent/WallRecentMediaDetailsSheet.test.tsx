@@ -20,6 +20,9 @@ const recentItem = {
   displayedAt: null,
   status: 'queued' as const,
   isFeatured: true,
+  isVideo: true,
+  durationSeconds: 34,
+  videoPolicyLabel: 'Video longo com politica especial',
   isReplay: false,
 };
 
@@ -46,6 +49,8 @@ describe('WallRecentMediaDetailsSheet', () => {
     expect(await screen.findByTestId('wall-recent-media-details-sheet')).toBeInTheDocument();
     expect(screen.getByText(/Detalhes da midia recente/i)).toBeInTheDocument();
     expect(screen.getByText(/Carla/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Video 34s/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Video longo com politica especial/i)).toBeInTheDocument();
   });
 
   it('usa drawer no mobile', async () => {

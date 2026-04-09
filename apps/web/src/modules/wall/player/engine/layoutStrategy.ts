@@ -16,7 +16,12 @@ function hasCaption(media: WallRuntimeItem): boolean {
 export function resolveRenderableLayout(
   requested: WallLayout,
   media: WallRuntimeItem,
+  videoMultiLayoutPolicy: 'disallow' | 'one' | 'all' = 'disallow',
 ): RenderableLayout {
+  if (media.type === 'video' && isMultiItemLayout(requested) && videoMultiLayoutPolicy === 'disallow') {
+    return 'fullscreen';
+  }
+
   if (requested !== 'auto') return requested;
 
   const withCaption = hasCaption(media);

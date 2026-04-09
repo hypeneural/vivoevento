@@ -5,12 +5,18 @@
  * Inspired by the VIPSocial cinematic layout with double-card effect.
  */
 
-import MediaSurface from '../components/MediaSurface';
+import MediaSurface, { type MediaSurfaceVideoControlProps } from '../components/MediaSurface';
 import type { WallRuntimeItem } from '../types';
 import { WALL_CARD, WALL_READING_GRADIENT } from '../design/tokens';
 import { resolvePrimaryMediaFit } from '../engine/layoutStrategy';
 
-export function CinematicLayout({ media }: { media: WallRuntimeItem }) {
+export function CinematicLayout({
+  media,
+  videoControl,
+}: {
+  media: WallRuntimeItem;
+  videoControl?: MediaSurfaceVideoControlProps | null;
+}) {
   return (
     <div className="relative flex min-h-screen items-center justify-center px-[max(16px,2vw)] py-[max(16px,2vh)]">
       {/* Blurred background echo */}
@@ -19,6 +25,7 @@ export function CinematicLayout({ media }: { media: WallRuntimeItem }) {
           media={media}
           fit="cover"
           imageClassName="scale-110 opacity-60 blur-2xl"
+          renderVideoPosterOnly={media.type === 'video'}
         />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,_rgba(9,9,11,0.25)_0%,_rgba(9,9,11,0.75)_100%)]" />
       </div>
@@ -31,6 +38,7 @@ export function CinematicLayout({ media }: { media: WallRuntimeItem }) {
           <MediaSurface
             media={media}
             fit={resolvePrimaryMediaFit('cinematic', media)}
+            videoControl={videoControl}
           />
         </div>
       </div>

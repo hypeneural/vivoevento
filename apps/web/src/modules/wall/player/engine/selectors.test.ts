@@ -118,6 +118,29 @@ describe('wall selectors', () => {
     expect(nextItemId).toBe('joao_1');
   });
 
+  it('prefers featured media when sender pools are equally fair', () => {
+    const nextItemId = pickNextWallItemId([
+      makeRuntimeItem({
+        id: 'featured_item',
+        sender_name: 'Maria',
+        senderKey: 'sender-maria',
+        sender_key: 'sender-maria',
+        is_featured: true,
+        created_at: '2026-04-01T10:01:00Z',
+      }),
+      makeRuntimeItem({
+        id: 'regular_item',
+        sender_name: 'Joao',
+        senderKey: 'sender-joao',
+        sender_key: 'sender-joao',
+        is_featured: false,
+        created_at: '2026-04-01T10:02:00Z',
+      }),
+    ]);
+
+    expect(nextItemId).toBe('featured_item');
+  });
+
   it('respects sender window limit when another sender is available', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-01T10:10:00Z'));

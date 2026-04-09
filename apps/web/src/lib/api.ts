@@ -5,6 +5,8 @@
  * Preparado para plugar no backend Sanctum quando disponível.
  */
 
+import { getRealtimeSocketId } from './realtime';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 // ─── Token Management ──────────────────────────────────────
@@ -105,6 +107,11 @@ function buildHeaders(custom?: HeadersInit): Headers {
   const token = getToken();
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const socketId = getRealtimeSocketId();
+  if (socketId) {
+    headers.set('X-Socket-ID', socketId);
   }
 
   return headers;

@@ -42,11 +42,13 @@ import { cn } from '@/lib/utils';
 
 import { ModerationBulkActionBar } from './components/ModerationBulkActionBar';
 import { type ModerationMediaAction } from './components/ModerationMediaCard';
+import { ModerationMediaSurface } from './components/ModerationMediaSurface';
 import { ModerationReviewPanel } from './components/ModerationReviewPanel';
 import { ModerationVirtualGrid, type ModerationVirtualGridHandle } from './components/ModerationVirtualGrid';
 import {
   compareModerationMedia,
   flattenModerationPages,
+  mergeModerationItemCollections,
   moderationItemMatchesFilters,
   prependModerationItems,
   removeModerationItems,
@@ -105,6 +107,7 @@ function buildOptimisticItems(
         moderation_status: 'approved',
         publication_status: 'published',
         status: 'published',
+        updated_at: nextTimestamp,
         published_at: item.published_at ?? nextTimestamp,
       };
     }
@@ -115,6 +118,7 @@ function buildOptimisticItems(
         moderation_status: 'rejected',
         publication_status: 'draft',
         status: 'rejected',
+        updated_at: nextTimestamp,
       };
     }
 
@@ -122,6 +126,7 @@ function buildOptimisticItems(
       return {
         ...item,
         is_featured: payload.desiredValue ?? !item.is_featured,
+        updated_at: nextTimestamp,
       };
     }
 
@@ -132,6 +137,7 @@ function buildOptimisticItems(
         ...item,
         is_pinned: false,
         sort_order: 0,
+        updated_at: nextTimestamp,
       };
     }
 
@@ -142,6 +148,7 @@ function buildOptimisticItems(
       ...item,
       is_pinned: true,
       sort_order: (maxSortOrderByEvent.get(item.event_id) ?? 0) + offset,
+      updated_at: nextTimestamp,
     };
   });
 }
@@ -183,8 +190,7 @@ export default function ModerationPage() {
 
   const deferredSearch = useDeferredValue(search);
 
-  const feedFilters = useMemo<ModerationListFilters>(() => ({
-    per_page: perPage,
+  const sharedFilters = useMemo<Omit<ModerationListFilters, 'per_page' | 'cursor'>>(() => ({
     search: deferredSearch || undefined,
     event_id: eventFilter === 'all' ? undefined : Number(eventFilter),
     status: statusFilter === 'all' ? undefined : statusFilter as ModerationStatusFilter,
@@ -192,9 +198,15 @@ export default function ModerationPage() {
     pinned: pinnedOnly ? true : undefined,
     sender_blocked: blockedSenderOnly ? true : undefined,
     orientation: orientationFilter === 'all' ? undefined : orientationFilter as ModerationOrientationFilter,
-  }), [blockedSenderOnly, deferredSearch, eventFilter, featuredOnly, orientationFilter, perPage, pinnedOnly, statusFilter]);
+  }), [blockedSenderOnly, deferredSearch, eventFilter, featuredOnly, orientationFilter, pinnedOnly, statusFilter]);
+
+  const feedFilters = useMemo<ModerationListFilters>(() => ({
+    ...sharedFilters,
+    per_page: perPage,
+  }), [perPage, sharedFilters]);
 
   const feedQueryKey = useMemo(() => queryKeys.media.feed(feedFilters), [feedFilters]);
+  const statsQueryKey = useMemo(() => queryKeys.media.feedStats(sharedFilters), [sharedFilters]);
 
   const eventsQuery = useQuery({
     queryKey: queryKeys.events.list({ scope: 'moderation-options' }),
@@ -205,8 +217,15 @@ export default function ModerationPage() {
   const feedQuery = useInfiniteQuery({
     queryKey: feedQueryKey,
     initialPageParam: null as string | null,
-    queryFn: ({ pageParam }) => moderationService.list({ ...feedFilters, cursor: pageParam }),
+    queryFn: ({ pageParam, signal }) => moderationService.list({ ...feedFilters, cursor: pageParam }, signal),
     getNextPageParam: (lastPage) => lastPage.meta.next_cursor ?? undefined,
+    enabled: canView,
+    staleTime: 15_000,
+  });
+
+  const statsQuery = useQuery({
+    queryKey: statsQueryKey,
+    queryFn: ({ signal }) => moderationService.listStats(sharedFilters, signal),
     enabled: canView,
     staleTime: 15_000,
   });
@@ -220,14 +239,14 @@ export default function ModerationPage() {
   const selectedItems = useMemo(() => media.filter((item) => selectedSet.has(item.id)), [media, selectedSet]);
   const focusedMedia = useMemo(() => media.find((item) => item.id === focusedMediaId) ?? null, [focusedMediaId, media]);
   const focusedMediaIndex = useMemo(() => media.findIndex((item) => item.id === focusedMediaId), [focusedMediaId, media]);
-  const stats = feedQuery.data?.pages[0]?.meta.stats ?? EMPTY_STATS;
+  const stats = statsQuery.data ?? EMPTY_STATS;
   const activeQuickFilter = resolveQuickFilter(statusFilter, featuredOnly, pinnedOnly, blockedSenderOnly);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const virtualGridRef = useRef<ModerationVirtualGridHandle | null>(null);
 
   const focusedMediaDetailQuery = useQuery({
     queryKey: queryKeys.media.detail(String(focusedMediaId ?? '')),
-    queryFn: () => moderationService.show(focusedMediaId as number),
+    queryFn: ({ signal }) => moderationService.show(focusedMediaId as number, signal),
     enabled: focusedMediaId !== null,
     staleTime: 15_000,
   });
@@ -263,12 +282,12 @@ export default function ModerationPage() {
   useEffect(() => {
     const node = loadMoreRef.current;
 
-    if (!node || !feedQuery.hasNextPage || feedQuery.isFetchingNextPage || feedQuery.isFetchNextPageError) {
+    if (!node || !feedQuery.hasNextPage || feedQuery.isFetching || feedQuery.isFetchingNextPage || feedQuery.isFetchNextPageError) {
       return;
     }
 
     const observer = new IntersectionObserver((entries) => {
-      if (entries[0]?.isIntersecting) {
+      if (entries[0]?.isIntersecting && !feedQuery.isFetching && !feedQuery.isFetchingNextPage) {
         feedQuery.fetchNextPage();
       }
     }, { rootMargin: '1200px 0px' });
@@ -365,10 +384,14 @@ export default function ModerationPage() {
   }, [feedFilters, perPage, updateFeedCache]);
 
   const queueIncomingItem = useCallback((item: ApiEventMediaItem) => {
-    setIncomingItems((current) => [...current.filter((existing) => existing.id !== item.id), item].sort(compareModerationMedia));
+    setIncomingItems((current) => (
+      mergeModerationItemCollections(current, [item]).sort(compareModerationMedia)
+    ));
   }, []);
 
   const handleRealtimeItem = useCallback((item: ApiEventMediaItem) => {
+    void queryClient.invalidateQueries({ queryKey: statsQueryKey });
+
     const existsInFeed = media.some((existing) => existing.id === item.id);
     const matchesFilter = moderationItemMatchesFilters(item, feedFilters);
 
@@ -388,7 +411,7 @@ export default function ModerationPage() {
     }
 
     queueIncomingItem(item);
-  }, [feedFilters, isNearTop, media, prependIncomingToFeed, queueIncomingItem, selectedIds.length, upsertFeedItems]);
+  }, [feedFilters, isNearTop, media, prependIncomingToFeed, queryClient, queueIncomingItem, selectedIds.length, statsQueryKey, upsertFeedItems]);
 
   const { connectionStatus: realtimeStatus } = useModerationRealtime({
     enabled: canView && !!meOrganization?.id,
@@ -396,6 +419,7 @@ export default function ModerationPage() {
     onCreated: handleRealtimeItem,
     onUpdated: handleRealtimeItem,
     onDeleted: (payload) => {
+      void queryClient.invalidateQueries({ queryKey: statsQueryKey });
       removeFromFeed([payload.id]);
       setIncomingItems((current) => current.filter((item) => item.id !== payload.id));
       setSelectedIds((current) => current.filter((id) => id !== payload.id));
@@ -430,7 +454,10 @@ export default function ModerationPage() {
       return response;
     },
     onMutate: async (payload) => {
-      await queryClient.cancelQueries({ queryKey: feedQueryKey });
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: feedQueryKey }),
+        queryClient.cancelQueries({ queryKey: statsQueryKey }),
+      ]);
 
       const previousFeed = queryClient.getQueryData<FeedData>(feedQueryKey);
       const optimisticItems = buildOptimisticItems(payload, media);
@@ -461,6 +488,7 @@ export default function ModerationPage() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.gallery.all(), refetchType: 'inactive' }),
         queryClient.invalidateQueries({ queryKey: queryKeys.events.all(), refetchType: 'inactive' }),
+        queryClient.invalidateQueries({ queryKey: statsQueryKey }),
         ...response.ids.map((id) => queryClient.invalidateQueries({ queryKey: queryKeys.media.detail(String(id)) })),
       ]);
 
@@ -490,6 +518,7 @@ export default function ModerationPage() {
       ));
       await queryClient.invalidateQueries({ queryKey: queryKeys.media.detail(String(item.id)) });
       await queryClient.invalidateQueries({ queryKey: queryKeys.events.detail(String(item.event_id)) });
+      await queryClient.invalidateQueries({ queryKey: statsQueryKey });
 
       toast({
         title: payload.shouldBlock ? 'Remetente bloqueado' : 'Remetente desbloqueado',
@@ -895,7 +924,7 @@ export default function ModerationPage() {
 
       <Drawer open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}><DrawerContent className="max-h-[92vh] rounded-t-[28px]"><DrawerHeader className="border-b border-border/60 px-5 pb-4 text-left"><DrawerTitle>Filtros avancados</DrawerTitle><DrawerDescription>Ajuste o recorte da fila sem perder o contexto da moderacao.</DrawerDescription></DrawerHeader><div className="grid gap-3 overflow-y-auto px-4 py-4"><Select value={eventFilter} onValueChange={setEventFilter}><SelectTrigger><SelectValue placeholder="Evento" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os eventos</SelectItem>{events.map((eventItem) => <SelectItem key={eventItem.id} value={String(eventItem.id)}>{eventItem.title}</SelectItem>)}</SelectContent></Select><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem>{MODERATION_STATUS_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Select value={orientationFilter} onValueChange={setOrientationFilter}><SelectTrigger><SelectValue placeholder="Formato" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os formatos</SelectItem>{MODERATION_ORIENTATION_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Select value={String(perPage)} onValueChange={(value) => setPerPage(Number(value))}><SelectTrigger><SelectValue placeholder="Densidade" /></SelectTrigger><SelectContent>{MODERATION_PAGE_SIZE_OPTIONS.map((option) => <SelectItem key={option} value={String(option)}>{option} por bloco</SelectItem>)}</SelectContent></Select><div className="grid grid-cols-2 gap-2"><Button type="button" variant={featuredOnly ? 'default' : 'outline'} className="rounded-2xl" onClick={() => { setFeaturedOnly((current) => !current); setPinnedOnly(false); setBlockedSenderOnly(false); }}><Star className={cn('h-4 w-4', featuredOnly && 'fill-current')} />Favoritas</Button><Button type="button" variant={pinnedOnly ? 'default' : 'outline'} className="rounded-2xl" onClick={() => { setPinnedOnly((current) => !current); setFeaturedOnly(false); setBlockedSenderOnly(false); }}><Pin className="h-4 w-4" />Fixadas</Button><Button type="button" variant={blockedSenderOnly ? 'default' : 'outline'} className="col-span-2 rounded-2xl" onClick={() => { setBlockedSenderOnly((current) => !current); setFeaturedOnly(false); setPinnedOnly(false); setStatusFilter('all'); }}><ShieldBan className="h-4 w-4" />Remetentes bloqueados</Button></div><div className="flex flex-wrap gap-2 pt-2"><Button type="button" className="rounded-full" onClick={() => setMobileFiltersOpen(false)}>Aplicar</Button><Button type="button" variant="outline" className="rounded-full" onClick={clearFilters}>Limpar filtros</Button></div></div></DrawerContent></Drawer>
 
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}><DialogContent className="max-w-5xl"><DialogHeader><DialogTitle>{focusedMedia?.event_title || 'Preview da midia'}</DialogTitle><DialogDescription>{focusedMedia ? `${focusedMedia.sender_name} - ${formatDateTime(focusedMedia.created_at)}` : 'Visualizacao ampliada'}</DialogDescription></DialogHeader>{focusedMedia?.preview_url || focusedMedia?.thumbnail_url ? <div className="overflow-hidden rounded-[24px] border border-border/60 bg-muted"><img src={focusedMedia.preview_url || focusedMedia.thumbnail_url || undefined} alt={focusedMedia.caption || focusedMedia.event_title || 'Midia ampliada'} className="max-h-[70vh] w-full object-contain" loading="lazy" decoding="async" /></div> : <div className="flex h-80 items-center justify-center rounded-[24px] border border-dashed border-border/60 bg-muted/30 text-muted-foreground"><ImageIcon className="h-10 w-10" /></div>}</DialogContent></Dialog>
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}><DialogContent className="max-w-5xl"><DialogHeader><DialogTitle>{focusedMedia?.event_title || 'Preview da midia'}</DialogTitle><DialogDescription>{focusedMedia ? `${focusedMedia.sender_name} - ${formatDateTime(focusedMedia.created_at)}` : 'Visualizacao ampliada'}</DialogDescription></DialogHeader>{focusedMedia ? <div className="overflow-hidden rounded-[24px] border border-border/60 bg-muted"><ModerationMediaSurface media={focusedMedia} variant="preview" className="max-h-[70vh] min-h-[20rem] w-full" mediaClassName="max-h-[70vh] w-full object-contain" fit="contain" videoPreload="auto" /></div> : <div className="flex h-80 items-center justify-center rounded-[24px] border border-dashed border-border/60 bg-muted/30 text-muted-foreground"><ImageIcon className="h-10 w-10" /></div>}</DialogContent></Dialog>
     </>
   );
 }

@@ -56,6 +56,7 @@ export const queryKeys = {
     list: (filters: Record<string, unknown>) => [...queryKeys.media.lists(), filters] as const,
     feeds: () => [...queryKeys.media.all(), 'feed'] as const,
     feed: (filters: Record<string, unknown>) => [...queryKeys.media.feeds(), filters] as const,
+    feedStats: (filters: Record<string, unknown>) => [...queryKeys.media.feeds(), 'stats', filters] as const,
     detail: (id: string) => [...queryKeys.media.all(), 'detail', id] as const,
   },
 

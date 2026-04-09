@@ -14,7 +14,7 @@ export function WallTotalMediaCard({
     { label: 'Recebidas', value: totals.received },
     { label: 'Aprovadas', value: totals.approved },
     { label: 'Na fila', value: totals.queued },
-    { label: 'Exibidas', value: totals.displayed ?? '-' },
+    { label: 'Exibidas', value: totals.displayed },
   ];
 
   return (

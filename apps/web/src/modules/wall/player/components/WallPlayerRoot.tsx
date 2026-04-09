@@ -28,6 +28,7 @@ import { NewPhotoToast, useNewPhotoToast } from './NewPhotoToast';
 import PlayerShell from './PlayerShell';
 import SideThumbnails from './SideThumbnails';
 import type { WallConnectionStatus } from '../types';
+import type { MediaSurfaceVideoControlProps } from './MediaSurface';
 import { useSideThumbnails } from '../hooks/useSideThumbnails';
 
 function FloatingCaption({ layout, text }: { layout: string; text?: string | null }) {
@@ -56,6 +57,16 @@ export function WallPlayerRoot({ code }: { code: string }) {
     connectionStatus,
     lastSyncAt,
     handleAdFinished,
+    handleVideoStarting,
+    handleVideoFirstFrame,
+    handleVideoPlaybackReady,
+    handleVideoPlaying,
+    handleVideoProgress,
+    handleVideoWaiting,
+    handleVideoStalled,
+    handleVideoEnded,
+    handleVideoFailure,
+    videoRuntimeConfig,
   } = useWallPlayer(code);
 
   const { reducedEffects, modeLabel } = usePerformanceMode();
@@ -63,7 +74,11 @@ export function WallPlayerRoot({ code }: { code: string }) {
   const isAdShowing = Boolean(state.currentAd);
 
   const activeLayout = currentItem && state.settings
-    ? resolveRenderableLayout(state.settings.layout, currentItem)
+    ? resolveRenderableLayout(
+      state.settings.layout,
+      currentItem,
+      state.settings.video_multi_layout_policy ?? 'disallow',
+    )
     : null;
 
   const isMultiItemLayout = activeLayout === 'carousel' || activeLayout === 'mosaic' || activeLayout === 'grid';
@@ -79,6 +94,24 @@ export function WallPlayerRoot({ code }: { code: string }) {
         && !isAdShowing,
     },
   );
+
+  const videoControl: MediaSurfaceVideoControlProps | null = currentItem?.type === 'video' && !isAdShowing
+    ? {
+        playerStatus: state.status,
+        startupDeadlineMs: videoRuntimeConfig.startupDeadlineMs,
+        stallBudgetMs: videoRuntimeConfig.stallBudgetMs,
+        resumeMode: videoRuntimeConfig.resumeMode,
+        onStarting: handleVideoStarting,
+        onFirstFrame: handleVideoFirstFrame,
+        onPlaybackReady: handleVideoPlaybackReady,
+        onPlaying: handleVideoPlaying,
+        onProgress: handleVideoProgress,
+        onWaiting: handleVideoWaiting,
+        onStalled: handleVideoStalled,
+        onEnded: handleVideoEnded,
+        onFailure: handleVideoFailure,
+      }
+    : null;
 
   return (
     <PlayerShell backgroundUrl={state.settings?.background_url}>
@@ -146,7 +179,13 @@ export function WallPlayerRoot({ code }: { code: string }) {
               reducedMotion={reducedEffects}
             />
           ) : (
-            <LayoutRenderer media={currentItem} settings={state.settings} reducedMotion={reducedEffects} allItems={state.items} />
+            <LayoutRenderer
+              media={currentItem}
+              settings={state.settings}
+              reducedMotion={reducedEffects}
+              allItems={state.items}
+              videoControl={videoControl}
+            />
           )}
           {!isAdShowing ? (
             <FloatingCaption

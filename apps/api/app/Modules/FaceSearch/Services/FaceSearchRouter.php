@@ -6,9 +6,11 @@ use App\Modules\Events\Models\Event;
 use App\Modules\FaceSearch\DTOs\DetectedFaceData;
 use App\Modules\FaceSearch\DTOs\FaceSearchMatchData;
 use App\Modules\FaceSearch\Enums\FaceSearchQueryStatus;
+use App\Modules\FaceSearch\Models\EventMediaFace;
 use App\Modules\FaceSearch\Models\EventFaceSearchSetting;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use InvalidArgumentException;
+use RuntimeException;
 use Throwable;
 
 class FaceSearchRouter
@@ -19,6 +21,7 @@ class FaceSearchRouter
     public function __construct(
         iterable $backends,
         private readonly ?FaceSearchFailureClassifier $failureClassifier = null,
+        private readonly ?FaceSearchMediaSourceLoader $sourceLoader = null,
     ) {
         $this->backends = collect($backends)
             ->keyBy(fn (FaceSearchBackendInterface $backend) => $backend->key())
@@ -132,7 +135,51 @@ class FaceSearchRouter
      */
     public function indexMedia(EventMedia $media, EventFaceSearchSetting $settings): array
     {
-        return $this->backendForSettings($settings)->indexMedia($media, $settings);
+        $primary = $this->backendForSettings($settings);
+        $result = $primary->indexMedia($media, $settings);
+        $shadow = $this->shadowIndexBackendForSettings($settings, $primary->key());
+
+        if ($shadow === null) {
+            return $result;
+        }
+
+        $this->ensureShadowBaselineSource($media);
+
+        $startedAt = microtime(true);
+
+        try {
+            $shadowResult = $shadow->indexMedia($media, $settings);
+            $primaryGateAlignment = $this->alignLocalShadowBaselineWithPrimaryGate(
+                media: $media,
+                primary: $primary,
+                shadow: $shadow,
+                primaryResult: $result,
+            );
+
+            $result['shadow'] = [
+                'backend_key' => $shadow->key(),
+                'status' => 'completed',
+                'baseline_required' => true,
+                'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+                'result' => $shadowResult,
+                'primary_gate_alignment' => $primaryGateAlignment,
+            ];
+
+            return $result;
+        } catch (Throwable $exception) {
+            $result['shadow'] = [
+                'backend_key' => $shadow->key(),
+                'status' => 'failed',
+                'baseline_required' => true,
+                'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+                'failure' => $this->failureClassifier()->classify($exception) + [
+                    'exception_class' => $exception::class,
+                    'message' => $exception->getMessage(),
+                ],
+            ];
+
+            throw $exception;
+        }
     }
 
     private function primaryBackendKeyForSettings(EventFaceSearchSetting $settings): string
@@ -185,6 +232,23 @@ class FaceSearchRouter
         $shadowKey = is_string($fallbackBackendKey) && $fallbackBackendKey !== ''
             ? $fallbackBackendKey
             : 'local_pgvector';
+
+        if ($shadowKey === $primaryBackendKey) {
+            return null;
+        }
+
+        return $this->backendByKey($shadowKey, false);
+    }
+
+    private function shadowIndexBackendForSettings(
+        EventFaceSearchSetting $settings,
+        string $primaryBackendKey,
+    ): ?FaceSearchBackendInterface {
+        if (($settings->routing_policy ?: 'local_only') !== 'aws_primary_local_shadow') {
+            return null;
+        }
+
+        $shadowKey = $this->normalizeBackendKey($settings->fallback_backend_key ?: 'local_pgvector');
 
         if ($shadowKey === $primaryBackendKey) {
             return null;
@@ -322,6 +386,11 @@ class FaceSearchRouter
         return $this->failureClassifier ?? app(FaceSearchFailureClassifier::class);
     }
 
+    private function sourceLoader(): FaceSearchMediaSourceLoader
+    {
+        return $this->sourceLoader ?? app(FaceSearchMediaSourceLoader::class);
+    }
+
     private function normalizeBackendKey(?string $backendKey): string
     {
         $resolvedKey = is_string($backendKey) && $backendKey !== ''
@@ -346,5 +415,59 @@ class FaceSearchRouter
         }
 
         throw new InvalidArgumentException(sprintf('Nenhum backend de FaceSearch foi registrado para a chave [%s].', $backendKey));
+    }
+
+    private function ensureShadowBaselineSource(EventMedia $media): void
+    {
+        if (! $this->sourceLoader()->hasVariantSource($media, 'gallery')) {
+            throw new RuntimeException('Shadow local baseline requires a gallery variant before indexing.');
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $primaryResult
+     * @return array<string, mixed>
+     */
+    private function alignLocalShadowBaselineWithPrimaryGate(
+        EventMedia $media,
+        FaceSearchBackendInterface $primary,
+        FaceSearchBackendInterface $shadow,
+        array $primaryResult,
+    ): array {
+        if ($primary->key() !== 'aws_rekognition' || $shadow->key() !== 'local_pgvector') {
+            return [
+                'status' => 'not_applicable',
+            ];
+        }
+
+        $searchableCountBefore = EventMediaFace::query()
+            ->where('event_media_id', $media->id)
+            ->where('searchable', true)
+            ->count();
+
+        if ((int) ($primaryResult['faces_indexed'] ?? 0) > 0) {
+            return [
+                'status' => 'unchanged',
+                'searchable_faces_before' => $searchableCountBefore,
+                'searchable_faces_after' => $searchableCountBefore,
+                'reason' => null,
+            ];
+        }
+
+        $updated = EventMediaFace::query()
+            ->where('event_media_id', $media->id)
+            ->where('searchable', true)
+            ->update([
+                'searchable' => false,
+            ]);
+
+        return [
+            'status' => $updated > 0 ? 'demoted_local_searchables' : 'unchanged',
+            'searchable_faces_before' => $searchableCountBefore,
+            'searchable_faces_after' => max(0, $searchableCountBefore - $updated),
+            'reason' => $primaryResult['dominant_rejection_reason']
+                ?? $primaryResult['skipped_reason']
+                ?? 'primary_no_searchable_faces',
+        ];
     }
 }

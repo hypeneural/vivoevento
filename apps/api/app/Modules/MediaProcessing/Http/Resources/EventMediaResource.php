@@ -12,7 +12,14 @@ class EventMediaResource extends JsonResource
     public function toArray(Request $request): array
     {
         $assets = app(MediaAssetUrlService::class);
+        $thumbnailAsset = $assets->thumbnailAsset($this->resource);
+        $previewAsset = $assets->previewAsset($this->resource);
+        $moderationThumbnailAsset = $assets->moderationThumbnailAsset($this->resource);
+        $moderationPreviewAsset = $assets->moderationPreviewAsset($this->resource);
         $state = app(MediaEffectiveStateResolver::class)->resolve($this->resource);
+        $effectiveState = is_string($this->resource->getAttribute('moderation_feed_effective_state'))
+            ? $this->resource->getAttribute('moderation_feed_effective_state')
+            : $state['effective_media_state'];
 
         return [
             'id' => $this->id,
@@ -31,8 +38,8 @@ class EventMediaResource extends JsonResource
             ),
             'media_type' => $this->media_type,
             'channel' => $this->channel(),
-            'status' => $state['effective_media_state'],
-            'effective_media_state' => $state['effective_media_state'],
+            'status' => $effectiveState,
+            'effective_media_state' => $effectiveState,
             'processing_status' => $this->processing_status?->value,
             'moderation_status' => $this->moderation_status?->value,
             'publication_status' => $this->publication_status?->value,
@@ -70,10 +77,17 @@ class EventMediaResource extends JsonResource
             'sender_recommended_normalized_phone' => $this->sender_recommended_normalized_phone,
             'sender_media_count' => $this->sender_media_count,
             'caption' => $this->caption,
-            'thumbnail_url' => $assets->thumbnail($this->resource),
-            'preview_url' => $assets->preview($this->resource),
+            'thumbnail_url' => $thumbnailAsset['url'],
+            'thumbnail_source' => $thumbnailAsset['source'],
+            'preview_url' => $previewAsset['url'],
+            'preview_source' => $previewAsset['source'],
+            'moderation_thumbnail_url' => $moderationThumbnailAsset['url'],
+            'moderation_thumbnail_source' => $moderationThumbnailAsset['source'],
+            'moderation_preview_url' => $moderationPreviewAsset['url'],
+            'moderation_preview_source' => $moderationPreviewAsset['source'],
             'original_url' => $assets->original($this->resource),
             'created_at' => $this->created_at?->toIso8601String(),
+            'updated_at' => $this->updated_at?->toIso8601String(),
             'published_at' => $this->published_at?->toIso8601String(),
             'is_featured' => (bool) $this->is_featured,
             'is_pinned' => (int) ($this->sort_order ?? 0) > 0,

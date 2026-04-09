@@ -493,3 +493,209 @@ it('routes face indexing through aws rekognition when the event backend is confi
     expect($run?->result_json['faces_detected'] ?? null)->toBe(2)
         ->and($run?->result_json['faces_indexed'] ?? null)->toBe(2);
 });
+
+it('builds a mandatory local shadow baseline through the gallery variant when aws shadow routing is enabled', function () {
+    Storage::fake('public');
+    Storage::fake('ai-private');
+
+    $event = \App\Modules\Events\Models\Event::factory()->active()->create();
+    \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'recognition_enabled' => true,
+        'search_backend_key' => 'aws_rekognition',
+        'fallback_backend_key' => 'local_pgvector',
+        'routing_policy' => 'aws_primary_local_shadow',
+        'shadow_mode_percentage' => 0,
+        'aws_collection_id' => 'eventovivo-face-search-event-' . $event->id,
+    ]);
+
+    $backend = m::mock(AwsRekognitionFaceSearchBackend::class);
+    $backend->shouldReceive('key')
+        ->andReturn('aws_rekognition');
+    $backend->shouldReceive('indexMedia')
+        ->once()
+        ->andReturn([
+            'status' => 'indexed',
+            'source_ref' => 'aws:eventovivo-face-search-event-' . $event->id,
+            'faces_detected' => 2,
+            'faces_indexed' => 2,
+            'skipped_reason' => null,
+        ]);
+
+    app()->instance(AwsRekognitionFaceSearchBackend::class, $backend);
+    app()->forgetInstance(\App\Modules\FaceSearch\Services\FaceSearchRouter::class);
+
+    app()->instance(FaceDetectionProviderInterface::class, new class implements FaceDetectionProviderInterface
+    {
+        public function detect(EventMedia $media, \App\Modules\FaceSearch\Models\EventFaceSearchSetting $settings, string $binary): array
+        {
+            return [
+                new DetectedFaceData(
+                    boundingBox: new FaceBoundingBoxData(40, 50, 180, 180),
+                    detectionConfidence: 0.98,
+                    qualityScore: 0.91,
+                    sharpnessScore: 0.84,
+                    faceAreaRatio: 0.12,
+                    isPrimaryCandidate: true,
+                ),
+            ];
+        }
+    });
+
+    app()->instance(FaceEmbeddingProviderInterface::class, new class implements FaceEmbeddingProviderInterface
+    {
+        public function embed(EventMedia $media, \App\Modules\FaceSearch\Models\EventFaceSearchSetting $settings, string $cropBinary, DetectedFaceData $face): FaceEmbeddingData
+        {
+            return new FaceEmbeddingData(
+                vector: [0.11, 0.22, 0.33],
+                providerKey: 'noop',
+                providerVersion: 'foundation-v1',
+                modelKey: 'face-embedding-foundation-v1',
+                modelSnapshot: 'face-embedding-foundation-v1',
+                embeddingVersion: 'foundation-v1',
+            );
+        }
+    });
+
+    $path = UploadedFile::fake()
+        ->image('gallery.jpg', 1200, 900)
+        ->store("events/{$event->id}/variants/901", 'public');
+
+    $media = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'moderation_status' => ModerationStatus::Approved->value,
+        'face_index_status' => 'queued',
+    ]);
+
+    EventMediaVariant::query()->create([
+        'event_media_id' => $media->id,
+        'variant_key' => 'gallery',
+        'disk' => 'public',
+        'path' => $path,
+        'width' => 1200,
+        'height' => 900,
+        'size_bytes' => Storage::disk('public')->size($path),
+        'mime_type' => 'image/jpeg',
+    ]);
+
+    app(IndexMediaFacesJob::class, ['eventMediaId' => $media->id])->handle();
+
+    $media->refresh();
+    $run = MediaProcessingRun::query()
+        ->where('event_media_id', $media->id)
+        ->where('stage_key', 'face_index')
+        ->latest('id')
+        ->first();
+
+    expect($media->face_index_status)->toBe('indexed')
+        ->and(\App\Modules\FaceSearch\Models\EventMediaFace::query()->where('event_media_id', $media->id)->count())->toBe(1)
+        ->and(data_get($run?->result_json, 'shadow.backend_key'))->toBe('local_pgvector')
+        ->and(data_get($run?->result_json, 'shadow.status'))->toBe('completed')
+        ->and(data_get($run?->result_json, 'shadow.baseline_required'))->toBeTrue()
+        ->and(data_get($run?->result_json, 'shadow.result.source_ref'))->toBe("public:{$path}");
+});
+
+it('demotes local shadow searchables when the aws primary gate indexes no searchable faces for the media', function () {
+    Storage::fake('public');
+    Storage::fake('ai-private');
+
+    $event = \App\Modules\Events\Models\Event::factory()->active()->create();
+    \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'recognition_enabled' => true,
+        'search_backend_key' => 'aws_rekognition',
+        'fallback_backend_key' => 'local_pgvector',
+        'routing_policy' => 'aws_primary_local_shadow',
+        'shadow_mode_percentage' => 0,
+        'aws_collection_id' => 'eventovivo-face-search-event-' . $event->id,
+    ]);
+
+    $backend = m::mock(AwsRekognitionFaceSearchBackend::class);
+    $backend->shouldReceive('key')
+        ->andReturn('aws_rekognition');
+    $backend->shouldReceive('indexMedia')
+        ->once()
+        ->andReturn([
+            'status' => 'skipped',
+            'source_ref' => 'aws:eventovivo-face-search-event-' . $event->id,
+            'faces_detected' => 1,
+            'faces_indexed' => 0,
+            'skipped_reason' => 'no_faces_after_quality_gate',
+            'dominant_rejection_reason' => 'low_quality',
+        ]);
+
+    app()->instance(AwsRekognitionFaceSearchBackend::class, $backend);
+    app()->forgetInstance(\App\Modules\FaceSearch\Services\FaceSearchRouter::class);
+
+    app()->instance(FaceDetectionProviderInterface::class, new class implements FaceDetectionProviderInterface
+    {
+        public function detect(EventMedia $media, \App\Modules\FaceSearch\Models\EventFaceSearchSetting $settings, string $binary): array
+        {
+            return [
+                new DetectedFaceData(
+                    boundingBox: new FaceBoundingBoxData(40, 50, 180, 180),
+                    detectionConfidence: 0.98,
+                    qualityScore: 0.91,
+                    sharpnessScore: 0.84,
+                    faceAreaRatio: 0.12,
+                    isPrimaryCandidate: true,
+                ),
+            ];
+        }
+    });
+
+    app()->instance(FaceEmbeddingProviderInterface::class, new class implements FaceEmbeddingProviderInterface
+    {
+        public function embed(EventMedia $media, \App\Modules\FaceSearch\Models\EventFaceSearchSetting $settings, string $cropBinary, DetectedFaceData $face): FaceEmbeddingData
+        {
+            return new FaceEmbeddingData(
+                vector: [0.11, 0.22, 0.33],
+                providerKey: 'noop',
+                providerVersion: 'foundation-v1',
+                modelKey: 'face-embedding-foundation-v1',
+                modelSnapshot: 'face-embedding-foundation-v1',
+                embeddingVersion: 'foundation-v1',
+            );
+        }
+    });
+
+    $path = UploadedFile::fake()
+        ->image('gallery.jpg', 1200, 900)
+        ->store("events/{$event->id}/variants/902", 'public');
+
+    $media = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'moderation_status' => ModerationStatus::Approved->value,
+        'face_index_status' => 'queued',
+    ]);
+
+    EventMediaVariant::query()->create([
+        'event_media_id' => $media->id,
+        'variant_key' => 'gallery',
+        'disk' => 'public',
+        'path' => $path,
+        'width' => 1200,
+        'height' => 900,
+        'size_bytes' => Storage::disk('public')->size($path),
+        'mime_type' => 'image/jpeg',
+    ]);
+
+    app(IndexMediaFacesJob::class, ['eventMediaId' => $media->id])->handle();
+
+    $media->refresh();
+    $face = \App\Modules\FaceSearch\Models\EventMediaFace::query()
+        ->where('event_media_id', $media->id)
+        ->first();
+    $run = MediaProcessingRun::query()
+        ->where('event_media_id', $media->id)
+        ->where('stage_key', 'face_index')
+        ->latest('id')
+        ->first();
+
+    expect($media->face_index_status)->toBe('skipped')
+        ->and($face)->not->toBeNull()
+        ->and($face?->searchable)->toBeFalse()
+        ->and(data_get($run?->result_json, 'shadow.primary_gate_alignment.status'))->toBe('demoted_local_searchables')
+        ->and(data_get($run?->result_json, 'shadow.primary_gate_alignment.reason'))->toBe('low_quality')
+        ->and(data_get($run?->result_json, 'shadow.primary_gate_alignment.searchable_faces_after'))->toBe(0);
+});

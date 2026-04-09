@@ -15,7 +15,7 @@ class WallInsightsResource extends JsonResource
                 'received' => 0,
                 'approved' => 0,
                 'queued' => 0,
-                'displayed' => null,
+                'displayed' => 0,
             ],
             'recentItems' => $this->resource['recentItems'] ?? [],
             'sourceMix' => $this->resource['sourceMix'] ?? [],

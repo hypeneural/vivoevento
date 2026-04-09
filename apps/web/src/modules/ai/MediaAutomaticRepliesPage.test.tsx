@@ -86,20 +86,41 @@ function activateTab(name: RegExp) {
   fireEvent.click(tab);
 }
 
+function mockAuthenticatedUser({
+  roleKey = 'platform-admin',
+  permissions = [],
+}: {
+  roleKey?: string;
+  permissions?: string[];
+} = {}) {
+  useAuthMock.mockReturnValue({
+    meUser: {
+      id: 1,
+      role: {
+        key: roleKey,
+        name: roleKey,
+      },
+    },
+    can: (permission: string) => (
+      roleKey === 'super-admin'
+      || roleKey === 'platform-admin'
+      || permissions.includes(permission)
+    ),
+  });
+}
+
+async function selectByLabel(label: RegExp, option: RegExp) {
+  fireEvent.click(await screen.findByLabelText(label));
+  fireEvent.click(await screen.findByRole('option', { name: option }));
+}
+
 describe('MediaAutomaticRepliesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     HTMLElement.prototype.scrollIntoView = vi.fn();
+    window.localStorage.clear();
 
-    useAuthMock.mockReturnValue({
-      meUser: {
-        id: 1,
-        role: {
-          key: 'platform-admin',
-          name: 'platform-admin',
-        },
-      },
-    });
+    mockAuthenticatedUser();
 
     getConfigurationMock.mockResolvedValue({
       id: 1,
@@ -546,6 +567,62 @@ describe('MediaAutomaticRepliesPage', () => {
     expect(screen.getByRole('tab', { name: /historico/i })).toBeInTheDocument();
   });
 
+  it('applies permissions by mode and blocks restricted modes for non-platform users', async () => {
+    mockAuthenticatedUser({
+      roleKey: 'partner-manager',
+      permissions: ['settings.manage', 'audit.view'],
+    });
+
+    renderPage();
+
+    const basicTab = screen.getByRole('tab', { name: /b.sico/i });
+    const advancedTab = screen.getByRole('tab', { name: /avan.ado/i });
+    const auditTab = screen.getByRole('tab', { name: /auditoria/i });
+
+    expect(basicTab).toBeEnabled();
+    expect(advancedTab).toBeDisabled();
+    expect(auditTab).toBeEnabled();
+    expect(screen.getByText(/ajustes finos globais ficam restritos a administradores da plataforma/i)).toBeInTheDocument();
+
+    activateTab(/auditoria/i);
+
+    expect(await screen.findByRole('tab', { name: /laborat.rio/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /historico/i })).toBeInTheDocument();
+  });
+
+  it('persists the last mode and section by mode across navigation and remount', async () => {
+    const firstRender = renderPage();
+
+    activateTab(/auditoria/i);
+    activateTab(/historico/i);
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: /historico/i })).toHaveAttribute('data-state', 'active');
+    });
+
+    activateTab(/b.sico/i);
+    activateTab(/contexto do evento/i);
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: /contexto do evento/i })).toHaveAttribute('data-state', 'active');
+    });
+
+    activateTab(/auditoria/i);
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: /historico/i })).toHaveAttribute('data-state', 'active');
+    });
+
+    firstRender.unmount();
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: /auditoria/i })).toHaveAttribute('data-state', 'active');
+      expect(screen.getByRole('tab', { name: /historico/i })).toHaveAttribute('data-state', 'active');
+    });
+  });
+
   it('persists the contextual configuration with preset selection', async () => {
     renderPage();
 
@@ -678,7 +755,7 @@ describe('MediaAutomaticRepliesPage', () => {
   it('fills the instruction text when a preset is selected in the prompt test', async () => {
     renderPage();
 
-    activateTab(/^auditoria$/i);
+    activateTab(/auditoria/i);
     activateTab(/laborat.rio/i);
 
     fireEvent.change(await screen.findByLabelText(/id do evento/i), {
@@ -732,7 +809,7 @@ describe('MediaAutomaticRepliesPage', () => {
   it('shows the empty laboratory state before running and keeps quick replay disabled', async () => {
     renderPage();
 
-    activateTab(/^auditoria$/i);
+    activateTab(/auditoria/i);
     activateTab(/laborat.rio/i);
 
     expect(await screen.findByText(/resultado do laboratorio/i)).toBeInTheDocument();
@@ -743,7 +820,7 @@ describe('MediaAutomaticRepliesPage', () => {
   it('replays the last successful test even when the current file selection is empty', async () => {
     renderPage();
 
-    activateTab(/^auditoria$/i);
+    activateTab(/auditoria/i);
     activateTab(/laborat.rio/i);
 
     fireEvent.change(await screen.findByLabelText(/id do evento/i), {
@@ -799,7 +876,7 @@ describe('MediaAutomaticRepliesPage', () => {
 
     renderPage();
 
-    activateTab(/^auditoria$/i);
+    activateTab(/auditoria/i);
     activateTab(/laborat.rio/i);
 
     const fileInput = await screen.findByLabelText(/imagens do teste/i);
@@ -820,7 +897,7 @@ describe('MediaAutomaticRepliesPage', () => {
   it('lists real event history and loads the selected production detail', async () => {
     renderPage();
 
-    activateTab(/^auditoria$/i);
+    activateTab(/auditoria/i);
     activateTab(/historico/i);
 
     expect(await screen.findByText(/historico de eventos reais/i)).toBeInTheDocument();
@@ -849,8 +926,65 @@ describe('MediaAutomaticRepliesPage', () => {
     expect(screen.getAllByText(/casamento romantico/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/a imagem combina com o evento\./i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/a decisao usou imagem \+ texto normalizado\./i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/snapshot da politica efetiva/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/snapshot da politica efetiva/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/origem de cada campo da politica/i)).toBeInTheDocument();
     expect(screen.getAllByAltText(/preview da midia 200/i).length).toBeGreaterThan(0);
   });
+
+  it('sends the complete real history filter set from the frontend', async () => {
+    renderPage();
+
+    activateTab(/auditoria/i);
+    activateTab(/historico/i);
+
+    await screen.findByText(/historico de eventos reais/i);
+    listEventHistoryMock.mockClear();
+
+    await selectByLabel(/filtro de evento do historico real/i, /casamento ana e pedro/i);
+    await selectByLabel(/filtro de provedor do historico real/i, /openrouter/i);
+    await selectByLabel(/filtro de status do historico real/i, /sucesso/i);
+
+    fireEvent.change(screen.getByLabelText(/modelo/i), {
+      target: { value: 'openai/gpt-4.1-mini' },
+    });
+    fireEvent.change(screen.getByLabelText(/nome do preset/i), {
+      target: { value: 'Casamento romantico' },
+    });
+    fireEvent.change(screen.getByLabelText(/remetente/i), {
+      target: { value: 'Anderson Marques' },
+    });
+    fireEvent.change(screen.getByLabelText(/c.digo do motivo/i), {
+      target: { value: 'context.match.event' },
+    });
+    await selectByLabel(/filtro de elegibilidade do historico real/i, /revisao manual/i);
+    await selectByLabel(/filtro de estado efetivo do historico real/i, /aprovado/i);
+    fireEvent.change(screen.getByLabelText(/data inicial/i), {
+      target: { value: '2026-04-01' },
+    });
+    fireEvent.change(screen.getByLabelText(/data final/i), {
+      target: { value: '2026-04-08' },
+    });
+
+    await waitFor(() => {
+      expect(listEventHistoryMock).toHaveBeenCalledWith({
+        event_id: 77,
+        provider_key: 'openrouter',
+        model_key: 'openai/gpt-4.1-mini',
+        status: 'success',
+        preset_name: 'Casamento romantico',
+        sender_query: 'Anderson Marques',
+        reason_code: 'context.match.event',
+        publish_eligibility: 'review_only',
+        effective_media_state: 'approved',
+        date_from: '2026-04-01',
+        date_to: '2026-04-08',
+        per_page: 15,
+      });
+    });
+
+    expect(screen.getByText(/filtros ativos/i)).toBeInTheDocument();
+    expect(screen.getByText(/11 filtro\(s\) refinando o historico real\./i)).toBeInTheDocument();
+    expect(screen.getByText(/elegibilidade: revisao manual/i)).toBeInTheDocument();
+    expect(screen.getByText(/estado: aprovado/i)).toBeInTheDocument();
+  }, 10000);
 });
