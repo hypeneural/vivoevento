@@ -2,18 +2,28 @@
  * LayoutRenderer - Resolves the active wall layout through the registry.
  *
  * Single layouts keep AnimatePresence transitions here.
- * Board layouts keep their own cell-level transitions and receive a stable
- * 3-slot scheduler until the dedicated board subsystem lands.
+ * Board layouts share a dedicated board scheduler so the first dense layout
+ * does not become a one-off subsystem.
  */
 
 import { useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { resolveLayoutTransition } from '../engine/motion';
-import { isMultiItemLayout, resolveRenderableLayout } from '../engine/layoutStrategy';
-import { useMultiSlot } from '../hooks/useMultiSlot';
+import { resolveRenderableLayout } from '../engine/layoutStrategy';
+import { resolveWallRuntimeBudget } from '../runtime-capabilities';
 import { getWallLayoutDefinition } from '../themes/registry';
-import type { WallRuntimeItem, WallSettings } from '../types';
+import {
+  createBoardInstanceKey,
+  createLinearAdjacencyMap,
+} from '../themes/board/types';
+import { useWallBoard } from '../themes/board/useWallBoard';
+import { usePuzzleBoard } from '../themes/puzzle/usePuzzleBoard';
+import type {
+  WallPerformanceTier,
+  WallRuntimeItem,
+  WallSettings,
+} from '../types';
 import type { MediaSurfaceVideoControlProps } from './MediaSurface';
 
 const MULTI_ITEM_SLOT_COUNT = 3;
@@ -24,6 +34,8 @@ interface LayoutRendererProps {
   reducedMotion?: boolean;
   allItems?: WallRuntimeItem[];
   videoControl?: MediaSurfaceVideoControlProps | null;
+  eventId?: string | number | null;
+  performanceTier?: WallPerformanceTier;
 }
 
 export function LayoutRenderer({
@@ -32,6 +44,8 @@ export function LayoutRenderer({
   reducedMotion = false,
   allItems = [],
   videoControl = null,
+  eventId = null,
+  performanceTier = reducedMotion ? 'performance' : 'premium',
 }: LayoutRendererProps) {
   const resolvedLayout = resolveRenderableLayout(
     settings.layout,
@@ -41,6 +55,7 @@ export function LayoutRenderer({
   const definition = getWallLayoutDefinition(resolvedLayout);
   const LayoutComponent = definition.renderer;
   const isBoardLayout = definition.kind === 'board';
+  const runtimeBudget = resolveWallRuntimeBudget(performanceTier);
 
   const advanceCountRef = useRef(0);
   const lastMediaIdRef = useRef(media.id);
@@ -50,11 +65,41 @@ export function LayoutRenderer({
     advanceCountRef.current += 1;
   }
 
-  const multiSlot = useMultiSlot(
-    isBoardLayout || isMultiItemLayout(resolvedLayout) ? allItems : [],
-    MULTI_ITEM_SLOT_COUNT,
-    advanceCountRef.current,
+  const boardState = useWallBoard(
+    isBoardLayout && definition.id !== 'puzzle' ? allItems : [],
+    {
+      slotCount: MULTI_ITEM_SLOT_COUNT,
+      advanceTrigger: advanceCountRef.current,
+      boardInstanceKey: createBoardInstanceKey({
+        eventId,
+        layout: resolvedLayout,
+        preset: settings.theme_config?.preset ?? null,
+        themeVersion: definition.version,
+        performanceTier,
+        reducedMotion,
+      }),
+      adjacencyMap: createLinearAdjacencyMap(MULTI_ITEM_SLOT_COUNT),
+      avoidSameSender: true,
+    },
   );
+  const puzzleBoardState = usePuzzleBoard(
+    definition.id === 'puzzle' ? allItems : [],
+    {
+      settings,
+      boardInstanceKey: createBoardInstanceKey({
+        eventId,
+        layout: resolvedLayout,
+        preset: settings.theme_config?.preset ?? null,
+        themeVersion: definition.version,
+        performanceTier,
+        reducedMotion,
+      }),
+      advanceTrigger: advanceCountRef.current,
+      maxBoardPieces: runtimeBudget.maxBoardPieces,
+      reducedMotion,
+    },
+  );
+  const resolvedBoardState = definition.id === 'puzzle' ? puzzleBoardState : boardState;
 
   if (isBoardLayout) {
     return (
@@ -64,8 +109,10 @@ export function LayoutRenderer({
           settings={settings}
           reducedMotion={reducedMotion}
           videoControl={videoControl}
-          slots={multiSlot.slots}
-          activeSlot={multiSlot.nextSlotIndex}
+          slots={resolvedBoardState.slots}
+          activeSlot={resolvedBoardState.activeSlot}
+          activeSlotIndexes={resolvedBoardState.activeSlotIndexes}
+          maxStrongAnimations={runtimeBudget.maxStrongAnimations}
         />
       </div>
     );

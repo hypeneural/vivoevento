@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import type { ApiEventMediaItem } from '@/lib/api-types';
 import { cn } from '@/lib/utils';
 
+import { moderationService } from '../services/moderation.service';
 import { isVideoAsset } from '../utils';
 
 type ModerationSurfaceVariant = 'thumbnail' | 'preview';
@@ -13,6 +14,7 @@ type LoadState = 'loading' | 'loaded' | 'error';
 interface ModerationMediaSurfaceProps {
   media: Pick<
     ApiEventMediaItem,
+    | 'id'
     | 'media_type'
     | 'mime_type'
     | 'thumbnail_url'
@@ -32,6 +34,39 @@ interface ModerationMediaSurfaceProps {
   fit?: 'cover' | 'contain';
   sizes?: string;
   videoPreload?: 'none' | 'metadata' | 'auto';
+}
+
+const reportedSurfaceTelemetry = new Set<string>();
+
+function reportSurfaceTelemetryOnce(
+  event: string,
+  payload: {
+    mediaId?: number;
+    variant: ModerationSurfaceVariant;
+    mediaType: string;
+    assetSource?: string | null;
+  },
+) {
+  const key = [
+    event,
+    payload.mediaId ?? 'unknown',
+    payload.variant,
+    payload.assetSource ?? 'none',
+  ].join(':');
+
+  if (reportedSurfaceTelemetry.has(key)) {
+    return;
+  }
+
+  reportedSurfaceTelemetry.add(key);
+
+  void moderationService.trackTelemetry({
+    event,
+    media_id: payload.mediaId,
+    surface_variant: payload.variant,
+    media_type: payload.mediaType,
+    asset_source: payload.assetSource,
+  }).catch(() => undefined);
 }
 
 function hasDedicatedModerationProfile(media: ModerationMediaSurfaceProps['media']) {
@@ -120,6 +155,28 @@ export function ModerationMediaSurface({
     setLoadState(asset.url ? 'loading' : 'error');
   }, [asset.kind, asset.posterUrl, asset.source, asset.url]);
 
+  useEffect(() => {
+    if (!asset.url) {
+      reportSurfaceTelemetryOnce('media_surface_unavailable', {
+        mediaId: media.id,
+        variant,
+        mediaType: media.media_type,
+        assetSource: asset.source,
+      });
+    }
+  }, [asset.source, asset.url, media.id, media.media_type, variant]);
+
+  useEffect(() => {
+    if (asset.source === 'original' && asset.url) {
+      reportSurfaceTelemetryOnce('media_surface_original_fallback', {
+        mediaId: media.id,
+        variant,
+        mediaType: media.media_type,
+        assetSource: asset.source,
+      });
+    }
+  }, [asset.source, asset.url, media.id, media.media_type, variant]);
+
   const fitClassName = fit === 'contain' ? 'object-contain' : 'object-cover';
   const alt = media.caption || media.event_title || 'Midia do evento';
   const showFallback = loadState === 'error';
@@ -157,7 +214,15 @@ export function ModerationMediaSurface({
           playsInline
           preload={videoPreload}
           onLoadedData={() => setLoadState('loaded')}
-          onError={() => setLoadState('error')}
+          onError={() => {
+            setLoadState('error');
+            reportSurfaceTelemetryOnce('media_surface_error', {
+              mediaId: media.id,
+              variant,
+              mediaType: media.media_type,
+              assetSource: asset.source,
+            });
+          }}
         />
       ) : (
         <img
@@ -173,7 +238,15 @@ export function ModerationMediaSurface({
           decoding="async"
           sizes={sizes}
           onLoad={() => setLoadState('loaded')}
-          onError={() => setLoadState('error')}
+          onError={() => {
+            setLoadState('error');
+            reportSurfaceTelemetryOnce('media_surface_error', {
+              mediaId: media.id,
+              variant,
+              mediaType: media.media_type,
+              assetSource: asset.source,
+            });
+          }}
         />
       )}
 

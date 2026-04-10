@@ -42,6 +42,7 @@ use App\Modules\MediaProcessing\Services\MediaAuditLogger;
 use App\Modules\MediaProcessing\Services\MediaPipelineMetricsService;
 use App\Modules\MediaProcessing\Services\ModerationBroadcasterService;
 use App\Modules\MediaProcessing\Services\EventMediaSenderContextService;
+use App\Modules\MediaProcessing\Services\ModerationObservabilityService;
 use App\Modules\InboundMedia\Models\ChannelWebhookLog;
 use App\Modules\Telegram\Models\TelegramMessageFeedback;
 use App\Modules\WhatsApp\Models\WhatsAppDispatchLog;
@@ -108,6 +109,7 @@ class EventMediaController extends BaseController
 
     public function moderationFeed(ListModerationMediaRequest $request): JsonResponse
     {
+        $startedAt = microtime(true);
         $organizationId = $request->user()?->currentOrganization()?->id;
 
         abort_unless($organizationId, 422, 'Nenhuma organizacao ativa encontrada.');
@@ -136,6 +138,28 @@ class EventMediaController extends BaseController
 
         app(EventMediaSenderContextService::class)->hydrateCollection($page['items']);
 
+        app(ModerationObservabilityService::class)->recordFeedResponse([
+            'organization_id' => $organizationId,
+            'user_id' => $request->user()?->id,
+            'event_id' => $validated['event_id'] ?? null,
+            'cursor_present' => filled($validated['cursor'] ?? null),
+            'per_page' => $perPage,
+            'item_count' => count($page['items']),
+            'has_more' => (bool) $page['has_more'],
+            'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            'filters' => [
+                'status' => $validated['status'] ?? null,
+                'media_type' => $validated['media_type'] ?? null,
+                'featured' => array_key_exists('featured', $validated) ? (bool) $validated['featured'] : null,
+                'pinned' => array_key_exists('pinned', $validated) ? (bool) $validated['pinned'] : null,
+                'sender_blocked' => array_key_exists('sender_blocked', $validated) ? (bool) $validated['sender_blocked'] : null,
+                'orientation' => $validated['orientation'] ?? null,
+                'duplicates' => array_key_exists('duplicates', $validated) ? (bool) $validated['duplicates'] : null,
+                'ai_review' => array_key_exists('ai_review', $validated) ? (bool) $validated['ai_review'] : null,
+                'search_present' => filled($validated['search'] ?? null),
+            ],
+        ]);
+
         return response()->json([
             'success' => true,
             'data' => EventMediaResource::collection($page['items'])->resolve(),
@@ -152,6 +176,7 @@ class EventMediaController extends BaseController
 
     public function moderationFeedStats(ListModerationMediaRequest $request): JsonResponse
     {
+        $startedAt = microtime(true);
         $organizationId = $request->user()?->currentOrganization()?->id;
 
         abort_unless($organizationId, 422, 'Nenhuma organizacao ativa encontrada.');
@@ -172,9 +197,28 @@ class EventMediaController extends BaseController
             aiReview: array_key_exists('ai_review', $validated) ? (bool) $validated['ai_review'] : null,
         );
 
-        return $this->success(
-            $this->cachedModerationStats($query, $organizationId, $validated)
-        );
+        $stats = $this->cachedModerationStats($query, $organizationId, $validated);
+
+        app(ModerationObservabilityService::class)->recordStatsResponse([
+            'organization_id' => $organizationId,
+            'user_id' => $request->user()?->id,
+            'event_id' => $validated['event_id'] ?? null,
+            'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            'stats' => $stats,
+            'filters' => [
+                'status' => $validated['status'] ?? null,
+                'media_type' => $validated['media_type'] ?? null,
+                'featured' => array_key_exists('featured', $validated) ? (bool) $validated['featured'] : null,
+                'pinned' => array_key_exists('pinned', $validated) ? (bool) $validated['pinned'] : null,
+                'sender_blocked' => array_key_exists('sender_blocked', $validated) ? (bool) $validated['sender_blocked'] : null,
+                'orientation' => $validated['orientation'] ?? null,
+                'duplicates' => array_key_exists('duplicates', $validated) ? (bool) $validated['duplicates'] : null,
+                'ai_review' => array_key_exists('ai_review', $validated) ? (bool) $validated['ai_review'] : null,
+                'search_present' => filled($validated['search'] ?? null),
+            ],
+        ]);
+
+        return $this->success($stats);
     }
 
     public function index(
@@ -212,6 +256,7 @@ class EventMediaController extends BaseController
         EventAccessService $eventAccess,
     ): JsonResponse
     {
+        $startedAt = microtime(true);
         $eventMedia->loadMissing('event');
 
         abort_unless($eventAccess->can($request->user(), $eventMedia->event, 'media.view'), 403);
@@ -227,6 +272,18 @@ class EventMediaController extends BaseController
         ])->loadCount('faces');
 
         app(EventMediaSenderContextService::class)->hydrateModel($eventMedia, includeMediaCount: true);
+
+        app(ModerationObservabilityService::class)->recordDetailResponse([
+            'organization_id' => $request->user()?->currentOrganization()?->id,
+            'user_id' => $request->user()?->id,
+            'event_id' => $eventMedia->event_id,
+            'media_id' => $eventMedia->id,
+            'media_type' => $eventMedia->media_type,
+            'moderation_status' => $eventMedia->moderation_status?->value ?? $eventMedia->moderation_status,
+            'publication_status' => $eventMedia->publication_status?->value ?? $eventMedia->publication_status,
+            'processing_status' => $eventMedia->processing_status,
+            'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        ]);
 
         return $this->success(new EventMediaDetailResource(
             $eventMedia

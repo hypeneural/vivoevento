@@ -1,9 +1,19 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ApiEventMediaItem } from '@/lib/api-types';
 
 import { ModerationMediaSurface } from './ModerationMediaSurface';
+
+const { trackTelemetryMock } = vi.hoisted(() => ({
+  trackTelemetryMock: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('../services/moderation.service', () => ({
+  moderationService: {
+    trackTelemetry: trackTelemetryMock,
+  },
+}));
 
 function makeMedia(overrides: Partial<ApiEventMediaItem> = {}): ApiEventMediaItem {
   return {
@@ -42,6 +52,10 @@ function makeMedia(overrides: Partial<ApiEventMediaItem> = {}): ApiEventMediaIte
 }
 
 describe('ModerationMediaSurface', () => {
+  afterEach(() => {
+    trackTelemetryMock.mockClear();
+  });
+
   it('keeps a loading placeholder until the image finishes loading', () => {
     render(
       <ModerationMediaSurface
@@ -71,6 +85,11 @@ describe('ModerationMediaSurface', () => {
 
     expect(screen.getByTestId('media-surface-fallback')).toBeInTheDocument();
     expect(screen.getByText(/preview indisponivel/i)).toBeInTheDocument();
+    expect(trackTelemetryMock).toHaveBeenCalledWith(expect.objectContaining({
+      event: 'media_surface_error',
+      media_id: 1,
+      surface_variant: 'thumbnail',
+    }));
   });
 
   it('uses the video preview as the playback source and the thumbnail as poster when available', () => {
@@ -123,5 +142,36 @@ describe('ModerationMediaSurface', () => {
 
     expect(screen.getByTestId('media-surface-fallback')).toBeInTheDocument();
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(trackTelemetryMock).toHaveBeenCalledWith(expect.objectContaining({
+      event: 'media_surface_unavailable',
+      media_id: 1,
+      surface_variant: 'preview',
+    }));
+  });
+
+  it('tracks when the moderation surface falls back to an original-backed asset', () => {
+    render(
+      <ModerationMediaSurface
+        media={makeMedia({
+          moderation_thumbnail_url: undefined,
+          moderation_thumbnail_source: undefined,
+          moderation_preview_url: undefined,
+          moderation_preview_source: undefined,
+          thumbnail_url: 'https://example.test/original-thumb.jpg',
+          thumbnail_source: 'original',
+          preview_url: null,
+          preview_source: null,
+        })}
+        variant="thumbnail"
+        className="h-40 w-40"
+      />,
+    );
+
+    expect(trackTelemetryMock).toHaveBeenCalledWith(expect.objectContaining({
+      event: 'media_surface_original_fallback',
+      media_id: 1,
+      asset_source: 'original',
+      surface_variant: 'thumbnail',
+    }));
   });
 });

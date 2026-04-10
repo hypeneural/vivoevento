@@ -310,6 +310,50 @@ Regras confirmadas:
 - o budget do endpoint ficou protegido com `14` queries no cenario completo;
 - o `PATCH` ainda nao foi aberto e continua dependente da validacao agregadora e da action transacional das `Tarefas 1.5` e `1.6`.
 
+## Validacao agregadora do PATCH em `2026-04-10`
+
+A `Tarefa 1.5` foi concluida com `UpdateEventJourneyRequest`.
+
+O que entrou no request:
+
+- campos base de `moderation_mode` e `modules`;
+- intake agregado com `intake_defaults` e `intake_channels`;
+- bloco `content_moderation`;
+- bloco `media_intelligence`;
+- validacoes cruzadas via `after()` para devolver `422` util ao inspector.
+
+Regras cruzadas validadas:
+
+- `gate` exige `fallback_mode=review`;
+- Telegram ativo exige `bot_username` e `media_inbox_code`;
+- WhatsApp direto ativo exige `media_inbox_code`;
+- TTL continua limitado entre `1` e `4320`;
+- `fixed_random` exige templates;
+- `modules.wall=true` falha sem entitlement do evento;
+- `whatsapp_instance_id` falha fora da organizacao do evento;
+- `provider_key=openrouter` reaproveita a validacao oficial/local de modelo homologado.
+
+Leitura pratica:
+
+- o contrato do `PATCH` ja esta fechado antes da action transacional;
+- o frontend pode trabalhar com paths de erro estaveis como `media_intelligence.fallback_mode` e `intake_channels.telegram.bot_username`;
+- a `Tarefa 1.6` agora pode focar em transacao, orchestration e revalidacao da projection apos save.
+
+Bateria validada:
+
+```bash
+cd apps/api
+php artisan test tests/Unit/Events/UpdateEventJourneyRequestTest.php
+php artisan test tests/Unit/Events/UpdateEventJourneyRequestTest.php tests/Feature/Events/EventJourneyControllerTest.php tests/Unit/Events/EventJourneyProjectionDataTest.php tests/Unit/Events/BuildEventJourneySummaryActionTest.php tests/Unit/Events/BuildEventJourneyProjectionActionTest.php tests/Feature/Events/EventJourneyArchitectureCharacterizationTest.php tests/Feature/Events/EventIntakeChannelsTest.php tests/Feature/Events/EventIntakeChannelsTelegramPrivateTest.php tests/Feature/ContentModeration/ContentModerationSettingsTest.php tests/Feature/MediaIntelligence/MediaIntelligenceSettingsTest.php
+```
+
+Resultado:
+
+- `10` testes passaram na bateria unitária do request;
+- `13` assertions passaram na bateria unitária do request;
+- `54` testes passaram na regressão ampliada;
+- `362` assertions passaram na regressão ampliada.
+
 ---
 
 ## Leitura real da stack atual

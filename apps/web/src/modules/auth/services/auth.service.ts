@@ -168,6 +168,30 @@ function buildMockMeResponse(userId: string): MeResponse | null {
         custom_domain: null,
       },
     } : null,
+    active_context: org ? {
+      type: 'organization',
+      organization_id: parseInt(org.id) || 1,
+      event_id: null,
+      role_key: user.role.replace(/_/g, '-'),
+      role_label: formatRoleLabel(user.role.replace(/_/g, '-'), user.role),
+      capabilities: [],
+      entry_path: '/',
+    } : null,
+    workspaces: {
+      organizations: org ? [{
+        organization_id: parseInt(org.id) || 1,
+        organization_uuid: org.id,
+        organization_name: org.tradeName || org.name,
+        organization_slug: org.slug || org.name.toLowerCase().replace(/\s+/g, '-'),
+        organization_type: org.type || 'partner',
+        organization_status: org.status,
+        role_key: user.role.replace(/_/g, '-'),
+        role_label: formatRoleLabel(user.role.replace(/_/g, '-'), user.role),
+        is_owner: user.role === 'partner_owner',
+        entry_path: '/',
+      }] : [],
+      event_accesses: [],
+    },
     access: {
       accessible_modules: session.enabledModules,
       modules: session.enabledModules.map(m => ({ key: m, enabled: true, visible: true })),
@@ -234,6 +258,7 @@ function buildMockSignupSession(
   phone: string,
   journey: MockSignupOtpState['journey'] = 'partner_signup',
 ): MeResponse {
+  const generatedId = Date.now();
   const normalizedPhone = phone.startsWith('55') ? phone : `55${phone}`;
   const journeyConfig = resolveMockJourney(journey);
   const slug = name
@@ -303,7 +328,7 @@ function buildMockSignupSession(
 
   return {
     user: {
-      id: Date.now(),
+      id: generatedId,
       name,
       email: `wa+${normalizedPhone}@eventovivo.local`,
       phone: normalizedPhone,
@@ -325,7 +350,7 @@ function buildMockSignupSession(
       last_login_at: new Date().toISOString(),
     },
     organization: {
-      id: Date.now(),
+      id: generatedId,
       uuid: `mock-org-${slug}`,
       type: journeyConfig.organizationType,
       name,
@@ -338,6 +363,30 @@ function buildMockSignupSession(
         subdomain: null,
         custom_domain: null,
       },
+    },
+    active_context: {
+      type: 'organization',
+      organization_id: generatedId,
+      event_id: null,
+      role_key: 'partner-owner',
+      role_label: 'Proprietario',
+      capabilities: [],
+      entry_path: '/',
+    },
+    workspaces: {
+      organizations: [{
+        organization_id: generatedId,
+        organization_uuid: `mock-org-${slug}`,
+        organization_name: name,
+        organization_slug: slug,
+        organization_type: journeyConfig.organizationType,
+        organization_status: 'active',
+        role_key: 'partner-owner',
+        role_label: 'Proprietario',
+        is_owner: true,
+        entry_path: '/',
+      }],
+      event_accesses: [],
     },
     access: {
       accessible_modules: accessibleModules,
@@ -1093,6 +1142,86 @@ export const authService = {
     }
 
     await api.delete('/auth/me/avatar');
+  },
+
+  async setOrganizationContext(organizationId: number): Promise<MeResponse> {
+    if (USE_MOCK) {
+      await delay(200);
+      const session = getPersistedSession();
+      if (!session) throw { status: 401, message: 'Nao autenticado' };
+
+      const workspace = session.workspaces.organizations.find(item => item.organization_id === organizationId);
+      if (!workspace) {
+        throw { status: 403, message: 'Contexto de organizacao indisponivel.' };
+      }
+
+      session.active_context = {
+        type: 'organization',
+        organization_id: workspace.organization_id,
+        event_id: null,
+        role_key: workspace.role_key,
+        role_label: workspace.role_label,
+        capabilities: [],
+        entry_path: '/',
+      };
+      session.organization = {
+        id: workspace.organization_id,
+        uuid: workspace.organization_uuid,
+        type: workspace.organization_type ?? 'partner',
+        name: workspace.organization_name,
+        slug: workspace.organization_slug,
+        status: workspace.organization_status ?? 'active',
+        logo_url: session.organization?.id === workspace.organization_id ? session.organization.logo_url : null,
+        branding: session.organization?.id === workspace.organization_id
+          ? session.organization.branding
+          : {
+              primary_color: null,
+              secondary_color: null,
+              subdomain: null,
+              custom_domain: null,
+            },
+      };
+      persistSession(session);
+      return session;
+    }
+
+    const session = await api.post<MeResponse>('/auth/context/organization', {
+      body: { organization_id: organizationId },
+    });
+    persistSession(session);
+    return session;
+  },
+
+  async setEventContext(eventId: number): Promise<MeResponse> {
+    if (USE_MOCK) {
+      await delay(200);
+      const session = getPersistedSession();
+      if (!session) throw { status: 401, message: 'Nao autenticado' };
+
+      const workspace = session.workspaces.event_accesses.find(item => item.event_id === eventId);
+      if (!workspace) {
+        throw { status: 403, message: 'Contexto de evento indisponivel.' };
+      }
+
+      session.active_context = {
+        type: 'event',
+        organization_id: workspace.organization_id,
+        event_id: workspace.event_id,
+        role_key: workspace.role_key,
+        role_label: workspace.role_label,
+        capabilities: workspace.capabilities,
+        entry_path: workspace.entry_path,
+      };
+      session.organization = null;
+      persistSession(session);
+      return session;
+    }
+
+    const session = await api.post<MeResponse>('/auth/context/event', {
+      body: { event_id: eventId },
+    });
+    persistSession(session);
+    return session;
   },
 
   /** Check if a token exists */

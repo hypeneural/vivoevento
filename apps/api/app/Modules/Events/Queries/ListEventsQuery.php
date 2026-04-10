@@ -12,6 +12,7 @@ class ListEventsQuery implements QueryInterface
     use HasPortableLike;
     public function __construct(
         protected ?int $organizationId = null,
+        protected ?array $eventIds = null,
         protected ?int $clientId = null,
         protected ?string $status = null,
         protected ?string $eventType = null,
@@ -37,6 +38,20 @@ class ListEventsQuery implements QueryInterface
 
         if ($this->organizationId) {
             $query->where('organization_id', $this->organizationId);
+        }
+
+        if (is_array($this->eventIds)) {
+            $normalizedEventIds = collect($this->eventIds)
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn (int $id) => $id > 0)
+                ->values()
+                ->all();
+
+            if ($normalizedEventIds === []) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('id', $normalizedEventIds);
+            }
         }
 
         if ($this->clientId) {

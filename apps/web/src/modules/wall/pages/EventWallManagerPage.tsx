@@ -81,6 +81,7 @@ import {
   cloneWallSettings,
   markWallSelectionAsCustom,
   prepareWallSettingsPayload,
+  resolveManagedWallSettings,
   resolveWallSelectionModeOption,
 } from '../wall-settings';
 
@@ -288,6 +289,24 @@ export default function EventWallManagerPage() {
     () => !areWallSettingsEqual(draft, persistedSettings),
     [draft, persistedSettings],
   );
+  const managedWallSettings = useMemo(
+    () => (wallSettings ? resolveManagedWallSettings(wallSettings, options.layouts) : null),
+    [options.layouts, wallSettings],
+  );
+
+  useEffect(() => {
+    if (!draft) {
+      return;
+    }
+
+    const reconciledDraft = resolveManagedWallSettings(draft, options.layouts);
+
+    if (areWallSettingsEqual(draft, reconciledDraft)) {
+      return;
+    }
+
+    setDraft(reconciledDraft);
+  }, [draft, options.layouts]);
 
   const headerDescription = useMemo(() => {
     if (!event) return 'Carregando dados do evento e do telao.';
@@ -299,16 +318,16 @@ export default function EventWallManagerPage() {
   }, [event]);
 
   const selectionSummary = useMemo(
-    () => (wallSettings ? buildWallSelectionSummary(wallSettings, selectionModes) : ''),
-    [selectionModes, wallSettings],
+    () => (managedWallSettings ? buildWallSelectionSummary(managedWallSettings, selectionModes) : ''),
+    [managedWallSettings, selectionModes],
   );
   const videoPolicySummary = useMemo(
-    () => (wallSettings ? buildWallVideoPolicySummary(wallSettings) : ''),
-    [wallSettings],
+    () => (managedWallSettings ? buildWallVideoPolicySummary(managedWallSettings) : ''),
+    [managedWallSettings],
   );
   const normalizedWallSettings = useMemo(
-    () => (wallSettings ? prepareWallSettingsPayload(cloneWallSettings(wallSettings)) : null),
-    [wallSettings],
+    () => (managedWallSettings ? prepareWallSettingsPayload(cloneWallSettings(managedWallSettings)) : null),
+    [managedWallSettings],
   );
   const liveSimulationFingerprint = useMemo(
     () => (normalizedWallSettings ? JSON.stringify(normalizedWallSettings) : ''),
@@ -367,7 +386,14 @@ export default function EventWallManagerPage() {
   }
 
   function updateDraft<K extends keyof ApiWallSettings>(key: K, value: ApiWallSettings[K]) {
-    setDraft((current) => (current ? { ...current, [key]: value } : current));
+    setDraft((current) => (
+      current
+        ? resolveManagedWallSettings({
+          ...current,
+          [key]: value,
+        }, options.layouts)
+        : current
+    ));
   }
 
   function updateSelectionPolicy<K extends keyof ApiWallSelectionPolicy>(
@@ -379,7 +405,10 @@ export default function EventWallManagerPage() {
         return current;
       }
 
-      return markWallSelectionAsCustom(current, { [key]: value });
+      return resolveManagedWallSettings(
+        markWallSelectionAsCustom(current, { [key]: value }),
+        options.layouts,
+      );
     });
   }
 
@@ -390,10 +419,10 @@ export default function EventWallManagerPage() {
       }
 
       const preset = resolveWallSelectionModeOption(value as ApiWallSettings['selection_mode'], selectionModes);
-      return applyWallSelectionPreset({
+      return resolveManagedWallSettings(applyWallSelectionPreset({
         ...current,
         selection_mode: value as ApiWallSettings['selection_mode'],
-      }, preset);
+      }, preset), options.layouts);
     });
   }
 
@@ -406,7 +435,9 @@ export default function EventWallManagerPage() {
     if (!draft) return false;
 
     try {
-      const payload = await saveMutation.mutateAsync(prepareWallSettingsPayload(draft));
+      const payload = await saveMutation.mutateAsync(
+        prepareWallSettingsPayload(resolveManagedWallSettings(draft, options.layouts)),
+      );
       setDraft(cloneWallSettings(payload.settings));
       queryClient.setQueryData(queryKeys.wall.settings(eventId), payload);
       await Promise.all([
@@ -733,7 +764,7 @@ export default function EventWallManagerPage() {
             onCopyWallCode={copyWallCode}
             hasUnsavedChanges={hasUnsavedChanges}
             onOpenSelectedMediaDetails={() => setIsRecentDetailsOpen(true)}
-            wallSettings={wallSettings}
+            wallSettings={managedWallSettings ?? wallSettings}
             selectionSummary={selectionSummary}
             simulationSummary={simulationSummary}
             simulationPreview={simulationPreview}
@@ -923,7 +954,7 @@ export default function EventWallManagerPage() {
 
           {activeInspectorTab === 'appearance' ? (
             <WallAppearanceTab
-              wallSettings={wallSettings}
+              wallSettings={managedWallSettings ?? wallSettings}
               options={options}
               videoPolicySummary={videoPolicySummary}
               onDraftChange={updateDraft}

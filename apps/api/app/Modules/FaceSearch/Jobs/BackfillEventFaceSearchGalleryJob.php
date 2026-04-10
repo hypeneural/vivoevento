@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class BackfillEventFaceSearchGalleryJob implements ShouldBeUnique, ShouldQueue
 {
@@ -50,6 +51,18 @@ class BackfillEventFaceSearchGalleryJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $action->execute($event);
+        if (! is_string($settings->aws_collection_id) || trim($settings->aws_collection_id) === '') {
+            Log::channel((string) config('observability.queue_log_channel', config('logging.default')))
+                ->info('face_search.backfill.waiting_for_collection', [
+                    'event_id' => $event->id,
+                    'queue' => $this->queue ?: 'face-index',
+                ]);
+
+            $this->release($this->backoff);
+
+            return;
+        }
+
+        $action->execute($event, ensureBackend: false);
     }
 }

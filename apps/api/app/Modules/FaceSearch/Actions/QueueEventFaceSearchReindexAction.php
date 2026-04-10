@@ -17,7 +17,7 @@ class QueueEventFaceSearchReindexAction
     /**
      * @return array<string, mixed>
      */
-    public function execute(Event $event): array
+    public function execute(Event $event, bool $ensureBackend = true): array
     {
         $settings = $event->faceSearchSettings()->firstOrNew(
             ['event_id' => $event->id],
@@ -34,7 +34,10 @@ class QueueEventFaceSearchReindexAction
         }
 
         $backend = $this->router->backendForSettings($settings);
-        $backend->ensureEventBackend($event, $settings);
+
+        if ($ensureBackend) {
+            $backend->ensureEventBackend($event, $settings);
+        }
 
         $queued = 0;
 

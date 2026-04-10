@@ -114,8 +114,8 @@ Itens concluidos nesta rodada:
 
 Itens ainda pendentes deste plano:
 
-- [ ] repetir `EXPLAIN ANALYZE` em ambiente homologado real quando houver credencial/configuracao disponivel;
-- [ ] validar a politica de JIT do PostgreSQL em homolog/producao para queries OLTP do painel.
+- [ ] publicar em homolog uma release que contenha o comando `media:moderation-feed-explain`, o `search document` e as migrations da trilha atual da moderacao;
+- [ ] rodar o benchmark em homolog com a release atualizada e validar a politica de JIT do PostgreSQL para queries OLTP do painel.
 
 Comando recomendado para homolog:
 
@@ -146,6 +146,16 @@ Itens concluidos nesta rodada:
 - [x] expor posicao, pendentes depois da midia atual e amostra carregada no `ModerationReviewPanel`;
 - [x] validar no backend que `stats.pending` continua alinhado aos filtros ativos de moderacao;
 - [x] ampliar a cobertura TDD em `feed-utils.test.ts`, `ModerationReviewPanel.test.tsx`, `moderation-architecture.test.ts` e `ModerationMediaTest.php`.
+
+## Status da decima segunda entrega
+
+Itens concluidos nesta rodada:
+
+- [x] validar acesso SSH ao ambiente de homolog informado pelo time;
+- [x] localizar a release ativa em `/var/www/eventovivo/current -> /var/www/eventovivo/releases/20260406_194835`;
+- [x] confirmar que a release ativa de homolog ainda nao contem o comando `media:moderation-feed-explain`, os services `ModerationFeedExplainAnalyzeService` e `ModerationSearchDocumentBuilder`, nem as migrations `2026_04_09_230000_add_moderation_feed_indexes.php` e `2026_04_09_232000_add_moderation_search_document_to_event_media`;
+- [x] registrar que a pendencia de benchmark em homolog deixou de ser falta de acesso e passou a ser falta de rollout da release atual da moderacao;
+- [x] manter a validacao local verde com benchmark da moderacao em PostgreSQL real via `php artisan media:moderation-feed-explain --disable-jit`.
 
 Este plano responde 9 perguntas:
 
@@ -749,619 +759,165 @@ O que precisa mudar primeiro:
 - experiments de `maxPages` ou politica avancada de descarte;
 - qualquer troca maior de biblioteca de virtualizacao so depois de medir gargalo real.
 
-## Fase 0 - Congelar comportamento e fechar contrato
+## Backlog remanescente normalizado
 
-Objetivo:
+O topo deste documento ja registra 12 entregas concluidas. O corpo abaixo passa a listar apenas o backlog real, em ordem, sem repetir como pendente aquilo que o codigo e os testes ja cobrem.
 
-- travar a semantica esperada antes de mexer na pagina.
+### 1. Homolog e rollout da trilha atual
 
-### 0.1 Manter os testes de caracterizacao criados nesta rodada
+Status atual:
 
-Subtarefas:
+- acesso SSH ao ambiente informado pelo time foi validado;
+- a release ativa de homolog hoje e `/var/www/eventovivo/current -> /var/www/eventovivo/releases/20260406_194835`;
+- essa release ainda nao contem os artefatos mais novos da moderacao:
+  - comando `media:moderation-feed-explain`;
+  - services `ModerationFeedExplainAnalyzeService` e `ModerationSearchDocumentBuilder`;
+  - migrations `2026_04_09_230000_add_moderation_feed_indexes.php` e `2026_04_09_232000_add_moderation_search_document_to_event_media.php`.
 
-- [ ] manter `ModerationFeedCharacterizationTest` como retrato do bug atual enquanto a correcao nao entra;
-- [ ] manter `feed-utils.test.ts` para documentar a semantica atual do frontend;
-- [ ] manter `MediaAssetUrlServiceTest` como prova do fallback para original.
+Proxima ordem:
 
-Observacao:
+1. publicar em homolog uma release com o estado atual da moderacao;
+2. aplicar as migrations pendentes da trilha de moderacao, se ainda nao estiverem presentes no ambiente;
+3. executar o benchmark real em homolog:
+   - `cd /var/www/eventovivo/current/apps/api && php artisan media:moderation-feed-explain --disable-jit --fail-on-budget --output=storage/app/reports/moderation-feed-explain-homolog.json`
+4. registrar a decisao de JIT do PostgreSQL para esse ambiente;
+5. anexar o resultado ao plano e ao runbook operacional.
 
-- quando a fase 1 entrar, o teste de caracterizacao deve ser invertido para virar teste de contrato final, nao removido.
+Definicao de pronto deste bloco:
 
-### 0.2 Fechar o contrato funcional da rota `/media/feed`
+- [ ] release de homolog contem a trilha atual da moderacao;
+- [ ] benchmark em homolog executado com o comando oficial;
+- [ ] budgets de `feed <= 700ms` e `search <= 500ms` validados;
+- [ ] politica de JIT documentada para homolog/producao.
 
-Decisoes que precisam estar escritas e aceitas:
+### 2. Observabilidade minima da rota
 
-- [ ] `status` do feed passa a significar `effective_media_state`;
-- [ ] `status` no filtro da rota `/media/feed` passa a operar sobre `effective state`;
-- [ ] a ordenacao operacional passa a existir como projecao cursor-safe formal;
-- [ ] `meta.stats` da pagina passa a refletir `effective state`, mas deixa de viajar acoplado a primeira pagina;
-- [ ] campos brutos continuam no payload apenas para diagnostico e painel detalhado;
-- [ ] detalhe e feed precisam concordar no mesmo `status` para o mesmo item.
+Este e o principal backlog tecnico real depois do rollout em homolog.
 
-### 0.3 Fechar a regra de transporte do realtime
-
-Decisoes que precisam estar escritas e aceitas:
-
-- [ ] requests autenticadas do admin enviam `X-Socket-ID`;
-- [ ] broadcasts de mutation relevante usam `toOthers()`;
-- [ ] frontend compara payload mais novo antes de aplicar patch.
-
-### 0.4 Definir SLOs minimos e medicao inicial da pagina
-
-Metas iniciais para esta rota:
-
-- [ ] primeira pagina de feed em `p95 <= 700ms` no ambiente homologado;
-- [ ] troca de filtro com tela estabilizada em `p95 <= 500ms` sem concorrencia de requests antigos;
-- [ ] sem duplicidade de `fetchNextPage` para o mesmo cursor;
-- [ ] sem discrepancia funcional entre feed e detalhe para `status`.
-- [ ] comecar a registrar latencia de feed, filtro, erro de thumbnail e origem de asset desde a primeira sprint.
-
-### Bateria TDD da fase 0
-
-Backend:
-
-- [ ] manter `apps/api/tests/Feature/MediaProcessing/ModerationFeedCharacterizationTest.php`
-- [ ] manter `apps/api/tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php`
-- [ ] criar `apps/api/tests/Feature/MediaProcessing/ModerationFeedContractTest.php`
-
-Frontend:
-
-- [ ] manter `apps/web/src/modules/moderation/feed-utils.test.ts`
-- [ ] manter `apps/web/src/lib/api.realtime.test.ts`
-- [ ] manter `apps/web/src/app/routing/router-architecture.test.ts`
-- [ ] criar `apps/web/src/modules/moderation/services/moderation.service.test.ts`
-
-## Fase 1 - Corrigir o contrato backend do feed
-
-Objetivo:
-
-- fazer `/media/feed` e `/media/{id}` falarem a mesma lingua de status, filtro, prioridade e stats.
-
-### 1.1 Carregar o contexto correto do evento no feed
-
-Arquivos-alvo:
-
-- `apps/api/app/Modules/MediaProcessing/Queries/ListModerationMediaQuery.php`
-- `apps/api/app/Modules/MediaProcessing/Http/Resources/EventMediaResource.php`
-
-Subtarefas:
-
-- [ ] ampliar o eager loading de `event` para incluir o que o `MediaEffectiveStateResolver` realmente precisa;
-- [ ] carregar tambem `event.contentModerationSettings` e `event.mediaIntelligenceSettings`;
-- [ ] revisar colunas selecionadas para nao quebrar a regra de `id + foreign keys`.
-
-Resultado esperado:
-
-- o resource do feed deixa de perder contexto de IA.
-
-### 1.2 Criar uma projecao unica de `effective state` para a query
-
-Arquivos recomendados:
-
-- `apps/api/app/Modules/MediaProcessing/Queries/ListModerationMediaQuery.php`
-- `apps/api/app/Modules/MediaProcessing/Support/ModerationFeedStateProjection.php` ou equivalente
-
-Subtarefas:
-
-- [ ] centralizar a logica de `effective state` usada por filtro, ordenacao e stats;
-- [ ] evitar duplicar `CASE WHEN` em varios pontos soltos;
-- [ ] decidir se a projecao sera feita por:
-  - helper SQL centralizado no proprio modulo;
-  - ou view/read model se a expressao ficar complexa demais.
-
-Decisao recomendada:
-
-- comecar com helper SQL centralizado;
-- migrar para read model dedicado apenas se o custo de query em producao justificar.
-
-### 1.3 Alinhar ordenacao e cursor com a mesma projecao
-
-Subtarefas:
-
-- [ ] trocar a prioridade SQL atual baseada so em `moderation_status = pending`;
-- [ ] usar a mesma prioridade que o frontend ja entende como `pending_moderation`;
-- [ ] formalizar a projecao operacional com alias/representacao unica e cursor-safe;
-- [ ] garantir que a combinacao final continue deterministicamente unica;
-- [ ] garantir que o cursor nao dependa de trecho ambiguo ou valor `null` instavel;
-- [ ] refletir a nova prioridade no cursor encode/decode;
-- [ ] garantir que a ordenacao final continue estavel com:
-  - `sort_order desc`
-  - prioridade operacional
-  - `created_at desc`
-  - `id desc`
-
-### 1.4 Alinhar filtro `status` e `meta.stats`
-
-Subtarefas:
-
-- [ ] fazer `status=pending_moderation` incluir pendencias de IA e workflow bruto;
-- [ ] fazer `approved`, `rejected`, `published`, `processing`, `received` e `error` seguirem a semantica operacional decidida;
-- [ ] recalcular `meta.stats` com a mesma semantica do filtro rapido.
-
-Decisao importante:
-
-- se a equipe ainda quiser contagens brutas de workflow, elas devem entrar em outro bloco de `meta`, nao no `stats` operacional do moderador.
-
-### 1.5 Desacoplar `stats` da primeira pagina do feed
-
-Arquivos-alvo:
-
-- `apps/api/app/Modules/MediaProcessing/Http/Controllers/EventMediaController.php`
-- rota dedicada do modulo `MediaProcessing`
-
-Subtarefas:
-
-- [ ] criar endpoint leve de `stats` para a moderacao;
-- [ ] manter a mesma semantica de filtro operacional usada pelo feed;
-- [ ] invalidar `stats` de forma independente das paginas do feed;
-- [ ] decidir se contagens brutas tambem entram, mas em bloco separado.
-
-### 1.6 Preservar diagnostico bruto sem poluir o contrato da superficie
-
-Subtarefas:
-
-- [ ] manter `moderation_status`, `publication_status`, `processing_status`, `safety_status` e `vlm_status` no payload;
-- [ ] documentar que esses campos sao diagnosticos, nao a chave primaria de UX da rota;
-- [ ] usar esses campos principalmente no painel lateral e em troubleshooting.
-
-### Bateria TDD da fase 1
-
-Antes de implementar:
-
-- [ ] inverter `ModerationFeedCharacterizationTest` para o comportamento correto assim que a mudanca entrar;
-- [ ] criar `apps/api/tests/Feature/MediaProcessing/ModerationFeedEffectiveStatusTest.php`
-- [ ] criar `apps/api/tests/Feature/MediaProcessing/ModerationFeedStatsTest.php`
-- [ ] criar `apps/api/tests/Feature/MediaProcessing/ModerationFeedCursorStabilityTest.php`
-- [ ] criar `apps/api/tests/Feature/MediaProcessing/ModerationFeedStatsEndpointTest.php`
-
-Cenarios obrigatorios:
-
-- [ ] midia `approved` com `safety_status=review` em evento `ai + enforced` aparece como `pending_moderation`;
-- [ ] `status=pending_moderation` traz workflow pendente e pendencia por IA;
-- [ ] item com `vlm_status=rejected` em modo `gate` entra como `rejected`;
-- [ ] cursor nao duplica nem pula item ao virar pagina com mistura de estados;
-- [ ] `meta.stats.pending` bate com a mesma semantica do filtro "Nao moderadas".
-
-## Fase 2 - Estabilizar query pipeline e infinite scroll no frontend
-
-Objetivo:
-
-- reduzir concorrencia inutil, cancelar requests obsoletos e diminuir churn da `InfiniteQuery`.
-
-### 2.1 Propagar `AbortSignal` nas queries da rota
-
-Arquivos-alvo:
-
-- `apps/web/src/modules/moderation/services/moderation.service.ts`
-- `apps/web/src/modules/moderation/ModerationPage.tsx`
-
-Subtarefas:
-
-- [ ] aceitar `signal` em `moderationService.list`;
-- [ ] aceitar `signal` em `moderationService.show`;
-- [ ] passar `signal` vindo do `queryFn` para o service;
-- [ ] validar cancelamento nas trocas rapidas de busca, evento e filtros.
-
-Resultado esperado:
-
-- requests antigas deixam de completar e sobrescrever estado visual quando o usuario ja mudou o filtro.
-
-### 2.2 Endurecer o gatilho de `fetchNextPage`
-
-Subtarefas:
-
-- [ ] proteger o callback do observer com `hasNextPage && !isFetching && !isFetchingNextPage`;
-- [ ] revisar `rootMargin: '1200px 0px'` com base em medicao;
-- [ ] garantir que o sentinela nao dispare cascata de pagina enquanto o viewport ainda esta montando;
-- [ ] medir se a tela ganha mais com `600px` ou `800px` do que com `1200px`.
-
-### 2.3 Desacoplar `stats` no frontend
-
-Arquivos-alvo:
-
-- `apps/web/src/modules/moderation/ModerationPage.tsx`
-- `apps/web/src/modules/moderation/services/moderation.service.ts`
-
-Subtarefas:
-
-- [ ] criar query separada para `stats`;
-- [ ] invalidar `stats` em mutation e em eventos relevantes;
-- [ ] parar de ler `pages[0].meta.stats` como fonte do topo.
-
-### 2.4 Reduzir cirurgia agressiva em `pages`
-
-Arquivos-alvo:
-
-- `apps/web/src/modules/moderation/feed-utils.ts`
-- `apps/web/src/modules/moderation/ModerationPage.tsx`
-
-Subtarefas:
-
-- [ ] revisar `rebuildPages()` para nao reembaralhar mais do que o necessario;
-- [ ] evitar resort global em atualizacao que nao muda chaves de ordenacao;
-- [ ] manter `pageParams` intactos em toda cirurgia local;
-- [ ] decidir se parte do estado de realtime deve sair da cache e virar overlay derivado.
-
-Decisao recomendada:
-
-- `query cache` continua sendo a fonte dos itens carregados;
-- `incomingItems` vira overlay explicito para novidades ainda nao aplicadas.
-
-### 2.5 Preservar foco e navegacao
-
-Subtarefas:
-
-- [ ] impedir troca de foco para o primeiro item em momentos desnecessarios;
-- [ ] so mover foco automaticamente quando o item atual realmente sair do conjunto visivel;
-- [ ] manter navegacao por teclado coerente apos approve/reject.
-
-### Bateria TDD da fase 2
-
-Arquivos recomendados:
-
-- `apps/web/src/modules/moderation/services/moderation.service.test.ts`
-- `apps/web/src/modules/moderation/ModerationPage.feed.test.tsx`
-- ampliar `apps/web/src/modules/moderation/feed-utils.test.ts`
-
-Cenarios obrigatorios:
-
-- [ ] troca rapida de busca cancela request anterior;
-- [ ] troca de filtro nao deixa resposta antiga reaparecer na tela;
-- [ ] `fetchNextPage` nao roda quando `isFetching` ja estiver ativo;
-- [ ] `stats` da pagina nao dependem mais de `pages[0].meta.stats`;
-- [ ] merge local preserva `pageParams`;
-- [ ] foco nao salta indevidamente durante update simples de item.
-
-## Fase 3 - Corrigir continuidade visual da midia
-
-Objetivo:
-
-- parar de depender do navegador puro para mediar loading, erro e transicao de thumbnail.
-
-### 3.1 Expor proveniencia do asset no backend
-
-Arquivos-alvo:
-
-- `apps/api/app/Modules/MediaProcessing/Services/MediaAssetUrlService.php`
-- `apps/api/app/Modules/MediaProcessing/Http/Resources/EventMediaResource.php`
-- `apps/api/app/Modules/MediaProcessing/Http/Resources/EventMediaDetailResource.php`
-
-Campos recomendados:
-
-- `thumbnail_source`
-- `preview_source`
-
-Valores esperados:
-
-- `thumb`
-- `gallery`
-- `wall`
-- `fast_preview`
-- `original`
-- `none`
-
-Motivo:
-
-- o frontend precisa saber quando esta mostrando um asset otimizado e quando caiu no original.
-
-### 3.2 Criar um componente de superficie de thumbnail
-
-Arquivos recomendados:
-
-- `apps/web/src/modules/moderation/components/ModerationMediaThumbnail.tsx`
-- `apps/web/src/modules/moderation/components/ModerationMediaCard.tsx`
-
-Responsabilidades:
-
-- [ ] estado `loading`;
-- [ ] estado `loaded`;
-- [ ] estado `error`;
-- [ ] placeholder estavel;
-- [ ] fade-in controlado apos `load`;
-- [ ] fallback visual claro em erro sem quebrar o card.
-
-### 3.3 Tratar asset original como classe diferente de risco visual
-
-Subtarefas:
-
-- [ ] se `thumbnail_source === original`, usar placeholder mais conservador;
-- [ ] evitar trocar card para branco ou transparente enquanto a imagem grande nao chega;
-- [ ] opcionalmente sinalizar visualmente que a variante otimizada ainda nao existe.
-
-### 3.4 Revisar video em cards
-
-Subtarefas:
-
-- [ ] manter `preload="metadata"` em preview de video no grid;
-- [ ] garantir que video sem poster nao degrade a experiencia da grade;
-- [ ] validar se video precisa de placeholder proprio no grid.
-
-### Bateria TDD da fase 3
-
-Backend:
-
-- [ ] criar `apps/api/tests/Unit/Modules/MediaProcessing/MediaAssetSourceTest.php`
-
-Frontend:
-
-- [ ] criar `apps/web/src/modules/moderation/components/ModerationMediaThumbnail.test.tsx`
-- [ ] ampliar `apps/web/src/modules/moderation/components/ModerationReviewPanel.test.tsx`
-
-Cenarios obrigatorios:
-
-- [ ] thumbnail mostra placeholder antes do load;
-- [ ] thumbnail faz fade-in apenas depois de `load`;
-- [ ] erro de imagem cai em fallback estavel;
-- [ ] payload exposto marca corretamente quando a origem e `original`.
-
-## Fase 4 - Domar realtime e updates otimistas
-
-Objetivo:
-
-- impedir que a fila viva roube foco do operador ou reorganize tudo a cada evento.
-
-### 4.1 Separar claramente `loaded feed` de `incoming queue`
-
-Subtarefas:
-
-- [ ] manter entrada imediata so quando o operador estiver no topo e sem selecao;
-- [ ] se houver selecao ativa ou scroll distante do topo, enfileirar em `incoming`;
-- [ ] exibir CTA claro para aplicar novos itens;
-- [ ] impedir que item novo derrube o contexto de revisao atual.
-
-### 4.2 Corrigir transporte e supressao de eco
-
-Subtarefas:
-
-- [ ] enviar `X-Socket-ID` em todas as mutations autenticadas do admin;
-- [ ] usar `toOthers()` nos broadcasts da trilha de moderacao;
-- [ ] comparar `updated_at`, `version` ou heuristica equivalente antes de aplicar payload remoto;
-- [ ] validar que mutation local + resposta HTTP + broadcast nao fazem triplo churn do mesmo item.
-
-### 4.3 Patch local por tipo de evento
-
-Regras recomendadas:
-
-- `created`
-  - entra no feed somente quando seguro;
-  - caso contrario vai para `incoming`;
-- `updated`
-  - faz patch local do item visivel;
-  - so reordena se chave de ordenacao mudar de fato;
-- `deleted`
-  - remove do feed, fila e selecao.
-
-### 4.4 Mutations do operador precisam ser previsiveis
-
-Subtarefas:
-
-- [ ] approve/reject devem mover foco para o proximo item pendente de forma deterministica;
-- [ ] favorite/pin devem evitar resort global desnecessario;
-- [ ] bulk actions devem aplicar patch em lote e refetch controlado em seguida.
-
-### 4.5 Reconciliacao apos reconnect
-
-Subtarefas:
-
-- [ ] quando o canal websocket reconectar, disparar resync controlado;
-- [ ] evitar duplicar item ja patchado localmente;
-- [ ] garantir que a fila `incoming` continue consistente apos reconnect.
-
-### Bateria TDD da fase 4
-
-Arquivos recomendados:
-
-- `apps/web/src/modules/moderation/hooks/useModerationRealtime.test.ts`
-- `apps/web/src/modules/moderation/ModerationPage.realtime.test.tsx`
-- ampliar `apps/web/src/modules/moderation/feed-utils.test.ts`
-
-Cenarios obrigatorios:
-
-- [ ] item novo nao entra no topo enquanto ha selecao ativa;
-- [ ] mutation do operador nao reaplica eco do proprio socket;
-- [ ] item atualizado visivel sofre patch sem recriar toda a lista;
-- [ ] delete remove item de feed, `incoming` e selecao;
-- [ ] reconnect dispara resync sem duplicidade.
-
-## Fase 5 - Melhorar o painel lateral e cortar waterfalls evitaveis
-
-Objetivo:
-
-- manter abertura do painel rapida sem depender de waterfall desnecessario.
-
-### 5.1 Separar `feed payload` de `detail payload`
-
-Regra recomendada:
-
-- o feed entrega tudo o que o card precisa e um subconjunto leve do review;
-- o detalhe busca somente campos pesados:
-  - bloco completo de IA;
-  - diagnostico de deduplicacao;
-  - auditoria de override;
-  - dados mais ricos do remetente.
-
-### 5.2 Semear o painel com dados do feed
-
-Subtarefas:
-
-- [ ] abrir o painel com `focusedMedia` imediatamente;
-- [ ] hidratar os campos faltantes com `show()` sem resetar o layout;
-- [ ] evitar spinner de tela inteira no painel quando ja existe bootstrap local.
-
-### 5.3 Prefetch onde a navegacao e previsivel
-
-Subtarefas:
-
-- [ ] prefetch do detalhe ao focar item via teclado;
-- [ ] opcionalmente prefetch do proximo item pendente;
-- [ ] medir se isso reduz sensacao de atraso sem gerar waterfall desnecessario.
-
-### Bateria TDD da fase 5
-
-Arquivos recomendados:
-
-- ampliar `apps/web/src/modules/moderation/components/ModerationReviewPanel.test.tsx`
-- criar `apps/web/src/modules/moderation/ModerationPage.detail.test.tsx`
-
-Cenarios obrigatorios:
-
-- [ ] painel abre com dados iniciais do feed;
-- [ ] detalhe completo chega sem desmontar estrutura do painel;
-- [ ] navegacao por teclado preenche o proximo item com menor latencia percebida.
-
-## Fase 6 - Observabilidade, rollout e guardrails permanentes
-
-Objetivo:
-
-- impedir que a pagina volte a degradar silenciosamente.
-
-### 6.1 Medir o que importa
-
-Metricas minimas:
+Metricas minimas recomendadas:
 
 - [ ] tempo da primeira pagina do feed;
 - [ ] tempo de troca de filtro ate tela estabilizada;
 - [ ] quantidade de `fetchNextPage` por sessao;
-- [ ] taxa de `thumbnail_source=original`;
-- [ ] taxa de erro de imagem no card;
+- [ ] taxa de `thumbnail_source=original` ou ausencia de variante de moderacao;
+- [ ] taxa de erro de imagem/video na surface;
 - [ ] tamanho medio da fila `incoming`;
 - [ ] tempo de abertura do painel lateral.
 
-Observacao:
+Arquivos/provas esperadas:
 
-- essa fase organiza o guardrail permanente;
-- a instrumentacao minima precisa comecar ainda na Sprint 1.
+- instrumentacao no frontend da moderacao;
+- instrumentacao ou logs de suporte no backend;
+- uma nota curta no plano com fonte de dados e thresholds adotados.
 
-### 6.2 Rollout por ordem de risco
+### 3. Guardrails permanentes de CI
 
-Sequencia recomendada:
+O codigo local esta verde, mas o plano ainda nao esta protegido por pipeline.
 
-1. alinhar contrato backend;
-2. separar `stats` do feed;
-3. ligar `AbortSignal` e endurecer infinite scroll;
-4. trocar superficie de thumbnail;
-5. estabilizar overlay realtime;
-6. otimizar painel lateral.
+Proxima ordem:
 
-### 6.3 Guardrails de regressao
+1. adicionar a suite da moderacao ao CI;
+2. bloquear regressao de contrato do feed;
+3. bloquear regressao de `feed-utils` e da surface visual;
+4. manter o type-check do frontend como gate obrigatorio.
 
-Subtarefas:
+Comandos minimos para virar gate:
 
-- [ ] adicionar suite da moderacao ao CI;
-- [ ] bloquear PR que quebre contrato de feed;
-- [ ] bloquear PR que remova cobertura de `feed-utils`;
-- [ ] bloquear PR que quebre `thumbnail_source` ou fallback visual.
+- `cd apps/web && npm.cmd run test -- src/lib/api.realtime.test.ts src/app/routing/router-architecture.test.ts src/app/routing/scroll-restoration.test.ts src/modules/moderation/feed-utils.test.ts src/modules/moderation/services/moderation.service.test.ts src/modules/moderation/components/ModerationReviewPanel.test.tsx src/modules/moderation/components/ModerationMediaSurface.test.tsx src/modules/moderation/moderation-architecture.test.ts`
+- `cd apps/web && npm.cmd run type-check`
+- `cd apps/api && php artisan test tests/Feature/MediaProcessing/ModerationFeedCharacterizationTest.php tests/Feature/MediaProcessing/ModerationMediaTest.php tests/Feature/MediaProcessing/EventMediaListTest.php tests/Feature/MediaProcessing/RunModerationFeedExplainCommandTest.php tests/Unit/MediaProcessing/MediaEffectiveStateResolverTest.php tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php tests/Unit/Modules/MediaProcessing/ModerationFeedExplainAnalyzeServiceTest.php tests/Unit/Modules/MediaProcessing/ModerationSearchDocumentBuilderTest.php tests/Unit/Modules/MediaProcessing/MediaAssetUrlServiceTest.php`
 
-## Bateria TDD consolidada
+### 4. Decisoes finais de produto e UX operacional
+
+Nao sao bugs bloqueantes, mas ainda precisam de decisao explicita.
+
+- [ ] decidir se o quick filter `Nao moderadas` vira default do produto ou preferencia configuravel por operador;
+- [ ] decidir se a visao de `stats` segue apenas operacional ou se ganha tambem um bloco bruto de diagnostico;
+- [ ] decidir se o `prefetch` deve subir do item focado para o proximo item pendente quando a navegacao por teclado for dominante.
+
+### 5. Refino opcional guiado por medicao
+
+Esses itens nao devem voltar ao `P0`.
+
+- [ ] revisar `rootMargin` com medicao real de churn/continuidade;
+- [ ] avaliar `maxPages` apenas se memoria ou refetch sequencial virarem problema real;
+- [ ] revisar memoizacao/virtualizacao so se surgir gargalo mensuravel apos observabilidade;
+- [ ] considerar mais testes de realtime detalhado apenas se aparecer regressao nova nessa trilha.
+
+## Bateria de regressao que precisa permanecer verde
 
 ### Backend
 
 Manter:
 
 - `apps/api/tests/Feature/MediaProcessing/ModerationFeedCharacterizationTest.php`
+- `apps/api/tests/Feature/MediaProcessing/ModerationMediaTest.php`
+- `apps/api/tests/Feature/MediaProcessing/EventMediaListTest.php`
+- `apps/api/tests/Feature/MediaProcessing/RunModerationFeedExplainCommandTest.php`
+- `apps/api/tests/Unit/MediaProcessing/MediaEffectiveStateResolverTest.php`
+- `apps/api/tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php`
+- `apps/api/tests/Unit/Modules/MediaProcessing/ModerationFeedExplainAnalyzeServiceTest.php`
+- `apps/api/tests/Unit/Modules/MediaProcessing/ModerationSearchDocumentBuilderTest.php`
 - `apps/api/tests/Unit/Modules/MediaProcessing/MediaAssetUrlServiceTest.php`
-
-Criar:
-
-- `apps/api/tests/Feature/MediaProcessing/ModerationFeedContractTest.php`
-- `apps/api/tests/Feature/MediaProcessing/ModerationFeedEffectiveStatusTest.php`
-- `apps/api/tests/Feature/MediaProcessing/ModerationFeedStatsTest.php`
-- `apps/api/tests/Feature/MediaProcessing/ModerationFeedCursorStabilityTest.php`
-- `apps/api/tests/Unit/Modules/MediaProcessing/MediaAssetSourceTest.php`
 
 ### Frontend
 
 Manter:
 
+- `apps/web/src/lib/api.realtime.test.ts`
+- `apps/web/src/app/routing/router-architecture.test.ts`
+- `apps/web/src/app/routing/scroll-restoration.test.ts`
 - `apps/web/src/modules/moderation/feed-utils.test.ts`
-- `apps/web/src/modules/moderation/components/ModerationReviewPanel.test.tsx`
-
-Criar:
-
 - `apps/web/src/modules/moderation/services/moderation.service.test.ts`
-- `apps/web/src/modules/moderation/ModerationPage.feed.test.tsx`
+- `apps/web/src/modules/moderation/components/ModerationReviewPanel.test.tsx`
+- `apps/web/src/modules/moderation/components/ModerationMediaSurface.test.tsx`
+- `apps/web/src/modules/moderation/moderation-architecture.test.ts`
+
+Extensoes futuras so se surgirem gaps reais:
+
 - `apps/web/src/modules/moderation/ModerationPage.realtime.test.tsx`
 - `apps/web/src/modules/moderation/ModerationPage.detail.test.tsx`
-- `apps/web/src/modules/moderation/components/ModerationMediaThumbnail.test.tsx`
 - `apps/web/src/modules/moderation/hooks/useModerationRealtime.test.ts`
 
-## Sequencia recomendada de execucao
+## Definicao de pronto normalizada
 
-### Sprint 1
+A rota `/moderation` so deve ser considerada estabilizada de ponta a ponta quando:
 
-- Fase 0 completa
-- Fase 1 completa
-- instrumentacao minima da Fase 6.1 ligada
-- iniciar Fase 2.1, 2.2 e 2.3
-
-Saida esperada:
-
-- rota `/media/feed` coerente com `effective state`
-- projecao cursor-safe formalizada
-- `stats` corrigidos e desacoplados do feed
-- requests obsoletos cancelados
-
-### Sprint 2
-
-- concluir Fase 2
-- concluir Fase 3
-
-Saida esperada:
-
-- infinite scroll mais previsivel
-- card sem "pisca" branco
-- tratamento claro para fallback do original
-
-### Sprint 3
-
-- concluir Fase 4
-- concluir Fase 5
-- consolidar Fase 6
-
-Saida esperada:
-
-- realtime mais amigavel para operacao
-- painel lateral mais responsivo
-- guardrails de regressao ligados
-
-## Definicao de pronto
-
-A pagina `/moderation` so deve ser considerada estabilizada quando:
-
-- [ ] o mesmo item tem o mesmo `status` no feed e no detalhe;
-- [ ] `status=pending_moderation` traz toda a fila operacional esperada;
-- [ ] `stats` da pagina vem de query dedicada e batem com os quick filters visiveis;
-- [ ] a ordenacao operacional continua cursor-safe, sem duplicar ou pular item;
-- [ ] requests antigas nao sobrescrevem filtros novos;
-- [ ] `fetchNextPage` nao concorre com outro fetch da mesma `InfiniteQuery`;
-- [ ] mutations do moderador enviam `X-Socket-ID` e broadcasts relevantes usam `toOthers()`;
-- [ ] cards de imagem tem placeholder, transicao de load e fallback de erro;
-- [ ] a taxa de uso de asset original e observavel;
-- [ ] scroll restoration esta explicitamente tratado no router;
-- [ ] realtime nao rouba foco do operador em uso normal;
-- [ ] testes backend e frontend da moderacao estao verdes no CI.
+- [x] feed e detalhe usam o mesmo `status` operacional;
+- [x] `status=pending_moderation` traz a fila operacional esperada;
+- [x] `stats` da pagina vem de query dedicada e batem com os quick filters visiveis;
+- [x] a ordenacao operacional continua cursor-safe, sem duplicar ou pular item;
+- [x] requests antigas deixam de sobrescrever filtros novos;
+- [x] `fetchNextPage` nao concorre com outro fetch da mesma `InfiniteQuery`;
+- [x] mutations do moderador enviam `X-Socket-ID` e broadcasts relevantes usam `toOthers()`;
+- [x] cards de imagem/video usam placeholder, transicao de load e fallback de erro;
+- [x] a rota nao cai no asset original no feed da moderacao;
+- [x] scroll restoration esta tratado no router;
+- [x] realtime nao reaplica eco basico do proprio operador;
+- [x] a fila mostra contador de pendentes restantes e posicao atual;
+- [ ] benchmark em homolog foi executado com a release correta;
+- [ ] politica de JIT foi validada em homolog/producao;
+- [ ] observabilidade minima da rota esta ligada;
+- [ ] testes backend e frontend da moderacao rodam no CI.
 
 ## Duvidas ainda em aberto
 
-Estas duvidas nao bloqueiam o plano, mas precisam ser fechadas antes das fases finais:
+Estas duvidas nao bloqueiam o estado local atual, mas precisam de fechamento antes do encerramento definitivo:
 
-1. `stats` dedicadas devem expor apenas visao operacional ou tambem um bloco bruto de diagnostico?
+1. `Nao moderadas` vira default do produto ou preferencia configuravel?
 2. qual `rootMargin` final entrega melhor equilibrio entre continuidade e churn no ambiente real?
-3. vale limitar `maxPages` na rota de moderacao ou isso piora scroll restoration para o time operacional?
-4. qual `getKey` do router representa melhor o retorno para a fila: pathname puro ou pathname + filtros criticos?
-5. o painel lateral deve prefetch do proximo item por teclado ja no `P1` ou isso fica para medicao posterior?
+3. vale limitar `maxPages` na rota de moderacao ou isso piora scroll restoration?
+4. `stats` devem expor somente visao operacional ou tambem contagens brutas em bloco separado?
+5. o painel lateral deve prefetch do proximo item pendente por teclado ou manter apenas o aquecimento do proximo item carregado?
 
 ## Recomendacao final
 
-O `P0` real da moderacao nao e trocar biblioteca nem reescrever a tela inteira.
+O proximo passo correto nao e abrir mais feature de moderacao.
 
-O `P0` real e:
+A ordem correta agora e:
 
-1. corrigir o contrato backend do feed para `effective state`;
-2. formalizar uma projecao cursor-safe para ordenacao operacional;
-3. separar `stats` do payload da primeira pagina;
-4. propagar `AbortSignal` e endurecer a `InfiniteQuery`;
-5. adicionar `X-Socket-ID` + `toOthers()` + dedupe por versao/tempo;
-6. parar de tratar thumbnail como `<img>` sem estado.
-
-Se essa ordem for seguida, a pagina sai do estado "funciona, mas pisca e confunde" para um estado operacional previsivel, com contrato consistente e base boa para refinamentos posteriores.
+1. publicar a release atual da moderacao em homolog;
+2. rodar o benchmark oficial no ambiente remoto e fechar JIT;
+3. ligar observabilidade minima da rota;
+4. levar a bateria atual para o CI;
+5. so depois abrir refinos opcionais de UX/performance guiados por medicao.

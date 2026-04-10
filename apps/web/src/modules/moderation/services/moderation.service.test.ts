@@ -137,4 +137,30 @@ describe('moderationService', () => {
 
     expect(postSpy).toHaveBeenCalledWith('/media/77/undo-decision');
   });
+
+  it('posts moderation route telemetry to the dedicated feed telemetry endpoint', async () => {
+    const postSpy = vi.spyOn(api, 'post').mockResolvedValue(null as never);
+
+    await moderationService.trackTelemetry({
+      event: 'filters_stabilized',
+      duration_ms: 180,
+      item_count: 24,
+      filters: {
+        status: 'pending_moderation',
+        per_page: 24,
+      },
+    });
+
+    expect(postSpy).toHaveBeenCalledWith('/media/feed/telemetry', {
+      body: {
+        event: 'filters_stabilized',
+        duration_ms: 180,
+        item_count: 24,
+        filters: {
+          status: 'pending_moderation',
+          per_page: 24,
+        },
+      },
+    });
+  });
 });

@@ -13,6 +13,7 @@ import PolaroidLayout from '../layouts/PolaroidLayout';
 import SpotlightLayout from '../layouts/SpotlightLayout';
 import SplitLayout from '../layouts/SplitLayout';
 import type { WallLayout, WallLayoutKind, WallRuntimeItem, WallSettings } from '../types';
+import PuzzleLayout from './puzzle/PuzzleLayout';
 import { getWallLayoutMotionTokens, type WallMotionTokens } from './motion';
 
 export interface WallLayoutCapabilities {
@@ -34,6 +35,8 @@ export interface WallLayoutRendererProps {
   videoControl?: MediaSurfaceVideoControlProps | null;
   slots?: (WallRuntimeItem | null)[];
   activeSlot?: number;
+  activeSlotIndexes?: number[];
+  maxStrongAnimations?: number;
 }
 
 export interface WallLayoutDefinition {
@@ -121,17 +124,24 @@ function withBoardRenderer(
   Component: ComponentType<{
     items: (WallRuntimeItem | null)[];
     activeSlot?: number;
+    activeSlotIndexes?: number[];
+    maxStrongAnimations?: number;
   }>,
 ): ComponentType<WallLayoutRendererProps> {
-  return function BoardLayoutRenderer({ slots = [], activeSlot = 0 }) {
+  return function BoardLayoutRenderer({
+    slots = [],
+    activeSlot = 0,
+    activeSlotIndexes = [],
+    maxStrongAnimations,
+  }) {
     return createElement(Component, {
       items: slots,
       activeSlot,
+      activeSlotIndexes,
+      maxStrongAnimations,
     });
   };
 }
-
-const PuzzleLayoutFallback = withSingleRenderer(FullscreenLayout);
 
 function defineLayout(
   id: WallLayout,
@@ -237,7 +247,7 @@ export const wallLayoutRegistry: Record<WallLayout, WallLayoutDefinition> = {
     'puzzle',
     'Quebra Cabeca',
     'board',
-    PuzzleLayoutFallback,
+    PuzzleLayout,
     boardLayoutCapabilities({
       supportsVideoPlayback: false,
       supportsVideoPosterOnly: false,

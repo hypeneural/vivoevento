@@ -5,11 +5,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import type { ApiWallOptionsResponse, ApiWallSettings } from '@/lib/api-types';
+import type { ApiWallOptionsResponse, ApiWallSettings, ApiWallThemeConfig } from '@/lib/api-types';
 
 import { HelpLabel, HelpTooltip } from '../../WallManagerHelp';
 import { WallManagerSection } from '../../WallManagerSection';
 import {
+  resolveManagerWallLayoutOption,
+  WALL_PUZZLE_ANCHOR_MODE_OPTIONS,
+  WALL_PUZZLE_BURST_INTENSITY_OPTIONS,
+  WALL_PUZZLE_PRESET_OPTIONS,
   WALL_SLIDER_FIELDS,
   WALL_TOGGLE_FIELDS,
   WALL_VIDEO_AUDIO_POLICY_OPTIONS,
@@ -35,6 +39,29 @@ export function WallAppearanceTab({
   videoPolicySummary,
   onDraftChange,
 }: WallAppearanceTabProps) {
+  const currentLayoutOption = resolveManagerWallLayoutOption(wallSettings.layout, options.layouts);
+  const layoutCapabilities = currentLayoutOption?.capabilities;
+  const layoutOptions = currentLayoutOption && !options.layouts.some((item) => item.value === currentLayoutOption.value)
+    ? [...options.layouts, currentLayoutOption]
+    : options.layouts;
+  const isPuzzleLayout = currentLayoutOption?.value === 'puzzle';
+  const supportsThemeConfig = Boolean(layoutCapabilities?.supports_theme_config);
+  const sideThumbnailsLocked = layoutCapabilities?.supports_side_thumbnails === false;
+  const themeConfig = {
+    ...currentLayoutOption?.defaults.theme_config,
+    ...wallSettings.theme_config,
+  } satisfies ApiWallThemeConfig;
+
+  function updateThemeConfig<K extends keyof ApiWallThemeConfig>(
+    key: K,
+    value: ApiWallThemeConfig[K],
+  ) {
+    onDraftChange('theme_config', {
+      ...themeConfig,
+      [key]: value,
+    });
+  }
+
   return (
     <>
       <WallManagerSection
@@ -119,11 +146,11 @@ export function WallAppearanceTab({
           <div className="space-y-2">
             <HelpLabel helpKey="layout" className="text-sm">Estilo da exibicao</HelpLabel>
             <Select value={wallSettings.layout} onValueChange={(value) => onDraftChange('layout', value)}>
-              <SelectTrigger>
+              <SelectTrigger data-testid="wall-layout-select">
                 <SelectValue placeholder="Selecione o estilo" />
               </SelectTrigger>
               <SelectContent>
-                {options.layouts.map((layout) => (
+                {layoutOptions.map((layout) => (
                   <SelectItem key={layout.value} value={layout.value}>{layout.label}</SelectItem>
                 ))}
               </SelectContent>
@@ -171,16 +198,118 @@ export function WallAppearanceTab({
             <div>
               <HelpLabel helpKey="sideThumbnails">Miniaturas laterais</HelpLabel>
               <p className="text-[11px] text-muted-foreground">
-                Exibe uma faixa com as proximas midias na lateral do telao, mantendo o publico engajado.
+                {sideThumbnailsLocked
+                  ? 'Este layout desliga miniaturas laterais para preservar o palco principal e o budget do board.'
+                  : 'Exibe uma faixa com as proximas midias na lateral do telao, mantendo o publico engajado.'}
               </p>
             </div>
             <Switch
+              data-testid="wall-side-thumbnails-switch"
               checked={wallSettings.show_side_thumbnails ?? true}
+              disabled={sideThumbnailsLocked}
               onCheckedChange={(checked) => onDraftChange('show_side_thumbnails', checked)}
             />
           </div>
         </div>
       </WallManagerSection>
+
+      {supportsThemeConfig ? (
+        <WallManagerSection
+          title="Configuracao do puzzle"
+          description="Esses controles modelam o board do puzzle sem abrir combinacoes que a v1 ainda nao suporta."
+        >
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
+              <p className="text-sm font-medium text-foreground">
+                Puzzle exibe imagens. Videos entram em layout individual de fallback.
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                Esta v1 nao usa video dentro das pecas, nao ativa blur pesado por slot e nao tenta face overlay client-side.
+              </p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <HelpLabel helpKey="layout" className="text-sm">Preset do mosaico</HelpLabel>
+                <Select
+                  value={themeConfig.preset ?? 'standard'}
+                  onValueChange={(value) => updateThemeConfig('preset', value)}
+                >
+                  <SelectTrigger data-testid="wall-puzzle-preset-select">
+                    <SelectValue placeholder="Selecione o preset" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WALL_PUZZLE_PRESET_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  {WALL_PUZZLE_PRESET_OPTIONS.find((option) => option.value === (themeConfig.preset ?? 'standard'))?.description}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <HelpLabel helpKey="layout" className="text-sm">Peca ancora</HelpLabel>
+                <Select
+                  value={themeConfig.anchor_mode ?? 'event_brand'}
+                  onValueChange={(value) => updateThemeConfig('anchor_mode', value)}
+                >
+                  <SelectTrigger data-testid="wall-puzzle-anchor-select">
+                    <SelectValue placeholder="Selecione a ancora" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WALL_PUZZLE_ANCHOR_MODE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  {WALL_PUZZLE_ANCHOR_MODE_OPTIONS.find((option) => option.value === (themeConfig.anchor_mode ?? 'event_brand'))?.description}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <HelpLabel helpKey="transition" className="text-sm">Intensidade do burst</HelpLabel>
+                <Select
+                  value={themeConfig.burst_intensity ?? 'normal'}
+                  onValueChange={(value) => updateThemeConfig('burst_intensity', value)}
+                >
+                  <SelectTrigger data-testid="wall-puzzle-burst-select">
+                    <SelectValue placeholder="Selecione a intensidade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WALL_PUZZLE_BURST_INTENSITY_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  {WALL_PUZZLE_BURST_INTENSITY_OPTIONS.find((option) => option.value === (themeConfig.burst_intensity ?? 'normal'))?.description}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/60 p-4">
+                <div>
+                  <HelpLabel helpKey="layout">Hero slot</HelpLabel>
+                  <p className="text-[11px] text-muted-foreground">
+                    Segura uma peca com maior permanencia visual para featured ou imagem ancora da cena.
+                  </p>
+                </div>
+                <Switch
+                  data-testid="wall-puzzle-hero-switch"
+                  checked={themeConfig.hero_enabled ?? true}
+                  onCheckedChange={(checked) => updateThemeConfig('hero_enabled', checked)}
+                />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border/60 bg-background/60 p-4 text-[11px] text-muted-foreground">
+              Sender e caption ficam fora das pecas na v1. Nao existe floating caption por slot neste tema.
+            </div>
+          </div>
+        </WallManagerSection>
+      ) : null}
 
       <WallManagerSection
         title={(
@@ -319,25 +448,38 @@ export function WallAppearanceTab({
               </p>
             </div>
 
-            <div className="space-y-2">
-              <HelpLabel helpKey="videoMultiLayoutPolicy" className="text-sm">Video em multi-slot</HelpLabel>
-              <Select
-                value={wallSettings.video_multi_layout_policy}
-                onValueChange={(value) => onDraftChange('video_multi_layout_policy', value)}
+            {isPuzzleLayout ? (
+              <div
+                data-testid="wall-video-multi-layout-locked"
+                className="space-y-2 rounded-2xl border border-border/60 bg-background/60 p-4"
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a regra" />
-                </SelectTrigger>
-                <SelectContent>
-                  {WALL_VIDEO_MULTI_LAYOUT_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-[11px] text-muted-foreground">
-                {WALL_VIDEO_MULTI_LAYOUT_OPTIONS.find((option) => option.value === wallSettings.video_multi_layout_policy)?.description}
-              </p>
-            </div>
+                <HelpLabel helpKey="videoMultiLayoutPolicy" className="text-sm">Video em multi-slot</HelpLabel>
+                <p className="text-sm font-medium text-foreground">Travado em nao permitir</p>
+                <p className="text-[11px] text-muted-foreground">
+                  O puzzle nao abre video dentro do board. Quando a midia atual for video, o wall cai para o fallback single-item.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <HelpLabel helpKey="videoMultiLayoutPolicy" className="text-sm">Video em multi-slot</HelpLabel>
+                <Select
+                  value={wallSettings.video_multi_layout_policy}
+                  onValueChange={(value) => onDraftChange('video_multi_layout_policy', value)}
+                >
+                  <SelectTrigger data-testid="wall-video-multi-layout-select">
+                    <SelectValue placeholder="Selecione a regra" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WALL_VIDEO_MULTI_LAYOUT_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  {WALL_VIDEO_MULTI_LAYOUT_OPTIONS.find((option) => option.value === wallSettings.video_multi_layout_policy)?.description}
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <HelpLabel helpKey="videoPreferredVariant" className="text-sm">Variante preferida</HelpLabel>

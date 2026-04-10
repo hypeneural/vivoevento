@@ -7,21 +7,10 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-
-function shouldReduceForHardware(): boolean {
-  if (typeof navigator === 'undefined') return false;
-
-  const deviceMemory = 'deviceMemory' in navigator
-    ? Number((navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 0)
-    : 0;
-
-  const hardwareConcurrency = 'hardwareConcurrency' in navigator
-    ? Number(navigator.hardwareConcurrency ?? 0)
-    : 0;
-
-  return (deviceMemory > 0 && deviceMemory <= 4)
-    || (hardwareConcurrency > 0 && hardwareConcurrency <= 4);
-}
+import {
+  resolveWallPerformanceTier,
+  resolveWallRuntimeBudget,
+} from '../runtime-capabilities';
 
 export function usePerformanceMode() {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
@@ -38,13 +27,34 @@ export function usePerformanceMode() {
     };
   }, []);
 
+  const performanceTier = useMemo(() => {
+    const deviceMemory = 'deviceMemory' in navigator
+      ? Number((navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 0)
+      : 0;
+    const hardwareConcurrency = 'hardwareConcurrency' in navigator
+      ? Number(navigator.hardwareConcurrency ?? 0)
+      : 0;
+
+    return resolveWallPerformanceTier({
+      prefersReducedMotion,
+      deviceMemoryGb: deviceMemory > 0 ? deviceMemory : null,
+      hardwareConcurrency: hardwareConcurrency > 0 ? hardwareConcurrency : null,
+    });
+  }, [prefersReducedMotion]);
+
   const reducedEffects = useMemo(
-    () => prefersReducedMotion || shouldReduceForHardware(),
-    [prefersReducedMotion],
+    () => performanceTier === 'performance',
+    [performanceTier],
+  );
+  const runtimeBudget = useMemo(
+    () => resolveWallRuntimeBudget(performanceTier),
+    [performanceTier],
   );
 
   return {
     reducedEffects,
+    performanceTier,
+    runtimeBudget,
     modeLabel: reducedEffects ? 'Performance' : 'Premium',
   };
 }

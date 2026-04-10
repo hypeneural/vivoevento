@@ -167,6 +167,83 @@ O que esta bateria do PR 2 travou:
 - `WallPlayerRoot` deixa de hardcode de side thumbnails por nome de layout e passa a respeitar `kind`/capability do registry;
 - `layoutStrategy` passa a tratar `puzzle` como multi-layout com fallback de video para `cinematic`.
 
+### Validacao da Fase 3 - board subsystem foundation - 2026-04-10
+
+Frontend:
+
+- `cd apps/web && npm run test -- src/modules/wall/player/themes/board/BoardSelectionPolicy.test.ts src/modules/wall/player/themes/board/BoardBurstScheduler.test.ts src/modules/wall/player/themes/board/useWallBoard.test.ts src/modules/wall/player/wall-theme-architecture-characterization.test.ts src/modules/wall/player/components/LayoutRenderer.video-multi-layout.test.tsx src/modules/wall/player/components/WallPlayerRoot.test.tsx`
+  - `6 arquivos`
+  - `19 testes`
+  - `PASS`
+- `cd apps/web && npm run test -- src/modules/wall`
+  - `50 arquivos`
+  - `261 testes`
+  - `PASS`
+- `cd apps/web && npm run type-check`
+  - `PASS`
+
+O que esta bateria da fase 3 travou:
+
+- `LayoutRenderer` passa a usar `useWallBoard` no caminho principal dos layouts `board`, em vez de depender de `useMultiSlot`;
+- o board ganha identidade formal via `boardInstanceKey` com `eventId`, `layout`, `preset`, `themeVersion`, `performanceTier` e `reducedMotion`;
+- updates incrementais de fila deixam de resetar o board quando a identidade nao muda;
+- mudancas de `preset` ou `performanceTier` resetam o board de forma explicita;
+- o scheduler passa a preencher vazio antes de substituir slot ocupado, preservar ancora, segurar featured por mais tempo e evitar troca de slots adjacentes quando houver alternativa;
+- a politica de selecao passa a evitar duplicata visivel de sender quando existe outra opcao pronta na pool.
+
+### Validacao da Fase 4 - readiness, hot window e runtime budget - 2026-04-10
+
+Frontend:
+
+- `cd apps/web && npm run test -- src/modules/wall/player/engine/readiness.test.ts src/modules/wall/player/engine/preload.test.ts src/modules/wall/player/engine/cache.test.ts src/modules/wall/player/hooks/usePerformanceMode.test.ts src/modules/wall/player/hooks/useWallPlayer.test.tsx src/modules/wall/player/hooks/useWallEngine.test.tsx src/modules/wall/player/components/WallPlayerRoot.test.tsx`
+  - `7 arquivos`
+  - `39 testes`
+  - `PASS`
+- `cd apps/web && npm run test -- src/modules/wall`
+  - `52 arquivos`
+  - `268 testes`
+  - `PASS`
+- `cd apps/web && npm run type-check`
+  - `PASS`
+
+O que esta bateria da fase 4 travou:
+
+- a trilha generica de probe de imagem deixa de confiar so em `onload` e passa a usar `decode()` como readiness real;
+- `cache.ts` passa a usar a mesma semantica de readiness do preload, em vez de manter duas definicoes diferentes de "asset pronto";
+- o player ganha `readiness.ts` com janela quente limitada por `layout` e `runtime budget`, em vez de aquecer a fila inteira;
+- `fetchPriority` alto fica reservado para `current`, `anchor` e `next-burst`, preservando prioridade da peca que entra agora;
+- o budget operacional fecha `6` pecas / `1` decode para tier `performance` e `9` pecas / `2` decodes para tier `premium`;
+- `usePerformanceMode` passa a devolver `performanceTier` e `runtimeBudget`, em vez de so um booleano de reduced effects;
+- layouts `board` passam a respeitar `maxStrongAnimations` por tier no runtime visual, em vez de animar forte todo slot ativo;
+- updates de midia vindos por realtime continuam entrando sem refetch completo de boot.
+
+### Validacao da Fase 5 - `PuzzleLayout` image-only e gates de video - 2026-04-10
+
+Frontend:
+
+- `cd apps/web && npm run test -- src/modules/wall/player/themes/board/board-utils.test.ts src/modules/wall/player/layouts/GridLayout.test.tsx src/modules/wall/player/engine/layoutStrategy.test.ts src/modules/wall/player/components/LayoutRenderer.video-multi-layout.test.tsx src/modules/wall/player/themes/shared/ThemeMediaSurface.test.tsx src/modules/wall/player/themes/puzzle/PuzzlePiece.test.tsx src/modules/wall/player/themes/puzzle/usePuzzleBoard.test.ts src/modules/wall/player/themes/puzzle/PuzzleLayout.test.tsx`
+  - `8 arquivos`
+  - `42 testes`
+  - `PASS`
+- `cd apps/web && npm run test -- src/modules/wall`
+  - `58 arquivos`
+  - `282 testes`
+  - `PASS`
+- `cd apps/web && npm run type-check`
+  - `PASS`
+
+O que esta bateria da fase 5 travou:
+
+- `PuzzleLayout` entra como renderer real do registry, em vez de fallback cosmetico para layout existente;
+- o `puzzle` usa `usePuzzleBoard` sobre a fundacao de `useWallBoard`, preservando o board em update incremental de fila;
+- o preset `compact` fecha `6` pecas e o `standard` fecha `9`, com ancora opcional sem criar um segundo renderer;
+- os shapes usam `clipPathUnits="objectBoundingBox"` e `defs` deduplicados por variante, em vez de um SVG completo por slot;
+- drift roda fora do render React via `useAnimationFrame + useMotionValue + useSpring`, sem loop de `setState` por frame;
+- `ThemeMediaSurface` e poster-only para video e o board `puzzle` nunca monta `<video>`;
+- `layoutStrategy` agora derruba qualquer video em `puzzle` para fallback single-item `cinematic`, mesmo se `video_multi_layout_policy=all`;
+- o fallback de video no caminho `puzzle` continua usando a trilha controlada de `WallVideoSurface`, com somente `1` `<video>` montado;
+- o runtime visual passa a limitar slots com animacao forte por tier tambem nos layouts de board ja existentes.
+
 ### Leituras oficiais validadas
 
 Motion:
@@ -594,38 +671,38 @@ Arquivos-alvo:
 
 Subtarefas:
 
-- [ ] definir modelo de slot, ocupacao e idade do slot;
-- [ ] definir scheduler de burst com:
+- [x] definir modelo de slot, ocupacao e idade do slot;
+- [x] definir scheduler de burst com:
   - preenchimento de slot vazio;
   - preservacao de ancora;
   - preservacao maior de featured;
   - substituicao do slot mais antigo elegivel;
   - limite de trocas por burst;
   - bloqueio de trocas adjacentes no mesmo burst.
-- [ ] definir selecao sem duplicata visivel de sender quando houver alternativa;
-- [ ] formalizar `boardInstanceKey` com:
+- [x] definir selecao sem duplicata visivel de sender quando houver alternativa;
+- [x] formalizar `boardInstanceKey` com:
   - `eventId`
   - `layout`
   - `preset`
   - `themeVersion`
   - `performanceTier`
   - `reducedMotion`
-- [ ] preservar board em updates comuns de fila;
-- [ ] resetar board apenas quando a identidade acima mudar.
+- [x] preservar board em updates comuns de fila;
+- [x] resetar board apenas quando a identidade acima mudar.
 
 ### Bateria TDD da fase 3
 
-- [ ] criar `apps/web/src/modules/wall/player/themes/board/useWallBoard.test.ts`
-- [ ] criar `apps/web/src/modules/wall/player/themes/board/BoardBurstScheduler.test.ts`
-- [ ] criar `apps/web/src/modules/wall/player/themes/board/BoardSelectionPolicy.test.ts`
+- [x] criar `apps/web/src/modules/wall/player/themes/board/useWallBoard.test.ts`
+- [x] criar `apps/web/src/modules/wall/player/themes/board/BoardBurstScheduler.test.ts`
+- [x] criar `apps/web/src/modules/wall/player/themes/board/BoardSelectionPolicy.test.ts`
 
 Cenarios obrigatorios:
 
-- [ ] item novo preenche vazio antes de substituir slot ocupado;
-- [ ] featured permanece mais tempo que item comum;
-- [ ] board nao reseta em update incremental de fila;
-- [ ] board reseta quando muda `preset` ou `performanceTier`;
-- [ ] scheduler evita trocar dois vizinhos no mesmo burst quando houver alternativa.
+- [x] item novo preenche vazio antes de substituir slot ocupado;
+- [x] featured permanece mais tempo que item comum;
+- [x] board nao reseta em update incremental de fila;
+- [x] board reseta quando muda `preset` ou `performanceTier`;
+- [x] scheduler evita trocar dois vizinhos no mesmo burst quando houver alternativa.
 
 ## Fase 4 - Readiness de asset, cache quente e budget de runtime
 
@@ -644,18 +721,18 @@ Arquivos-alvo:
 
 Subtarefas:
 
-- [ ] separar `network_ready` de `decode_ready`;
-- [ ] trocar a trilha generica de probe de imagem para `decode()` quando disponivel;
-- [ ] criar janela quente:
+- [x] separar `network_ready` de `decode_ready`;
+- [x] trocar a trilha generica de probe de imagem para `decode()` quando disponivel;
+- [x] criar janela quente:
   - pecas visiveis;
   - ancora;
   - candidatos do proximo burst.
-- [ ] usar `fetchpriority="high"` so para ancora, hero e proximo burst;
-- [ ] limitar concurrent decode por tier;
-- [ ] limitar slots entrando em animacao forte por tier;
-- [ ] registrar budget de runtime para `6` e `9` pecas;
-- [ ] integrar budget ao `usePerformanceMode`;
-- [ ] nao exigir refetch completo da fila para reagir a item novo.
+- [x] usar `fetchpriority="high"` so para ancora, hero e proximo burst;
+- [x] limitar concurrent decode por tier;
+- [x] limitar slots entrando em animacao forte por tier;
+- [x] registrar budget de runtime para `6` e `9` pecas;
+- [x] integrar budget ao `usePerformanceMode`;
+- [x] nao exigir refetch completo da fila para reagir a item novo.
 
 Budget inicial da v1:
 
@@ -663,24 +740,29 @@ Budget inicial da v1:
   - `6` pecas
   - `1` decode simultaneo
   - `1` troca por burst
+  - `1` slot com animacao forte
 - FHD padrao:
   - `9` pecas
   - `2` decodes simultaneos
   - `2` trocas por burst
+  - `2` slots com animacao forte
 
 ### Bateria TDD da fase 4
 
-- [ ] ampliar `apps/web/src/modules/wall/player/engine/preload.test.ts`
-- [ ] ampliar `apps/web/src/modules/wall/player/engine/cache.test.ts`
-- [ ] criar `apps/web/src/modules/wall/player/engine/readiness.test.ts`
-- [ ] criar `apps/web/src/modules/wall/player/hooks/usePerformanceMode.test.ts`
+- [x] ampliar `apps/web/src/modules/wall/player/engine/preload.test.ts`
+- [x] ampliar `apps/web/src/modules/wall/player/engine/cache.test.ts`
+- [x] criar `apps/web/src/modules/wall/player/engine/readiness.test.ts`
+- [x] criar `apps/web/src/modules/wall/player/hooks/usePerformanceMode.test.ts`
+- [x] criar `apps/web/src/modules/wall/player/themes/board/board-utils.test.ts`
+- [x] criar `apps/web/src/modules/wall/player/layouts/GridLayout.test.tsx`
 
 Cenarios obrigatorios:
 
-- [ ] imagem so entra como `ready` depois de `decode`;
-- [ ] asset de futuro nao rouba prioridade da peca que entra agora;
-- [ ] janela quente nao tenta aquecer fila inteira;
-- [ ] board continua reagindo a evento realtime sem refetch completo.
+- [x] imagem so entra como `ready` depois de `decode`;
+- [x] asset de futuro nao rouba prioridade da peca que entra agora;
+- [x] janela quente nao tenta aquecer fila inteira;
+- [x] layouts de board respeitam budget de animacao forte por tier;
+- [x] board continua reagindo a evento realtime sem refetch completo.
 
 ## Fase 5 - Implementar `Quebra Cabeca` v1
 
@@ -702,19 +784,19 @@ Arquivos-alvo:
 
 Subtarefas:
 
-- [ ] criar preset `compact` com `6` pecas;
-- [ ] criar preset `standard` com `9` pecas;
-- [ ] criar peca ancora central opcional;
-- [ ] criar `clipPath` com `clipPathUnits="objectBoundingBox"`;
-- [ ] deduplicar `defs` por variante de shape;
-- [ ] limitar catalogo inicial a poucas variantes de shape;
-- [ ] implementar drift e micro-burst via `MotionValue + useSpring + useAnimationFrame/useAnimate`;
-- [ ] bloquear video dentro do tema e cair para `cinematic` via capability `fallbackVideoLayout`;
-- [ ] garantir que fallback de video use `WallVideoSurface`, nao `<video>` cru;
-- [ ] garantir `maxSimultaneousVideos=0` dentro do board;
-- [ ] bloquear side thumbnails enquanto `layout=puzzle`;
-- [ ] bloquear floating caption por peca;
-- [ ] manter sender/caption apenas em ancora ou barra externa, se necessario.
+- [x] criar preset `compact` com `6` pecas;
+- [x] criar preset `standard` com `9` pecas;
+- [x] criar peca ancora central opcional;
+- [x] criar `clipPath` com `clipPathUnits="objectBoundingBox"`;
+- [x] deduplicar `defs` por variante de shape;
+- [x] limitar catalogo inicial a poucas variantes de shape;
+- [x] implementar drift fora do render React via `MotionValue + useSpring + useAnimationFrame` e manter burst declarativo por motion;
+- [x] bloquear video dentro do tema e cair para `cinematic` via capability `fallbackVideoLayout`;
+- [x] garantir que fallback de video use `WallVideoSurface`, nao `<video>` cru;
+- [x] garantir `maxSimultaneousVideos=0` dentro do board;
+- [x] bloquear side thumbnails em runtime enquanto `layout=puzzle`;
+- [x] bloquear floating caption por peca;
+- [x] manter sender/caption apenas em ancora ou barra externa, se necessario.
 
 Regras da v1:
 
@@ -726,22 +808,23 @@ Regras da v1:
 
 ### Bateria TDD da fase 5
 
-- [ ] criar `apps/web/src/modules/wall/player/themes/puzzle/PuzzleLayout.test.tsx`
-- [ ] criar `apps/web/src/modules/wall/player/themes/puzzle/PuzzlePiece.test.tsx`
-- [ ] criar `apps/web/src/modules/wall/player/themes/puzzle/usePuzzleBoard.test.ts`
-- [ ] criar `apps/web/src/modules/wall/player/themes/shared/ThemeMediaSurface.test.tsx`
-- [ ] ampliar `apps/web/src/modules/wall/player/engine/layoutStrategy.test.ts`
+- [x] criar `apps/web/src/modules/wall/player/themes/puzzle/PuzzleLayout.test.tsx`
+- [x] criar `apps/web/src/modules/wall/player/themes/puzzle/PuzzlePiece.test.tsx`
+- [x] criar `apps/web/src/modules/wall/player/themes/puzzle/usePuzzleBoard.test.ts`
+- [x] criar `apps/web/src/modules/wall/player/themes/shared/ThemeMediaSurface.test.tsx`
+- [x] ampliar `apps/web/src/modules/wall/player/engine/layoutStrategy.test.ts`
+- [x] ampliar `apps/web/src/modules/wall/player/components/LayoutRenderer.video-multi-layout.test.tsx`
 
 Cenarios obrigatorios:
 
-- [ ] `layout=puzzle` cai para fallback single-item quando a midia atual for video;
-- [ ] fallback de video no `puzzle` monta somente `1` `<video>`;
-- [ ] fallback de video no `puzzle` usa poster-first/control path da `WallVideoSurface`;
-- [ ] board `puzzle` nunca monta `<video>` em slot;
-- [ ] preset `standard` usa `9` slots e `compact` usa `6`;
-- [ ] troca incremental nao remonta o board inteiro;
-- [ ] drift nao depende de `setState` por frame;
-- [ ] shape e referenciado por `defs` deduplicados, nao por SVG unico por slot.
+- [x] `layout=puzzle` cai para fallback single-item quando a midia atual for video;
+- [x] fallback de video no `puzzle` monta somente `1` `<video>`;
+- [x] fallback de video no `puzzle` usa poster-first/control path da `WallVideoSurface`;
+- [x] board `puzzle` nunca monta `<video>` em slot;
+- [x] preset `standard` usa `9` slots e `compact` usa `6`;
+- [x] troca incremental nao remonta o board inteiro;
+- [x] drift nao depende de `setState` por frame;
+- [x] shape e referenciado por `defs` deduplicados, nao por SVG unico por slot.
 
 ## Fase 6 - Manager, preview e bloqueio de capabilities
 
@@ -1091,16 +1174,16 @@ O `Quebra Cabeca` so deve ser considerado pronto quando:
 - [x] `puzzle.capabilities.maxSimultaneousVideos = 0`;
 - [x] `puzzle.capabilities.fallbackVideoLayout = cinematic`;
 - [x] player tem `MotionConfig` e contrato global de motion;
-- [ ] `puzzle` usa fundacao de board, nao `useMultiSlot` remendado;
-- [ ] readiness de imagem depende de `decode()`, nao so de `load`;
-- [ ] cache aquece apenas a janela quente do board;
-- [ ] realtime continua atualizando a fila sem refetch completo;
+- [x] `puzzle` usa fundacao de board, nao `useMultiSlot` remendado;
+- [x] readiness de imagem depende de `decode()`, nao so de `load`;
+- [x] cache aquece apenas a janela quente do board;
+- [x] realtime continua atualizando a fila sem refetch completo;
 - [ ] preview e player batem no mesmo preset;
 - [ ] manager bloqueia video e outras capabilities incompativeis;
-- [ ] `puzzle` nao monta `<video>` dentro do board;
-- [ ] video elegivel em `puzzle` cai para fallback single-item com `WallVideoSurface`;
+- [x] `puzzle` nao monta `<video>` dentro do board;
+- [x] video elegivel em `puzzle` cai para fallback single-item com `WallVideoSurface`;
 - [ ] `maxSimultaneousVideos` default do produto continua `1`;
-- [ ] board so reseta quando a identidade oficial muda;
+- [x] board so reseta quando a identidade oficial muda;
 - [ ] em FHD padrao com `9` pecas o layout se mantem fluido e sem loading visivel reentrante;
 - [ ] rollout interno passou por pelo menos um evento controlado.
 

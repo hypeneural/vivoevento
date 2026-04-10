@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { fallbackOptions } from './manager-config';
+import { fallbackOptions, PUZZLE_LAYOUT_FALLBACK_OPTION } from './manager-config';
 import {
+  applyWallLayoutCapabilities,
   areWallSettingsEqual,
   cloneWallSettings,
   prepareWallSettingsPayload,
+  resolveManagedWallSettings,
 } from './wall-settings';
 import type { ApiWallSettings } from '@/lib/api-types';
 
@@ -102,5 +104,38 @@ describe('wall settings theme config helpers', () => {
       supports_theme_config: false,
     });
     expect(fallbackOptions.layouts.some((layout) => layout.value === 'puzzle')).toBe(false);
+  });
+
+  it('applies puzzle defaults and capability locks without losing theme_config stability', () => {
+    const resolved = applyWallLayoutCapabilities({
+      ...baseSettings,
+      show_side_thumbnails: true,
+      video_multi_layout_policy: 'all',
+      theme_config: {},
+    }, PUZZLE_LAYOUT_FALLBACK_OPTION);
+
+    expect(resolved.show_side_thumbnails).toBe(false);
+    expect(resolved.video_multi_layout_policy).toBe('disallow');
+    expect(resolved.theme_config).toEqual({
+      preset: 'standard',
+      anchor_mode: 'event_brand',
+      burst_intensity: 'normal',
+      hero_enabled: true,
+      video_behavior: 'fallback_single_item',
+    });
+  });
+
+  it('resolves managed wall settings with a synthetic puzzle option when the rollout fallback list is active', () => {
+    const resolved = resolveManagedWallSettings({
+      ...baseSettings,
+      show_side_thumbnails: true,
+      video_multi_layout_policy: 'one',
+      theme_config: {},
+    }, fallbackOptions.layouts);
+
+    expect(resolved.layout).toBe('puzzle');
+    expect(resolved.show_side_thumbnails).toBe(false);
+    expect(resolved.video_multi_layout_policy).toBe('disallow');
+    expect(resolved.theme_config.preset).toBe('standard');
   });
 });

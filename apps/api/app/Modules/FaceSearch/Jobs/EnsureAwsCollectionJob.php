@@ -5,12 +5,13 @@ namespace App\Modules\FaceSearch\Jobs;
 use App\Modules\Events\Models\Event;
 use App\Modules\FaceSearch\Services\AwsRekognitionFaceSearchBackend;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class EnsureAwsCollectionJob implements ShouldQueue
+class EnsureAwsCollectionJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable;
     use InteractsWithQueue;
@@ -20,11 +21,17 @@ class EnsureAwsCollectionJob implements ShouldQueue
     public int $tries = 3;
     public int $timeout = 90;
     public int $backoff = 20;
+    public int $uniqueFor = 900;
 
     public function __construct(
         public readonly int $eventId,
     ) {
         $this->onQueue('face-index');
+    }
+
+    public function uniqueId(): string
+    {
+        return "face-search-ensure-aws:{$this->eventId}";
     }
 
     public function handle(AwsRekognitionFaceSearchBackend $backend): void

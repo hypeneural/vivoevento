@@ -41,8 +41,10 @@ describe('resolveRenderableLayout', () => {
     expect(resolveRenderableLayout('carousel', makeMedia({ type: 'video' }), 'one')).toBe('carousel');
   });
 
-  it('treats puzzle as a board layout and falls back to cinematic for video when multi-slot playback is disallowed', () => {
+  it('treats puzzle as a board layout and always falls back to cinematic for current video playback', () => {
     expect(resolveRenderableLayout('puzzle', makeMedia({ type: 'video' }))).toBe('cinematic');
+    expect(resolveRenderableLayout('puzzle', makeMedia({ type: 'video' }), 'one')).toBe('cinematic');
+    expect(resolveRenderableLayout('puzzle', makeMedia({ type: 'video' }), 'all')).toBe('cinematic');
   });
 
   // ─── Horizontal ──────────────────────────────

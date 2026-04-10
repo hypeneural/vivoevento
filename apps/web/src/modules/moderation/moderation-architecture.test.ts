@@ -83,4 +83,27 @@ describe('moderation architecture', () => {
       .toContain('Pendentes restantes')
       .toContain('Posicao atual');
   });
+
+  it('keeps "Nao moderadas" as the default operational recorte and restores it when clearing filters', () => {
+    const currentDirectory = dirname(fileURLToPath(import.meta.url));
+    const source = readFileSync(resolve(currentDirectory, 'ModerationPage.tsx'), 'utf8');
+
+    expect(source)
+      .toContain("const DEFAULT_STATUS_FILTER: ModerationStatusFilter = 'pending_moderation'")
+      .toContain("useState<string>(DEFAULT_STATUS_FILTER)")
+      .toContain("setStatusFilter(DEFAULT_STATUS_FILTER)");
+  });
+
+  it('wires moderation route telemetry for feed, detail, pagination and incoming queue churn', () => {
+    const currentDirectory = dirname(fileURLToPath(import.meta.url));
+    const source = readFileSync(resolve(currentDirectory, 'ModerationPage.tsx'), 'utf8');
+
+    expect(source)
+      .toContain('moderationService.trackTelemetry')
+      .toContain("event: 'feed_first_page_loaded'")
+      .toContain("event: 'filters_stabilized'")
+      .toContain("event: 'feed_next_page_loaded'")
+      .toContain("event: 'detail_loaded'")
+      .toContain("event: 'incoming_queue_changed'");
+  });
 });

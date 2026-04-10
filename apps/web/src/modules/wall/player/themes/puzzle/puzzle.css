@@ -1,0 +1,66 @@
+.puzzle-board {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  gap: clamp(10px, 1vw, 18px);
+  padding: clamp(18px, 2vw, 28px);
+  background:
+    radial-gradient(circle at top left, rgba(249, 115, 22, 0.24), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.16), transparent 22%),
+    linear-gradient(160deg, #040404 0%, #101218 100%);
+}
+
+.puzzle-board[data-preset='compact'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.puzzle-board[data-preset='standard'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+}
+
+.puzzle-piece-shell {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 28px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.puzzle-piece-outline {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 28px;
+  pointer-events: none;
+}
+
+.puzzle-anchor {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: clamp(16px, 2vw, 24px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.18)),
+    radial-gradient(circle at top, rgba(250, 204, 21, 0.24), transparent 38%),
+    linear-gradient(145deg, rgba(11, 15, 25, 0.96), rgba(27, 24, 42, 0.88));
+}
+
+.puzzle-anchor-kicker {
+  font-size: clamp(0.72rem, 0.9vw, 0.94rem);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.puzzle-anchor-title {
+  margin-top: 0.45rem;
+  font-size: clamp(1.4rem, 2vw, 2.4rem);
+  line-height: 1.05;
+  color: #fff7ed;
+}

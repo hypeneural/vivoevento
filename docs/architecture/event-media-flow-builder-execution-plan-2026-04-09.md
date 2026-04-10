@@ -1231,6 +1231,34 @@ cd apps/api
 php artisan test --filter=UpdateEventJourneyRequestTest
 ```
 
+Status em `2026-04-10`:
+
+- [x] `UpdateEventJourneyRequest` criado;
+- [x] o request agrega validacao de `moderation_mode`, `modules`, `intake_defaults`, `intake_channels`, `content_moderation` e `media_intelligence`;
+- [x] as regras cruzadas foram implementadas via `after()`, alinhadas ao padrao oficial de `FormRequest` do Laravel;
+- [x] `media_intelligence.mode=gate` exige `fallback_mode=review`;
+- [x] `telegram.enabled=true` exige `bot_username` e `media_inbox_code`;
+- [x] `whatsapp_direct.enabled=true` exige `media_inbox_code`;
+- [x] TTL de canais continua protegido entre `1` e `4320`;
+- [x] `reply_text_mode=fixed_random` exige ao menos um template;
+- [x] `modules.wall=true` falha quando o evento nao tem entitlement para wall;
+- [x] `whatsapp_instance_id` falha quando a instancia nao pertence a mesma organizacao do evento;
+- [x] validacao do `provider_key/model_key` de OpenRouter foi reaproveitada no patch agregador;
+- [x] o request esta pronto para ser usado no `PATCH /events/{event}/journey-builder` da `Tarefa 1.6`.
+
+Bateria validada em `2026-04-10`:
+
+```bash
+cd apps/api
+php artisan test tests/Unit/Events/UpdateEventJourneyRequestTest.php
+php artisan test tests/Unit/Events/UpdateEventJourneyRequestTest.php tests/Feature/Events/EventJourneyControllerTest.php tests/Unit/Events/EventJourneyProjectionDataTest.php tests/Unit/Events/BuildEventJourneySummaryActionTest.php tests/Unit/Events/BuildEventJourneyProjectionActionTest.php tests/Feature/Events/EventJourneyArchitectureCharacterizationTest.php tests/Feature/Events/EventIntakeChannelsTest.php tests/Feature/Events/EventIntakeChannelsTelegramPrivateTest.php tests/Feature/ContentModeration/ContentModerationSettingsTest.php tests/Feature/MediaIntelligence/MediaIntelligenceSettingsTest.php
+```
+
+Resultado:
+
+- bateria unitária do request passou com `10` testes e `13` assertions;
+- regressão ampliada passou com `54` testes e `362` assertions.
+
 ### Tarefa 1.6 - Criar `UpdateEventJourneyAction`
 
 Subtarefas:

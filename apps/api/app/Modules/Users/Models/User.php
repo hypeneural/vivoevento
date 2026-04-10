@@ -64,11 +64,30 @@ class User extends Authenticatable
         return $this->hasMany(\App\Modules\Organizations\Models\OrganizationMember::class);
     }
 
+    public function eventTeamMembers(): HasMany
+    {
+        return $this->hasMany(\App\Modules\EventTeam\Models\EventTeamMember::class);
+    }
+
     /**
      * Get the user's current/default organization.
      */
     public function currentOrganization(): ?\App\Modules\Organizations\Models\Organization
     {
+        $activeContext = $this->preferences['active_context'] ?? null;
+
+        if (is_array($activeContext) && ($activeContext['type'] ?? null) === 'event') {
+            return null;
+        }
+
+        $preferredOrganizationId = is_array($activeContext) && ($activeContext['type'] ?? null) === 'organization'
+            ? (int) ($activeContext['organization_id'] ?? 0)
+            : 0;
+
+        if ($preferredOrganizationId > 0) {
+            return $this->organizations()->where('organizations.id', $preferredOrganizationId)->first();
+        }
+
         return $this->organizations()->first();
     }
 }

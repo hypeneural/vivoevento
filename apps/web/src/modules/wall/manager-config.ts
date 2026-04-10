@@ -4,6 +4,9 @@ import type {
   ApiWallOptionsResponse,
   ApiWallSelectionModeOption,
   ApiWallSettings,
+  ApiWallThemeAnchorMode,
+  ApiWallThemeBurstIntensity,
+  ApiWallThemePreset,
   ApiWallVideoAudioPolicy,
   ApiWallVideoMultiLayoutPolicy,
   ApiWallVideoPlaybackMode,
@@ -42,6 +45,30 @@ const multiLayoutMetadata = {
     theme_config: {},
   },
 } satisfies Pick<ApiWallLayoutOption, 'capabilities' | 'defaults'>;
+
+export const PUZZLE_LAYOUT_FALLBACK_OPTION: ApiWallLayoutOption = {
+  value: 'puzzle',
+  label: 'Quebra Cabeca',
+  capabilities: {
+    supports_video_playback: false,
+    supports_video_poster_only: false,
+    supports_multi_video: false,
+    max_simultaneous_videos: 0,
+    fallback_video_layout: 'cinematic',
+    supports_side_thumbnails: false,
+    supports_floating_caption: false,
+    supports_theme_config: true,
+  },
+  defaults: {
+    theme_config: {
+      preset: 'standard',
+      anchor_mode: 'event_brand',
+      burst_intensity: 'normal',
+      hero_enabled: true,
+      video_behavior: 'fallback_single_item',
+    },
+  },
+};
 
 export const fallbackOptions: ApiWallOptionsResponse = {
   layouts: [
@@ -185,6 +212,23 @@ export const fallbackOptions: ApiWallOptionsResponse = {
     },
   ],
 };
+
+export function resolveManagerWallLayoutOption(
+  layout: ApiWallLayoutOption['value'],
+  layouts: ApiWallLayoutOption[] = fallbackOptions.layouts,
+): ApiWallLayoutOption | null {
+  const resolved = layouts.find((item) => item.value === layout);
+
+  if (resolved) {
+    return resolved;
+  }
+
+  if (layout === 'puzzle') {
+    return PUZZLE_LAYOUT_FALLBACK_OPTION;
+  }
+
+  return null;
+}
 
 export const HELP_TEXTS = {
   realtime: {
@@ -511,6 +555,62 @@ export const WALL_VIDEO_PREFERRED_VARIANT_OPTIONS: Array<{
     value: 'original',
     label: 'Arquivo original',
     description: 'Permite fallback para o arquivo original quando a policy aceitar.',
+  },
+];
+
+export const WALL_PUZZLE_PRESET_OPTIONS: Array<{
+  value: ApiWallThemePreset;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'compact',
+    label: 'Compacto',
+    description: 'Usa 6 pecas e segura melhor hardware mais fraco.',
+  },
+  {
+    value: 'standard',
+    label: 'Padrao',
+    description: 'Usa 9 pecas e entrega a composicao principal da v1.',
+  },
+];
+
+export const WALL_PUZZLE_ANCHOR_MODE_OPTIONS: Array<{
+  value: ApiWallThemeAnchorMode;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'event_brand',
+    label: 'Marca do evento',
+    description: 'Mantem uma peca ancora editorial com a marca do evento.',
+  },
+  {
+    value: 'qr_prompt',
+    label: 'Convite com QR',
+    description: 'Usa a ancora como CTA para enviar foto ao vivo.',
+  },
+  {
+    value: 'none',
+    label: 'Sem ancora',
+    description: 'Preenche o board apenas com imagens da fila.',
+  },
+];
+
+export const WALL_PUZZLE_BURST_INTENSITY_OPTIONS: Array<{
+  value: ApiWallThemeBurstIntensity;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'gentle',
+    label: 'Suave',
+    description: 'Trocas mais contidas para ambientes mais elegantes.',
+  },
+  {
+    value: 'normal',
+    label: 'Normal',
+    description: 'Cadencia padrao do puzzle com entradas mais vivas.',
   },
 ];
 

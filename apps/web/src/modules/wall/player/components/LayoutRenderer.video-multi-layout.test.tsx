@@ -32,6 +32,17 @@ function makeVideo(id: string): WallRuntimeItem {
   };
 }
 
+function makeImage(id: string): WallRuntimeItem {
+  return {
+    ...makeVideo(id),
+    url: `https://cdn.example.com/${id}.jpg`,
+    type: 'image',
+    preview_url: undefined,
+    duration_seconds: undefined,
+    has_audio: undefined,
+  };
+}
+
 function makeSettings(): WallSettings {
   return {
     interval_ms: 8000,
@@ -138,5 +149,72 @@ describe('LayoutRenderer video multi-layout characterization', () => {
     expect(videos).toHaveLength(1);
     expect(videos[0].getAttribute('poster')).toBe(items[0].preview_url);
     expect(posterImages.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('falls back to a single controlled video surface when puzzle receives a video as current media', () => {
+    const items = [makeVideo('video-1'), makeVideo('video-2'), makeVideo('video-3')];
+    const settings = {
+      ...makeSettings(),
+      layout: 'puzzle' as const,
+      theme_config: {
+        preset: 'standard' as const,
+        anchor_mode: 'none' as const,
+        burst_intensity: 'normal' as const,
+        hero_enabled: true,
+        video_behavior: 'fallback_single_item' as const,
+      },
+    };
+
+    const { container } = render(
+      <LayoutRenderer
+        media={items[0]}
+        settings={settings}
+        allItems={items}
+        videoControl={makeVideoControl()}
+        performanceTier="premium"
+      />,
+    );
+
+    const videos = container.querySelectorAll('video');
+
+    expect(videos).toHaveLength(1);
+    expect(videos[0].getAttribute('poster')).toBe(items[0].preview_url);
+  });
+
+  it('never mounts video tags inside puzzle board slots when the queue is mixed', () => {
+    const items = [
+      makeImage('image-1'),
+      makeVideo('video-1'),
+      makeImage('image-2'),
+      makeImage('image-3'),
+      makeImage('image-4'),
+      makeImage('image-5'),
+      makeImage('image-6'),
+      makeImage('image-7'),
+      makeImage('image-8'),
+    ];
+    const settings = {
+      ...makeSettings(),
+      layout: 'puzzle' as const,
+      theme_config: {
+        preset: 'standard' as const,
+        anchor_mode: 'none' as const,
+        burst_intensity: 'normal' as const,
+        hero_enabled: true,
+        video_behavior: 'fallback_single_item' as const,
+      },
+    };
+
+    const { container } = render(
+      <LayoutRenderer
+        media={items[0]}
+        settings={settings}
+        allItems={items}
+        performanceTier="premium"
+      />,
+    );
+
+    expect(container.querySelectorAll('video')).toHaveLength(0);
+    expect(container.querySelectorAll('[data-testid^=\"puzzle-piece-\"]')).toHaveLength(9);
   });
 });

@@ -1,5 +1,6 @@
 import type { ApiWallMediaSource, ApiWallSettings } from '@/lib/api-types';
 
+import { resolveManagedWallSettings } from '../../../wall-settings';
 import { WallPreviewCanvas } from './WallPreviewCanvas';
 
 type PreviewMedia = {
@@ -27,7 +28,8 @@ export function WallDraftPreviewCard({
   previewMedia,
   upcomingItems,
 }: WallDraftPreviewCardProps) {
-  const visibleUpcomingItems = settings.show_side_thumbnails ? upcomingItems.slice(0, 3) : [];
+  const previewSettings = resolveManagedWallSettings(settings, []);
+  const visibleUpcomingItems = previewSettings.show_side_thumbnails ? upcomingItems.slice(0, 3) : [];
 
   return (
     <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
@@ -40,7 +42,7 @@ export function WallDraftPreviewCard({
 
       <div className="mt-4">
         <WallPreviewCanvas
-          settings={settings}
+          settings={previewSettings}
           primaryItem={previewMedia ? {
             itemId: 'preview-current',
             previewUrl: previewMedia.previewUrl,
@@ -55,13 +57,13 @@ export function WallDraftPreviewCard({
 
       <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
         <span className="rounded-full border border-border/60 bg-background px-3 py-1">
-          {settings.show_side_thumbnails ? 'Miniaturas laterais ativas' : 'Miniaturas laterais ocultas'}
+          {previewSettings.show_side_thumbnails ? 'Miniaturas laterais ativas' : 'Miniaturas laterais ocultas'}
         </span>
         <span className="rounded-full border border-border/60 bg-background px-3 py-1">
-          {settings.show_sender_credit ? 'Credito do remetente ativo' : 'Credito do remetente oculto'}
+          {previewSettings.show_sender_credit ? 'Credito do remetente ativo' : 'Credito do remetente oculto'}
         </span>
         <span className="rounded-full border border-border/60 bg-background px-3 py-1">
-          {settings.show_qr ? 'QR visivel' : 'QR oculto'}
+          {previewSettings.show_qr ? 'QR visivel' : 'QR oculto'}
         </span>
       </div>
     </div>

@@ -69,7 +69,7 @@
     },
     {
       "id": "vipsocial-person-a-03",
-      "relative_path": "55160408924_b566098f08_o.jpg",
+      "relative_path": "55160408924_b566098f08_o-smoke.jpg",
       "event_id": "local-vipsocial-01",
       "person_id": "person-a",
       "expected_positive_set": [
@@ -83,15 +83,13 @@
       "is_public_search_eligible": true,
       "expected_moderation_bucket": "safe",
       "consent_basis": "explicit_local_validation",
-      "size_bytes": 7600685,
-      "requires_derivative_for_compreface": true,
-      "smoke_relative_path": "derivatives/55160408924_b566098f08_o-smoke.jpg",
-      "smoke_size_bytes": 3064613,
+      "size_bytes": 3064613,
+      "requires_derivative_for_compreface": false,
       "target_face_selection": {
         "strategy": "left_to_right_index",
         "value": 1
       },
-      "notes": "Same consented person; in a four-person image, target is the first person in frame."
+      "notes": "Same consented person; local shared folder currently retains the smoke-sized variant for this four-person scene."
     },
     {
       "id": "vipsocial-person-a-04",
@@ -142,7 +140,7 @@
     },
     {
       "id": "vipsocial-person-b-02",
-      "relative_path": "55160539330_600b6f30cc_o.jpg",
+      "relative_path": "55160539330_600b6f30cc_o-smoke.jpg",
       "event_id": "local-vipsocial-01",
       "person_id": "person-b",
       "expected_positive_set": [
@@ -155,15 +153,13 @@
       "is_public_search_eligible": true,
       "expected_moderation_bucket": "safe",
       "consent_basis": "explicit_local_validation",
-      "size_bytes": 9440832,
-      "requires_derivative_for_compreface": true,
-      "smoke_relative_path": "derivatives/55160539330_600b6f30cc_o-smoke.jpg",
-      "smoke_size_bytes": 2772316,
+      "size_bytes": 2772316,
+      "requires_derivative_for_compreface": false,
       "target_face_selection": {
         "strategy": "left_to_right_index",
         "value": 2
       },
-      "notes": "Same consented person; one of two people in frame."
+      "notes": "Same consented person; local shared folder currently retains the smoke-sized variant for this two-person scene."
     },
     {
       "id": "vipsocial-person-b-03",

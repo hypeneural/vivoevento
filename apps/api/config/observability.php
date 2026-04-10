@@ -3,6 +3,7 @@
 return [
     'wall_log_channel' => env('LOG_WALL_REALTIME_CHANNEL', 'wall-realtime'),
     'queue_log_channel' => env('LOG_QUEUE_TELEMETRY_CHANNEL', 'queue-telemetry'),
+    'moderation_log_channel' => env('LOG_MODERATION_CHANNEL', env('LOG_QUEUE_TELEMETRY_CHANNEL', 'queue-telemetry')),
     'operations_dashboard_roles' => array_values(array_filter(array_map(
         static fn (string $role): string => trim($role),
         explode(',', (string) env('OPERATIONS_DASHBOARD_ROLES', 'super-admin,platform-admin'))

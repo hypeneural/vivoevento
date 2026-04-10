@@ -2,6 +2,7 @@
 
 use App\Modules\Auth\Http\Controllers\LoginController;
 use App\Modules\Auth\Http\Controllers\AccessMatrixController;
+use App\Modules\Auth\Http\Controllers\AccessPresetController;
 use App\Modules\Users\Http\Controllers\MeController;
 use Illuminate\Support\Facades\Route;
 
@@ -26,6 +27,8 @@ Route::prefix('auth')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('me', [MeController::class, 'show']);
         Route::patch('me', [MeController::class, 'update']);
+        Route::post('context/organization', [MeController::class, 'setOrganizationContext']);
+        Route::post('context/event', [MeController::class, 'setEventContext']);
         Route::patch('me/password', [MeController::class, 'updatePassword']);
         Route::post('me/avatar', [MeController::class, 'uploadAvatar']);
         Route::delete('me/avatar', [MeController::class, 'deleteAvatar']);
@@ -36,4 +39,5 @@ Route::prefix('auth')->group(function () {
 // Access Matrix
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('access/matrix', [AccessMatrixController::class, 'index']);
+    Route::get('access/presets', [AccessPresetController::class, 'index']);
 });

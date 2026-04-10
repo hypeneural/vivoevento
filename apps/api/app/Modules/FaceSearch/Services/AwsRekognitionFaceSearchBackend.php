@@ -24,6 +24,7 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
         private readonly AwsImagePreprocessor $preprocessor = new AwsImagePreprocessor,
         private readonly FaceQualityGateService $qualityGate = new FaceQualityGateService,
         private readonly FaceSearchMediaSourceLoader $sourceLoader = new FaceSearchMediaSourceLoader,
+        private readonly ?AwsFaceCropIndexSourceBuilder $indexSourceBuilder = null,
         private readonly ?ProviderCircuitBreaker $circuitBreaker = null,
         private readonly ?FaceSearchTelemetryService $telemetry = null,
     ) {}
@@ -90,51 +91,11 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
         $media->loadMissing(['event', 'variants']);
 
         $source = $this->sourceLoader->loadImageBinary($media);
-        $prepared = $this->preprocessor->prepare($source['binary'], [
-            'max_dimension' => 1920,
-            'max_bytes' => 5_242_880,
-        ]);
-
         $collectionId = $this->resolveCollectionId($media->event, $settings);
         $client = $this->rekognitionClient($settings, 'index');
-        $externalImageId = $this->externalImageId($media, $prepared['binary']);
+        $inputs = $this->indexSourceBuilder()->build($media, $settings, $source);
 
         $this->cleanupExistingProviderRecords($client, $media, $collectionId);
-
-        try {
-            $response = $this->toArray($this->callAws(
-                operation: 'index',
-                callback: fn () => $client->indexFaces([
-                    'CollectionId' => $collectionId,
-                    'Image' => [
-                        'Bytes' => $prepared['binary'],
-                    ],
-                    'ExternalImageId' => $externalImageId,
-                    'QualityFilter' => $settings->aws_index_quality_filter,
-                    'MaxFaces' => $this->resolveMaxFaces($settings),
-                    'DetectionAttributes' => $this->resolveDetectionAttributes($settings),
-                ]),
-                context: [
-                    'event_id' => $media->event_id,
-                    'event_media_id' => $media->id,
-                    'collection_id' => $collectionId,
-                    'aws_operation' => 'IndexFaces',
-                    'external_image_id' => $externalImageId,
-                ],
-            ));
-        } catch (AwsException $exception) {
-            if ($this->isNoFaceFound($exception)) {
-                return [
-                    'status' => 'skipped',
-                    'source_ref' => $source['source_ref'],
-                    'faces_detected' => 0,
-                    'faces_indexed' => 0,
-                    'skipped_reason' => 'no_faces_detected',
-                ];
-            }
-
-            throw $exception;
-        }
 
         $searchableFaceIds = [];
         $facesDetected = 0;
@@ -145,99 +106,181 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
             'index_only' => 0,
             'search_priority' => 0,
         ];
+        $sourceRefsUsed = [];
 
-        foreach ((array) ($response['FaceRecords'] ?? []) as $recordPayload) {
-            $facesDetected++;
+        foreach ($inputs as $input) {
+            $externalImageId = $this->externalImageId(
+                $media,
+                $input['binary'],
+                isset($input['face_index']) ? (int) $input['face_index'] : null,
+            );
 
-            $recordPayload = (array) $recordPayload;
-            $facePayload = (array) ($recordPayload['Face'] ?? []);
-            $faceDetail = (array) ($recordPayload['FaceDetail'] ?? []);
-            $detectedFace = $this->mapDetectedFace($facePayload, $faceDetail, $prepared['width'], $prepared['height']);
-            $assessment = $this->qualityGate->assess($detectedFace, $settings);
-            $qualitySummary[$assessment->tier->value]++;
+            try {
+                $response = $this->toArray($this->callAws(
+                    operation: 'index',
+                    callback: fn () => $client->indexFaces([
+                        'CollectionId' => $collectionId,
+                        'Image' => [
+                            'Bytes' => $input['binary'],
+                        ],
+                        'ExternalImageId' => $externalImageId,
+                        'QualityFilter' => $settings->aws_index_quality_filter,
+                        'MaxFaces' => $this->maxFacesForInput($input, $settings),
+                        'DetectionAttributes' => $this->resolveDetectionAttributes($settings),
+                    ]),
+                    context: [
+                        'event_id' => $media->event_id,
+                        'event_media_id' => $media->id,
+                        'collection_id' => $collectionId,
+                        'aws_operation' => 'IndexFaces',
+                        'external_image_id' => $externalImageId,
+                        'source_kind' => $input['source_kind'] ?? 'source_image',
+                        'source_ref' => $input['source_ref'] ?? $source['source_ref'],
+                    ],
+                ));
+            } catch (AwsException $exception) {
+                if ($this->isNoFaceFound($exception)) {
+                    continue;
+                }
 
-            $searchable = ! $assessment->isRejected() && $media->moderation_status !== ModerationStatus::Rejected;
-
-            if (! $searchable) {
-                $dominantRejectionReason ??= $assessment->reason ?? 'media_not_searchable';
+                throw $exception;
             }
 
-            FaceSearchProviderRecord::query()->create([
-                'event_id' => $media->event_id,
-                'event_media_id' => $media->id,
-                'provider_key' => $this->key(),
-                'backend_key' => $this->key(),
-                'collection_id' => $collectionId,
-                'face_id' => $facePayload['FaceId'] ?? null,
-                'image_id' => $facePayload['ImageId'] ?? null,
-                'external_image_id' => $facePayload['ExternalImageId'] ?? $externalImageId,
-                'bbox_json' => $this->boundingBoxArray($detectedFace),
-                'landmarks_json' => $detectedFace->landmarks,
-                'pose_json' => [
-                    'yaw' => $detectedFace->poseYaw,
-                    'pitch' => $detectedFace->posePitch,
-                    'roll' => $detectedFace->poseRoll,
-                ],
-                'quality_json' => [
-                    'composed_quality_score' => $detectedFace->qualityScore,
-                    'sharpness' => data_get($faceDetail, 'Quality.Sharpness'),
-                    'brightness' => data_get($faceDetail, 'Quality.Brightness'),
-                    'confidence' => $facePayload['Confidence'] ?? null,
-                    'face_area_ratio' => $detectedFace->faceAreaRatio,
-                    'quality_tier' => $assessment->tier->value,
-                    'quality_rejection_reason' => $assessment->reason,
-                ],
-                'unindexed_reasons_json' => $searchable
-                    ? []
-                    : array_values(array_filter([
-                        $assessment->reason,
-                        $media->moderation_status === ModerationStatus::Rejected ? 'media_rejected' : null,
-                    ])),
-                'searchable' => $searchable,
-                'indexed_at' => now(),
-                'provider_payload_json' => $recordPayload,
-            ]);
+            $sourceRefsUsed[] = (string) ($input['source_ref'] ?? $source['source_ref']);
 
-            if ($searchable && isset($facePayload['FaceId']) && is_string($facePayload['FaceId'])) {
-                $searchableFaceIds[] = $facePayload['FaceId'];
-                $facesIndexed++;
+            foreach ((array) ($response['FaceRecords'] ?? []) as $recordPayload) {
+                $facesDetected++;
+
+                $recordPayload = (array) $recordPayload;
+                $facePayload = (array) ($recordPayload['Face'] ?? []);
+                $faceDetail = (array) ($recordPayload['FaceDetail'] ?? []);
+                $detectedFace = $this->mapDetectedFace(
+                    $facePayload,
+                    $faceDetail,
+                    (int) ($input['width'] ?? 0),
+                    (int) ($input['height'] ?? 0),
+                );
+                $assessment = $this->qualityGate->assessAwsIndex(
+                    $detectedFace,
+                    $settings,
+                    (string) ($input['source_kind'] ?? 'source_image'),
+                );
+                $qualitySummary[$assessment->tier->value]++;
+
+                $searchable = ! $assessment->isRejected() && $media->moderation_status !== ModerationStatus::Rejected;
+
+                if (! $searchable) {
+                    $dominantRejectionReason ??= $assessment->reason ?? 'media_not_searchable';
+                }
+
+                FaceSearchProviderRecord::query()->create([
+                    'event_id' => $media->event_id,
+                    'event_media_id' => $media->id,
+                    'provider_key' => $this->key(),
+                    'backend_key' => $this->key(),
+                    'collection_id' => $collectionId,
+                    'face_id' => $facePayload['FaceId'] ?? null,
+                    'image_id' => $facePayload['ImageId'] ?? null,
+                    'external_image_id' => $facePayload['ExternalImageId'] ?? $externalImageId,
+                    'bbox_json' => $this->boundingBoxArray($detectedFace),
+                    'landmarks_json' => $detectedFace->landmarks,
+                    'pose_json' => [
+                        'yaw' => $detectedFace->poseYaw,
+                        'pitch' => $detectedFace->posePitch,
+                        'roll' => $detectedFace->poseRoll,
+                    ],
+                    'quality_json' => [
+                        'composed_quality_score' => $detectedFace->qualityScore,
+                        'sharpness' => data_get($faceDetail, 'Quality.Sharpness'),
+                        'brightness' => data_get($faceDetail, 'Quality.Brightness'),
+                        'confidence' => $facePayload['Confidence'] ?? null,
+                        'face_area_ratio' => $detectedFace->faceAreaRatio,
+                        'quality_tier' => $assessment->tier->value,
+                        'quality_rejection_reason' => $assessment->reason,
+                        'source_kind' => $input['source_kind'] ?? 'source_image',
+                        'source_ref' => $input['source_ref'] ?? $source['source_ref'],
+                        'source_bbox' => $input['source_bbox'] ?? null,
+                        'local_quality_tier' => $input['local_quality_tier'] ?? null,
+                        'local_quality_reason' => $input['local_quality_reason'] ?? null,
+                    ],
+                    'unindexed_reasons_json' => $searchable
+                        ? []
+                        : array_values(array_filter([
+                            $assessment->reason,
+                            $media->moderation_status === ModerationStatus::Rejected ? 'media_rejected' : null,
+                        ])),
+                    'searchable' => $searchable,
+                    'indexed_at' => now(),
+                    'provider_payload_json' => [
+                        ...$recordPayload,
+                        'index_input' => [
+                            'source_kind' => $input['source_kind'] ?? 'source_image',
+                            'source_ref' => $input['source_ref'] ?? $source['source_ref'],
+                            'face_index' => $input['face_index'] ?? null,
+                            'source_bbox' => $input['source_bbox'] ?? null,
+                        ],
+                    ],
+                ]);
+
+                if ($searchable && isset($facePayload['FaceId']) && is_string($facePayload['FaceId'])) {
+                    $searchableFaceIds[] = $facePayload['FaceId'];
+                    $facesIndexed++;
+                }
             }
-        }
 
-        foreach ((array) ($response['UnindexedFaces'] ?? []) as $unindexedPayload) {
-            $facesDetected++;
+            foreach ((array) ($response['UnindexedFaces'] ?? []) as $unindexedPayload) {
+                $facesDetected++;
 
-            $unindexedPayload = (array) $unindexedPayload;
-            $faceDetail = (array) ($unindexedPayload['FaceDetail'] ?? []);
-            $detectedFace = $this->mapDetectedFace([], $faceDetail, $prepared['width'], $prepared['height']);
+                $unindexedPayload = (array) $unindexedPayload;
+                $faceDetail = (array) ($unindexedPayload['FaceDetail'] ?? []);
+                $detectedFace = $this->mapDetectedFace(
+                    [],
+                    $faceDetail,
+                    (int) ($input['width'] ?? 0),
+                    (int) ($input['height'] ?? 0),
+                );
 
-            FaceSearchProviderRecord::query()->create([
-                'event_id' => $media->event_id,
-                'event_media_id' => $media->id,
-                'provider_key' => $this->key(),
-                'backend_key' => $this->key(),
-                'collection_id' => $collectionId,
-                'face_id' => null,
-                'image_id' => null,
-                'external_image_id' => $externalImageId,
-                'bbox_json' => $this->boundingBoxArray($detectedFace),
-                'landmarks_json' => $detectedFace->landmarks,
-                'pose_json' => [
-                    'yaw' => $detectedFace->poseYaw,
-                    'pitch' => $detectedFace->posePitch,
-                    'roll' => $detectedFace->poseRoll,
-                ],
-                'quality_json' => [
-                    'composed_quality_score' => $detectedFace->qualityScore,
-                    'sharpness' => data_get($faceDetail, 'Quality.Sharpness'),
-                    'brightness' => data_get($faceDetail, 'Quality.Brightness'),
-                    'face_area_ratio' => $detectedFace->faceAreaRatio,
-                ],
-                'unindexed_reasons_json' => array_values((array) ($unindexedPayload['Reasons'] ?? [])),
-                'searchable' => false,
-                'indexed_at' => now(),
-                'provider_payload_json' => $unindexedPayload,
-            ]);
+                FaceSearchProviderRecord::query()->create([
+                    'event_id' => $media->event_id,
+                    'event_media_id' => $media->id,
+                    'provider_key' => $this->key(),
+                    'backend_key' => $this->key(),
+                    'collection_id' => $collectionId,
+                    'face_id' => null,
+                    'image_id' => null,
+                    'external_image_id' => $externalImageId,
+                    'bbox_json' => $this->boundingBoxArray($detectedFace),
+                    'landmarks_json' => $detectedFace->landmarks,
+                    'pose_json' => [
+                        'yaw' => $detectedFace->poseYaw,
+                        'pitch' => $detectedFace->posePitch,
+                        'roll' => $detectedFace->poseRoll,
+                    ],
+                    'quality_json' => [
+                        'composed_quality_score' => $detectedFace->qualityScore,
+                        'sharpness' => data_get($faceDetail, 'Quality.Sharpness'),
+                        'brightness' => data_get($faceDetail, 'Quality.Brightness'),
+                        'face_area_ratio' => $detectedFace->faceAreaRatio,
+                        'source_kind' => $input['source_kind'] ?? 'source_image',
+                        'source_ref' => $input['source_ref'] ?? $source['source_ref'],
+                        'source_bbox' => $input['source_bbox'] ?? null,
+                        'local_quality_tier' => $input['local_quality_tier'] ?? null,
+                        'local_quality_reason' => $input['local_quality_reason'] ?? null,
+                    ],
+                    'unindexed_reasons_json' => array_values((array) ($unindexedPayload['Reasons'] ?? [])),
+                    'searchable' => false,
+                    'indexed_at' => now(),
+                    'provider_payload_json' => [
+                        ...$unindexedPayload,
+                        'index_input' => [
+                            'source_kind' => $input['source_kind'] ?? 'source_image',
+                            'source_ref' => $input['source_ref'] ?? $source['source_ref'],
+                            'face_index' => $input['face_index'] ?? null,
+                            'source_bbox' => $input['source_bbox'] ?? null,
+                        ],
+                    ],
+                ]);
+            }
         }
 
         $rejectedFaceIds = FaceSearchProviderRecord::query()
@@ -269,12 +312,14 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
 
         return [
             'status' => $facesIndexed > 0 ? 'indexed' : 'skipped',
-            'source_ref' => $source['source_ref'],
+            'source_ref' => $this->indexSourceRef($source['source_ref'], $sourceRefsUsed, count($inputs)),
             'faces_detected' => $facesDetected,
             'faces_indexed' => $facesIndexed,
             'quality_summary' => $qualitySummary,
             'dominant_rejection_reason' => $dominantRejectionReason,
-            'skipped_reason' => $facesIndexed > 0 ? null : 'no_faces_after_quality_gate',
+            'skipped_reason' => $facesDetected > 0
+                ? ($facesIndexed > 0 ? null : 'no_faces_after_quality_gate')
+                : 'no_faces_detected',
         ];
     }
 
@@ -446,6 +491,13 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
             }
         }
 
+        $reusedExistingUserId = $this->reusableExistingUserId(
+            requestedFaceIds: $requestedFaceIds,
+            associatedFaceIds: $associatedFaceIds,
+            unsuccessfulByFaceId: $unsuccessfulByFaceId,
+        );
+        $effectiveUserId = $reusedExistingUserId ?? $userId;
+
         $records = FaceSearchProviderRecord::query()
             ->where('event_id', $event->id)
             ->where('backend_key', $this->key())
@@ -458,24 +510,32 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
         foreach ($records as $record) {
             $failure = $unsuccessfulByFaceId[$record->face_id] ?? null;
             $payload = is_array($record->provider_payload_json) ? $record->provider_payload_json : [];
+            $reusedExistingAssociation = $failure !== null && $reusedExistingUserId !== null;
             $awsUserVector = [
-                'status' => $failure === null ? 'synced' : 'failed',
-                'user_id' => $userId,
+                'status' => $failure === null
+                    ? 'synced'
+                    : ($reusedExistingAssociation ? 'synced_existing' : 'failed'),
+                'requested_user_id' => $userId,
+                'user_id' => $effectiveUserId,
                 'synced_at' => $syncedAt,
                 'user_status' => $userStatus,
                 'requested_face_count' => count($requestedFaceIds),
                 'associated_face_count' => count(array_unique($associatedFaceIds)),
                 'unsuccessful_face_count' => count($unsuccessfulByFaceId),
                 'association' => [
-                    'result' => $failure === null ? 'associated' : 'failed',
+                    'result' => $failure === null
+                        ? 'associated'
+                        : ($reusedExistingAssociation ? 'reused_existing' : 'failed'),
                     'confidence' => $failure['Confidence'] ?? null,
                     'reasons' => array_values((array) ($failure['Reasons'] ?? [])),
-                    'reported_user_id' => $failure['UserId'] ?? $userId,
+                    'reported_user_id' => $failure['UserId'] ?? $effectiveUserId,
                 ],
             ];
 
             $record->forceFill([
-                'user_id' => $failure === null ? $userId : $record->user_id,
+                'user_id' => ($failure === null || $reusedExistingAssociation)
+                    ? $effectiveUserId
+                    : $record->user_id,
                 'provider_payload_json' => [
                     ...$payload,
                     'aws_user_vector' => $awsUserVector,
@@ -484,11 +544,12 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
         }
 
         return [
-            'user_id' => $userId,
+            'user_id' => $effectiveUserId,
             'requested_face_count' => count($requestedFaceIds),
             'associated_face_count' => count(array_unique($associatedFaceIds)),
             'unsuccessful_face_count' => count($unsuccessfulByFaceId),
             'user_status' => $userStatus,
+            'reused_existing_user_id' => $reusedExistingUserId,
         ];
     }
 
@@ -623,15 +684,15 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
             ->groupBy('user_id');
 
         return collect((array) ($response['UserMatches'] ?? []))
-            ->map(function (mixed $match) use ($recordsByUserId): ?FaceSearchMatchData {
+            ->flatMap(function (mixed $match) use ($recordsByUserId): array {
                 $userId = data_get($match, 'User.UserId');
 
                 if (! is_string($userId) || $userId === '' || ! $recordsByUserId->has($userId)) {
-                    return null;
+                    return [];
                 }
 
-                /** @var FaceSearchProviderRecord|null $record */
-                $record = $recordsByUserId->get($userId)
+                /** @var \Illuminate\Support\Collection<int, FaceSearchProviderRecord>|null $records */
+                $records = $recordsByUserId->get($userId)
                     ?->sort(function (FaceSearchProviderRecord $left, FaceSearchProviderRecord $right): int {
                         $leftQuality = is_array($left->quality_json) ? $left->quality_json : [];
                         $rightQuality = is_array($right->quality_json) ? $right->quality_json : [];
@@ -651,22 +712,28 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
 
                         return ((int) $left->id) <=> ((int) $right->id);
                     })
-                    ->first();
+                    ->values();
 
-                if (! $record instanceof FaceSearchProviderRecord) {
-                    return null;
+                if ($records === null || $records->isEmpty()) {
+                    return [];
                 }
 
-                $quality = is_array($record->quality_json) ? $record->quality_json : [];
+                $distance = round(1 - (((float) data_get($match, 'Similarity', 0.0)) / 100), 6);
 
-                return new FaceSearchMatchData(
-                    faceId: (int) $record->id,
-                    eventMediaId: (int) $record->event_media_id,
-                    distance: round(1 - (((float) data_get($match, 'Similarity', 0.0)) / 100), 6),
-                    qualityScore: isset($quality['composed_quality_score']) ? (float) $quality['composed_quality_score'] : null,
-                    faceAreaRatio: isset($quality['face_area_ratio']) ? (float) $quality['face_area_ratio'] : null,
-                    qualityTier: is_string($quality['quality_tier'] ?? null) ? $quality['quality_tier'] : null,
-                );
+                return $records
+                    ->map(function (FaceSearchProviderRecord $record) use ($distance): FaceSearchMatchData {
+                        $quality = is_array($record->quality_json) ? $record->quality_json : [];
+
+                        return new FaceSearchMatchData(
+                            faceId: (int) $record->id,
+                            eventMediaId: (int) $record->event_media_id,
+                            distance: $distance,
+                            qualityScore: isset($quality['composed_quality_score']) ? (float) $quality['composed_quality_score'] : null,
+                            faceAreaRatio: isset($quality['face_area_ratio']) ? (float) $quality['face_area_ratio'] : null,
+                            qualityTier: is_string($quality['quality_tier'] ?? null) ? $quality['quality_tier'] : null,
+                        );
+                    })
+                    ->all();
             })
             ->filter()
             ->values()
@@ -682,6 +749,55 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
             ->where('searchable', true)
             ->whereNotNull('user_id')
             ->exists();
+    }
+
+    /**
+     * @param array<int, string> $requestedFaceIds
+     * @param array<int, string> $associatedFaceIds
+     * @param array<string, array<string, mixed>> $unsuccessfulByFaceId
+     */
+    private function reusableExistingUserId(
+        array $requestedFaceIds,
+        array $associatedFaceIds,
+        array $unsuccessfulByFaceId,
+    ): ?string {
+        if ($associatedFaceIds !== [] || count($unsuccessfulByFaceId) !== count($requestedFaceIds)) {
+            return null;
+        }
+
+        $reportedUserIds = collect($unsuccessfulByFaceId)
+            ->map(function (array $failure): ?string {
+                $userId = $failure['UserId'] ?? null;
+
+                return is_string($userId) && trim($userId) !== '' ? trim($userId) : null;
+            })
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($reportedUserIds->count() !== 1) {
+            return null;
+        }
+
+        $allReusable = collect($unsuccessfulByFaceId)->every(function (array $failure): bool {
+            $reasons = array_values(array_filter(
+                (array) ($failure['Reasons'] ?? []),
+                fn (mixed $reason): bool => is_string($reason) && $reason !== '',
+            ));
+
+            return collect($reasons)->contains(
+                fn (string $reason): bool => in_array($reason, [
+                    'ASSOCIATED_TO_A_DIFFERENT_USER',
+                    'ASSOCIATED_TO_A_DIFFERENT_IDENTITY',
+                ], true),
+            );
+        });
+
+        if (! $allReusable) {
+            return null;
+        }
+
+        return (string) $reportedUserIds->first();
     }
 
     private function idempotencyToken(string $prefix, string ...$parts): string
@@ -829,6 +945,18 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
             if ($localRecords->has($faceId)) {
                 /** @var FaceSearchProviderRecord $record */
                 $record = $localRecords->get($faceId);
+                $existingPayload = is_array($record->provider_payload_json) ? $record->provider_payload_json : [];
+                $indexInput = is_array(data_get($existingPayload, 'index_input'))
+                    ? data_get($existingPayload, 'index_input')
+                    : null;
+                $mergedPayload = [
+                    ...$existingPayload,
+                    ...$remoteFace,
+                ];
+
+                if (is_array($indexInput)) {
+                    $mergedPayload['index_input'] = $indexInput;
+                }
 
                 if ($record->trashed()) {
                     $record->restore();
@@ -841,7 +969,7 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
                     'image_id' => $remoteFace['ImageId'] ?? $record->image_id,
                     'external_image_id' => $remoteFace['ExternalImageId'] ?? $record->external_image_id,
                     'bbox_json' => $this->listFaceBoundingBoxArray($remoteFace),
-                    'provider_payload_json' => $remoteFace,
+                    'provider_payload_json' => $mergedPayload,
                     'indexed_at' => now(),
                 ])->save();
 
@@ -1029,6 +1157,16 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
     }
 
     /**
+     * @param array<string, mixed> $input
+     */
+    private function maxFacesForInput(array $input, EventFaceSearchSetting $settings): int
+    {
+        return ($input['source_kind'] ?? 'source_image') === 'face_crop'
+            ? 1
+            : $this->resolveMaxFaces($settings);
+    }
+
+    /**
      * @return array<int, string>
      */
     private function resolveDetectionAttributes(EventFaceSearchSetting $settings): array
@@ -1038,14 +1176,19 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
         return $attributes !== [] ? $attributes : ['DEFAULT', 'FACE_OCCLUDED'];
     }
 
-    private function externalImageId(EventMedia $media, string $binary): string
+    private function externalImageId(EventMedia $media, string $binary, ?int $faceIndex = null): string
     {
-        return sprintf(
-            'evt:%d:media:%d:rev:%s',
+        $prefix = sprintf(
+            'evt:%d:media:%d',
             $media->event_id,
             $media->id,
-            substr(hash('sha256', $binary), 0, 12),
         );
+
+        if ($faceIndex !== null && $faceIndex >= 0) {
+            $prefix .= sprintf(':face:%d', $faceIndex);
+        }
+
+        return sprintf('%s:rev:%s', $prefix, substr(hash('sha256', $binary), 0, 12));
     }
 
     private function cleanupExistingProviderRecords(RekognitionClient $client, EventMedia $media, string $collectionId): void
@@ -1281,7 +1424,7 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
             return null;
         }
 
-        if (! preg_match('/^evt:(\d+):media:(\d+):rev:/', $externalImageId, $matches)) {
+        if (! preg_match('/^evt:(\d+):media:(\d+)(?::face:\d+)?:rev:/', $externalImageId, $matches)) {
             return null;
         }
 
@@ -1298,6 +1441,29 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
             ->exists();
 
         return $exists ? $mediaId : null;
+    }
+
+    /**
+     * @param array<int, string> $sourceRefsUsed
+     */
+    private function indexSourceRef(string $fallbackSourceRef, array $sourceRefsUsed, int $inputCount): string
+    {
+        if ($sourceRefsUsed === []) {
+            return $fallbackSourceRef;
+        }
+
+        $distinct = array_values(array_unique(array_filter($sourceRefsUsed, fn (mixed $value): bool => is_string($value) && $value !== '')));
+
+        if (count($distinct) === 1) {
+            return $distinct[0];
+        }
+
+        return sprintf('%s#inputs:%d', $fallbackSourceRef, max(1, $inputCount));
+    }
+
+    private function indexSourceBuilder(): AwsFaceCropIndexSourceBuilder
+    {
+        return $this->indexSourceBuilder ?? app(AwsFaceCropIndexSourceBuilder::class);
     }
 
     private function circuitBreaker(): ProviderCircuitBreaker

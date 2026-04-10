@@ -18,11 +18,11 @@ export function resolveRenderableLayout(
   media: WallRuntimeItem,
   videoMultiLayoutPolicy: 'disallow' | 'one' | 'all' = 'disallow',
 ): RenderableLayout {
-  if (media.type === 'video' && isMultiItemLayout(requested) && videoMultiLayoutPolicy === 'disallow') {
-    if (requested === 'puzzle') {
-      return 'cinematic';
-    }
+  if (requested === 'puzzle' && media.type === 'video') {
+    return 'cinematic';
+  }
 
+  if (media.type === 'video' && isMultiItemLayout(requested) && videoMultiLayoutPolicy === 'disallow') {
     return 'fullscreen';
   }
 

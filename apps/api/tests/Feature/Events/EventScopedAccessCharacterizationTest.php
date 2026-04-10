@@ -47,7 +47,7 @@ it('characterizes that an organization viewer can view media from another event 
     expect($response->json('data.0.event_id'))->toBe($otherEvent->id);
 });
 
-it('characterizes that an event team assignment alone does not grant event media access today', function () {
+it('characterizes that an event team assignment now grants event media access only for the assigned event', function () {
     $this->seedPermissions();
 
     $organization = $this->createOrganization();
@@ -71,9 +71,10 @@ it('characterizes that an event team assignment alone does not grant event media
         'role' => 'viewer',
     ]);
 
-    $this->assertApiForbidden(
-        $this->apiGet("/events/{$event->id}/media"),
-    );
+    $response = $this->apiGet("/events/{$event->id}/media");
+
+    $this->assertApiSuccess($response);
+    expect($response->json('data.0.event_id'))->toBe($event->id);
 });
 
 it('characterizes that an authenticated organization owner can mutate event team membership for a foreign organization event', function () {
@@ -104,7 +105,7 @@ it('characterizes that an authenticated organization owner can mutate event team
     ]);
 });
 
-it('characterizes that a user with viewer role but no organization membership can list events without organization scoping', function () {
+it('characterizes that a user with viewer role but no organization membership can no longer list global events without explicit event access', function () {
     $this->seedPermissions();
 
     $user = $this->createUser([
@@ -132,7 +133,5 @@ it('characterizes that a user with viewer role but no organization membership ca
     $response = $this->apiGet('/events');
 
     $this->assertApiSuccess($response);
-    expect(collect($response->json('data'))->pluck('id')->all())
-        ->toContain($eventA->id)
-        ->toContain($eventB->id);
+    expect($response->json('data'))->toBeArray()->toHaveCount(0);
 });

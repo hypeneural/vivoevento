@@ -99,6 +99,7 @@ type ModerationUndoPayload = {
 };
 
 const EMPTY_STATS = { total: 0, pending: 0, approved: 0, rejected: 0, featured: 0, pinned: 0 };
+const DEFAULT_STATUS_FILTER: ModerationStatusFilter = 'pending_moderation';
 
 function isInteractiveTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) {
@@ -194,7 +195,7 @@ export default function ModerationPage() {
   const [perPage, setPerPage] = useState<number>(MODERATION_PAGE_SIZE_OPTIONS[1]);
   const [search, setSearch] = useState(prefilledScope.search);
   const [eventFilter, setEventFilter] = useState(prefilledScope.eventId);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>(DEFAULT_STATUS_FILTER);
   const [orientationFilter, setOrientationFilter] = useState<string>('all');
   const [mediaTypeFilter, setMediaTypeFilter] = useState<string>('all');
   const [featuredOnly, setFeaturedOnly] = useState(false);
@@ -215,6 +216,13 @@ export default function ModerationPage() {
   const [autoAdvanceEnabled, setAutoAdvanceEnabled] = useState(false);
   const [pendingRejectPayload, setPendingRejectPayload] = useState<PendingRejectPayload | null>(null);
   const [rejectReasonDraft, setRejectReasonDraft] = useState('');
+  const filterChangeStartedAtRef = useRef<number>(performance.now());
+  const firstFeedTelemetrySentRef = useRef(false);
+  const lastStabilizedFilterKeyRef = useRef<string | null>(null);
+  const previousPageCountRef = useRef(0);
+  const previousIncomingQueueSizeRef = useRef(0);
+  const pendingDetailTelemetryMediaIdRef = useRef<number | null>(null);
+  const detailRequestStartedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     setSearch(prefilledScope.search);
@@ -240,6 +248,19 @@ export default function ModerationPage() {
     ...sharedFilters,
     per_page: perPage,
   }), [perPage, sharedFilters]);
+  const telemetryFilters = useMemo<Record<string, boolean | number | string | null>>(() => ({
+    event_id: eventFilter === 'all' ? null : Number(eventFilter),
+    status: statusFilter,
+    media_type: mediaTypeFilter === 'all' ? null : mediaTypeFilter,
+    orientation: orientationFilter === 'all' ? null : orientationFilter,
+    featured: featuredOnly ? true : null,
+    pinned: pinnedOnly ? true : null,
+    sender_blocked: blockedSenderOnly ? true : null,
+    duplicates: duplicatesOnly ? true : null,
+    ai_review: aiReviewOnly ? true : null,
+    per_page: perPage,
+  }), [aiReviewOnly, blockedSenderOnly, duplicatesOnly, eventFilter, featuredOnly, mediaTypeFilter, orientationFilter, perPage, pinnedOnly, statusFilter]);
+  const telemetryFilterKey = useMemo(() => JSON.stringify(telemetryFilters), [telemetryFilters]);
 
   const feedQueryKey = useMemo(() => queryKeys.media.feed(feedFilters), [feedFilters]);
   const statsQueryKey = useMemo(() => queryKeys.media.feedStats(sharedFilters), [sharedFilters]);
@@ -295,6 +316,23 @@ export default function ModerationPage() {
     () => resolveNextModerationDetailPrefetchItem(media, focusedMediaId),
     [focusedMediaId, media],
   );
+  const trackRouteTelemetry = useCallback((payload: {
+    event: string;
+    duration_ms?: number;
+    media_id?: number;
+    item_count?: number;
+    page_count?: number;
+    queue_size?: number;
+    has_more?: boolean;
+    surface_variant?: 'thumbnail' | 'preview';
+    asset_source?: string | null;
+    media_type?: string;
+  }) => {
+    void moderationService.trackTelemetry({
+      ...payload,
+      filters: telemetryFilters,
+    }).catch(() => undefined);
+  }, [telemetryFilters]);
 
   const focusedMediaDetailQuery = useQuery({
     queryKey: queryKeys.media.detail(String(focusedMediaId ?? '')),
@@ -333,6 +371,77 @@ export default function ModerationPage() {
   }, [nextDetailPrefetchItem?.id, queryClient]);
 
   useEffect(() => {
+    filterChangeStartedAtRef.current = performance.now();
+  }, [telemetryFilterKey]);
+
+  useEffect(() => {
+    if (!canView || feedQuery.isLoading || feedQuery.isError || !feedQuery.data?.pages.length) {
+      return;
+    }
+
+    const durationMs = Math.max(0, Math.round(performance.now() - filterChangeStartedAtRef.current));
+    const firstPageItemCount = feedQuery.data.pages[0]?.data.length ?? 0;
+
+    if (!firstFeedTelemetrySentRef.current) {
+      firstFeedTelemetrySentRef.current = true;
+      trackRouteTelemetry({
+        event: 'feed_first_page_loaded',
+        duration_ms: durationMs,
+        item_count: firstPageItemCount,
+        page_count: 1,
+        has_more: feedQuery.hasNextPage ?? false,
+      });
+    }
+
+    if (lastStabilizedFilterKeyRef.current !== telemetryFilterKey) {
+      lastStabilizedFilterKeyRef.current = telemetryFilterKey;
+      trackRouteTelemetry({
+        event: 'filters_stabilized',
+        duration_ms: durationMs,
+        item_count: media.length,
+        page_count: feedQuery.data.pages.length,
+        has_more: feedQuery.hasNextPage ?? false,
+      });
+    }
+  }, [canView, feedQuery.data, feedQuery.hasNextPage, feedQuery.isError, feedQuery.isLoading, media.length, telemetryFilterKey, trackRouteTelemetry]);
+
+  useEffect(() => {
+    const pageCount = feedQuery.data?.pages.length ?? 0;
+
+    if (!canView) {
+      previousPageCountRef.current = pageCount;
+      return;
+    }
+
+    if (pageCount > previousPageCountRef.current && previousPageCountRef.current > 0) {
+      trackRouteTelemetry({
+        event: 'feed_next_page_loaded',
+        item_count: media.length,
+        page_count: pageCount,
+        has_more: feedQuery.hasNextPage ?? false,
+      });
+    }
+
+    previousPageCountRef.current = pageCount;
+  }, [canView, feedQuery.data?.pages.length, feedQuery.hasNextPage, media.length, trackRouteTelemetry]);
+
+  useEffect(() => {
+    if (!canView) {
+      previousIncomingQueueSizeRef.current = incomingItems.length;
+      return;
+    }
+
+    if (incomingItems.length !== previousIncomingQueueSizeRef.current) {
+      previousIncomingQueueSizeRef.current = incomingItems.length;
+      trackRouteTelemetry({
+        event: 'incoming_queue_changed',
+        queue_size: incomingItems.length,
+        item_count: media.length,
+      });
+    }
+  }, [canView, incomingItems.length, media.length, trackRouteTelemetry]);
+
+  useEffect(() => {
     const handleScroll = () => setIsNearTop(window.scrollY < 140);
 
     handleScroll();
@@ -359,6 +468,34 @@ export default function ModerationPage() {
   }, [focusedMediaId, media]);
 
   useEffect(() => {
+    if (focusedMediaId === null) {
+      pendingDetailTelemetryMediaIdRef.current = null;
+      detailRequestStartedAtRef.current = null;
+      return;
+    }
+
+    pendingDetailTelemetryMediaIdRef.current = focusedMediaId;
+    detailRequestStartedAtRef.current = performance.now();
+  }, [focusedMediaId]);
+
+  useEffect(() => {
+    if (!focusedMediaDetailQuery.data?.id || pendingDetailTelemetryMediaIdRef.current !== focusedMediaDetailQuery.data.id) {
+      return;
+    }
+
+    trackRouteTelemetry({
+      event: 'detail_loaded',
+      duration_ms: detailRequestStartedAtRef.current === null
+        ? undefined
+        : Math.max(0, Math.round(performance.now() - detailRequestStartedAtRef.current)),
+      media_id: focusedMediaDetailQuery.data.id,
+    });
+
+    pendingDetailTelemetryMediaIdRef.current = null;
+    detailRequestStartedAtRef.current = null;
+  }, [focusedMediaDetailQuery.data?.id, trackRouteTelemetry]);
+
+  useEffect(() => {
     const node = loadMoreRef.current;
 
     if (!node || !feedQuery.hasNextPage || feedQuery.isFetching || feedQuery.isFetchingNextPage || feedQuery.isFetchNextPageError) {
@@ -379,7 +516,7 @@ export default function ModerationPage() {
   const clearFilters = useCallback(() => {
     setSearch('');
     setEventFilter('all');
-    setStatusFilter('all');
+    setStatusFilter(DEFAULT_STATUS_FILTER);
     setOrientationFilter('all');
     setMediaTypeFilter('all');
     setFeaturedOnly(false);

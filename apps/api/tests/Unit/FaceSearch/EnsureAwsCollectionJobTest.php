@@ -40,3 +40,10 @@ it('does nothing when the event is not configured to use aws rekognition', funct
 
     $job->handle($backend);
 });
+
+it('uses a stable unique lock per event to avoid duplicate collection provisioning jobs', function () {
+    $job = new EnsureAwsCollectionJob(123);
+
+    expect($job->uniqueId())->toBe('face-search-ensure-aws:123')
+        ->and($job->uniqueFor)->toBe(900);
+});

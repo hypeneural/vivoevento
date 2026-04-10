@@ -78,6 +78,26 @@ return [
                 'failure_threshold' => (int) env('FACE_SEARCH_AWS_CIRCUIT_FAILURE_THRESHOLD', 3),
                 'open_seconds' => (int) env('FACE_SEARCH_AWS_CIRCUIT_OPEN_SECONDS', 30),
             ],
+            'index_profiles' => [
+                'default' => [
+                    'prefer_face_crops' => false,
+                    'max_face_crops' => 0,
+                    'crop_scale_factor' => 1.8,
+                    'crop_min_quality_score' => null,
+                    'crop_search_priority_quality_delta' => null,
+                ],
+                'social_gallery_event' => [
+                    'prefer_face_crops' => true,
+                    'max_face_crops' => 6,
+                    'crop_scale_factor' => 1.8,
+                    'crop_min_quality_score' => 0.50,
+                    'crop_search_priority_quality_delta' => 0.15,
+                    'user_vector_cluster_threshold' => null,
+                    'user_vector_min_faces_per_user' => 4,
+                    'user_vector_min_yaw_spread' => null,
+                    'user_vector_min_pitch_spread' => null,
+                ],
+            ],
             'user_vectors' => [
                 'cluster_threshold' => (float) env('FACE_SEARCH_AWS_USER_VECTOR_CLUSTER_THRESHOLD', 0.35),
                 'min_faces_per_user' => (int) env('FACE_SEARCH_AWS_USER_VECTOR_MIN_FACES', 5),

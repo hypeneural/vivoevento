@@ -72,7 +72,7 @@ export function WallPlayerRoot({ code }: { code: string }) {
     videoRuntimeConfig,
   } = useWallPlayer(code);
 
-  const { reducedEffects, modeLabel } = usePerformanceMode();
+  const { reducedEffects, modeLabel, performanceTier } = usePerformanceMode();
   const { visible: toastVisible, message: toastMessage } = useNewPhotoToast();
   const isAdShowing = Boolean(state.currentAd);
 
@@ -196,6 +196,8 @@ export function WallPlayerRoot({ code }: { code: string }) {
               reducedMotion={reducedEffects}
               allItems={state.items}
               videoControl={videoControl}
+              eventId={state.event?.id ?? code}
+              performanceTier={performanceTier}
             />
           )}
           {!isAdShowing ? (

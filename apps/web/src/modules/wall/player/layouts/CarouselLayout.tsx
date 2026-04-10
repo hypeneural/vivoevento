@@ -13,18 +13,29 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import MediaSurface from '../components/MediaSurface';
 import type { WallRuntimeItem } from '../types';
+import { resolveStrongAnimationSlotIndexes } from '../themes/board/board-utils';
 import './carousel.css';
 
 interface CarouselLayoutProps {
   items: (WallRuntimeItem | null)[];
   activeSlot: number;
+  activeSlotIndexes?: number[];
+  maxStrongAnimations?: number;
 }
 
 const POSITIONS = ['carousel-left', 'carousel-center', 'carousel-right'] as const;
 
-export function CarouselLayout({ items, activeSlot }: CarouselLayoutProps) {
+export function CarouselLayout({
+  items,
+  activeSlot,
+  activeSlotIndexes = [],
+  maxStrongAnimations = activeSlotIndexes.length,
+}: CarouselLayoutProps) {
   // items[0] = left, items[1] = center, items[2] = right
   const centerItem = items[1];
+  const strongSlots = new Set(
+    resolveStrongAnimationSlotIndexes(activeSlotIndexes, maxStrongAnimations),
+  );
 
   return (
     <div className="carousel-container">
@@ -42,10 +53,11 @@ export function CarouselLayout({ items, activeSlot }: CarouselLayoutProps) {
               <motion.div
                 key={item.id}
                 className={`carousel-slide ${posClass}`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.5 }}
+                data-strong-animation={strongSlots.has(i) ? 'true' : 'false'}
+                initial={strongSlots.has(i) ? { opacity: 0, scale: 0.9, y: i === activeSlot ? 18 : 0 } : { opacity: 0 }}
+                animate={strongSlots.has(i) ? { opacity: 1, scale: 1, y: 0 } : { opacity: 1 }}
+                exit={strongSlots.has(i) ? { opacity: 0, scale: 0.98 } : { opacity: 0 }}
+                transition={{ duration: strongSlots.has(i) ? 0.42 : 0.2 }}
               >
                 <MediaSurface media={item} fit="cover" />
               </motion.div>

@@ -77,4 +77,58 @@ describe('WallPreviewCanvas', () => {
     expect(screen.getByAltText(/Logo do parceiro/i)).toBeInTheDocument();
     expect(screen.getByAltText(/Ana/i)).toBeInTheDocument();
   });
+
+  it('mantem a previa do puzzle previsivel com o mesmo renderer e sem miniaturas laterais', () => {
+    render(
+      <WallPreviewCanvas
+        settings={{
+          ...wallSettings,
+          layout: 'puzzle',
+          show_side_thumbnails: true,
+          theme_config: {
+            preset: 'compact',
+          },
+        }}
+        primaryItem={{
+          itemId: 'media-1',
+          previewUrl: 'https://cdn.example.com/current.jpg',
+          senderName: 'Carla',
+          sourceType: 'telegram',
+          isFeatured: true,
+          caption: 'Noite principal',
+        }}
+        upcomingItems={[
+          {
+            itemId: 'media-2',
+            previewUrl: 'https://cdn.example.com/upcoming-1.jpg',
+            senderName: 'Ana',
+          },
+          {
+            itemId: 'media-3',
+            previewUrl: 'https://cdn.example.com/upcoming-2.jpg',
+            senderName: 'Bruno',
+          },
+          {
+            itemId: 'media-4',
+            previewUrl: 'https://cdn.example.com/upcoming-3.jpg',
+            senderName: 'Dani',
+          },
+          {
+            itemId: 'media-5',
+            previewUrl: 'https://cdn.example.com/upcoming-4.jpg',
+            senderName: 'Eva',
+          },
+          {
+            itemId: 'media-6',
+            previewUrl: 'https://cdn.example.com/upcoming-5.jpg',
+            senderName: 'Fabio',
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getAllByTestId(/puzzle-piece-/)).toHaveLength(6);
+    expect(screen.queryByTestId('wall-side-thumbnails-left')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('wall-side-thumbnails-right')).not.toBeInTheDocument();
+  });
 });

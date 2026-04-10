@@ -13,6 +13,7 @@ import {
 } from '../../../player/design/tokens';
 import { isMultiItemLayout, resolveRenderableLayout, shouldRenderFloatingCaption } from '../../../player/engine/layoutStrategy';
 import type { WallRuntimeItem, WallSettings } from '../../../player/types';
+import { resolveManagedWallSettings } from '../../../wall-settings';
 
 const DEFAULT_SCENE_WIDTH = 1365;
 const DEFAULT_SCENE_HEIGHT = 768;
@@ -100,7 +101,10 @@ export function WallPreviewCanvas({
     };
   }, []);
 
-  const previewSettings = settings as unknown as WallSettings;
+  const previewSettings = useMemo(
+    () => resolveManagedWallSettings(settings, []) as unknown as WallSettings,
+    [settings],
+  );
   const currentItem = useMemo(() => buildRuntimeItem(primaryItem, 0), [primaryItem]);
   const queueRuntimeItems = useMemo(
     () => upcomingItems
@@ -198,6 +202,8 @@ export function WallPreviewCanvas({
                     settings={previewSettings}
                     reducedMotion={true}
                     allItems={allItems}
+                    eventId="preview"
+                    performanceTier="preview"
                   />
 
                   <BrandingOverlay

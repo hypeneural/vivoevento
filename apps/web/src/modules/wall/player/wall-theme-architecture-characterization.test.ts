@@ -30,7 +30,7 @@ describe('wall theme architecture characterization', () => {
     expect(settingsRequestSource).toContain('theme_config');
   });
 
-  it('still hardcodes 3 slots for board layouts, but now uses a formal registry and theme-level motion contract', () => {
+  it('still hardcodes 3 slots for board layouts, but now uses a formal registry, board subsystem and theme-level motion contract', () => {
     const layoutRendererSource = fs.readFileSync(
       path.resolve(__dirname, 'components/LayoutRenderer.tsx'),
       'utf8',
@@ -53,6 +53,9 @@ describe('wall theme architecture characterization', () => {
     expect(layoutRendererSource).toContain("from 'framer-motion'");
     expect(layoutRendererSource).toContain('getWallLayoutDefinition');
     expect(layoutRendererSource).toContain('resolveLayoutTransition');
+    expect(layoutRendererSource).toContain('useWallBoard');
+    expect(layoutRendererSource).toContain('createBoardInstanceKey');
+    expect(layoutRendererSource).not.toContain('useMultiSlot');
     expect(layoutRendererSource).not.toContain('function renderSingleLayout');
     expect(layoutRendererSource).not.toContain('function renderMultiLayout');
 
@@ -108,7 +111,7 @@ describe('wall theme architecture characterization', () => {
     expect(managerSource).not.toContain('prefetchQuery');
   });
 
-  it('uses img.decode() only in proactive next-item preload, not in the generic wall asset probe pipeline', () => {
+  it('uses decode-based readiness both in proactive preload and in the generic wall asset probe pipeline, with a bounded warm window', () => {
     const preloadSource = fs.readFileSync(
       path.resolve(__dirname, 'engine/preload.ts'),
       'utf8',
@@ -117,10 +120,20 @@ describe('wall theme architecture characterization', () => {
       path.resolve(__dirname, 'engine/cache.ts'),
       'utf8',
     );
+    const readinessSource = fs.readFileSync(
+      path.resolve(__dirname, 'engine/readiness.ts'),
+      'utf8',
+    );
+    const engineSource = fs.readFileSync(
+      path.resolve(__dirname, 'hooks/useWallEngine.ts'),
+      'utf8',
+    );
 
     expect(preloadSource).toContain('img.decode()');
-    expect(cacheSource).not.toContain('.decode(');
-    expect(cacheSource).toContain('image.onload');
+    expect(cacheSource).toContain('loadWallImageReadiness');
+    expect(readinessSource).toContain('await image.decode()');
+    expect(engineSource).toContain('resolveWallPreloadPlan');
+    expect(engineSource).toContain('runtimeBudget.maxConcurrentDecode');
   });
 
   it('exposes capability metadata, but manager controls are not capability-gated yet', () => {

@@ -92,4 +92,63 @@ describe('primeWallAsset', () => {
       errorMessage: null,
     }));
   });
+
+  it('only reports an image as ready after decode completes in the generic probe pipeline', async () => {
+    let settled = false;
+    let resolveDecode: (() => void) | null = null;
+
+    const originalImage = globalThis.Image;
+
+    class MockImage {
+      onload: null | (() => void) = null;
+      onerror: null | (() => void) = null;
+      naturalWidth = 1080;
+      naturalHeight = 1350;
+      decoding: 'sync' | 'async' | 'auto' = 'auto';
+      fetchPriority: 'high' | 'low' | 'auto' = 'auto';
+
+      set src(_value: string) {
+        queueMicrotask(() => {
+          this.onload?.();
+        });
+      }
+
+      decode() {
+        return new Promise<void>((resolve) => {
+          resolveDecode = resolve;
+        });
+      }
+    }
+
+    globalThis.Image = MockImage as unknown as typeof Image;
+
+    try {
+      const promise = primeWallAsset({
+        ...makeVideoItem({
+          id: 'media_image_1',
+          url: 'https://cdn.example.com/media-image-1.jpg',
+          type: 'image',
+        }),
+      }).then((result) => {
+        settled = true;
+        return result;
+      });
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(settled).toBe(false);
+
+      resolveDecode?.();
+
+      await expect(promise).resolves.toEqual(expect.objectContaining({
+        status: 'ready',
+        width: 1080,
+        height: 1350,
+        orientation: 'vertical',
+      }));
+    } finally {
+      globalThis.Image = originalImage;
+    }
+  });
 });

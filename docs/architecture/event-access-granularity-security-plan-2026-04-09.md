@@ -253,6 +253,7 @@ Implicacao para o projeto:
 Docs oficiais:
 
 - card: https://ui.shadcn.com/docs/components/radix/card
+- command: https://ui.shadcn.com/docs/components/command
 - dialog: https://ui.shadcn.com/docs/components/dialog
 - tabs: https://ui.shadcn.com/docs/components/tabs
 - radix primitives: https://www.radix-ui.com/primitives/docs/overview/introduction
@@ -260,6 +261,7 @@ Docs oficiais:
 Pontos relevantes:
 
 - `Card` atende bem discovery, agrupamento e CTA primario;
+- `Command` atende bem busca e troca rapida entre workspaces e eventos;
 - `Dialog` atende confirmacoes e acoes focadas sem trocar de contexto;
 - `Tabs` funcionam melhor para separar secoes simples do que permissao bruta em tabela;
 - Radix prioriza acessibilidade, foco, teclado e papeis ARIA.
@@ -267,6 +269,7 @@ Pontos relevantes:
 Implicacao para o projeto:
 
 - para noiva, DJ e parceiro, a V1 deve preferir cards, tabs simples, dialogs e resumo textual;
+- o seletor de workspace pode usar `CommandDialog` para busca rapida sem criar menu tecnico;
 - evitar grids densos, matrizes tecnicas e tabelas como tela principal para usuario leigo;
 - botoes precisam usar labels explicitas e linguagem operacional, nao jargao tecnico.
 
@@ -329,6 +332,7 @@ Padrao visual recomendado:
 - resumo textual do papel em portugues;
 - CTA principal visivel por card;
 - tabs curtas para separar `Midias`, `Moderacao`, `Wall` e `Play`;
+- `CommandDialog` para troca rapida de workspace ou evento quando houver muitos acessos;
 - dialogs apenas para confirmacao ou convite, nunca para despejar matriz de permissao.
 
 Padrao visual a evitar:
@@ -581,6 +585,14 @@ Tabs recomendadas:
 - `Encerrados`;
 - `Todos`.
 
+Template V1 recomendado:
+
+- cards simples, nunca tabela como entrada;
+- topo com busca e CTA de filtros;
+- parceiro, data e papel visiveis acima das acoes;
+- badges curtas para `Operar evento`, `Moderar midias`, `Ver midias`;
+- CTA principal por card conforme o preset.
+
 Regras:
 
 - nunca mostrar eventos fora de `workspaces.event_accesses`;
@@ -785,6 +797,13 @@ Nao mostra:
 - audit global;
 - equipe da organizacao.
 
+Template recomendado:
+
+- navegacao horizontal curta para `Midias`, `Moderacao`, `Telao`, `Jogos`;
+- esconder por completo qualquer aba nao permitida;
+- preferir CTA por contexto em vez de menus densos;
+- manter parceira e evento sempre visiveis no topo para reduzir erro operacional.
+
 ### `WorkspaceSelector`
 
 Componente transversal.
@@ -795,6 +814,42 @@ Regras:
 - se houver mais de um evento event-scoped, permite trocar evento;
 - se o usuario tiver organizacao e eventos pontuais, mostra os dois grupos separados;
 - nunca mostra workspace sem vinculo autorizado.
+
+## Ultima caracterizacao antes da implementacao de `active_context + workspaces`
+
+### Backend
+
+O teste `EventOnlySessionCharacterizationTest` provou que hoje um usuario apenas event-scoped:
+
+- recebe `organization = null` em `/auth/me`;
+- nao recebe `workspaces`;
+- nao recebe `active_context`;
+- ainda recebe `accessible_modules` derivados das permissions globais do role.
+
+Implicacao:
+
+- a sessao atual nao sabe bootstrapar contexto de evento;
+- se nao corrigirmos isso primeiro, o frontend vai continuar inferindo navegacao a partir de permissions globais soltas.
+
+### Frontend
+
+O teste `AppSidebar.test.tsx` provou que hoje a navegacao continua organizacional:
+
+- existe `Dashboard`, `Eventos` e `Midias`;
+- nao existe entrada dedicada `Meus eventos`;
+- nao ha separacao de layout entre contexto organizacional e contexto event-scoped.
+
+Inspecao de rotas em `App.tsx` confirmou:
+
+- nao existe rota `/my-events`;
+- todas as rotas autenticadas relevantes continuam sob `AdminLayout`;
+- `LoginRoute` ainda redireciona para `/` por padrao, sem logica de workspace selector.
+
+Conclusao:
+
+- `active_context + workspaces` precisa entrar antes de qualquer endurecimento real de UX event-scoped;
+- `/my-events` precisa nascer junto com um layout proprio;
+- `AdminLayout` nao pode continuar sendo o shell padrao para usuarios apenas event-scoped.
 
 ## Contrato de Sessao Alvo
 
@@ -1597,6 +1652,23 @@ Frontend:
 
 - `npx vitest run src/modules/moderation/moderation-architecture.test.ts src/modules/moderation/moderation-event-scope.contract.test.ts src/modules/moderation/components/ModerationReviewPanel.test.tsx src/modules/moderation/services/moderation.service.test.ts`
 - resultado: `7 passed`, `3 todo`
+
+Type-check:
+
+- `npm run type-check`
+- resultado: `ok`
+
+## Validacao pre-execucao especifica de `active_context + /my-events`
+
+Backend:
+
+- `php artisan test tests/Feature/Auth/EventOnlySessionCharacterizationTest.php tests/Feature/Auth/MeTest.php tests/Feature/Auth/MultiOrganizationWorkspaceContractTest.php tests/Feature/Events/EventScopedAccessCharacterizationTest.php tests/Feature/Events/EventScopedAccessContractTest.php tests/Feature/EventTeam/EventPermissionPresetContractTest.php`
+- resultado: `21 passed`, `19 todos`, `167 assertions`
+
+Frontend:
+
+- `npx vitest run src/app/layouts/AppSidebar.test.tsx src/app/layouts/AppHeader.characterization.test.tsx src/modules/auth/LoginPage.test.tsx src/modules/auth/login-navigation.test.ts src/modules/auth/workspace-selector.contract.test.tsx src/modules/auth/my-events-page.contract.test.tsx`
+- resultado: `7 passed`, `19 todo`
 
 Type-check:
 

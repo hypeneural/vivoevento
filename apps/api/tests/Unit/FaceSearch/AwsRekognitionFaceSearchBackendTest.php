@@ -3,9 +3,11 @@
 use App\Modules\Events\Models\Event;
 use App\Modules\FaceSearch\DTOs\DetectedFaceData;
 use App\Modules\FaceSearch\DTOs\FaceBoundingBoxData;
+use App\Modules\FaceSearch\Services\AwsFaceCropIndexSourceBuilder;
 use App\Modules\FaceSearch\Services\AwsImagePreprocessor;
 use App\Modules\FaceSearch\Models\EventFaceSearchSetting;
 use App\Modules\FaceSearch\Models\FaceSearchProviderRecord;
+use App\Modules\FaceSearch\Services\FaceDetectionProviderInterface;
 use App\Modules\FaceSearch\Services\FaceQualityGateService;
 use App\Modules\MediaProcessing\Enums\ModerationStatus;
 use App\Modules\MediaProcessing\Models\EventMedia;
@@ -265,6 +267,132 @@ it('indexes aws face records and persists unindexed faces telemetry', function (
         ->and($records[1]->unindexed_reasons_json)->toBe(['LOW_SHARPNESS']);
 });
 
+it('indexes face focused crops for the social gallery aws profile and keeps borderline crop matches searchable', function () {
+    Storage::fake('public');
+
+    $event = Event::factory()->create();
+
+    $settings = \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'provider_key' => 'compreface',
+        'recognition_enabled' => true,
+        'search_backend_key' => 'aws_rekognition',
+        'aws_region' => 'eu-central-1',
+        'aws_collection_id' => 'eventovivo-face-search-event-' . $event->id,
+        'aws_index_profile_key' => 'social_gallery_event',
+        'min_face_size_px' => 100,
+        'min_quality_score' => 0.60,
+    ]);
+
+    $path = UploadedFile::fake()
+        ->image('gallery.jpg', 1600, 900)
+        ->store("events/{$event->id}/variants/311", 'public');
+
+    $media = EventMedia::factory()->approved()->create([
+        'event_id' => $event->id,
+        'media_type' => 'image',
+    ]);
+
+    EventMediaVariant::query()->create([
+        'event_media_id' => $media->id,
+        'variant_key' => 'gallery',
+        'disk' => 'public',
+        'path' => $path,
+        'width' => 1600,
+        'height' => 900,
+        'size_bytes' => Storage::disk('public')->size($path),
+        'mime_type' => 'image/jpeg',
+    ]);
+
+    $detector = new class implements FaceDetectionProviderInterface
+    {
+        public function detect(EventMedia $media, EventFaceSearchSetting $settings, string $binary): array
+        {
+            return [
+                new DetectedFaceData(
+                    boundingBox: new FaceBoundingBoxData(60, 70, 170, 170),
+                    qualityScore: 0.95,
+                    isPrimaryCandidate: true,
+                ),
+            ];
+        }
+    };
+
+    $client = m::mock(RekognitionClient::class);
+    $factory = m::mock(AwsRekognitionClientFactory::class);
+
+    $factory->shouldReceive('makeRekognitionClient')
+        ->once()
+        ->with('index', ['region' => 'eu-central-1'])
+        ->andReturn($client);
+
+    $client->shouldReceive('indexFaces')
+        ->once()
+        ->with(m::on(function (array $payload) use ($settings): bool {
+            return $payload['CollectionId'] === $settings->aws_collection_id
+                && $payload['MaxFaces'] === 1
+                && str_contains((string) ($payload['ExternalImageId'] ?? ''), ':face:0:rev:')
+                && is_string($payload['Image']['Bytes'] ?? null)
+                && $payload['Image']['Bytes'] !== '';
+        }))
+        ->andReturn([
+            'FaceRecords' => [
+                [
+                    'Face' => [
+                        'FaceId' => 'face-crop-1',
+                        'ImageId' => 'image-crop-1',
+                        'Confidence' => 99.995,
+                    ],
+                    'FaceDetail' => [
+                        'BoundingBox' => [
+                            'Left' => 0.31,
+                            'Top' => 0.25,
+                            'Width' => 0.41,
+                            'Height' => 0.48,
+                        ],
+                        'Quality' => [
+                            'Brightness' => 87.2,
+                            'Sharpness' => 53.33,
+                        ],
+                        'Pose' => [
+                            'Yaw' => 2.0,
+                            'Pitch' => 1.0,
+                            'Roll' => 0.0,
+                        ],
+                    ],
+                ],
+            ],
+            'UnindexedFaces' => [],
+        ]);
+
+    $backend = new AwsRekognitionFaceSearchBackend(
+        $factory,
+        new AwsImagePreprocessor,
+        new FaceQualityGateService,
+        new \App\Modules\FaceSearch\Services\FaceSearchMediaSourceLoader,
+        new AwsFaceCropIndexSourceBuilder(
+            $detector,
+            new FaceQualityGateService,
+            new AwsImagePreprocessor,
+        ),
+    );
+
+    $result = $backend->indexMedia($media, $settings);
+
+    $record = FaceSearchProviderRecord::query()
+        ->where('event_media_id', $media->id)
+        ->first();
+
+    expect($result['status'])->toBe('indexed')
+        ->and($result['faces_detected'])->toBe(1)
+        ->and($result['faces_indexed'])->toBe(1)
+        ->and($record)->not->toBeNull()
+        ->and($record?->searchable)->toBeTrue()
+        ->and(data_get($record?->quality_json, 'quality_tier'))->toBe('index_only')
+        ->and(data_get($record?->quality_json, 'source_kind'))->toBe('face_crop')
+        ->and((string) $record?->external_image_id)->toContain(':face:0:rev:');
+});
+
 it('deletes aws faces that fail the event searchable gate and stores them as non searchable records', function () {
     Storage::fake('public');
 
@@ -388,6 +516,9 @@ it('searches faces by image and maps aws face ids back to searchable event media
     ]);
 
     $matchedMedia = EventMedia::factory()->approved()->published()->create([
+        'event_id' => $event->id,
+    ]);
+    $secondaryMatchedMedia = EventMedia::factory()->approved()->published()->create([
         'event_id' => $event->id,
     ]);
 
@@ -595,6 +726,9 @@ it('searches aws user vectors by selfie when the event opts into users mode', fu
     $matchedMedia = EventMedia::factory()->approved()->published()->create([
         'event_id' => $event->id,
     ]);
+    $secondaryMatchedMedia = EventMedia::factory()->approved()->published()->create([
+        'event_id' => $event->id,
+    ]);
 
     $searchableRecord = \Database\Factories\FaceSearchProviderRecordFactory::new()->create([
         'event_id' => $event->id,
@@ -609,6 +743,21 @@ it('searches aws user vectors by selfie when the event opts into users mode', fu
             'composed_quality_score' => 0.95,
             'quality_tier' => 'search_priority',
             'face_area_ratio' => 0.20,
+        ],
+    ]);
+    $secondarySearchableRecord = \Database\Factories\FaceSearchProviderRecordFactory::new()->create([
+        'event_id' => $event->id,
+        'event_media_id' => $secondaryMatchedMedia->id,
+        'provider_key' => 'aws_rekognition',
+        'backend_key' => 'aws_rekognition',
+        'collection_id' => $settings->aws_collection_id,
+        'face_id' => '30000000-0000-0000-0000-000000000002',
+        'user_id' => 'evt:' . $event->id . ':usr:pr:1',
+        'searchable' => true,
+        'quality_json' => [
+            'composed_quality_score' => 0.88,
+            'quality_tier' => 'index_only',
+            'face_area_ratio' => 0.16,
         ],
     ]);
 
@@ -671,10 +820,13 @@ it('searches aws user vectors by selfie when the event opts into users mode', fu
         topK: 12,
     );
 
-    expect($result['matches'])->toHaveCount(1)
+    expect($result['matches'])->toHaveCount(2)
         ->and($result['matches'][0]->eventMediaId)->toBe($matchedMedia->id)
         ->and($result['matches'][0]->faceId)->toBe($searchableRecord->id)
         ->and($result['matches'][0]->distance)->toBe(0.026)
+        ->and($result['matches'][1]->eventMediaId)->toBe($secondaryMatchedMedia->id)
+        ->and($result['matches'][1]->faceId)->toBe($secondarySearchableRecord->id)
+        ->and($result['matches'][1]->distance)->toBe(0.026)
         ->and(data_get($result['provider_payload_json'], 'search_mode_requested'))->toBe('users')
         ->and(data_get($result['provider_payload_json'], 'search_mode_resolved'))->toBe('users');
 });
@@ -876,6 +1028,97 @@ it('creates and associates aws user vectors idempotently and records per-face sy
         ->and($failedRecord->user_id)->toBeNull();
 });
 
+it('reuses the existing aws user id when every requested face is already associated to the same remote user', function () {
+    $event = Event::factory()->create();
+
+    $settings = \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'recognition_enabled' => true,
+        'search_backend_key' => 'aws_rekognition',
+        'aws_region' => 'eu-central-1',
+        'aws_collection_id' => 'eventovivo-face-search-event-' . $event->id,
+        'aws_associate_user_match_threshold' => 77,
+    ]);
+
+    $firstRecord = \Database\Factories\FaceSearchProviderRecordFactory::new()->create([
+        'event_id' => $event->id,
+        'backend_key' => 'aws_rekognition',
+        'provider_key' => 'aws_rekognition',
+        'collection_id' => $settings->aws_collection_id,
+        'face_id' => '60000000-0000-0000-0000-000000000001',
+        'user_id' => null,
+    ]);
+
+    $secondRecord = \Database\Factories\FaceSearchProviderRecordFactory::new()->create([
+        'event_id' => $event->id,
+        'backend_key' => 'aws_rekognition',
+        'provider_key' => 'aws_rekognition',
+        'collection_id' => $settings->aws_collection_id,
+        'face_id' => '60000000-0000-0000-0000-000000000002',
+        'user_id' => null,
+    ]);
+
+    $client = m::mock(RekognitionClient::class);
+    $factory = m::mock(AwsRekognitionClientFactory::class);
+
+    $factory->shouldReceive('makeRekognitionClient')
+        ->once()
+        ->with('index', ['region' => 'eu-central-1'])
+        ->andReturn($client);
+
+    $client->shouldReceive('createUser')
+        ->once()
+        ->andReturn([]);
+
+    $client->shouldReceive('associateFaces')
+        ->once()
+        ->andReturn([
+            'AssociatedFaces' => [],
+            'UnsuccessfulFaceAssociations' => [
+                [
+                    'FaceId' => '60000000-0000-0000-0000-000000000001',
+                    'Reasons' => ['ASSOCIATED_TO_A_DIFFERENT_USER'],
+                    'UserId' => 'evt:' . $event->id . ':usr:existing',
+                ],
+                [
+                    'FaceId' => '60000000-0000-0000-0000-000000000002',
+                    'Reasons' => ['ASSOCIATED_TO_A_DIFFERENT_USER'],
+                    'UserId' => 'evt:' . $event->id . ':usr:existing',
+                ],
+            ],
+            'UserStatus' => 'CREATED',
+        ]);
+
+    $backend = new AwsRekognitionFaceSearchBackend($factory);
+
+    $summary = $backend->syncUserVector(
+        event: $event,
+        settings: $settings,
+        userId: 'evt:' . $event->id . ':usr:new',
+        faceIds: [
+            '60000000-0000-0000-0000-000000000001',
+            '60000000-0000-0000-0000-000000000002',
+        ],
+    );
+
+    $firstRecord->refresh();
+    $secondRecord->refresh();
+
+    expect($summary)->toMatchArray([
+        'user_id' => 'evt:' . $event->id . ':usr:existing',
+        'requested_face_count' => 2,
+        'associated_face_count' => 0,
+        'unsuccessful_face_count' => 2,
+        'user_status' => 'CREATED',
+        'reused_existing_user_id' => 'evt:' . $event->id . ':usr:existing',
+    ])
+        ->and($firstRecord->user_id)->toBe('evt:' . $event->id . ':usr:existing')
+        ->and($secondRecord->user_id)->toBe('evt:' . $event->id . ':usr:existing')
+        ->and(data_get($firstRecord->provider_payload_json, 'aws_user_vector.status'))->toBe('synced_existing')
+        ->and(data_get($firstRecord->provider_payload_json, 'aws_user_vector.association.result'))->toBe('reused_existing')
+        ->and(data_get($firstRecord->provider_payload_json, 'aws_user_vector.requested_user_id'))->toBe('evt:' . $event->id . ':usr:new');
+});
+
 it('opens the aws circuit after repeated search failures and blocks the immediate retry', function () {
     config()->set('face_search.providers.aws_rekognition.circuit_breaker.failure_threshold', 1);
     config()->set('face_search.providers.aws_rekognition.circuit_breaker.open_seconds', 60);
@@ -984,6 +1227,20 @@ it('reconciles aws collection drift by restoring remote matches, creating remote
         'collection_id' => $settings->aws_collection_id,
         'face_id' => 'face-matched',
         'searchable' => true,
+        'provider_payload_json' => [
+            'index_input' => [
+                'source_kind' => 'face_crop',
+                'source_ref' => 'public:events/' . $event->id . '/variants/' . $matchedMedia->id . '/gallery.webp#face:0@1.8',
+                'face_index' => 0,
+                'source_bbox' => [
+                    'x' => 320,
+                    'y' => 95,
+                    'width' => 205,
+                    'height' => 227,
+                ],
+            ],
+            'existing_hint' => 'keep-me',
+        ],
     ]);
 
     $localOnlyRecord = \Database\Factories\FaceSearchProviderRecordFactory::new()->create([
@@ -1105,6 +1362,9 @@ it('reconciles aws collection drift by restoring remote matches, creating remote
             'width' => 0.25,
             'height' => 0.25,
         ])
+        ->and(data_get($matchedRecord->provider_payload_json, 'index_input.source_kind'))->toBe('face_crop')
+        ->and(data_get($matchedRecord->provider_payload_json, 'index_input.source_bbox.x'))->toBe(320)
+        ->and(data_get($matchedRecord->provider_payload_json, 'existing_hint'))->toBe('keep-me')
         ->and($restoredRecord)->not->toBeNull()
         ->and($restoredRecord?->trashed())->toBeFalse()
         ->and($remoteOnlyRecord)->not->toBeNull()

@@ -2,6 +2,10 @@ type RouteLoader = () => Promise<unknown>;
 
 export const routeImports = {
   login: () => import('@/modules/auth/LoginPage'),
+  myEvents: () => import('@/modules/auth/MyEventsPage'),
+  eventWorkspaceLayout: () => import('@/modules/auth/EventWorkspaceLayout'),
+  eventWorkspaceHome: () => import('@/modules/auth/EventWorkspaceHomePage'),
+  eventWorkspaceModule: () => import('@/modules/auth/EventWorkspaceModulePage'),
   aiMediaReplies: () => import('@/modules/ai/MediaAutomaticRepliesPage'),
   profile: () => import('@/modules/auth/ProfilePage'),
   dashboard: () => import('@/modules/dashboard/DashboardPage'),
@@ -60,6 +64,15 @@ const adminPreloadMatchers: Array<{ pattern: RegExp; loaders: RouteLoader[] }> =
     pattern: /^\/dashboard(?:\/|$)/,
     loaders: [routeImports.dashboard],
   },
+  {
+    pattern: /^\/my-events(?:\/|$)/,
+    loaders: [
+      routeImports.myEvents,
+      routeImports.eventWorkspaceLayout,
+      routeImports.eventWorkspaceHome,
+      routeImports.eventWorkspaceModule,
+    ],
+  },
 ];
 
 export function preloadRouteForPath(path: string) {
@@ -80,5 +93,6 @@ export function preloadCommonAdminRoutes() {
     routeImports.dashboard(),
     routeImports.eventsList(),
     routeImports.eventCreate(),
+    routeImports.myEvents(),
   ]);
 }

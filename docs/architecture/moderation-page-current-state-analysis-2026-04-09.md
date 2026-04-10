@@ -1493,7 +1493,7 @@ Status consolidado ate esta entrega:
 - [x] validar `search document` com `5.000` midias sinteticas e `--disable-jit` dentro do budget;
 - [x] reabrir a sonda com `20.000` midias sinteticas e corrigir `search_event_title_hot` com fast path por `event_id`;
 - [x] validar `20.000` midias sinteticas com `search document`, fast path de titulo exato e `--disable-jit` dentro do budget;
-- [ ] repetir o benchmark com o comando novo em homolog real quando houver credencial/configuracao disponivel;
+- [ ] publicar a release atual da moderacao em homolog e repetir o benchmark com o comando novo nesse ambiente;
 - [x] adicionar auto-advance e razoes de reprova;
 - [x] adicionar revisao por cluster de duplicata;
 - [x] adicionar undo curto apos acoes unitarias;

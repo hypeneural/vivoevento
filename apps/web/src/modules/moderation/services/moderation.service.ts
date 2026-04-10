@@ -30,6 +30,24 @@ export const moderationService = {
     return api.get<ApiEventMediaItem[]>(`/media/${mediaId}/duplicates`, { signal });
   },
 
+  async trackTelemetry(payload: {
+    event: string;
+    duration_ms?: number;
+    media_id?: number;
+    item_count?: number;
+    page_count?: number;
+    queue_size?: number;
+    has_more?: boolean;
+    surface_variant?: 'thumbnail' | 'preview';
+    asset_source?: string | null;
+    media_type?: string;
+    filters?: Record<string, boolean | number | string | null>;
+  }) {
+    return api.post<null>('/media/feed/telemetry', {
+      body: payload,
+    });
+  },
+
   async approve(mediaId: number | string, reason?: string) {
     return api.post<ApiEventMediaItem>(`/media/${mediaId}/approve`, {
       body: {

@@ -1,5 +1,6 @@
 import type {
   ApiWallEventPhase,
+  ApiWallLayoutOption,
   ApiWallSelectionMode,
   ApiWallSelectionModeOption,
   ApiWallSelectionPolicy,
@@ -11,6 +12,7 @@ import type {
   ApiWallVideoPreferredVariant,
   ApiWallVideoResumeMode,
 } from '@/lib/api-types';
+import { resolveManagerWallLayoutOption } from './manager-config';
 
 export const DEFAULT_WALL_SELECTION_POLICY: ApiWallSelectionPolicy = {
   max_eligible_items_per_sender: 4,
@@ -173,6 +175,40 @@ export function prepareWallSettingsPayload(settings: ApiWallSettings): ApiWallSe
     neon_text: blankToNull(settings.neon_text),
     instructions_text: blankToNull(settings.instructions_text),
   };
+}
+
+export function applyWallLayoutCapabilities(
+  settings: ApiWallSettings,
+  layoutOption?: ApiWallLayoutOption | null,
+): ApiWallSettings {
+  const resolvedLayoutOption = layoutOption ?? resolveManagerWallLayoutOption(settings.layout, []);
+  const normalizedThemeConfig = resolvedLayoutOption?.capabilities.supports_theme_config
+    ? normalizeWallThemeConfig({
+      ...resolvedLayoutOption.defaults.theme_config,
+      ...settings.theme_config,
+    })
+    : normalizeWallThemeConfig(settings.theme_config);
+
+  return {
+    ...settings,
+    show_side_thumbnails: resolvedLayoutOption?.capabilities.supports_side_thumbnails === false
+      ? false
+      : (settings.show_side_thumbnails ?? true),
+    video_multi_layout_policy: resolvedLayoutOption?.value === 'puzzle'
+      ? 'disallow'
+      : normalizeVideoMultiLayoutPolicy(settings.video_multi_layout_policy),
+    theme_config: normalizedThemeConfig,
+  };
+}
+
+export function resolveManagedWallSettings(
+  settings: ApiWallSettings,
+  layoutOptions: ApiWallLayoutOption[] = [],
+): ApiWallSettings {
+  return applyWallLayoutCapabilities(
+    cloneWallSettings(settings),
+    resolveManagerWallLayoutOption(settings.layout, layoutOptions),
+  );
 }
 
 export function areWallSettingsEqual(

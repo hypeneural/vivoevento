@@ -1,5 +1,6 @@
 import type { WallRuntimeItem } from '../types';
 import { detectOrientation } from './selectors';
+import { loadWallImageReadiness, type WallImageReadinessOptions } from './readiness';
 
 export interface WallAssetProbeResult {
   status: 'loading' | 'ready' | 'stale' | 'error';
@@ -117,28 +118,25 @@ async function deleteCachedAsset(url: string): Promise<void> {
   }
 }
 
-function loadImageSource(source: string): Promise<WallAssetProbeResult> {
-  return new Promise((resolve) => {
-    const image = new Image();
+async function loadImageSource(
+  source: string,
+  options?: WallImageReadinessOptions,
+): Promise<WallAssetProbeResult> {
+  const readiness = await loadWallImageReadiness(source, options);
 
-    image.onload = () => {
-      resolve({
-        status: 'ready',
-        width: image.naturalWidth || null,
-        height: image.naturalHeight || null,
-        orientation: detectOrientation(image.naturalWidth || null, image.naturalHeight || null),
-      });
+  if (readiness.status === 'ready') {
+    return {
+      status: 'ready',
+      width: readiness.width,
+      height: readiness.height,
+      orientation: readiness.orientation,
     };
+  }
 
-    image.onerror = () => {
-      resolve({
-        status: 'error',
-        errorMessage: 'Falha ao carregar a imagem do telao.',
-      });
-    };
-
-    image.src = source;
-  });
+  return {
+    status: 'error',
+    errorMessage: readiness.errorMessage ?? 'Falha ao carregar a imagem do telao.',
+  };
 }
 
 function loadVideoSource(source: string): Promise<WallAssetProbeResult> {
@@ -208,6 +206,7 @@ async function loadAssetFromCachedBlob(item: WallRuntimeItem): Promise<WallAsset
 export async function primeWallAsset(
   item: WallRuntimeItem,
   onStatus?: (result: WallAssetProbeResult) => void,
+  options?: WallImageReadinessOptions,
 ): Promise<WallAssetProbeResult> {
   if (!item.url) {
     const result = resolveCached({
@@ -239,7 +238,7 @@ export async function primeWallAsset(
   const loader = (async () => {
     const directResult = item.type === 'video'
       ? await loadVideoSource(item.url as string)
-      : await loadImageSource(item.url as string);
+      : await loadImageSource(item.url as string, options);
 
     if (directResult.status === 'ready') {
       wallCacheMetrics.missCount += 1;

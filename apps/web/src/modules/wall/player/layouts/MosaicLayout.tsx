@@ -13,21 +13,30 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import MediaSurface from '../components/MediaSurface';
 import type { WallRuntimeItem } from '../types';
+import { resolveStrongAnimationSlotIndexes } from '../themes/board/board-utils';
 
 interface MosaicLayoutProps {
   items: (WallRuntimeItem | null)[];
+  activeSlotIndexes?: number[];
+  maxStrongAnimations?: number;
 }
 
 function MosaicCell({
   item,
   isPrimary,
+  slotIndex,
+  isStrongAnimation,
 }: {
   item: WallRuntimeItem | null;
   isPrimary: boolean;
+  slotIndex: number;
+  isStrongAnimation: boolean;
 }) {
   if (!item) {
     return (
       <div
+        data-testid={`mosaic-cell-${slotIndex}`}
+        data-strong-animation="false"
         className="overflow-hidden"
         style={{
           borderRadius: 'clamp(8px, 1vw, 16px)',
@@ -41,6 +50,8 @@ function MosaicCell({
 
   return (
     <div
+      data-testid={`mosaic-cell-${slotIndex}`}
+      data-strong-animation={isStrongAnimation ? 'true' : 'false'}
       className="relative overflow-hidden"
       style={{ borderRadius: 'clamp(8px, 1vw, 16px)', gridRow: isPrimary ? '1 / 3' : undefined }}
     >
@@ -48,10 +59,10 @@ function MosaicCell({
         <motion.div
           key={item.id}
           className="absolute inset-0"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
+          initial={isStrongAnimation ? { opacity: 0, scale: 0.94, x: isPrimary ? -24 : 12 } : { opacity: 0 }}
+          animate={isStrongAnimation ? { opacity: 1, scale: 1, x: 0 } : { opacity: 1 }}
+          exit={isStrongAnimation ? { opacity: 0, scale: 0.98 } : { opacity: 0 }}
+          transition={{ duration: isStrongAnimation ? 0.34 : 0.18 }}
         >
           <MediaSurface media={item} fit="cover" />
         </motion.div>
@@ -81,7 +92,15 @@ function MosaicCell({
   );
 }
 
-export function MosaicLayout({ items }: MosaicLayoutProps) {
+export function MosaicLayout({
+  items,
+  activeSlotIndexes = [],
+  maxStrongAnimations = activeSlotIndexes.length,
+}: MosaicLayoutProps) {
+  const strongSlots = new Set(
+    resolveStrongAnimationSlotIndexes(activeSlotIndexes, maxStrongAnimations),
+  );
+
   return (
     <div
       className="absolute inset-0"
@@ -94,9 +113,9 @@ export function MosaicLayout({ items }: MosaicLayoutProps) {
         background: '#0a0a0a',
       }}
     >
-      <MosaicCell item={items[0] ?? null} isPrimary={true} />
-      <MosaicCell item={items[1] ?? null} isPrimary={false} />
-      <MosaicCell item={items[2] ?? null} isPrimary={false} />
+      <MosaicCell item={items[0] ?? null} slotIndex={0} isPrimary={true} isStrongAnimation={strongSlots.has(0)} />
+      <MosaicCell item={items[1] ?? null} slotIndex={1} isPrimary={false} isStrongAnimation={strongSlots.has(1)} />
+      <MosaicCell item={items[2] ?? null} slotIndex={2} isPrimary={false} isStrongAnimation={strongSlots.has(2)} />
     </div>
   );
 }

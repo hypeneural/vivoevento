@@ -29,6 +29,10 @@ import { AppErrorBoundary } from '@/shared/components/AppErrorBoundary';
 import { Loader2 } from 'lucide-react';
 
 const LoginPage = lazy(routeImports.login);
+const MyEventsPage = lazy(routeImports.myEvents);
+const EventWorkspaceLayout = lazy(routeImports.eventWorkspaceLayout);
+const EventWorkspaceHomePage = lazy(routeImports.eventWorkspaceHome);
+const EventWorkspaceModulePage = lazy(routeImports.eventWorkspaceModule);
 const AiMediaRepliesPage = lazy(routeImports.aiMediaReplies);
 const ProfilePage = lazy(routeImports.profile);
 const DashboardPage = lazy(routeImports.dashboard);
@@ -82,7 +86,7 @@ function LegacyWhatsAppDetailRedirect() {
 }
 
 function LoginRoute() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, preferredHomePath } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -90,7 +94,7 @@ function LoginRoute() {
   }
 
   return isAuthenticated
-    ? <Navigate to={resolveLoginReturnPath(location.search, '/')} replace />
+    ? <Navigate to={resolveLoginReturnPath(location.search, preferredHomePath || '/')} replace />
     : <LoginPage />;
 }
 
@@ -103,6 +107,20 @@ function ProtectedRoute() {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  return <Outlet />;
+}
+
+function OrganizationWorkspaceRoute() {
+  const { isLoading, isEventOnlySession, preferredHomePath } = useAuth();
+
+  if (isLoading) {
+    return <FullScreenLoader />;
+  }
+
+  if (isEventOnlySession) {
+    return <Navigate to={preferredHomePath || '/my-events'} replace />;
   }
 
   return (
@@ -140,105 +158,113 @@ const router = createBrowserRouter(
       <Route path="/e/:slug/play/:gameSlug" element={<PublicGamePage />} />
 
       <Route element={<ProtectedRoute />}>
-        <Route element={<AdminLayout />}>
-          <Route index element={<DashboardPage />} />
+        <Route path="my-events" element={<EventWorkspaceLayout />}>
+          <Route index element={<MyEventsPage />} />
+          <Route path=":eventId" element={<EventWorkspaceHomePage />} />
+          <Route path=":eventId/:section" element={<EventWorkspaceModulePage />} />
+        </Route>
 
-          <Route path="events" element={<EventsListPage />} />
-          <Route path="events/create" element={<CreateEventPage />} />
-          <Route path="events/:id" element={<EventDetailPage />} />
-          <Route path="events/:id/wall" element={<WallPage />} />
-          <Route path="events/:id/play" element={<PlayPage />} />
-          <Route path="events/:id/edit" element={<EditEventPage />} />
+        <Route element={<OrganizationWorkspaceRoute />}>
+          <Route element={<AdminLayout />}>
+            <Route index element={<DashboardPage />} />
 
-          <Route path="media" element={<MediaPage />} />
-          <Route path="moderation" element={<ModerationPage />} />
-          <Route path="gallery" element={<GalleryPage />} />
-          <Route path="wall" element={<WallPage />} />
-          <Route path="play" element={<PlayPage />} />
-          <Route path="hub" element={<HubPage />} />
-          <Route path="whatsapp" element={<Navigate to={WHATSAPP_SETTINGS_PATH} replace />} />
-          <Route path="whatsapp/:id" element={<LegacyWhatsAppDetailRedirect />} />
+            <Route path="events" element={<EventsListPage />} />
+            <Route path="events/create" element={<CreateEventPage />} />
+            <Route path="events/:id" element={<EventDetailPage />} />
+            <Route path="events/:id/wall" element={<WallPage />} />
+            <Route path="events/:id/play" element={<PlayPage />} />
+            <Route path="events/:id/edit" element={<EditEventPage />} />
 
-          <Route path="profile" element={<ProfilePage />} />
+            <Route path="media" element={<MediaPage />} />
+            <Route path="moderation" element={<ModerationPage />} />
+            <Route path="gallery" element={<GalleryPage />} />
+            <Route path="wall" element={<WallPage />} />
+            <Route path="play" element={<PlayPage />} />
+            <Route path="hub" element={<HubPage />} />
+            <Route path="whatsapp" element={<Navigate to={WHATSAPP_SETTINGS_PATH} replace />} />
+            <Route path="whatsapp/:id" element={<LegacyWhatsAppDetailRedirect />} />
 
-          <Route
-            path="ia/moderacao-de-midia"
-            element={(
-              <ModuleGuard moduleKey="settings" requiredPermissions={['settings.manage']}>
-                <AiMediaRepliesPage />
-              </ModuleGuard>
-            )}
-          />
-          <Route path="ia/respostas-de-midia" element={<Navigate to="/ia/moderacao-de-midia" replace />} />
-          <Route
-            path="partners"
-            element={(
-              <ModuleGuard moduleKey="partners" requiredPermissions={['partners.manage.any', 'partners.view.any']}>
-                <PartnersPage />
-              </ModuleGuard>
-            )}
-          />
-          <Route
-            path="clients"
-            element={(
-              <ModuleGuard moduleKey="clients" requiredPermissions={['clients.view']}>
-                <ClientsPage />
-              </ModuleGuard>
-            )}
-          />
-          <Route
-            path="plans"
-            element={(
-              <ModuleGuard
-                moduleKey="plans"
-                requiredPermissions={['billing.view', 'billing.manage', 'billing.purchase', 'billing.manage_subscription', 'plans.view']}
-              >
-                <PlansPage />
-              </ModuleGuard>
-            )}
-          />
-          <Route
-            path="analytics"
-            element={(
-              <ModuleGuard moduleKey="analytics" requiredPermissions={['analytics.view']}>
-                <AnalyticsPage />
-              </ModuleGuard>
-            )}
-          />
-          <Route
-            path="audit"
-            element={(
-              <ModuleGuard moduleKey="audit" requiredPermissions={['audit.view']}>
-                <AuditPage />
-              </ModuleGuard>
-            )}
-          />
-          <Route
-            path="settings"
-            element={(
-              <ModuleGuard moduleKey="settings" requiredPermissions={['settings.manage']}>
-                <SettingsPage />
-              </ModuleGuard>
-            )}
-          />
-          <Route
-            path="settings/whatsapp"
-            element={(
-              <ModuleGuard moduleKey="whatsapp" requiredPermissions={['channels.manage', 'channels.view']}>
-                <WhatsAppInstancesPage />
-              </ModuleGuard>
-            )}
-          />
-          <Route
-            path="settings/whatsapp/:id"
-            element={(
-              <ModuleGuard moduleKey="whatsapp" requiredPermissions={['channels.manage', 'channels.view']}>
-                <WhatsAppInstanceDetailPage />
-              </ModuleGuard>
-            )}
-          />
+            <Route path="profile" element={<ProfilePage />} />
 
-          <Route path="*" element={<NotFound />} />
+            <Route
+              path="ia/moderacao-de-midia"
+              element={(
+                <ModuleGuard moduleKey="settings" requiredPermissions={['settings.manage']}>
+                  <AiMediaRepliesPage />
+                </ModuleGuard>
+              )}
+            />
+            <Route path="ia/respostas-de-midia" element={<Navigate to="/ia/moderacao-de-midia" replace />} />
+            <Route
+              path="partners"
+              element={(
+                <ModuleGuard moduleKey="partners" requiredPermissions={['partners.manage.any', 'partners.view.any']}>
+                  <PartnersPage />
+                </ModuleGuard>
+              )}
+            />
+            <Route
+              path="clients"
+              element={(
+                <ModuleGuard moduleKey="clients" requiredPermissions={['clients.view']}>
+                  <ClientsPage />
+                </ModuleGuard>
+              )}
+            />
+            <Route
+              path="plans"
+              element={(
+                <ModuleGuard
+                  moduleKey="plans"
+                  requiredPermissions={['billing.view', 'billing.manage', 'billing.purchase', 'billing.manage_subscription', 'plans.view']}
+                >
+                  <PlansPage />
+                </ModuleGuard>
+              )}
+            />
+            <Route
+              path="analytics"
+              element={(
+                <ModuleGuard moduleKey="analytics" requiredPermissions={['analytics.view']}>
+                  <AnalyticsPage />
+                </ModuleGuard>
+              )}
+            />
+            <Route
+              path="audit"
+              element={(
+                <ModuleGuard moduleKey="audit" requiredPermissions={['audit.view']}>
+                  <AuditPage />
+                </ModuleGuard>
+              )}
+            />
+            <Route
+              path="settings"
+              element={(
+                <ModuleGuard moduleKey="settings" requiredPermissions={['settings.manage']}>
+                  <SettingsPage />
+                </ModuleGuard>
+              )}
+            />
+            <Route
+              path="settings/whatsapp"
+              element={(
+                <ModuleGuard moduleKey="whatsapp" requiredPermissions={['channels.manage', 'channels.view']}>
+                  <WhatsAppInstancesPage />
+                </ModuleGuard>
+              )}
+            />
+            <Route
+              path="settings/whatsapp/:id"
+              element={(
+                <ModuleGuard moduleKey="whatsapp" requiredPermissions={['channels.manage', 'channels.view']}>
+                  <WhatsAppInstanceDetailPage />
+                </ModuleGuard>
+              )}
+            />
+
+            <Route path="*" element={<NotFound />} />
+          </Route>
         </Route>
       </Route>
     </Route>,

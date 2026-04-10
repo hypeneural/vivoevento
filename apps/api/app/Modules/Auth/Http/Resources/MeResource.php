@@ -3,6 +3,7 @@
 namespace App\Modules\Auth\Http\Resources;
 
 use App\Modules\Auth\Services\AccessStateBuilderService;
+use App\Modules\Auth\Services\WorkspaceStateBuilderService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Storage;
@@ -16,7 +17,11 @@ class MeResource extends JsonResource
     public function toArray(Request $request): array
     {
         $user = $this->resource;
-        $organization = $user->currentOrganization();
+        $workspaceState = app(WorkspaceStateBuilderService::class)->build($user);
+        $activeContext = $workspaceState['active_context'];
+        $organization = ($activeContext['type'] ?? null) === 'organization'
+            ? $user->currentOrganization()
+            : null;
         $subscription = $organization?->subscription;
         $plan = $subscription?->plan;
         $access = app(AccessStateBuilderService::class)->build($user, $organization);
@@ -42,6 +47,11 @@ class MeResource extends JsonResource
                 'last_login_at' => $user->last_login_at?->toISOString(),
             ],
             'organization' => $this->buildOrganization($organization),
+            'active_context' => $activeContext,
+            'workspaces' => [
+                'organizations' => $workspaceState['organizations'],
+                'event_accesses' => $workspaceState['event_accesses'],
+            ],
             'access' => $access,
             'subscription' => $this->buildSubscription($subscription, $plan),
         ];

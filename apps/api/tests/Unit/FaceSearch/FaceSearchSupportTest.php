@@ -55,6 +55,28 @@ it('assesses quality tiers and reasons for detected faces', function () {
         ->and($service->passes($borderlineFace, $settings))->toBeTrue();
 });
 
+it('relaxes aws crop quality gating for the social gallery profile without changing the base gate', function () {
+    $settings = \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'min_face_size_px' => 100,
+        'min_quality_score' => 0.60,
+        'aws_index_profile_key' => 'social_gallery_event',
+    ]);
+
+    $service = app(FaceQualityGateService::class);
+    $cropCandidate = new DetectedFaceData(
+        boundingBox: new FaceBoundingBoxData(10, 10, 160, 160),
+        qualityScore: 0.5333,
+    );
+
+    $baseAssessment = $service->assess($cropCandidate, $settings);
+    $awsCropAssessment = $service->assessAwsIndex($cropCandidate, $settings, 'face_crop');
+
+    expect($baseAssessment->tier)->toBe(FaceQualityTier::Reject)
+        ->and($baseAssessment->reason)->toBe('low_quality')
+        ->and($awsCropAssessment->tier)->toBe(FaceQualityTier::IndexOnly)
+        ->and($awsCropAssessment->reason)->toBe('borderline_quality');
+});
+
 it('stores embeddings and searches by event using sqlite fallback', function () {
     $store = app(PgvectorFaceVectorStore::class);
 

@@ -55,8 +55,8 @@ class EventFaceSearchOperationalSummaryService
         /** @var array<string, int> $aggregated */
         $aggregated = EventMedia::query()
             ->where('event_id', $eventId)
-            ->selectRaw('COALESCE(face_index_status, ?) as face_index_status_key, COUNT(*) as aggregate', ['__null__'])
-            ->groupBy(DB::raw('COALESCE(face_index_status, \'__null__\')'))
+            ->selectRaw("COALESCE(face_index_status, '__null__') as face_index_status_key, COUNT(*) as aggregate")
+            ->groupBy(DB::raw("COALESCE(face_index_status, '__null__')"))
             ->pluck('aggregate', 'face_index_status_key')
             ->map(fn (mixed $value): int => (int) $value)
             ->all();

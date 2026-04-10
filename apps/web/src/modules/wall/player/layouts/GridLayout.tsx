@@ -13,15 +13,28 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import MediaSurface from '../components/MediaSurface';
 import type { WallRuntimeItem } from '../types';
+import { resolveStrongAnimationSlotIndexes } from '../themes/board/board-utils';
 
 interface GridLayoutProps {
   items: (WallRuntimeItem | null)[];
+  activeSlotIndexes?: number[];
+  maxStrongAnimations?: number;
 }
 
-function GridCell({ item }: { item: WallRuntimeItem | null }) {
+function GridCell({
+  item,
+  slotIndex,
+  isStrongAnimation,
+}: {
+  item: WallRuntimeItem | null;
+  slotIndex: number;
+  isStrongAnimation: boolean;
+}) {
   if (!item) {
     return (
       <div
+        data-testid={`grid-cell-${slotIndex}`}
+        data-strong-animation="false"
         className="grid-cell-empty overflow-hidden rounded-[18px]"
         style={{
           background: 'rgba(255,255,255,0.03)',
@@ -33,6 +46,8 @@ function GridCell({ item }: { item: WallRuntimeItem | null }) {
 
   return (
     <div
+      data-testid={`grid-cell-${slotIndex}`}
+      data-strong-animation={isStrongAnimation ? 'true' : 'false'}
       className="relative overflow-hidden rounded-[18px]"
       style={{
         background: 'rgba(255,255,255,0.06)',
@@ -44,10 +59,10 @@ function GridCell({ item }: { item: WallRuntimeItem | null }) {
         <motion.div
           key={item.id}
           className="absolute inset-0"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.25 }}
+          initial={isStrongAnimation ? { opacity: 0, scale: 0.92, y: 18 } : { opacity: 0 }}
+          animate={isStrongAnimation ? { opacity: 1, scale: 1, y: 0 } : { opacity: 1 }}
+          exit={isStrongAnimation ? { opacity: 0, scale: 0.98 } : { opacity: 0 }}
+          transition={{ duration: isStrongAnimation ? 0.32 : 0.16 }}
         >
           <MediaSurface media={item} fit="cover" />
         </motion.div>
@@ -81,7 +96,15 @@ function GridCell({ item }: { item: WallRuntimeItem | null }) {
   );
 }
 
-export function GridLayout({ items }: GridLayoutProps) {
+export function GridLayout({
+  items,
+  activeSlotIndexes = [],
+  maxStrongAnimations = activeSlotIndexes.length,
+}: GridLayoutProps) {
+  const strongSlots = new Set(
+    resolveStrongAnimationSlotIndexes(activeSlotIndexes, maxStrongAnimations),
+  );
+
   return (
     <div
       className="absolute inset-0"
@@ -93,9 +116,9 @@ export function GridLayout({ items }: GridLayoutProps) {
         background: '#070707',
       }}
     >
-      <GridCell item={items[0] ?? null} />
-      <GridCell item={items[1] ?? null} />
-      <GridCell item={items[2] ?? null} />
+      <GridCell item={items[0] ?? null} slotIndex={0} isStrongAnimation={strongSlots.has(0)} />
+      <GridCell item={items[1] ?? null} slotIndex={1} isStrongAnimation={strongSlots.has(1)} />
+      <GridCell item={items[2] ?? null} slotIndex={2} isStrongAnimation={strongSlots.has(2)} />
     </div>
   );
 }

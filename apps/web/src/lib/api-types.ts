@@ -711,8 +711,55 @@ export interface ApiUserOrganization {
 export interface MeResponse {
   user: MeUser;
   organization: MeOrganization | null;
+  active_context: MeActiveContext | null;
+  workspaces: MeWorkspaces;
   access: MeAccess;
   subscription: MeSubscription | null;
+}
+
+export interface MeActiveContext {
+  type: 'organization' | 'event';
+  organization_id: number | null;
+  event_id: number | null;
+  role_key: string;
+  role_label: string;
+  capabilities: string[];
+  entry_path: string;
+}
+
+export interface MeWorkspaces {
+  organizations: MeOrganizationWorkspace[];
+  event_accesses: MeEventAccessWorkspace[];
+}
+
+export interface MeOrganizationWorkspace {
+  organization_id: number;
+  organization_uuid: string;
+  organization_name: string;
+  organization_slug: string;
+  organization_type: string | null;
+  organization_status: string | null;
+  role_key: string;
+  role_label: string;
+  is_owner: boolean;
+  entry_path: string;
+}
+
+export interface MeEventAccessWorkspace {
+  event_id: number;
+  event_uuid: string;
+  event_title: string;
+  event_slug: string;
+  event_date: string | null;
+  event_status: string | null;
+  organization_id: number;
+  organization_name: string;
+  organization_slug: string | null;
+  role_key: string;
+  role_label: string;
+  persisted_role: string;
+  capabilities: string[];
+  entry_path: string;
 }
 
 export interface MeUser {

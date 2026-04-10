@@ -434,4 +434,46 @@ describe('useWallPlayer', () => {
       },
     ]);
   });
+
+  it('applies realtime media updates without forcing a full boot refetch', async () => {
+    renderHook(() => useWallPlayer('ABCD1234'));
+
+    await flushAsyncWork();
+
+    getWallBootMock.mockClear();
+
+    const config = useWallRealtimeMock.mock.calls[0]?.[0] as {
+      onNewMedia?: (payload: {
+        id: string;
+        url: string;
+        type: 'image' | 'video';
+        sender_name?: string | null;
+        sender_key?: string | null;
+        source_type?: string | null;
+        caption?: string | null;
+        duplicate_cluster_key?: string | null;
+        is_featured?: boolean;
+      }) => void;
+    };
+
+    act(() => {
+      config.onNewMedia?.({
+        id: 'media_2',
+        url: 'https://cdn.example.com/media-2.jpg',
+        type: 'image',
+        sender_name: 'Paula',
+        sender_key: 'sender-paula',
+        source_type: 'whatsapp',
+        caption: 'Nova foto',
+        duplicate_cluster_key: null,
+        is_featured: false,
+      });
+    });
+
+    expect(engineMock.handleNewMedia).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'media_2',
+      url: 'https://cdn.example.com/media-2.jpg',
+    }));
+    expect(getWallBootMock).not.toHaveBeenCalled();
+  });
 });

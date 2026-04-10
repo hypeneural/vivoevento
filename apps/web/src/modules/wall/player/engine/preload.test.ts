@@ -3,7 +3,12 @@
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { preloadNextItem, preloadVideoAuto, resolveNextPreloadItem } from '../engine/preload';
+import {
+  preloadImageWithDecode,
+  preloadNextItem,
+  preloadVideoAuto,
+  resolveNextPreloadItem,
+} from '../engine/preload';
 import type { WallRuntimeItem, WallSettings, WallSenderRuntimeStats } from '../types';
 
 function makeItem(id: string, overrides?: Partial<WallRuntimeItem>): WallRuntimeItem {
@@ -155,6 +160,51 @@ describe('video preload helpers', () => {
     expect(created[0].preload).toBe('auto');
     expect(created[0].muted).toBe(true);
     expect(created[0].src).toContain('https://cdn.test/video.mp4');
+  });
+
+  it('sets fetchPriority and decoding hints when preloading the piece entering now', async () => {
+    let createdImage: {
+      decoding: 'sync' | 'async' | 'auto';
+      fetchPriority: 'high' | 'low' | 'auto';
+      decode: ReturnType<typeof vi.fn>;
+      _src?: string;
+    } | null = null;
+
+    const originalImage = globalThis.Image;
+
+    class MockImage {
+      decoding: 'sync' | 'async' | 'auto' = 'auto';
+      fetchPriority: 'high' | 'low' | 'auto' = 'auto';
+      decode = vi.fn().mockResolvedValue(undefined);
+
+      constructor() {
+        createdImage = this as unknown as typeof createdImage;
+      }
+
+      set src(value: string) {
+        this._src = value;
+      }
+
+      get src() {
+        return this._src ?? '';
+      }
+    }
+
+    globalThis.Image = MockImage as unknown as typeof Image;
+
+    try {
+      const ready = await preloadImageWithDecode('https://cdn.test/anchor.jpg', {
+        fetchPriority: 'high',
+        decoding: 'sync',
+      });
+
+      expect(ready).toBe(true);
+      expect(createdImage?.fetchPriority).toBe('high');
+      expect(createdImage?.decoding).toBe('sync');
+      expect(createdImage?.decode).toHaveBeenCalled();
+    } finally {
+      globalThis.Image = originalImage;
+    }
   });
 
   it('uses video preloading when the next item is a video', async () => {

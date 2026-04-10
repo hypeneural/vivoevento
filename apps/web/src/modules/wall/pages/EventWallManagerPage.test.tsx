@@ -702,4 +702,148 @@ describe('EventWallManagerPage', () => {
       expect(deleteEventWallAdMock).toHaveBeenCalledWith('1', 1);
     });
   }, 15000);
+
+  it('mostra controles do puzzle e salva theme_config normalizado sem dirty state infinito', async () => {
+    getEventWallSettingsMock.mockResolvedValueOnce({
+      id: 10,
+      event_id: 1,
+      wall_code: 'ABCD1234',
+      is_enabled: true,
+      status: 'live',
+      status_label: 'Ao vivo',
+      public_url: 'https://example.com/wall/ABCD1234',
+      settings: {
+        interval_ms: 8000,
+        queue_limit: 50,
+        selection_mode: 'balanced',
+        event_phase: 'flow',
+        selection_policy: fallbackOptions.selection_modes[0].selection_policy,
+        theme_config: {},
+        layout: 'puzzle',
+        transition_effect: 'fade',
+        background_url: null,
+        partner_logo_url: null,
+        show_qr: true,
+        show_branding: true,
+        show_neon: false,
+        neon_text: null,
+        neon_color: '#ffffff',
+        show_sender_credit: false,
+        show_side_thumbnails: true,
+        accepted_orientation: 'all',
+        video_enabled: true,
+        video_playback_mode: 'play_to_end_if_short_else_cap',
+        video_max_seconds: 20,
+        video_resume_mode: 'resume_if_same_item_else_restart',
+        video_audio_policy: 'muted',
+        video_multi_layout_policy: 'all',
+        video_preferred_variant: 'wall_video_720p',
+        ad_mode: 'disabled',
+        ad_frequency: 5,
+        ad_interval_minutes: 3,
+        instructions_text: 'Envie sua foto',
+      },
+      diagnostics_summary: {
+        health_status: 'healthy' as const,
+        total_players: 1,
+        online_players: 1,
+        offline_players: 0,
+        degraded_players: 0,
+        ready_count: 12,
+        loading_count: 1,
+        error_count: 0,
+        stale_count: 0,
+        cache_enabled_players: 1,
+        persistent_storage_players: 1,
+        cache_hit_rate_avg: 86,
+        cache_usage_bytes_max: 1048576,
+        cache_quota_bytes_max: 8388608,
+        cache_stale_fallback_count: 1,
+        last_seen_at: '2026-04-02T21:00:00Z',
+        updated_at: '2026-04-02T21:00:00Z',
+      },
+      video_pipeline: {
+        ffmpeg_bin: 'ffmpeg',
+        ffprobe_bin: 'ffprobe',
+        ffmpeg_available: false,
+        ffprobe_available: false,
+        ffmpeg_resolved_path: null,
+        ffprobe_resolved_path: null,
+        ready: false,
+      },
+      expires_at: null,
+      created_at: '2026-04-02T20:00:00Z',
+      updated_at: '2026-04-02T21:00:00Z',
+    });
+
+    getWallOptionsMock.mockResolvedValueOnce({
+      ...fallbackOptions,
+      layouts: [
+        ...fallbackOptions.layouts,
+        {
+          value: 'puzzle',
+          label: 'Quebra Cabeca',
+          capabilities: {
+            supports_video_playback: false,
+            supports_video_poster_only: false,
+            supports_multi_video: false,
+            max_simultaneous_videos: 0,
+            fallback_video_layout: 'cinematic',
+            supports_side_thumbnails: false,
+            supports_floating_caption: false,
+            supports_theme_config: true,
+          },
+          defaults: {
+            theme_config: {
+              preset: 'standard',
+              anchor_mode: 'event_brand',
+              burst_intensity: 'normal',
+              hero_enabled: true,
+              video_behavior: 'fallback_single_item',
+            },
+          },
+        },
+      ],
+    });
+
+    renderPage();
+
+    const appearanceTab = await screen.findByRole('tab', { name: /Aparencia/i });
+    fireEvent.click(appearanceTab);
+
+    await waitFor(() => {
+      expect(appearanceTab).toHaveAttribute('aria-selected', 'true');
+    });
+
+    expect(await screen.findByText(/Configuracao do puzzle/i)).toBeInTheDocument();
+    expect(screen.getByText(/Puzzle exibe imagens\. Videos entram em layout individual de fallback\./i)).toBeInTheDocument();
+    expect(screen.getByTestId('wall-side-thumbnails-switch')).toBeDisabled();
+    expect(screen.getByTestId('wall-video-multi-layout-locked')).toBeInTheDocument();
+
+    const saveButton = screen
+      .getAllByRole('button', { name: /Salvar alteracoes/i })
+      .find((button) => button.querySelector('.lucide-save') !== null);
+
+    expect(saveButton).toBeDefined();
+    fireEvent.click(saveButton as HTMLButtonElement);
+
+    await waitFor(() => {
+      expect(updateEventWallSettingsMock).toHaveBeenCalledWith('1', expect.objectContaining({
+        layout: 'puzzle',
+        show_side_thumbnails: false,
+        video_multi_layout_policy: 'disallow',
+        theme_config: {
+          preset: 'standard',
+          anchor_mode: 'event_brand',
+          burst_intensity: 'normal',
+          hero_enabled: true,
+          video_behavior: 'fallback_single_item',
+        },
+      }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/^Tudo salvo$/i).length).toBeGreaterThan(0);
+    });
+  }, 15000);
 });

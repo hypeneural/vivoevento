@@ -1,52 +1,59 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
-import type { MeResponse, MeUser, MeOrganization, MeAccess, MeSubscription, MeResolvedEntitlements, LoginPayload } from '@/lib/api-types';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+
+import type {
+  LoginPayload,
+  MeAccess,
+  MeActiveContext,
+  MeOrganization,
+  MeResolvedEntitlements,
+  MeResponse,
+  MeSubscription,
+  MeUser,
+  MeWorkspaces,
+} from '@/lib/api-types';
 import { AUTH_USE_MOCK, authService, clearSession } from '@/modules/auth/services/auth.service';
 import { mockUsers } from '@/shared/mock/data';
 
-// ─── Context ───────────────────────────────────────────────
-
 interface AuthContextType {
-  // Session data — comes directly from MeResponse
   meUser: MeUser | null;
   meOrganization: MeOrganization | null;
+  activeContext: MeActiveContext | null;
+  workspaces: MeWorkspaces;
   meAccess: MeAccess | null;
   meSubscription: MeSubscription | null;
   meEntitlements: MeResolvedEntitlements | null;
-
-  // Convenience
+  preferredHomePath: string;
+  isEventOnlySession: boolean;
   isAuthenticated: boolean;
   isLoading: boolean;
-
-  // Auth actions
   login: (payload: LoginPayload) => Promise<void>;
   loginMock: (userId: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
-
-  // Permissions (convenience)
+  setOrganizationContext: (organizationId: number) => Promise<void>;
+  setEventContext: (eventId: number) => Promise<void>;
   can: (permission: string) => boolean;
   hasRole: (role: string) => boolean;
   canAccessModule: (moduleKey: string) => boolean;
   hasFeature: (featureKey: string) => boolean;
-
-  // Dev helpers
   availableUsers: Array<{ id: string; name: string; role: string; email: string; phone?: string }>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const EMPTY_WORKSPACES: MeWorkspaces = {
+  organizations: [],
+  event_accesses: [],
+};
 
-// ─── Provider ──────────────────────────────────────────────
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<MeResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // ─── Hydrate session from persisted state or API
   const hydrateFromSession = useCallback((me: MeResponse) => {
     setSession(me);
   }, []);
 
-  // Hydrate on mount
   useEffect(() => {
     const persisted = authService.getPersistedSession();
     if (persisted) {
@@ -55,17 +62,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, [hydrateFromSession]);
 
-  // Listen for 401 events from API client
   useEffect(() => {
     const handleUnauthorized = () => {
       setSession(null);
       clearSession();
     };
+
     window.addEventListener('auth:unauthorized', handleUnauthorized);
+
     return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
   }, []);
-
-  // ─── Actions ─────────────────────────────────────────────
 
   const login = useCallback(async (payload: LoginPayload) => {
     setIsLoading(true);
@@ -107,7 +113,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [hydrateFromSession]);
 
-  // ─── Permission Helpers ──────────────────────────────────
+  const setOrganizationContext = useCallback(async (organizationId: number) => {
+    const me = await authService.setOrganizationContext(organizationId);
+    hydrateFromSession(me);
+  }, [hydrateFromSession]);
+
+  const setEventContext = useCallback(async (eventId: number) => {
+    const me = await authService.setEventContext(eventId);
+    hydrateFromSession(me);
+  }, [hydrateFromSession]);
 
   const can = useCallback((permission: string) => {
     if (!session) return false;
@@ -130,34 +144,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return session.access.feature_flags[featureKey] === true;
   }, [session]);
 
-  // ─── Memoized Value ──────────────────────────────────────
+  const workspaces = session?.workspaces ?? EMPTY_WORKSPACES;
+  const activeContext = session?.active_context ?? null;
+  const isEventOnlySession = !session?.organization
+    && workspaces.organizations.length === 0
+    && workspaces.event_accesses.length > 0;
+
+  const preferredHomePath = useMemo(() => {
+    if (!session) {
+      return '/';
+    }
+
+    if (activeContext?.entry_path) {
+      return activeContext.entry_path;
+    }
+
+    if (workspaces.event_accesses.length === 1 && workspaces.organizations.length === 0) {
+      return workspaces.event_accesses[0]?.entry_path ?? '/my-events';
+    }
+
+    if (workspaces.event_accesses.length > 1 && workspaces.organizations.length === 0) {
+      return '/my-events';
+    }
+
+    return '/';
+  }, [activeContext, session, workspaces.event_accesses, workspaces.organizations.length]);
 
   const value = useMemo<AuthContextType>(() => ({
     meUser: session?.user ?? null,
     meOrganization: session?.organization ?? null,
+    activeContext,
+    workspaces,
     meAccess: session?.access ?? null,
     meSubscription: session?.subscription ?? null,
     meEntitlements: session?.access.entitlements ?? null,
+    preferredHomePath,
+    isEventOnlySession,
     isAuthenticated: !!session,
     isLoading,
     login,
     loginMock,
     logout,
     refreshSession,
+    setOrganizationContext,
+    setEventContext,
     can,
     hasRole,
     canAccessModule,
     hasFeature,
     availableUsers: AUTH_USE_MOCK
-      ? mockUsers.map(u => ({
-          id: u.id,
-          name: u.name,
-          role: u.role,
-          email: u.email,
-          phone: u.phone,
+      ? mockUsers.map((user) => ({
+          id: user.id,
+          name: user.name,
+          role: user.role,
+          email: user.email,
+          phone: user.phone,
         }))
       : [],
-  }), [session, isLoading, login, loginMock, logout, refreshSession, can, hasRole, canAccessModule, hasFeature]);
+  }), [
+    session,
+    activeContext,
+    workspaces,
+    preferredHomePath,
+    isEventOnlySession,
+    isLoading,
+    login,
+    loginMock,
+    logout,
+    refreshSession,
+    setOrganizationContext,
+    setEventContext,
+    can,
+    hasRole,
+    canAccessModule,
+    hasFeature,
+  ]);
 
   return (
     <AuthContext.Provider value={value}>

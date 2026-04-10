@@ -27,6 +27,16 @@ class FaceSearchTelemetryService
         $providerPayload = is_array($execution['provider_payload_json'] ?? null)
             ? $execution['provider_payload_json']
             : [];
+        $shadowPayload = is_array($execution['shadow'] ?? null)
+            ? $execution['shadow']
+            : [];
+        $shadowComparison = is_array($shadowPayload['comparison'] ?? null)
+            ? $shadowPayload['comparison']
+            : [];
+        $resultCount = count($results);
+        $shadowResultCount = is_numeric($shadowPayload['result_count'] ?? null)
+            ? (int) $shadowPayload['result_count']
+            : null;
 
         $this->channel()->info('face_search.query.completed', $this->filterNull([
             ...$this->eventPayload($event),
@@ -47,7 +57,15 @@ class FaceSearchTelemetryService
             'search_mode_fallback_reason' => $providerPayload['search_mode_fallback_reason'] ?? null,
             'primary_duration_ms' => $execution['primary_duration_ms'] ?? null,
             'response_duration_ms' => $execution['response_duration_ms'] ?? null,
-            'result_count' => count($results),
+            'result_count' => $resultCount,
+            'shadow_backend_key' => $shadowPayload['backend_key'] ?? null,
+            'shadow_status' => $shadowPayload['status'] ?? null,
+            'shadow_result_count' => $shadowResultCount,
+            'shadow_latency_ms' => $shadowPayload['latency_ms'] ?? null,
+            'shadow_shared_count' => $shadowComparison['shared_count'] ?? null,
+            'shadow_top_match_same' => $shadowComparison['top_match_same'] ?? null,
+            'shadow_divergence_ratio' => $shadowComparison['divergence_ratio'] ?? null,
+            'shadow_found_when_primary_empty' => $resultCount === 0 && ($shadowResultCount ?? 0) > 0,
         ]));
     }
 

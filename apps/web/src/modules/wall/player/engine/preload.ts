@@ -12,6 +12,11 @@
 import type { WallRuntimeItem, WallSenderRuntimeStats, WallSettings } from '../types';
 import { pickNextWallItemId, resolveWallSelectionPolicy } from './selectors';
 
+export interface WallImagePreloadOptions {
+  fetchPriority?: 'high' | 'low' | 'auto';
+  decoding?: 'sync' | 'async' | 'auto';
+}
+
 /**
  * Predict the next item that `advance` would select.
  */
@@ -39,9 +44,21 @@ export function resolveNextPreloadItem(
  * Preload an image using img.decode() for flicker-free rendering.
  * Returns true if decode succeeded, false otherwise.
  */
-export function preloadImageWithDecode(url: string): Promise<boolean> {
+export function preloadImageWithDecode(
+  url: string,
+  options: WallImagePreloadOptions = {},
+): Promise<boolean> {
   return new Promise((resolve) => {
     const img = new Image();
+
+    if ('fetchPriority' in img && options.fetchPriority) {
+      img.fetchPriority = options.fetchPriority;
+    }
+
+    if (options.decoding) {
+      img.decoding = options.decoding;
+    }
+
     img.src = url;
 
     if (typeof img.decode === 'function') {
@@ -72,12 +89,15 @@ export function preloadVideoAuto(url: string): void {
 /**
  * Preload the next item based on its media type.
  */
-export async function preloadNextItem(item: WallRuntimeItem): Promise<void> {
+export async function preloadNextItem(
+  item: WallRuntimeItem,
+  options: WallImagePreloadOptions = {},
+): Promise<void> {
   if (!item.url) return;
 
   if (item.type === 'video') {
     preloadVideoAuto(item.url);
   } else {
-    await preloadImageWithDecode(item.url);
+    await preloadImageWithDecode(item.url, options);
   }
 }

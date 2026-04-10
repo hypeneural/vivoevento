@@ -3,6 +3,7 @@
 namespace App\Modules\Users\Http\Controllers;
 
 use App\Modules\Auth\Http\Resources\MeResource;
+use App\Modules\Events\Models\Event;
 use App\Modules\Users\Actions\UpdateCurrentUserPasswordAction;
 use App\Modules\Users\Actions\UploadCurrentUserAvatarAction;
 use App\Modules\Users\Http\Requests\UpdateCurrentUserPasswordRequest;
@@ -73,6 +74,62 @@ class MeController extends BaseController
         }
 
         $request->user()->update($validated);
+
+        return $this->show($request);
+    }
+
+    public function setOrganizationContext(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'organization_id' => ['required', 'integer', 'exists:organizations,id'],
+        ]);
+
+        $organizationId = (int) $validated['organization_id'];
+        $user = $request->user();
+
+        $canUseOrganization = $user->hasAnyRole(['super-admin', 'platform-admin'])
+            || $user->organizationMembers()->active()->where('organization_id', $organizationId)->exists();
+
+        abort_unless($canUseOrganization, 403);
+
+        $preferences = $user->preferences ?? [];
+        $preferences['active_context'] = [
+            'type' => 'organization',
+            'organization_id' => $organizationId,
+        ];
+
+        $user->update([
+            'preferences' => $preferences,
+        ]);
+
+        return $this->show($request);
+    }
+
+    public function setEventContext(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'event_id' => ['required', 'integer', 'exists:events,id'],
+        ]);
+
+        $event = Event::query()->findOrFail((int) $validated['event_id']);
+        $user = $request->user();
+
+        $canUseEvent = $user->hasAnyRole(['super-admin', 'platform-admin'])
+            || $user->eventTeamMembers()->where('event_id', $event->id)->exists()
+            || $user->organizationMembers()->active()->where('organization_id', $event->organization_id)->exists();
+
+        abort_unless($canUseEvent, 403);
+
+        $preferences = $user->preferences ?? [];
+        $preferences['active_context'] = [
+            'type' => 'event',
+            'event_id' => $event->id,
+            'organization_id' => $event->organization_id,
+        ];
+
+        $user->update([
+            'preferences' => $preferences,
+        ]);
 
         return $this->show($request);
     }

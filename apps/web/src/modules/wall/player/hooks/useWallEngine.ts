@@ -10,6 +10,7 @@ import type {
   WallStatusChangedPayload,
 } from '../types';
 import { primeWallAsset } from '../engine/cache';
+import { resolveWallPreloadPlan } from '../engine/readiness';
 import { resolveNextPreloadItem, preloadNextItem } from '../engine/preload';
 import {
   DEFAULT_EVENT_VIDEO_RESUME_MODE,
@@ -27,22 +28,10 @@ import {
   hydrateWallRuntimeItems,
   hydrateWallSenderStats,
 } from '../engine/storage';
-
-function uniqueItems(items: Array<WallRuntimeItem | null | undefined>): WallRuntimeItem[] {
-  const seen = new Set<string>();
-  const result: WallRuntimeItem[] = [];
-
-  for (const item of items) {
-    if (!item || seen.has(item.id)) {
-      continue;
-    }
-
-    seen.add(item.id);
-    result.push(item);
-  }
-
-  return result;
-}
+import {
+  resolveWallPerformanceTierFromEnvironment,
+  resolveWallRuntimeBudget,
+} from '../runtime-capabilities';
 
 export function useWallEngine(code: string) {
   const [state, dispatch] = useReducer(wallReducer, createEmptyState(code));
@@ -101,6 +90,10 @@ export function useWallEngine(code: string) {
     state.settings?.video_playback_mode,
     state.settings?.video_resume_mode,
   ]);
+  const runtimeBudget = useMemo(
+    () => resolveWallRuntimeBudget(resolveWallPerformanceTierFromEnvironment()),
+    [],
+  );
 
   useEffect(() => {
     if (
@@ -211,38 +204,60 @@ export function useWallEngine(code: string) {
     videoPolicyConfig,
   ]);
 
-  const itemsToPrime = useMemo(() => {
-    const topQueueItems = state.items
-      .filter((item) => item.assetStatus === 'idle')
-      .slice(0, 4);
-
-    return uniqueItems([
-      currentItem,
-      ...topQueueItems,
-    ]);
-  }, [currentItem, state.items]);
+  const preloadPlan = useMemo(() => resolveWallPreloadPlan({
+    items: state.items,
+    currentItem,
+    layout: state.settings?.layout ?? 'fullscreen',
+    budget: runtimeBudget,
+  }), [currentItem, runtimeBudget, state.items, state.settings?.layout]);
 
   useEffect(() => {
-    if (itemsToPrime.length === 0) {
+    if (preloadPlan.length === 0) {
       return;
     }
 
-    itemsToPrime.forEach((item) => {
-      void primeWallAsset(item, (result) => {
-        dispatch({
-          type: 'media-asset-status',
-          payload: {
-            id: item.id,
-            assetStatus: result.status,
-            width: result.width ?? null,
-            height: result.height ?? null,
-            orientation: result.orientation ?? null,
-            errorMessage: result.errorMessage ?? null,
-          },
-        });
-      });
-    });
-  }, [itemsToPrime]);
+    let cancelled = false;
+
+    const run = async () => {
+      for (let index = 0; index < preloadPlan.length; index += runtimeBudget.maxConcurrentDecode) {
+        const batch = preloadPlan.slice(index, index + runtimeBudget.maxConcurrentDecode);
+
+        await Promise.all(batch.map(async (entry) => {
+          if (cancelled) {
+            return;
+          }
+
+          const item = entry.item;
+          await primeWallAsset(item, (result) => {
+            dispatch({
+              type: 'media-asset-status',
+              payload: {
+                id: item.id,
+                assetStatus: result.status,
+                width: result.width ?? null,
+                height: result.height ?? null,
+                orientation: result.orientation ?? null,
+                errorMessage: result.errorMessage ?? null,
+              },
+            });
+          }, {
+            fetchPriority: entry.fetchPriority,
+            decoding: entry.decoding,
+          });
+        }));
+
+        if (cancelled) {
+          return;
+        }
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [preloadPlan, runtimeBudget.maxConcurrentDecode]);
 
   // Phase 0.1: Aggressively preload the predicted NEXT item (img.decode / video preload=auto)
   useEffect(() => {
@@ -258,7 +273,10 @@ export function useWallEngine(code: string) {
     );
 
     if (nextItem && nextItem.url) {
-      void preloadNextItem(nextItem);
+      void preloadNextItem(nextItem, {
+        fetchPriority: 'high',
+        decoding: 'sync',
+      });
     }
   }, [state.currentItemId, state.status, state.settings, state.items, state.senderStats]);
 

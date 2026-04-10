@@ -120,7 +120,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({ collapsed, onToggle, onNavClick }: AppSidebarProps) {
   const location = useLocation();
-  const { meUser: user, can, canAccessModule, logout } = useAuth();
+  const { meUser: user, workspaces, can, canAccessModule, logout } = useAuth();
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({
     settings: true,
   });
@@ -171,7 +171,28 @@ export function AppSidebar({ collapsed, onToggle, onNavClick }: AppSidebarProps)
       ...group,
       items: filterItems(group.items),
     }))
-    .filter((group) => group.items.length > 0);
+    .filter((group) => group.items.length > 0)
+    .map((group) => {
+      if (group.section !== 'main' || workspaces.event_accesses.length === 0) {
+        return group;
+      }
+
+      const myEventsItem: NavItem = {
+        key: 'my-events',
+        label: 'Meus eventos',
+        icon: CalendarDays,
+        path: '/my-events',
+      };
+
+      const alreadyPresent = group.items.some((item) => item.key === myEventsItem.key);
+
+      return alreadyPresent
+        ? group
+        : {
+            ...group,
+            items: [...group.items, myEventsItem],
+          };
+    });
 
   const isItemActive = (item: NavItem): boolean => {
     if (item.path && isPathActive(item.path, location.pathname, item.exact)) {

@@ -62,3 +62,22 @@ it('registers duplicate-cluster lookup and manual decision undo in the moderatio
         ->and($controllerSource)->toContain('public function duplicateCluster')
         ->and($controllerSource)->toContain('public function undoDecision');
 });
+
+it('ships minimal moderation observability for feed, stats, detail and client telemetry', function () {
+    $routesSource = file_get_contents(app_path('Modules/MediaProcessing/routes/api.php'));
+    $controllerSource = file_get_contents(app_path('Modules/MediaProcessing/Http/Controllers/EventMediaController.php'));
+    $telemetryControllerSource = file_get_contents(app_path('Modules/MediaProcessing/Http/Controllers/ModerationTelemetryController.php'));
+    $serviceSource = file_get_contents(app_path('Modules/MediaProcessing/Services/ModerationObservabilityService.php'));
+    $configSource = file_get_contents(config_path('observability.php'));
+
+    expect($routesSource)->toContain("Route::post('media/feed/telemetry'")
+        ->and($controllerSource)->toContain('recordFeedResponse')
+        ->and($controllerSource)->toContain('recordStatsResponse')
+        ->and($controllerSource)->toContain('recordDetailResponse')
+        ->and($telemetryControllerSource)->toContain('recordClientTelemetry')
+        ->and($serviceSource)->toContain('moderation.feed.response')
+        ->and($serviceSource)->toContain('moderation.feed.stats')
+        ->and($serviceSource)->toContain('moderation.feed.detail')
+        ->and($serviceSource)->toContain('moderation.feed.client_telemetry')
+        ->and($configSource)->toContain('moderation_log_channel');
+});

@@ -24,6 +24,10 @@ class AwsUserVectorReadinessService
      */
     public function evaluate(Event $event, EventFaceSearchSetting $settings): array
     {
+        $clusterThreshold = $this->clusterThreshold($settings);
+        $minFacesPerUser = $this->minFacesPerUser($settings);
+        $minYawSpread = $this->minYawSpread($settings);
+        $minPitchSpread = $this->minPitchSpread($settings);
         $collectionId = $this->resolveCollectionId($event, $settings);
         $providerRecords = FaceSearchProviderRecord::query()
             ->where('event_id', $event->id)
@@ -97,12 +101,18 @@ class AwsUserVectorReadinessService
             ->values()
             ->all();
 
-        $clusters = $this->clusterCandidates($candidates, $this->clusterThreshold());
+        $clusters = $this->clusterCandidates($candidates, $clusterThreshold);
         $readyClusters = [];
         $pendingClusters = [];
 
         foreach ($clusters as $cluster) {
-            $evaluated = $this->evaluateCluster($event, $cluster);
+            $evaluated = $this->evaluateCluster(
+                event: $event,
+                cluster: $cluster,
+                minFacesPerUser: $minFacesPerUser,
+                minYawSpread: $minYawSpread,
+                minPitchSpread: $minPitchSpread,
+            );
 
             if ($evaluated['ready']) {
                 $readyClusters[] = $evaluated;
@@ -114,10 +124,10 @@ class AwsUserVectorReadinessService
         }
 
         return [
-            'cluster_threshold' => $this->clusterThreshold(),
-            'min_faces_per_user' => $this->minFacesPerUser(),
-            'min_yaw_spread' => $this->minYawSpread(),
-            'min_pitch_spread' => $this->minPitchSpread(),
+            'cluster_threshold' => $clusterThreshold,
+            'min_faces_per_user' => $minFacesPerUser,
+            'min_yaw_spread' => $minYawSpread,
+            'min_pitch_spread' => $minPitchSpread,
             'matched_candidates' => count($candidates),
             'clusters_total' => count($clusters),
             'ready_clusters' => $readyClusters,
@@ -193,6 +203,25 @@ class AwsUserVectorReadinessService
      */
     private function providerBoundingBox(FaceSearchProviderRecord $record): ?array
     {
+        $payload = is_array($record->provider_payload_json) ? $record->provider_payload_json : [];
+        $sourceBbox = data_get($payload, 'index_input.source_bbox');
+
+        if (is_array($sourceBbox)) {
+            $x = $this->nullableFloat($sourceBbox['x'] ?? null);
+            $y = $this->nullableFloat($sourceBbox['y'] ?? null);
+            $width = $this->nullableFloat($sourceBbox['width'] ?? null);
+            $height = $this->nullableFloat($sourceBbox['height'] ?? null);
+
+            if ($x !== null && $y !== null && $width !== null && $height !== null) {
+                return [
+                    'x' => $x,
+                    'y' => $y,
+                    'width' => $width,
+                    'height' => $height,
+                ];
+            }
+        }
+
         $bbox = is_array($record->bbox_json) ? $record->bbox_json : [];
 
         if ($bbox === []) {
@@ -323,8 +352,13 @@ class AwsUserVectorReadinessService
      * @param array<string, mixed> $cluster
      * @return array<string, mixed>
      */
-    private function evaluateCluster(Event $event, array $cluster): array
-    {
+    private function evaluateCluster(
+        Event $event,
+        array $cluster,
+        int $minFacesPerUser,
+        float $minYawSpread,
+        float $minPitchSpread,
+    ): array {
         $faceIds = collect((array) ($cluster['face_ids'] ?? []))
             ->filter(fn (mixed $faceId): bool => is_string($faceId) && $faceId !== '')
             ->unique()
@@ -353,15 +387,15 @@ class AwsUserVectorReadinessService
         $pitchSpread = $this->spread((array) ($cluster['pose_pitches'] ?? []));
         $reasons = [];
 
-        if (count($faceIds) < $this->minFacesPerUser()) {
+        if (count($faceIds) < $minFacesPerUser) {
             $reasons[] = 'insufficient_faces';
         }
 
-        if ($yawSpread < $this->minYawSpread()) {
+        if ($yawSpread < $minYawSpread) {
             $reasons[] = 'insufficient_yaw_variation';
         }
 
-        if ($pitchSpread < $this->minPitchSpread()) {
+        if ($pitchSpread < $minPitchSpread) {
             $reasons[] = 'insufficient_pitch_variation';
         }
 
@@ -482,24 +516,75 @@ class AwsUserVectorReadinessService
         return is_numeric($value) ? (float) $value : null;
     }
 
-    private function clusterThreshold(): float
+    private function clusterThreshold(EventFaceSearchSetting $settings): float
     {
-        return (float) config('face_search.providers.aws_rekognition.user_vectors.cluster_threshold', 0.35);
+        return $this->floatProfileOverride(
+            $settings,
+            'user_vector_cluster_threshold',
+            (float) config('face_search.providers.aws_rekognition.user_vectors.cluster_threshold', 0.35),
+        );
     }
 
-    private function minFacesPerUser(): int
+    private function minFacesPerUser(EventFaceSearchSetting $settings): int
     {
-        return max(1, (int) config('face_search.providers.aws_rekognition.user_vectors.min_faces_per_user', 5));
+        return max(1, $this->intProfileOverride(
+            $settings,
+            'user_vector_min_faces_per_user',
+            (int) config('face_search.providers.aws_rekognition.user_vectors.min_faces_per_user', 5),
+        ));
     }
 
-    private function minYawSpread(): float
+    private function minYawSpread(EventFaceSearchSetting $settings): float
     {
-        return (float) config('face_search.providers.aws_rekognition.user_vectors.min_yaw_spread', 8.0);
+        return $this->floatProfileOverride(
+            $settings,
+            'user_vector_min_yaw_spread',
+            (float) config('face_search.providers.aws_rekognition.user_vectors.min_yaw_spread', 8.0),
+        );
     }
 
-    private function minPitchSpread(): float
+    private function minPitchSpread(EventFaceSearchSetting $settings): float
     {
-        return (float) config('face_search.providers.aws_rekognition.user_vectors.min_pitch_spread', 4.0);
+        return $this->floatProfileOverride(
+            $settings,
+            'user_vector_min_pitch_spread',
+            (float) config('face_search.providers.aws_rekognition.user_vectors.min_pitch_spread', 4.0),
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function profile(EventFaceSearchSetting $settings): array
+    {
+        $profileKey = is_string($settings->aws_index_profile_key) && $settings->aws_index_profile_key !== ''
+            ? $settings->aws_index_profile_key
+            : 'default';
+
+        return (array) config(
+            "face_search.providers.aws_rekognition.index_profiles.{$profileKey}",
+            config('face_search.providers.aws_rekognition.index_profiles.default', []),
+        );
+    }
+
+    private function floatProfileOverride(
+        EventFaceSearchSetting $settings,
+        string $key,
+        float $fallback,
+    ): float {
+        $value = $this->profile($settings)[$key] ?? null;
+
+        return is_numeric($value) ? (float) $value : $fallback;
+    }
+
+    private function intProfileOverride(
+        EventFaceSearchSetting $settings,
+        string $key,
+        int $fallback,
+    ): int {
+        $value = $this->profile($settings)[$key] ?? null;
+
+        return is_numeric($value) ? (int) $value : $fallback;
     }
 
     /**

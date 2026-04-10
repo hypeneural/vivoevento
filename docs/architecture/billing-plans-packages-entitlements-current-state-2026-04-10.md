@@ -21,6 +21,146 @@ Documentos relacionados:
 - `docs/architecture/public-event-checkout-v2-implementation-plan-2026-04-08.md`
 - `docs/architecture/billing-subscriptions-discovery.md`
 
+## Stack relevante
+
+## Backend
+
+Estado real lido em `apps/api/composer.json`:
+
+- PHP `>=8.3 <8.4`
+- Laravel Framework `13.x`
+- Laravel Sanctum `4.3`
+- Laravel Reverb `1.9`
+- Laravel Horizon `5.45`
+- Laravel Pulse `1.7`
+- Laravel Telescope `5.19`
+- Redis via `predis/predis`
+- Spatie Laravel Data `4.20`
+- Spatie Activitylog `4.12`
+- Spatie Medialibrary `11.21`
+- Spatie Permission `7.2`
+- Pest `4.4` + PHPUnit `12.5`
+
+Observacao importante:
+
+- alguns documentos operacionais do repo ainda citam Laravel `12`;
+- o estado real do codigo hoje, pelo `composer.json`, e Laravel `13`.
+
+## Frontend
+
+Estado real lido em `apps/web/package.json`:
+
+- React `18.3.1`
+- TypeScript `5.8.3`
+- Vite `5.4.19`
+- TailwindCSS `3.4.17`
+- TanStack Query `5.83.0`
+- React Hook Form `7.61.1`
+- Zod `3.25.76`
+- Radix UI + shadcn/ui
+- Framer Motion `12.38.0`
+- Pusher JS `8.4.3`
+- Vitest `3.2.4`
+- Playwright `1.59.1`
+
+## Leitura da stack para billing
+
+Para esta frente de planos e pacotes, a stack atual favorece:
+
+- backend com dominio modular em Laravel, actions/services/resources e testes Pest;
+- frontend SPA com formularios fortes, TanStack Query e tokenizacao Pagar.me no navegador;
+- integracao financeira propria por client HTTP, sem depender do SDK PHP legado da Pagar.me;
+- capacidade boa de evoluir catalogo, checkout e reconciliacao sem trocar stack.
+
+Ao mesmo tempo, a stack ainda nao resolve sozinha:
+
+- governanca de feature keys;
+- ledger de uso por ciclo;
+- enforcement transversal de limites;
+- CRUD comercial de catalogo;
+- projecao operacional de uso do plano no frontend.
+
+## Mapa da logica atual
+
+## 1. Recorrencia da conta parceira
+
+Hoje a logica da conta recorrente e:
+
+1. a organizacao escolhe um item do catalogo `plans`;
+2. o ciclo de cobranca vem de `plan_prices`;
+3. o frontend `/plans` coleta dados de cobranca e tokeniza cartao no submit final;
+4. o backend cria ou reutiliza `gateway_plan_id` no provider;
+5. o backend cria a `subscription` na Pagar.me;
+6. a `subscription` local passa a ser a baseline comercial da organizacao;
+7. os eventos da organizacao passam a resolver `commercial_mode=subscription_covered` quando cobertos.
+
+Ponto estrutural:
+
+- a cobertura recorrente hoje e resolvida direto da assinatura da organizacao;
+- ela nao depende de `event_access_grant` por evento.
+
+## 2. Compra unica por evento
+
+Hoje a logica da compra avulsa e:
+
+1. o usuario escolhe um item do catalogo `event_packages`;
+2. o checkout cria `billing_order` no modo `event_package`;
+3. o pagamento segue por Pix ou cartao;
+4. confirmacao/manual refresh/webhook leva a `EventPurchase`;
+5. a compra gera `EventAccessGrant` para aquele evento;
+6. o evento passa a resolver `commercial_mode=single_purchase`.
+
+Ponto estrutural:
+
+- a compra unica ja tem uma trilha mais explicita de pagamento para direito de acesso;
+- `event_access_grant` e a entidade que melhor representa esse direito hoje.
+
+## 3. Trial publico
+
+Hoje o trial publico e uma jornada propria:
+
+1. cria usuario;
+2. cria organizacao parceira leve;
+3. cria evento;
+4. cria `event_access_grant` com `source_type=trial`;
+5. aplica limites fixos hardcoded;
+6. nao cria assinatura recorrente.
+
+Defaults hardcoded hoje:
+
+- `7` dias de retencao;
+- `1` evento ativo;
+- `20` fotos;
+- `live=true`;
+- `hub=true`;
+- `wall=false`;
+- `play=false`;
+- watermark ligada.
+
+## 4. Bonus e manual override
+
+Hoje bonus e liberacao manual entram por grant:
+
+- `bonus` normalmente nasce com `package_id`;
+- `manual_override` pode nascer sem pacote, desde que leve features/limits;
+- ambos usam `event_access_grant`;
+- ambos entram no `EntitlementResolverService` junto com assinatura e compra avulsa.
+
+## 5. Como o frontend reflete isso hoje
+
+No frontend, a leitura atual esta dividida em duas jornadas:
+
+- `/plans` para recorrencia da organizacao;
+- `/checkout/evento` para compra unica por evento.
+
+Estado atual relevante:
+
+- checkout recorrente tokeniza cartao no submit final e envia apenas `card_token`;
+- troca de cartao recorrente pode usar wallet salva ou novo `card_token`;
+- checkout publico aceita Pix e cartao;
+- o helper `buildCheckoutPayload()` do checkout publico fixa `installments = 1` hoje;
+- o frontend ainda nao mostra uso real de quota mensal, porque o backend ainda nao tem ledger desse consumo.
+
 ## Veredito executivo
 
 O Eventovivo ja tem uma base correta para dois modelos comerciais diferentes:
@@ -128,6 +268,56 @@ Para a compra unica:
 - `apps/api/tests/Feature/Events/EventCommercialEnvelopeCharacterizationTest.php`
 - `apps/api/tests/Feature/InboundMedia/PublicUploadCommercialEnvelopeCharacterizationTest.php`
 - `apps/api/tests/Feature/Events/EventIntakeChannelsTest.php`
+
+## Testes adicionados nesta revisao
+
+- `apps/api/tests/Feature/Billing/PlansPackagesCurrentStateCharacterizationTest.php`
+- `apps/web/src/modules/billing/public-checkout/support/checkoutFormUtils.test.ts`
+
+## O que esta bateria adicional valida
+
+### Backend
+
+- o catalogo recorrente `/plans` hoje e um catalogo bruto de `plan + prices + features`, sem projecao comercial tipada;
+- o detalhe de pacote por evento monta `modules`, `limits` e `checkout_marketing` a partir da mesma bolsa de `event_package_features`;
+- o trial publico nasce por `event_access_grant`, com defaults hardcoded, sem criar assinatura recorrente;
+- a cobertura `subscription_covered` dos eventos vem direto da assinatura da organizacao, sem grants por evento.
+
+### Frontend
+
+- o helper do checkout avulso continua fixando `installments = 1` para cartao;
+- o payload de cartao sai com `card_token` apenas no momento final do submit;
+- o payload Pix nao carrega dados de cobranca de cartao.
+
+## Leituras reforcadas pela bateria
+
+Depois dessa rodada, tres conclusoes ficaram ainda mais fortes:
+
+1. o catalogo atual e funcional, mas ainda nao e um contrato comercial tipado;
+2. trial e pacote avulso ja usam grant como entidade de acesso de forma mais explicita do que a recorrencia;
+3. a recorrencia ja esta madura para cobranca, mas ainda nao para governanca de uso por ciclo.
+
+## Resultado da execucao desta rodada
+
+Backend executado:
+
+- `php artisan test tests/Feature/Billing/PlansPackagesCurrentStateCharacterizationTest.php tests/Feature/Billing/EventPackageCatalogTest.php tests/Feature/Billing/PublicTrialEventTest.php tests/Feature/Events/EventCommercialStatusTest.php`
+
+Resultado:
+
+- `15` testes passando;
+- `139` assertions;
+- nenhuma falha nesta bateria focada.
+
+Frontend executado:
+
+- `npm run test -- src/modules/billing/public-checkout/support/checkoutFormUtils.test.ts src/modules/plans/PlansPage.test.tsx src/modules/billing/services/public-event-checkout.service.test.ts`
+
+Resultado:
+
+- `3` arquivos de teste passando;
+- `12` testes passando;
+- nenhuma falha nesta bateria focada.
 
 ## Os dois modelos comerciais
 
@@ -1416,4 +1606,3 @@ Mas o proximo salto nao deve ser criar mais planos no seeder. O proximo salto de
 Para a recorrencia Pagar.me, o foco atual continua correto: cobrar mensalmente o parceiro com `plan + subscription`. Em paralelo, o produto precisa passar a medir e aplicar os recursos do plano no Eventovivo. Sem essa camada, a cobranca recorrente funciona financeiramente, mas o plano ainda nao controla de verdade o que o parceiro pode usar.
 
 Para compra unica, a estrutura tambem esta no caminho certo. O pacote avulso ja vincula pagamento, evento, purchase e grant. O ajuste importante e tornar parcelas, meios de pagamento, limites e recursos editaveis por catalogo, e nao fixos no frontend ou em seeders.
-

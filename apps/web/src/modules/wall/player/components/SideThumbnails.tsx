@@ -32,6 +32,7 @@ function ThumbnailColumn({
 
   return (
     <div
+      data-testid={`wall-side-thumbnails-${side}`}
       className={`absolute ${posClass} top-1/2 z-10 hidden -translate-y-1/2 flex-col lg:flex`}
       style={{ gap: 'clamp(6px, 0.8vh, 14px)' }}
     >

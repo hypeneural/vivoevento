@@ -2388,6 +2388,89 @@ Leitura pratica para o produto:
      - `npm.cmd run type-check`
      - `PASS`
 
+### Rodada real pequena em evento organico-like no lane `faces`
+
+Validacao executada em `2026-04-10` no evento tecnico `368` (`Codex FaceSearch VIPSocial 20260410-144855`) usando o lote local `C:\Users\Usuario\Desktop\vipsocial`.
+
+Escopo real validado:
+
+- criacao/uso de evento real com `search_backend_key=aws_rekognition`;
+- upload publico real de `12` imagens;
+- processamento real de variantes;
+- provisionamento real da collection AWS;
+- indexacao real no lane AWS;
+- busca interna e publica por selfie/rosto usando recortes derivados das proprias fotos do lote;
+- leitura real dos KPIs do detalhe do evento e da listagem `/media`.
+
+Resultado operacional consolidado:
+
+- `total_media=12`
+- `indexed_media=4`
+- `skipped_media=8`
+- `failed_media=0`
+- `searchable_records=5`
+- `distinct_ready_users=0`
+- `aws_search_mode=faces`
+
+Leitura objetiva:
+
+- os KPIs do detalhe do evento e da API de `/media` ficaram coerentes com o estado real do acervo;
+- o filtro HTTP de `/media` por `face_search_enabled=1` e `face_index_status=indexed` voltou a responder `200` e retornou `4` imagens indexadas;
+- a busca interna admin funcionou ponta a ponta;
+- a busca publica tambem funcionou ponta a ponta, mas devolveu `0` resultados enquanto o acervo permaneceu em `pending/draft`, porque essa superficie so entrega midias aprovadas/publicadas.
+
+Grupo validado: vestido marrom
+
+- query de rosto derivada de `55160538970_ce79eb2997_o.jpg`
+- `3/3` buscas internas devolveram match correto em `55160407814_c5e415daa1_o.jpg`
+- warm latency observada no backend AWS:
+  - `830ms`
+  - `862ms`
+  - `850ms`
+- shadow local concordou com o primario AWS em `3/3`:
+  - `shadow_result_count=1`
+  - `top_match_same=true`
+  - `divergence_ratio=0`
+
+Grupo validado: vestido vermelho
+
+- query de rosto derivada de `55159264527_7f683b08f6_o.jpg`
+- `3/3` buscas internas no primario AWS devolveram `0` resultados;
+- warm latency observada no backend AWS:
+  - `1009ms`
+  - `864ms`
+  - `864ms`
+- o shadow local encontrou consistentemente `55160407554_2fcfa6755a_o.jpg` em `3/3`;
+- a divergencia ficou estavel em:
+  - `shadow_result_count=1`
+  - `shadow_only_event_media_ids=[126748]`
+  - `top_match_same=false`
+  - `divergence_ratio=1`
+- probe direto no `SearchFacesByImage` da AWS confirmou que o vermelho nao retorna match nem com `FaceMatchThreshold` reduzido de `80` para `40`.
+
+Leitura de produto desta rodada:
+
+- o lane atual de `faces` esta funcional, mas ainda nao pode ser chamado de `100% perfeito` em agrupamento organico;
+- a pessoa de vestido marrom validou o caminho feliz real;
+- a pessoa de vestido vermelho expos um caso real em que:
+  - o shadow local encontra a identidade correta;
+  - o primario AWS retorna `0`;
+  - e a divergencia nao e apenas threshold superficial.
+
+Leitura operacional desta rodada:
+
+- a primeira passada assincrona da fila `face-index` abriu circuit breaker e deixou midias em `queued/failed` por duplicidade de jobs de provisionamento/backfill;
+- a collection e o acervo foram recuperados com rerun controlado e o evento terminou em `ready_for_guests`;
+- a telemetria de `face_search.query.completed` foi endurecida nesta rodada para tambem registrar resumo do shadow:
+  - `shadow_backend_key`
+  - `shadow_status`
+  - `shadow_result_count`
+  - `shadow_latency_ms`
+  - `shadow_shared_count`
+  - `shadow_top_match_same`
+  - `shadow_divergence_ratio`
+  - `shadow_found_when_primary_empty`
+
 ### P0. Faltantes obrigatorias para chamar de 100%
 
 1. Rodada organica final do modo `users`
@@ -2407,6 +2490,16 @@ Leitura pratica para o produto:
      - drift depois de reconcile;
      - latencia por query;
      - reclamacoes de match ruim ou zero resultado.
+
+3. Fechar o gap real ainda aberto no lane `faces`
+   - enquanto o produto ainda opera muito evento em `aws_search_mode=faces`, o caso organico do evento `368` nao permite chamar essa trilha de `perfeita`;
+   - antes de comunicar `100% funcional` como agrupamento por IA no lane atual, ainda falta:
+     - entender por que a identidade do vestido vermelho fica com `0` no primario AWS e `1` no shadow local;
+     - decidir se isso sera tratado por:
+       - melhoria de coverage/indexacao do acervo;
+       - recalibracao de gate/derivado para AWS;
+       - ou promocao mais rapida do lane `users` para eventos com massa suficiente;
+     - manter pelo menos uma rodada organica curta em `faces` ate esse gap deixar de aparecer.
 
 ### P1. Polimento de produto e reducao de friccao
 
@@ -2461,3 +2554,94 @@ O que falta agora esta mais concentrado em:
 
 - fechamento do rollout organico;
 - ultima validacao organica de rollout.
+
+### Fechamento desta trilha em 2026-04-10
+
+Depois da rodada acima, esta trilha foi reaberta e fechada com correcoes estruturais no backend AWS:
+
+1. indexacao AWS passou a privilegiar `face_crop` no perfil `social_gallery_event`
+   - a indexacao real do evento `368` subiu de `4/12` para `11/12` imagens com `face_index_status=indexed`;
+   - o unico `skipped` remanescente ficou em `55160322273_dc03572778_o.jpg`;
+   - esse arquivo nao ficou pendente por bug de pipeline, e sim por qualidade baixa real nos recortes detectados:
+     - `face_area_ratio` local entre `0.0032` e `0.0064`
+     - `sharpness` AWS entre `5.77` e `32.20`
+     - todos os recortes retornaram `low_quality`.
+
+2. o `reconcileCollection()` deixou de apagar os metadados locais do crop
+   - antes, a reconciliacao sobrescrevia `provider_payload_json` com o retorno bruto de `ListFaces`;
+   - isso removia `index_input.source_bbox` e quebrava o casamento entre face remota e face local;
+   - efeito real: um cluster pronto podia desaparecer logo depois do `reconcile`;
+   - agora a reconciliacao preserva `index_input`, `source_bbox` e demais hints locais necessarios para manter o cluster estavel.
+
+3. o sync de `users` ficou resiliente a reindex
+   - antes, um reindex real podia recriar `face_id`s e o `AssociateFaces` responder `ASSOCIATED_TO_A_DIFFERENT_USER`;
+   - isso acontecia porque a AWS ja conhecia o usuario anterior e o backend tratava a tentativa nova como falha total;
+   - agora, quando todas as faces do lote ja pertencem ao mesmo `reported_user_id`, o backend reaproveita automaticamente esse `user_id` existente e atualiza os registros locais.
+
+4. rodada organica final do modo `users` executada e aprovada no evento `368`
+   - comando usado:
+     - `php artisan face-search:validate-aws-users-high-cardinality 368 --sample-users=2 --min-ready-users=2 --target-ready-users=2 --max-fallback-rate=0.05 --min-users-mode-resolution-rate=0.95 --min-top1-match-rate=0.85 --min-topk-match-rate=0.95 --max-p95-latency-ms=1500`
+   - report final:
+     - `status=completed`
+     - `ready_users=2`
+     - `users_mode_resolution_rate=1.000000`
+     - `fallback_rate=0.000000`
+     - `top_1_match_rate=1.000000`
+     - `top_k_match_rate=1.000000`
+     - `p95_response_duration_ms=374`
+     - `passed=true`
+   - report salvo em:
+     - `storage/app/private/face-search-users-high-cardinality/20260410-192709-face-search-aws-users-high-cardinality.json`
+
+5. gap real do lane `faces` tambem foi fechado no evento `368`
+   - probes reais foram gerados a partir dos dois clusters prontos do proprio evento;
+   - ambas as identidades retornaram o conjunto esperado no primario AWS, sem fallback;
+   - cluster equivalente ao grupo do vestido marrom:
+     - `result_media_ids=[126753,126752,126754,126751]`
+     - `search_mode_resolved=faces`
+     - `fallback_triggered=false`
+     - `response_duration_ms` observado em torno de `2015ms`
+   - cluster equivalente ao grupo do vestido vermelho:
+     - `result_media_ids=[126748,126756,126745,126752,126755]`
+     - `search_mode_resolved=faces`
+     - `fallback_triggered=false`
+     - `response_duration_ms` observado entre `398ms` e `433ms`
+   - leitura pratica:
+     - o caso do vestido vermelho deixou de divergir entre AWS e shadow local;
+     - o lane `faces` voltou a encontrar corretamente a identidade no primario AWS;
+     - o lane `users` segue sendo a trilha preferencial para menor latencia e menor atrito no produto.
+
+6. estado final do evento tecnico `368` apos correcoes
+   - `total_media=12`
+   - `indexed_media=11`
+   - `skipped_media=1`
+   - `failed_media=0`
+   - `searchable_records=16`
+   - `distinct_ready_users=2`
+   - `aws_search_mode=users`
+   - `status=ready_for_guests`
+
+### Leitura objetiva final
+
+Com as correcoes desta rodada, a trilha AWS ficou fechada para o escopo atual do produto:
+
+- `faces` funcional e validado em evento real;
+- `users` funcional e validado em evento real;
+- `reconcile` sem destruir a base local do crop;
+- `sync user vectors` robusto depois de reindex;
+- observabilidade suficiente para diferenciar:
+  - falha de qualidade real da imagem;
+  - drift de collection;
+  - conflito de associacao de usuario ja existente na AWS;
+  - fallback inesperado;
+  - query respondida em `faces` ou `users`.
+
+O unico limite remanescente no evento `368` nao e mais um bug de integracao:
+
+- `55160322273_dc03572778_o.jpg` continua fora porque os rostos detectados sao pequenos e pouco nitidos para o nivel de qualidade atual.
+
+Se o produto quiser ir alem do escopo atual, os proximos incrementos deixam de ser bloqueios de funcionamento e passam a ser polimento:
+
+- reduzir cold-start do lane `faces` em probes mais pesados;
+- estudar uma trilha opcional de coverage relaxada para fotos de grupo com rosto muito pequeno;
+- manter observacao curta de producao controlada depois da ativacao em eventos reais nao-tecnicos.

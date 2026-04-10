@@ -28,9 +28,21 @@ class EventController extends BaseController
         $this->authorize('viewAny', Event::class);
 
         $validated = $request->validated();
+        $user = $request->user();
+        $organizationId = $validated['organization_id'] ?? $user?->currentOrganization()?->id;
+        $eventIds = null;
+
+        if (! $organizationId && $user && ! $user->hasAnyRole(['super-admin', 'platform-admin'])) {
+            $eventIds = $user->eventTeamMembers()
+                ->pluck('event_id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+        }
 
         $query = new ListEventsQuery(
-            organizationId: $validated['organization_id'] ?? $request->user()?->currentOrganization()?->id,
+            organizationId: $organizationId,
+            eventIds: $eventIds,
             clientId: $validated['client_id'] ?? null,
             status: $validated['status'] ?? null,
             eventType: $validated['event_type'] ?? null,
