@@ -118,6 +118,28 @@ it('returns the global super-admin role even with organization membership', func
     expect($response->json('data.user.role.key'))->toBe('super-admin');
 });
 
+it('allows super-admin to resolve an explicit organization context outside its memberships', function () {
+    [$user, $platformOrganization] = $this->actingAsSuperAdmin();
+    $partnerOrganization = $this->createOrganization([
+        'trade_name' => 'Parceiro de Suporte',
+        'type' => 'partner',
+    ]);
+
+    $response = $this->apiPost('/auth/context/organization', [
+        'organization_id' => $partnerOrganization->id,
+    ]);
+
+    $this->assertApiSuccess($response);
+    expect($response->json('data.user.role.key'))->toBe('super-admin');
+    expect($response->json('data.active_context.type'))->toBe('organization');
+    expect($response->json('data.active_context.organization_id'))->toBe($partnerOrganization->id);
+    expect($response->json('data.organization.id'))->toBe($partnerOrganization->id);
+    expect($response->json('data.organization.name'))->toBe('Parceiro de Suporte');
+
+    $user->refresh();
+    expect($user->currentOrganization()?->id)->toBe($partnerOrganization->id);
+});
+
 it('characterizes that /auth/me collapses a multi-organization user into a single current organization', function () {
     $this->seedPermissions();
 

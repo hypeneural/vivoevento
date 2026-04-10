@@ -26,6 +26,53 @@ it('uses the authenticated user current organization when no organization filter
         ->not->toContain('Evento de outra organizacao');
 });
 
+it('allows super-admin to list events across all organizations by default and filter a specific organization when requested', function () {
+    [$admin, $platformOrganization] = $this->actingAsSuperAdmin();
+    $partnerOrganization = $this->createOrganization([
+        'trade_name' => 'Parceiro Horizonte',
+    ]);
+
+    Event::factory()->create([
+        'organization_id' => $platformOrganization->id,
+        'title' => 'Evento da plataforma',
+    ]);
+
+    Event::factory()->create([
+        'organization_id' => $partnerOrganization->id,
+        'title' => 'Evento do parceiro',
+    ]);
+
+    $globalResponse = $this->apiGet('/events');
+
+    $this->assertApiSuccess($globalResponse);
+    expect(collect($globalResponse->json('data'))->pluck('title')->all())
+        ->toContain('Evento da plataforma')
+        ->toContain('Evento do parceiro');
+
+    $scopedResponse = $this->apiGet('/events?' . http_build_query([
+        'organization_id' => $partnerOrganization->id,
+    ]));
+
+    $this->assertApiSuccess($scopedResponse);
+    expect(collect($scopedResponse->json('data'))->pluck('title')->all())
+        ->toContain('Evento do parceiro')
+        ->not->toContain('Evento da plataforma');
+});
+
+it('forbids non global users from forcing another organization scope in the events listing', function () {
+    [$user, $organization] = $this->actingAsOwner();
+    $otherOrganization = $this->createOrganization();
+
+    Event::factory()->create([
+        'organization_id' => $otherOrganization->id,
+        'title' => 'Evento de outra organizacao',
+    ]);
+
+    $this->apiGet('/events?' . http_build_query([
+        'organization_id' => $otherOrganization->id,
+    ]))->assertStatus(403);
+});
+
 it('filters events by status type module and period', function () {
     [$user, $organization] = $this->actingAsOwner();
 

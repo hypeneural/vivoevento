@@ -85,6 +85,10 @@ class User extends Authenticatable
             : 0;
 
         if ($preferredOrganizationId > 0) {
+            if ($this->hasAnyRole(['super-admin', 'platform-admin'])) {
+                return \App\Modules\Organizations\Models\Organization::query()->find($preferredOrganizationId);
+            }
+
             return $this->organizations()->where('organizations.id', $preferredOrganizationId)->first();
         }
 

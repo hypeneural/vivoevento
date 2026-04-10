@@ -1,5 +1,6 @@
 import { api } from '@/lib/api';
 import { queryKeys } from '@/lib/query-client';
+import type { ApiOrganization, PaginatedResponse } from '@/lib/api-types';
 
 import type {
   EventBrandingAssetKind,
@@ -33,6 +34,22 @@ export const eventsService = {
     return api.getRaw<PaginatedEventsResponse>('/events', {
       params: filters,
     });
+  },
+
+  async listOrganizations(search?: string) {
+    const response = await api.get<PaginatedResponse<ApiOrganization>>('/organizations', {
+      params: {
+        search: search || undefined,
+        per_page: 100,
+      },
+    });
+
+    return response.data.map((organization) => ({
+      id: organization.id,
+      label: organization.trade_name || organization.legal_name || organization.slug,
+      type: organization.type,
+      status: organization.status,
+    }));
   },
 
   async show(id: number | string) {

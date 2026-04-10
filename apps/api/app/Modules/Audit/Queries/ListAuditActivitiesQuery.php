@@ -9,6 +9,7 @@ use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\Organizations\Models\Organization;
 use App\Modules\Organizations\Models\OrganizationMember;
 use App\Modules\Users\Models\User;
+use App\Shared\Concerns\InteractsWithActivityLogProperties;
 use App\Shared\Contracts\QueryInterface;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -17,6 +18,8 @@ use Spatie\Activitylog\Models\Activity;
 
 class ListAuditActivitiesQuery implements QueryInterface
 {
+    use InteractsWithActivityLogProperties;
+
     private const SUBJECT_TYPE_MAP = [
         'event' => Event::class,
         'organization' => Organization::class,
@@ -140,9 +143,10 @@ class ListAuditActivitiesQuery implements QueryInterface
                     $subjectQuery
                         ->where('subject_type', Subscription::class)
                         ->whereIn('subject_id', $organizationSubscriptionIds);
-                })
-                ->orWhere('properties->organization_id', $organizationId)
-                ->orWhereIn('properties->event_id', $organizationEventIds);
+                });
+
+            $this->whereActivityPropertyIdEquals($scopedQuery, 'organization_id', $organizationId, 'or');
+            $this->whereActivityPropertyIdInQuery($scopedQuery, 'event_id', $organizationEventIds, 'or');
         });
     }
 

@@ -3,6 +3,7 @@
 namespace App\Modules\Audit\Http\Controllers;
 
 use App\Modules\Events\Models\Event;
+use App\Shared\Concerns\InteractsWithActivityLogProperties;
 use App\Shared\Http\BaseController;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -10,6 +11,8 @@ use Spatie\Activitylog\Models\Activity;
 
 class EventTimelineController extends BaseController
 {
+    use InteractsWithActivityLogProperties;
+
     /**
      * GET /api/v1/events/{event}/timeline
      */
@@ -24,7 +27,7 @@ class EventTimelineController extends BaseController
                         ->where('subject_type', Event::class)
                         ->where('subject_id', $event->id);
                 })->orWhere(function ($propertyQuery) use ($event) {
-                    $propertyQuery->where('properties->event_id', $event->id);
+                    $this->whereActivityPropertyIdEquals($propertyQuery, 'event_id', $event->id);
                 });
             })
             ->with('causer:id,name')

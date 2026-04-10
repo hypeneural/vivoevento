@@ -7,11 +7,14 @@ use App\Modules\Events\Models\Event;
 use App\Modules\Organizations\Models\Organization;
 use App\Modules\Organizations\Models\OrganizationMember;
 use App\Modules\Users\Models\User;
+use App\Shared\Concerns\InteractsWithActivityLogProperties;
 use Illuminate\Database\Eloquent\Builder;
 use Spatie\Activitylog\Models\Activity;
 
 class ListPartnerActivitiesQuery
 {
+    use InteractsWithActivityLogProperties;
+
     public function __construct(
         private readonly Organization $partner,
         private readonly ?string $activityEvent = null,
@@ -48,10 +51,11 @@ class ListPartnerActivitiesQuery
                         $subjectQuery
                             ->where('subject_type', User::class)
                             ->whereIn('subject_id', $userIds);
-                    })
-                    ->orWhere('properties->partner_id', $partnerId)
-                    ->orWhere('properties->organization_id', $partnerId)
-                    ->orWhereIn('properties->event_id', $eventIds);
+                    });
+
+                $this->whereActivityPropertyIdEquals($builder, 'partner_id', $partnerId, 'or');
+                $this->whereActivityPropertyIdEquals($builder, 'organization_id', $partnerId, 'or');
+                $this->whereActivityPropertyIdInQuery($builder, 'event_id', $eventIds, 'or');
             });
 
         if ($this->activityEvent) {

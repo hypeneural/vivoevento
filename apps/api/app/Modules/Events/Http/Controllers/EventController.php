@@ -29,10 +29,19 @@ class EventController extends BaseController
 
         $validated = $request->validated();
         $user = $request->user();
-        $organizationId = $validated['organization_id'] ?? $user?->currentOrganization()?->id;
+        $isGlobalAdmin = $user?->hasAnyRole(['super-admin', 'platform-admin']) ?? false;
+        $requestedOrganizationId = $validated['organization_id'] ?? null;
+        $currentOrganizationId = $user?->currentOrganization()?->id;
+        $organizationId = $isGlobalAdmin
+            ? $requestedOrganizationId
+            : $currentOrganizationId;
         $eventIds = null;
 
-        if (! $organizationId && $user && ! $user->hasAnyRole(['super-admin', 'platform-admin'])) {
+        if (! $isGlobalAdmin && $requestedOrganizationId !== null && $requestedOrganizationId !== $currentOrganizationId) {
+            abort(403);
+        }
+
+        if (! $organizationId && $user && ! $isGlobalAdmin) {
             $eventIds = $user->eventTeamMembers()
                 ->pluck('event_id')
                 ->map(fn ($id) => (int) $id)

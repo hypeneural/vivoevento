@@ -3,6 +3,7 @@
 namespace App\Modules\Auth\Services;
 
 use App\Modules\EventTeam\Support\EventAccessPresetRegistry;
+use App\Modules\Organizations\Models\Organization;
 use App\Modules\Users\Models\User;
 
 class WorkspaceStateBuilderService
@@ -21,6 +22,7 @@ class WorkspaceStateBuilderService
     public function build(User $user): array
     {
         $organizations = $this->buildOrganizationWorkspaces($user);
+        $organizations = $this->appendStoredGlobalOrganizationWorkspace($user, $organizations);
         $eventAccesses = $this->buildEventAccesses($user);
         $activeContext = $this->resolveActiveContext($user, $organizations, $eventAccesses);
 
@@ -179,10 +181,67 @@ class WorkspaceStateBuilderService
         return null;
     }
 
+    /**
+     * @param  array<int, array<string, mixed>>  $organizations
+     * @return array<int, array<string, mixed>>
+     */
+    private function appendStoredGlobalOrganizationWorkspace(User $user, array $organizations): array
+    {
+        if (! $user->hasAnyRole(['super-admin', 'platform-admin'])) {
+            return $organizations;
+        }
+
+        $stored = data_get($user->preferences, 'active_context');
+
+        if (! is_array($stored) || ($stored['type'] ?? null) !== 'organization') {
+            return $organizations;
+        }
+
+        $organizationId = (int) ($stored['organization_id'] ?? 0);
+
+        if ($organizationId <= 0) {
+            return $organizations;
+        }
+
+        $alreadyLoaded = collect($organizations)->contains(
+            fn (array $workspace) => (int) ($workspace['organization_id'] ?? 0) === $organizationId
+        );
+
+        if ($alreadyLoaded) {
+            return $organizations;
+        }
+
+        $organization = Organization::query()
+            ->find($organizationId, ['id', 'uuid', 'trade_name', 'legal_name', 'slug', 'status', 'type']);
+
+        if (! $organization) {
+            return $organizations;
+        }
+
+        $roleKey = $user->hasRole('super-admin') ? 'super-admin' : 'platform-admin';
+
+        $organizations[] = [
+            'organization_id' => $organization->id,
+            'organization_uuid' => $organization->uuid,
+            'organization_name' => $organization->displayName(),
+            'organization_slug' => $organization->slug,
+            'organization_type' => $organization->type?->value,
+            'organization_status' => $organization->status?->value,
+            'role_key' => $roleKey,
+            'role_label' => $this->organizationRoleLabel($roleKey),
+            'is_owner' => true,
+            'entry_path' => '/',
+        ];
+
+        return $organizations;
+    }
+
     private function organizationRoleLabel(string $roleKey): string
     {
         return match ($roleKey) {
-            'partner-owner' => 'Proprietária',
+            'super-admin' => 'Super Admin',
+            'platform-admin' => 'Administrador da plataforma',
+            'partner-owner' => 'Proprietaria',
             'partner-manager' => 'Gerente / Secretaria',
             'financeiro' => 'Financeiro',
             'event-operator' => 'Operador de evento',

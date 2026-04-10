@@ -23,6 +23,7 @@ import { queryKeys } from '@/lib/query-client';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { EventStatusBadge } from '@/shared/components/StatusBadges';
+import { usePermissions } from '@/shared/hooks/usePermissions';
 
 import { EventActionsMenu } from './components/EventActionsMenu';
 import { EventsPagination } from './components/EventsPagination';
@@ -68,12 +69,14 @@ function buildCoverPreview(event: EventListItem) {
 export default function EventsListPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { isPlatformAdmin } = usePermissions();
 
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [moduleFilter, setModuleFilter] = useState<string>('all');
+  const [organizationFilter, setOrganizationFilter] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [sortBy, setSortBy] = useState<EventSortBy>('starts_at');
@@ -84,9 +87,10 @@ export default function EventsListPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [deferredSearch, statusFilter, typeFilter, moduleFilter, dateFrom, dateTo, sortBy, sortDirection]);
+  }, [dateFrom, dateTo, deferredSearch, moduleFilter, organizationFilter, sortBy, sortDirection, statusFilter, typeFilter]);
 
   const filters = useMemo(() => ({
+    organization_id: isPlatformAdmin && organizationFilter !== 'all' ? Number(organizationFilter) : undefined,
     search: deferredSearch || undefined,
     status: statusFilter === 'all' ? undefined : statusFilter,
     event_type: typeFilter === 'all' ? undefined : typeFilter,
@@ -97,11 +101,17 @@ export default function EventsListPage() {
     sort_direction: sortDirection,
     page,
     per_page: 12,
-  }), [dateFrom, dateTo, deferredSearch, moduleFilter, page, sortBy, sortDirection, statusFilter, typeFilter]);
+  }), [dateFrom, dateTo, deferredSearch, isPlatformAdmin, moduleFilter, organizationFilter, page, sortBy, sortDirection, statusFilter, typeFilter]);
 
   const eventsQuery = useQuery({
     ...eventsListQueryOptions(filters),
     placeholderData: keepPreviousData,
+  });
+
+  const organizationsQuery = useQuery({
+    queryKey: [...queryKeys.organizations.all(), 'events-filter'],
+    queryFn: () => eventsService.listOrganizations(),
+    enabled: isPlatformAdmin,
   });
 
   const statusMutation = useMutation({
@@ -141,6 +151,7 @@ export default function EventsListPage() {
     let count = 0;
 
     if (search.trim()) count += 1;
+    if (organizationFilter !== 'all') count += 1;
     if (statusFilter !== 'all') count += 1;
     if (typeFilter !== 'all') count += 1;
     if (moduleFilter !== 'all') count += 1;
@@ -149,13 +160,18 @@ export default function EventsListPage() {
     if (sortDirection !== 'desc') count += 1;
 
     return count;
-  }, [dateFrom, dateTo, moduleFilter, search, sortBy, sortDirection, statusFilter, typeFilter]);
+  }, [dateFrom, dateTo, moduleFilter, organizationFilter, search, sortBy, sortDirection, statusFilter, typeFilter]);
 
   const filtersSummary = useMemo(() => {
     const segments: string[] = [];
 
     if (search.trim()) {
       segments.push(`Busca: "${search.trim()}"`);
+    }
+
+    if (organizationFilter !== 'all') {
+      const organization = organizationsQuery.data?.find((option) => String(option.id) === organizationFilter);
+      segments.push(`Organizacao: ${organization?.label ?? organizationFilter}`);
     }
 
     if (statusFilter !== 'all') {
@@ -185,7 +201,7 @@ export default function EventsListPage() {
     );
 
     return segments.join(' | ');
-  }, [dateFrom, dateTo, moduleFilter, search, sortBy, sortDirection, sortLabel, statusFilter, typeFilter]);
+  }, [dateFrom, dateTo, moduleFilter, organizationFilter, organizationsQuery.data, search, sortBy, sortDirection, sortLabel, statusFilter, typeFilter]);
 
   const copyToClipboard = async (label: string, url?: string | null) => {
     if (!url) {
@@ -207,6 +223,7 @@ export default function EventsListPage() {
 
   const resetFilters = () => {
     setSearch('');
+    setOrganizationFilter('all');
     setStatusFilter('all');
     setTypeFilter('all');
     setModuleFilter('all');
@@ -281,6 +298,22 @@ export default function EventsListPage() {
                 className="pl-9"
               />
             </div>
+
+            {isPlatformAdmin ? (
+              <Select value={organizationFilter} onValueChange={setOrganizationFilter}>
+                <SelectTrigger className="xl:col-span-2">
+                  <SelectValue placeholder="Organizacao" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as organizacoes</SelectItem>
+                  {(organizationsQuery.data ?? []).map((organization) => (
+                    <SelectItem key={organization.id} value={String(organization.id)}>
+                      {organization.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="xl:col-span-2">
