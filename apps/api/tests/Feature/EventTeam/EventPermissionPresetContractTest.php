@@ -1,5 +1,8 @@
 <?php
 
+use App\Modules\Events\Models\Event;
+use App\Modules\EventTeam\Models\EventTeamMember;
+
 it('exposes safe event access presets for the frontend instead of raw permission strings', function () {
     [$user] = $this->actingAsOwner();
 
@@ -63,4 +66,33 @@ it('maps ver midias to read only media and gallery capabilities for a single eve
     expect($preset['capabilities'])->not->toContain('play');
 });
 
-it('allows updating an event team member role through a preset while preserving the event scope')->todo();
+it('allows updating an event team member role through a preset while preserving the event scope', function () {
+    [$owner, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    $memberUser = $this->createUser([
+        'email' => 'event-team-preset@eventovivo.test',
+        'phone' => '5511988877661',
+    ]);
+    $memberUser->assignRole('viewer');
+
+    $member = EventTeamMember::query()->create([
+        'event_id' => $event->id,
+        'user_id' => $memberUser->id,
+        'role' => 'viewer',
+    ]);
+
+    $response = $this->apiPatch("/events/{$event->id}/team/{$member->id}", [
+        'preset_key' => 'event.operator',
+    ]);
+
+    $this->assertApiSuccess($response);
+    $member->refresh();
+
+    expect($member->role)->toBe('operator');
+    expect($response->json('data.role_key'))->toBe('event.operator');
+    expect($response->json('data.capabilities'))->toContain('media', 'moderation', 'wall', 'play');
+});

@@ -104,6 +104,77 @@ it('prevents event-scoped users from listing unrelated events in the global even
 
 it('prevents event-scoped users from consuming organization-wide moderation feeds and channels')->todo();
 
-it('restricts event team management to authorized organization owners managers or event managers for the same event')->todo();
+it('restricts event team management to authorized organization owners managers or event managers for the same event', function () {
+    $this->seedPermissions();
+
+    $organization = $this->createOrganization(['trade_name' => 'Org Principal']);
+    $event = Event::factory()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    $foreignOrganization = $this->createOrganization(['trade_name' => 'Org Estrangeira']);
+    $foreignEvent = Event::factory()->create([
+        'organization_id' => $foreignOrganization->id,
+    ]);
+
+    $memberUser = $this->createUser([
+        'email' => 'team-managed@eventovivo.test',
+        'phone' => '5511988877662',
+    ]);
+    $memberUser->assignRole('viewer');
+
+    [$owner] = $this->actingAsOwner($organization);
+    $ownerResponse = $this->apiPost("/events/{$event->id}/team", [
+        'user_id' => $memberUser->id,
+        'preset_key' => 'event.media-viewer',
+    ]);
+    $this->assertApiSuccess($ownerResponse, 201);
+
+    [$orgManager] = $this->actingAsManager($organization);
+    $orgManagerResponse = $this->apiPatch(
+        "/events/{$event->id}/team/{$ownerResponse->json('data.id')}",
+        ['preset_key' => 'event.operator'],
+    );
+    $this->assertApiSuccess($orgManagerResponse);
+
+    $eventManager = $this->createUser([
+        'email' => 'event-manager-team@eventovivo.test',
+        'phone' => '5511988877663',
+    ]);
+    $eventManager->assignRole('viewer');
+    EventTeamMember::query()->create([
+        'event_id' => $event->id,
+        'user_id' => $eventManager->id,
+        'role' => 'manager',
+    ]);
+    $this->actingAs($eventManager);
+
+    $eventManagerResponse = $this->apiDelete("/events/{$event->id}/team/{$ownerResponse->json('data.id')}");
+    $eventManagerResponse->assertStatus(204);
+
+    [$foreignOwner] = $this->actingAsOwner($foreignOrganization);
+    $foreignOwnerResponse = $this->apiPost("/events/{$event->id}/team", [
+        'user_id' => $memberUser->id,
+        'preset_key' => 'event.media-viewer',
+    ]);
+    $this->assertApiForbidden($foreignOwnerResponse);
+
+    $moderator = $this->createUser([
+        'email' => 'event-moderator-team@eventovivo.test',
+        'phone' => '5511988877664',
+    ]);
+    $moderator->assignRole('viewer');
+    EventTeamMember::query()->create([
+        'event_id' => $event->id,
+        'user_id' => $moderator->id,
+        'role' => 'moderator',
+    ]);
+    $this->actingAs($moderator);
+
+    $moderatorResponse = $this->apiGet("/events/{$event->id}/team");
+    $this->assertApiForbidden($moderatorResponse);
+
+    expect($foreignEvent->id)->not->toBe($event->id);
+});
 
 it('keeps organization-level staff with org-wide access while preserving per-user audit attribution')->todo();

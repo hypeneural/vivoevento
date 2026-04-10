@@ -118,8 +118,8 @@ describe('AppSidebar', () => {
     );
 
     expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /eventos/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /midias/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /meus eventos/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('link').some((link) => link.getAttribute('href') === '/events')).toBe(true);
   });
 });

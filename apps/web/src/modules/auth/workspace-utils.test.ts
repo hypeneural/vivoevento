@@ -44,7 +44,13 @@ describe('workspace-utils', () => {
     const filtered = filterEventWorkspaces(
       [
         baseWorkspace({ event_id: 1, event_title: 'Casamento Ana e Joao', event_status: 'active' }),
-        baseWorkspace({ event_id: 2, event_title: 'Festa Sofia', organization_name: 'Luz Cerimonial', capabilities: ['overview', 'media'] }),
+        baseWorkspace({
+          event_id: 2,
+          event_title: 'Festa Sofia',
+          organization_name: 'Luz Cerimonial',
+          event_status: 'draft',
+          capabilities: ['overview', 'media'],
+        }),
         baseWorkspace({ event_id: 3, event_title: 'Corporativo Atlas', event_date: '2025-01-10', event_status: 'finished' }),
       ],
       {

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('wall theme architecture characterization', () => {
-  it('exposes the puzzle contract while keeping the static manager fallback gated', () => {
+  it('exposes the puzzle contract while keeping the static manager fallback gated and a synthetic puzzle fallback for persisted drafts', () => {
     const sharedTypesSource = fs.readFileSync(
       path.resolve(__dirname, '../../../../../../packages/shared-types/src/wall.ts'),
       'utf8',
@@ -21,12 +21,15 @@ describe('wall theme architecture characterization', () => {
       path.resolve(__dirname, '../../../../../../apps/api/app/Modules/Wall/Http/Requests/UpdateWallSettingsRequest.php'),
       'utf8',
     );
+    const staticFallbackLayoutBlock = managerConfigSource.match(/export const fallbackOptions:[\s\S]*?layouts:\s*\[(.*?)\],\s*transitions:/s)?.[1] ?? '';
 
     expect(sharedTypesSource).toContain("'puzzle'");
     expect(sharedTypesSource).toContain('theme_config');
     expect(backendEnumSource).toContain("case Puzzle = 'puzzle'");
     expect(backendEnumSource).toContain('supports_theme_config');
-    expect(managerConfigSource).not.toContain("value: 'puzzle'");
+    expect(managerConfigSource).toContain('export const PUZZLE_LAYOUT_FALLBACK_OPTION');
+    expect(managerConfigSource).toContain('resolveManagerWallLayoutOption');
+    expect(staticFallbackLayoutBlock).not.toContain("value: 'puzzle'");
     expect(settingsRequestSource).toContain('theme_config');
   });
 
@@ -136,7 +139,7 @@ describe('wall theme architecture characterization', () => {
     expect(engineSource).toContain('runtimeBudget.maxConcurrentDecode');
   });
 
-  it('exposes capability metadata, but manager controls are not capability-gated yet', () => {
+  it('exposes capability metadata and gates puzzle-incompatible manager controls', () => {
     const managerConfigSource = fs.readFileSync(
       path.resolve(__dirname, '../manager-config.ts'),
       'utf8',
@@ -153,19 +156,21 @@ describe('wall theme architecture characterization', () => {
     expect(managerConfigSource).toContain('WALL_VIDEO_MULTI_LAYOUT_OPTIONS');
     expect(managerConfigSource).toContain('supports_multi_video');
     expect(managerConfigSource).toContain('max_simultaneous_videos');
+    expect(managerConfigSource).toContain('supports_theme_config');
     expect(managerConfigSource).not.toContain('posterOnlyMode');
 
-    expect(appearanceTabSource).toContain('value={wallSettings.video_multi_layout_policy}');
-    expect(appearanceTabSource).toContain('WALL_VIDEO_MULTI_LAYOUT_OPTIONS');
-    expect(appearanceTabSource).not.toContain('capabilities');
-    expect(appearanceTabSource).not.toContain('maxSimultaneousVideos');
+    expect(appearanceTabSource).toContain('resolveManagerWallLayoutOption');
+    expect(appearanceTabSource).toContain('layoutCapabilities');
+    expect(appearanceTabSource).toContain('supportsThemeConfig');
+    expect(appearanceTabSource).toContain('wall-video-multi-layout-locked');
+    expect(appearanceTabSource).toContain('wall-side-thumbnails-switch');
 
     expect(optionsControllerSource).toContain("'layouts' => collect(WallLayout::enabledCases())->map");
     expect(optionsControllerSource).toContain('capabilities');
     expect(optionsControllerSource).toContain('defaults');
   });
 
-  it('keeps the puzzle execution plan aligned with the final video policy before implementation starts', () => {
+  it('keeps the puzzle execution plan aligned with the final video policy during implementation', () => {
     const executionPlanSource = fs.readFileSync(
       path.resolve(__dirname, '../../../../../../docs/architecture/wall-puzzle-theme-execution-plan-2026-04-09.md'),
       'utf8',

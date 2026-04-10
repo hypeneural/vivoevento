@@ -244,6 +244,30 @@ O que esta bateria da fase 5 travou:
 - o fallback de video no caminho `puzzle` continua usando a trilha controlada de `WallVideoSurface`, com somente `1` `<video>` montado;
 - o runtime visual passa a limitar slots com animacao forte por tier tambem nos layouts de board ja existentes.
 
+### Validacao da Fase 6 - manager, preview parity e bloqueio de capabilities - 2026-04-10
+
+Frontend:
+
+- `cd apps/web && npm run test -- src/modules/wall/player/wall-theme-architecture-characterization.test.ts src/modules/wall/wall-settings.test.ts src/modules/wall/components/manager/inspector/WallAppearanceTab.test.tsx src/modules/wall/components/manager/stage/WallPreviewCanvas.test.tsx src/modules/wall/pages/EventWallManagerPage.test.tsx`
+  - `5 arquivos`
+  - `30 testes`
+  - `PASS`
+- `cd apps/web && npm run test -- src/modules/wall`
+  - `58 arquivos`
+  - `288 testes`
+  - `PASS`
+- `cd apps/web && npm run type-check`
+  - `PASS`
+
+O que esta bateria da fase 6 travou:
+
+- o manager continua rollout-safe quando `fallbackOptions.layouts` ainda nao lista `puzzle`, mas drafts persistidos de `puzzle` seguem editaveis por uma `PUZZLE_LAYOUT_FALLBACK_OPTION` sintetica;
+- o editor passa a normalizar `draft` e payload salvo com `resolveManagedWallSettings()`, aplicando defaults de `theme_config` e locks de capability antes do save;
+- `WallAppearanceTab` agora mostra controles minimos de `theme_config` para `preset`, `anchor_mode`, `hero_enabled` e `burst_intensity`;
+- `layout=puzzle` desliga miniaturas laterais, trava `video_multi_layout_policy` em `disallow` e comunica o fallback operacional de video;
+- o preview do manager reaproveita o mesmo `LayoutRenderer` e a mesma normalizacao de settings do player, sem depender de estado incompleto do form;
+- salvar `theme_config` em `puzzle` nao volta dirty state infinito nem reabre combinacoes incompativeis apos reconcile local.
+
 ### Leituras oficiais validadas
 
 Motion:
@@ -842,37 +866,40 @@ Arquivos-alvo:
 
 Subtarefas:
 
-- [ ] expor `puzzle` no editor quando o gate permitir;
-- [ ] expor `theme_config` minimo:
+- [x] expor `puzzle` no editor quando o gate permitir;
+- [x] expor `theme_config` minimo:
   - `preset`
   - `anchor_mode`
   - `hero_enabled`
   - `burst_intensity`
-- [ ] bloquear no manager:
+- [x] bloquear no manager:
   - video em `puzzle`
   - side thumbnails em `puzzle`
   - floating caption por peca
   - blur pesado por slot
   - face overlay client-side
-- [ ] esconder/desabilitar `video_multi_layout_policy` quando `layout=puzzle`;
-- [ ] mostrar copy operacional:
+- [x] esconder/desabilitar `video_multi_layout_policy` quando `layout=puzzle`;
+- [x] mostrar copy operacional:
   - `Puzzle exibe imagens. Videos entram em layout individual de fallback.`
-- [ ] reaproveitar o mesmo registry/layout renderer no preview;
-- [ ] manter preview previsivel mesmo com configuracao incompleta ou invalida.
+- [x] reaproveitar o mesmo registry/layout renderer no preview;
+- [x] manter preview previsivel mesmo com configuracao incompleta ou invalida.
+- [x] normalizar `draft` e payload salvo com defaults/capabilities sinteticos para evitar combinacoes invalidas no manager.
 
 ### Bateria TDD da fase 6
 
-- [ ] ampliar `apps/web/src/modules/wall/pages/EventWallManagerPage.test.tsx`
-- [ ] ampliar `apps/web/src/modules/wall/components/manager/stage/WallPreviewCanvas.test.tsx`
-- [ ] ampliar `apps/web/src/modules/wall/components/manager/inspector/WallAppearanceTab.test.tsx`
+- [x] ampliar `apps/web/src/modules/wall/pages/EventWallManagerPage.test.tsx`
+- [x] ampliar `apps/web/src/modules/wall/components/manager/stage/WallPreviewCanvas.test.tsx`
+- [x] ampliar `apps/web/src/modules/wall/components/manager/inspector/WallAppearanceTab.test.tsx`
+- [x] ampliar `apps/web/src/modules/wall/wall-settings.test.ts`
+- [x] alinhar `apps/web/src/modules/wall/player/wall-theme-architecture-characterization.test.ts` ao manager capability-aware e ao fallback estatico rollout-safe.
 
 Cenarios obrigatorios:
 
-- [ ] manager mostra controles minimos do `puzzle`;
-- [ ] controles incompativeis ficam bloqueados ou desligados automaticamente;
-- [ ] manager nao permite `one` nem `all` para video multi-layout quando `layout=puzzle`;
-- [ ] preview do manager bate com o renderer do player;
-- [ ] salvar `theme_config` nao gera dirty state infinito.
+- [x] manager mostra controles minimos do `puzzle`;
+- [x] controles incompativeis ficam bloqueados ou desligados automaticamente;
+- [x] manager nao permite `one` nem `all` para video multi-layout quando `layout=puzzle`;
+- [x] preview do manager bate com o renderer do player;
+- [x] salvar `theme_config` nao gera dirty state infinito.
 
 ## P1 - melhoria importante depois da v1 estar firme
 
@@ -1178,8 +1205,8 @@ O `Quebra Cabeca` so deve ser considerado pronto quando:
 - [x] readiness de imagem depende de `decode()`, nao so de `load`;
 - [x] cache aquece apenas a janela quente do board;
 - [x] realtime continua atualizando a fila sem refetch completo;
-- [ ] preview e player batem no mesmo preset;
-- [ ] manager bloqueia video e outras capabilities incompativeis;
+- [x] preview e player batem no mesmo preset;
+- [x] manager bloqueia video e outras capabilities incompativeis;
 - [x] `puzzle` nao monta `<video>` dentro do board;
 - [x] video elegivel em `puzzle` cai para fallback single-item com `WallVideoSurface`;
 - [ ] `maxSimultaneousVideos` default do produto continua `1`;

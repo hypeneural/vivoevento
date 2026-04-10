@@ -931,6 +931,11 @@ Impacto:
   - com `--synthetic-media`, o comando cria volume transacional e faz rollback;
   - com `--disable-jit`, o comando mede a query sem custo de compilacao JIT;
   - com `--fail-on-budget`, o comando pode virar gate operacional de homolog.
+- a validacao em homolog foi concluida nesta entrega:
+  - a release ativa passou para `/var/www/eventovivo/releases/20260410_181500_moderation`;
+  - como o ambiente ainda nao tem `event_media` real, o benchmark oficial usou `--organization-id=1 --synthetic-media=5000`;
+  - com JIT habilitado, `search_sender_name_hot` saiu do budget (`~1378ms`) e o proprio plano mostrou `~1339ms` de compilacao JIT;
+  - com `--disable-jit`, todos os cenarios ficaram dentro do budget em PostgreSQL real de homolog.
 
 Decisao:
 
@@ -938,7 +943,7 @@ Decisao:
 - busca por titulo exato de evento nao deve mais passar pelo documento textual amplo; ela vira filtro por `event_id`;
 - nao adicionar `partial index` extra agora;
 - a validacao adicional com as chaves locais desta maquina confirmou que o ambiente efetivo ainda e `APP_ENV=local` com PostgreSQL em `127.0.0.1:5433`;
-- repetir a medicao em homolog real quando houver credencial/configuracao disponivel.
+- para a rota `/moderation`, a politica operacional passa a ser validar benchmark e leitura OLTP com `jit` desativado no comando oficial, porque o custo de compilacao domina a busca quente.
 
 ### P10. Mitigado nesta entrega: o painel lateral ainda busca detalhe por foco, mas agora aquece o proximo item
 
@@ -1373,9 +1378,10 @@ Estado atual:
 - o painel lateral repete a posicao e mostra quantas pendentes existem depois da midia atual;
 - a posicao e calculada pela ordem carregada do feed, enquanto o total de pendentes vem de `stats.pending`.
 
-Pendente:
+Decisao entregue:
 
-- decidir se o quick filter `Nao moderadas` deve virar default do produto para todos os operadores ou ficar como preferencia configuravel.
+- o quick filter `Nao moderadas` virou o recorte default do produto;
+- `Limpar filtros` volta para esse estado operacional, nao para `Tudo`.
 
 ### 5. Resolvido nesta entrega: revisao por cluster de duplicata
 
@@ -1493,13 +1499,22 @@ Status consolidado ate esta entrega:
 - [x] validar `search document` com `5.000` midias sinteticas e `--disable-jit` dentro do budget;
 - [x] reabrir a sonda com `20.000` midias sinteticas e corrigir `search_event_title_hot` com fast path por `event_id`;
 - [x] validar `20.000` midias sinteticas com `search document`, fast path de titulo exato e `--disable-jit` dentro do budget;
-- [ ] publicar a release atual da moderacao em homolog e repetir o benchmark com o comando novo nesse ambiente;
+- [x] publicar a release atual da moderacao em homolog e repetir o benchmark com o comando novo nesse ambiente;
+- [x] fechar a politica de JIT da rota com validacao em PostgreSQL real de homolog;
+- [x] ligar observabilidade minima da rota com logs estruturados e telemetria do frontend;
+- [x] levar a bateria atual da moderacao para o CI com workflow dedicado;
+- [x] definir `Nao moderadas` como recorte default do produto;
 - [x] adicionar auto-advance e razoes de reprova;
 - [x] adicionar revisao por cluster de duplicata;
 - [x] adicionar undo curto apos acoes unitarias;
 - [x] adicionar filtros operacionais fortes para imagens, videos, IA em review, duplicatas e erro;
 - [x] adicionar contador de fila restante e posicao do item atual;
 - [x] remover codigo morto de paginacao nao usada.
+
+Leitura atual do checklist:
+
+- o checklist tecnico da rota ficou integralmente fechado nesta rodada;
+- as pendencias remanescentes da moderacao deixaram de ser lacunas de implementacao e ficaram restritas a follow-up operacional, medicao real e duas decisoes finas de produto, detalhadas no execution plan.
 
 ## Conclusao
 

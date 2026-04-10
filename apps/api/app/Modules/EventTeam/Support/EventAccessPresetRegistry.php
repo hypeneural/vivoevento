@@ -113,6 +113,27 @@ class EventAccessPresetRegistry
     }
 
     /**
+     * @return array<int, string>
+     */
+    public function eventPresetKeys(): array
+    {
+        return array_keys($this->eventPresets());
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function presetByKey(string $key): array
+    {
+        return $this->eventPresets()[$key] ?? $this->eventPresets()['event.media-viewer'];
+    }
+
+    public function persistedRoleForPresetKey(string $key): string
+    {
+        return (string) ($this->presetByKey($key)['persisted_role'] ?? 'viewer');
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function presetForPersistedRole(string $role): array

@@ -32,6 +32,11 @@ class EventPolicy
         return $this->eventAccess->can($user, $event, 'events.update');
     }
 
+    public function manageTeam(User $user, Event $event): bool
+    {
+        return $this->eventAccess->can($user, $event, 'events.manage_team');
+    }
+
     public function publish(User $user, Event $event): bool
     {
         return $this->eventAccess->can($user, $event, 'events.publish');

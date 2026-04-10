@@ -77,7 +77,7 @@ it('characterizes that an event team assignment now grants event media access on
     expect($response->json('data.0.event_id'))->toBe($event->id);
 });
 
-it('characterizes that an authenticated organization owner can mutate event team membership for a foreign organization event', function () {
+it('characterizes that an authenticated organization owner can no longer mutate event team membership for a foreign organization event', function () {
     [$owner, $organization] = $this->actingAsOwner();
 
     $foreignOrganization = $this->createOrganization([
@@ -96,12 +96,11 @@ it('characterizes that an authenticated organization owner can mutate event team
         'role' => 'viewer',
     ]);
 
-    $this->assertApiSuccess($response, 201);
+    $this->assertApiForbidden($response);
 
-    $this->assertDatabaseHas('event_team_members', [
+    $this->assertDatabaseMissing('event_team_members', [
         'event_id' => $foreignEvent->id,
         'user_id' => $invitedUser->id,
-        'role' => 'viewer',
     ]);
 });
 

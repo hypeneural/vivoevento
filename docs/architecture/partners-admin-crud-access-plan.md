@@ -823,6 +823,14 @@ O que essa regressao ampliada confirmou:
 - o endurecimento do CRUD global de `organizations` continuou preservado;
 - a superficie real de `/organizations/current` esta completa para leitura, escrita, branding/logo e equipe.
 
+Atualizacao de dependencia compartilhada em `2026-04-10 14:32:00 -03:00`:
+
+- [x] a base de sessao multi-workspace para acessos event-scoped ja existe em `/auth/me`, com `active_context` e `workspaces.event_accesses`;
+- [x] o frontend ja possui entrada segura `/my-events` para usuarios convidados por evento;
+- [x] o modulo `EventTeam` agora bloqueia mutacao fora do escopo do evento e aceita presets de acesso;
+- [x] convites pendentes por evento ja sao persistidos com reutilizacao de `existing_user_id` quando o usuario da plataforma ja existir;
+- [ ] o aceite publico do convite por evento ainda nao esta pronto, entao delegacao partner -> DJ/noivos segue parcial no backend.
+
 Cobertura esperada:
 
 - super admin lista parceiros e nao ve `direct_customer`;

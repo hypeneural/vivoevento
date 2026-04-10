@@ -409,6 +409,19 @@ Permitir que o convidado conclua o onboarding sem criar nova organizacao.
 
 Permitir que um unico usuario opere em multiplas organizacoes e acessos event-scoped sem colapsar a sessao para o primeiro membership.
 
+### Status consolidado em `2026-04-10 14:32:00 -03:00`
+
+- [x] `GET /auth/me` ja devolve `workspaces.organizations`, `workspaces.event_accesses` e `active_context`.
+- [x] `POST /auth/context/organization` ja troca o workspace organizacional ativo.
+- [x] `POST /auth/context/event` ja fixa o contexto event-scoped ativo.
+- [x] o frontend ja redireciona usuario event-only para `/my-events` ou `/my-events/{eventId}`.
+- [x] o layout event-scoped ja esconde a navegacao organizacional.
+- [x] `GET /access/presets` ja existe para evitar hardcode da matriz no frontend.
+- [x] o dominio inicial de convite por evento ja persiste convites pendentes com `existing_user_id` quando houver usuario existente.
+- [ ] aceite publico do convite por evento ainda nao existe.
+- [ ] reenvio/revogacao do convite por evento ainda nao existem.
+- [ ] a UI `/events/:eventId/access` ainda nao existe.
+
 ### Tasks backend
 
 - [ ] Expandir `GET /auth/me` com:
@@ -684,6 +697,28 @@ Type-check:
 
 - `npm run type-check`
 - resultado: `ok`
+
+## Validacao complementar apos workspaces + convites pendentes por evento
+
+Backend:
+
+- `php artisan test tests/Feature/Auth/EventOnlySessionCharacterizationTest.php tests/Feature/Auth/MeTest.php tests/Feature/Auth/MultiOrganizationWorkspaceContractTest.php tests/Feature/EventTeam/EventPermissionPresetContractTest.php tests/Feature/EventTeam/EventTeamInvitationContractTest.php tests/Feature/Events/EventScopedAccessCharacterizationTest.php tests/Feature/Events/EventScopedAccessContractTest.php tests/Feature/Events/ListEventsTest.php tests/Feature/MediaProcessing/ModerationMediaTest.php`
+- resultado: `56 passed`, `7 todo`, `656 assertions`
+
+Frontend:
+
+- `npx vitest run src/modules/auth/MyEventsPage.test.tsx src/modules/auth/workspace-utils.test.ts src/app/layouts/AppSidebar.test.tsx src/modules/auth/workspace-selector.contract.test.tsx src/modules/auth/my-events-page.contract.test.tsx`
+- resultado: `8 passed`, `19 todo`
+
+Type-check:
+
+- `npm run type-check`
+- resultado: `ok`
+
+Rotas novas desta rodada:
+
+- `GET /api/v1/events/{event}/access/invitations`
+- `POST /api/v1/events/{event}/access/invitations`
 
 ## Ordem Recomendada de Execucao
 

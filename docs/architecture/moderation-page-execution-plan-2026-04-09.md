@@ -112,14 +112,16 @@ Itens concluidos nesta rodada:
 - [x] adicionar toast `Desfazer` para acoes unitarias de `approve`, `reject`, `favorite` e `pin`;
 - [x] ampliar a cobertura com testes de feature, service, helper, painel e arquitetura para cluster + undo.
 
-Itens ainda pendentes deste plano:
+Itens que fecharam o corte de rollout deste plano:
 
-- [ ] publicar em homolog uma release que contenha o comando `media:moderation-feed-explain`, o `search document` e as migrations da trilha atual da moderacao;
-- [ ] rodar o benchmark em homolog com a release atualizada e validar a politica de JIT do PostgreSQL para queries OLTP do painel.
+- [x] publicar em homolog uma release que contenha o comando `media:moderation-feed-explain`, o `search document` e as migrations da trilha atual da moderacao;
+- [x] rodar o benchmark em homolog com a release atualizada e validar a politica de JIT do PostgreSQL para queries OLTP do painel.
 
 Comando recomendado para homolog:
 
 - `cd apps/api && php artisan media:moderation-feed-explain --disable-jit --fail-on-budget --output=storage/app/reports/moderation-feed-explain-homolog.json`
+- quando o ambiente nao tiver `event_media` real, usar a sonda transacional:
+  - `cd apps/api && php artisan media:moderation-feed-explain --organization-id=1 --synthetic-media=5000 --disable-jit --fail-on-budget --output=storage/app/reports/moderation-feed-explain-homolog-disable-jit.json`
 
 Comando recomendado para sonda local de volume:
 
@@ -156,6 +158,22 @@ Itens concluidos nesta rodada:
 - [x] confirmar que a release ativa de homolog ainda nao contem o comando `media:moderation-feed-explain`, os services `ModerationFeedExplainAnalyzeService` e `ModerationSearchDocumentBuilder`, nem as migrations `2026_04_09_230000_add_moderation_feed_indexes.php` e `2026_04_09_232000_add_moderation_search_document_to_event_media`;
 - [x] registrar que a pendencia de benchmark em homolog deixou de ser falta de acesso e passou a ser falta de rollout da release atual da moderacao;
 - [x] manter a validacao local verde com benchmark da moderacao em PostgreSQL real via `php artisan media:moderation-feed-explain --disable-jit`.
+
+## Status da decima terceira entrega
+
+Itens concluidos nesta rodada:
+
+- [x] publicar em homolog a release atual da moderacao em `/var/www/eventovivo/releases/20260410_181500_moderation`;
+- [x] confirmar que a release ativa de homolog agora contem o comando `media:moderation-feed-explain`;
+- [x] executar o benchmark oficial em homolog com sonda sintetica transacional de `5.000` midias porque o ambiente ainda nao tem `event_media` real;
+- [x] validar que, com JIT habilitado, `search_sender_name_hot` saiu do budget (`~1378ms`) e que o proprio plano do PostgreSQL registrou `~1339ms` de compilacao JIT;
+- [x] validar que, com `--disable-jit`, todos os cenarios ficaram dentro do budget em homolog (`feed <= 700ms`, `search <= 500ms`);
+- [x] fechar a politica de JIT para esta rota: manter benchmark e leitura OLTP da moderacao validados com `SET LOCAL jit = off` no comando oficial;
+- [x] ligar observabilidade minima da rota com logs estruturados de `feed`, `stats`, `detail` e endpoint dedicado de telemetria do frontend;
+- [x] instrumentar o frontend para `feed_first_page_loaded`, `filters_stabilized`, `feed_next_page_loaded`, `detail_loaded`, `incoming_queue_changed`, `media_surface_error`, `media_surface_original_fallback` e `media_surface_unavailable`;
+- [x] definir `Nao moderadas` como recorte default do produto e fazer `Limpar filtros` voltar para esse estado operacional;
+- [x] levar a bateria atual da moderacao para CI com workflow dedicado em `.github/workflows/moderation.yml`;
+- [x] rerodar a bateria local completa da moderacao com os testes novos de observabilidade e telemetria.
 
 Este plano responde 9 perguntas:
 
@@ -348,6 +366,31 @@ Backend:
   - decisao correta apos ajuste do comando: `search_document.present = yes`, `search_document.promote = no`, `search_document.requires_follow_up = yes`
 - `cd apps/api && php artisan media:moderation-feed-explain --synthetic-media=20000 --disable-jit --fail-on-budget --output=storage/app/reports/moderation-feed-explain-synthetic-20000-search-document-event-title-fast-path.json`
   - `PASS`
+
+Entrega final desta rodada:
+
+- `cd apps/web && npm.cmd run test -- src/lib/api.realtime.test.ts src/app/routing/router-architecture.test.ts src/app/routing/scroll-restoration.test.ts src/modules/moderation/feed-utils.test.ts src/modules/moderation/services/moderation.service.test.ts src/modules/moderation/components/ModerationReviewPanel.test.tsx src/modules/moderation/components/ModerationMediaSurface.test.tsx src/modules/moderation/moderation-architecture.test.ts`
+  - `8 arquivos`
+  - `44 testes`
+  - `PASS`
+- `cd apps/web && npm.cmd run type-check`
+  - `PASS`
+- `cd apps/api && php artisan test tests/Feature/MediaProcessing/ModerationFeedCharacterizationTest.php tests/Feature/MediaProcessing/ModerationMediaTest.php tests/Feature/MediaProcessing/EventMediaListTest.php tests/Feature/MediaProcessing/RunModerationFeedExplainCommandTest.php tests/Feature/MediaProcessing/ModerationTelemetryEndpointTest.php tests/Unit/MediaProcessing/MediaEffectiveStateResolverTest.php tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php tests/Unit/Modules/MediaProcessing/ModerationFeedExplainAnalyzeServiceTest.php tests/Unit/Modules/MediaProcessing/ModerationSearchDocumentBuilderTest.php tests/Unit/Modules/MediaProcessing/MediaAssetUrlServiceTest.php tests/Unit/Modules/MediaProcessing/ModerationObservabilityServiceTest.php`
+  - `49 testes`
+  - `546 assertions`
+  - `PASS`
+- homolog:
+  - release ativa em `/var/www/eventovivo/current -> /var/www/eventovivo/releases/20260410_181500_moderation`
+  - `php artisan media:moderation-feed-explain --organization-id=1 --synthetic-media=5000 --output=storage/app/reports/moderation-feed-explain-homolog-jit-on.json`
+    - `FAIL` de budget em `search_sender_name_hot ~= 1377ms`
+    - `JIT Timing Total ~= 1339ms`
+  - `php artisan media:moderation-feed-explain --organization-id=1 --synthetic-media=5000 --disable-jit --fail-on-budget --output=storage/app/reports/moderation-feed-explain-homolog-disable-jit.json`
+    - `PASS`
+    - `feed_org_hot ~= 61ms`
+    - `feed_event_hot ~= 46ms`
+    - `feed_pending_hot ~= 37ms`
+    - `search_event_title_hot ~= 64ms`
+    - `search_sender_name_hot ~= 53ms`
   - `search_event_title_hot ~= 254ms`
   - `search_sender_name_hot ~= 30ms`
   - `search_document.requires_follow_up = no`
@@ -761,81 +804,65 @@ O que precisa mudar primeiro:
 
 ## Backlog remanescente normalizado
 
-O topo deste documento ja registra 12 entregas concluidas. O corpo abaixo passa a listar apenas o backlog real, em ordem, sem repetir como pendente aquilo que o codigo e os testes ja cobrem.
+O topo deste documento ja registra 13 entregas concluidas. O backlog real da moderacao agora ficou reduzido a observacao operacional e refino guiado por medicao.
 
-### 1. Homolog e rollout da trilha atual
+### 1. Follow-up de observabilidade
 
-Status atual:
+Estado atual entregue:
 
-- acesso SSH ao ambiente informado pelo time foi validado;
-- a release ativa de homolog hoje e `/var/www/eventovivo/current -> /var/www/eventovivo/releases/20260406_194835`;
-- essa release ainda nao contem os artefatos mais novos da moderacao:
-  - comando `media:moderation-feed-explain`;
-  - services `ModerationFeedExplainAnalyzeService` e `ModerationSearchDocumentBuilder`;
-  - migrations `2026_04_09_230000_add_moderation_feed_indexes.php` e `2026_04_09_232000_add_moderation_search_document_to_event_media.php`.
-
-Proxima ordem:
-
-1. publicar em homolog uma release com o estado atual da moderacao;
-2. aplicar as migrations pendentes da trilha de moderacao, se ainda nao estiverem presentes no ambiente;
-3. executar o benchmark real em homolog:
-   - `cd /var/www/eventovivo/current/apps/api && php artisan media:moderation-feed-explain --disable-jit --fail-on-budget --output=storage/app/reports/moderation-feed-explain-homolog.json`
-4. registrar a decisao de JIT do PostgreSQL para esse ambiente;
-5. anexar o resultado ao plano e ao runbook operacional.
-
-Definicao de pronto deste bloco:
-
-- [ ] release de homolog contem a trilha atual da moderacao;
-- [ ] benchmark em homolog executado com o comando oficial;
-- [ ] budgets de `feed <= 700ms` e `search <= 500ms` validados;
-- [ ] politica de JIT documentada para homolog/producao.
-
-### 2. Observabilidade minima da rota
-
-Este e o principal backlog tecnico real depois do rollout em homolog.
-
-Metricas minimas recomendadas:
-
-- [ ] tempo da primeira pagina do feed;
-- [ ] tempo de troca de filtro ate tela estabilizada;
-- [ ] quantidade de `fetchNextPage` por sessao;
-- [ ] taxa de `thumbnail_source=original` ou ausencia de variante de moderacao;
-- [ ] taxa de erro de imagem/video na surface;
-- [ ] tamanho medio da fila `incoming`;
-- [ ] tempo de abertura do painel lateral.
-
-Arquivos/provas esperadas:
-
-- instrumentacao no frontend da moderacao;
-- instrumentacao ou logs de suporte no backend;
-- uma nota curta no plano com fonte de dados e thresholds adotados.
-
-### 3. Guardrails permanentes de CI
-
-O codigo local esta verde, mas o plano ainda nao esta protegido por pipeline.
+- logs estruturados de `moderation.feed.response`, `moderation.feed.stats`, `moderation.feed.detail` e `moderation.feed.client_telemetry`;
+- telemetria do frontend para:
+  - `feed_first_page_loaded`
+  - `filters_stabilized`
+  - `feed_next_page_loaded`
+  - `detail_loaded`
+  - `incoming_queue_changed`
+  - `media_surface_error`
+  - `media_surface_original_fallback`
+  - `media_surface_unavailable`
 
 Proxima ordem:
 
-1. adicionar a suite da moderacao ao CI;
-2. bloquear regressao de contrato do feed;
-3. bloquear regressao de `feed-utils` e da surface visual;
-4. manter o type-check do frontend como gate obrigatorio.
+1. observar os logs da rota em homolog apos uso real da equipe;
+2. confirmar thresholds práticos de alerta para:
+   - primeira pagina;
+   - estabilizacao de filtros;
+   - taxa de erro de surface;
+   - taxa de fallback para asset original;
+   - crescimento da fila `incoming`;
+3. decidir se essa trilha permanece em logs estruturados ou sobe para dashboard dedicado.
 
-Comandos minimos para virar gate:
+### 2. Validacao do workflow de CI em execucao remota
 
-- `cd apps/web && npm.cmd run test -- src/lib/api.realtime.test.ts src/app/routing/router-architecture.test.ts src/app/routing/scroll-restoration.test.ts src/modules/moderation/feed-utils.test.ts src/modules/moderation/services/moderation.service.test.ts src/modules/moderation/components/ModerationReviewPanel.test.tsx src/modules/moderation/components/ModerationMediaSurface.test.tsx src/modules/moderation/moderation-architecture.test.ts`
-- `cd apps/web && npm.cmd run type-check`
-- `cd apps/api && php artisan test tests/Feature/MediaProcessing/ModerationFeedCharacterizationTest.php tests/Feature/MediaProcessing/ModerationMediaTest.php tests/Feature/MediaProcessing/EventMediaListTest.php tests/Feature/MediaProcessing/RunModerationFeedExplainCommandTest.php tests/Unit/MediaProcessing/MediaEffectiveStateResolverTest.php tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php tests/Unit/Modules/MediaProcessing/ModerationFeedExplainAnalyzeServiceTest.php tests/Unit/Modules/MediaProcessing/ModerationSearchDocumentBuilderTest.php tests/Unit/Modules/MediaProcessing/MediaAssetUrlServiceTest.php`
+Estado atual entregue:
 
-### 4. Decisoes finais de produto e UX operacional
+- workflow `.github/workflows/moderation.yml` criado com jobs separados de frontend e backend;
+- type-check do frontend entrou como gate;
+- a bateria atual da moderacao foi espelhada no workflow.
 
-Nao sao bugs bloqueantes, mas ainda precisam de decisao explicita.
+Follow-up real:
 
-- [ ] decidir se o quick filter `Nao moderadas` vira default do produto ou preferencia configuravel por operador;
+1. validar a primeira execucao do workflow no GitHub;
+2. ajustar apenas se o runner remoto revelar diferenca de ambiente nao coberta localmente.
+
+### 3. Decisoes restantes de produto e UX operacional
+
+Decisoes ja fechadas:
+
+- `Nao moderadas` virou o recorte default do produto;
+- `Limpar filtros` volta para esse recorte operacional.
+
+Ainda em aberto:
+
 - [ ] decidir se a visao de `stats` segue apenas operacional ou se ganha tambem um bloco bruto de diagnostico;
 - [ ] decidir se o `prefetch` deve subir do item focado para o proximo item pendente quando a navegacao por teclado for dominante.
 
-### 5. Refino opcional guiado por medicao
+### 4. Refino opcional guiado por medicao
+
+Os checks ainda abertos abaixo sao intencionais:
+
+- nao representam falha de implementacao do plano base;
+- representam apenas calibracao fina apos uso real e observabilidade ligada.
 
 Esses itens nao devem voltar ao `P0`.
 
@@ -854,11 +881,13 @@ Manter:
 - `apps/api/tests/Feature/MediaProcessing/ModerationMediaTest.php`
 - `apps/api/tests/Feature/MediaProcessing/EventMediaListTest.php`
 - `apps/api/tests/Feature/MediaProcessing/RunModerationFeedExplainCommandTest.php`
+- `apps/api/tests/Feature/MediaProcessing/ModerationTelemetryEndpointTest.php`
 - `apps/api/tests/Unit/MediaProcessing/MediaEffectiveStateResolverTest.php`
 - `apps/api/tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php`
 - `apps/api/tests/Unit/Modules/MediaProcessing/ModerationFeedExplainAnalyzeServiceTest.php`
 - `apps/api/tests/Unit/Modules/MediaProcessing/ModerationSearchDocumentBuilderTest.php`
 - `apps/api/tests/Unit/Modules/MediaProcessing/MediaAssetUrlServiceTest.php`
+- `apps/api/tests/Unit/Modules/MediaProcessing/ModerationObservabilityServiceTest.php`
 
 ### Frontend
 
@@ -895,29 +924,27 @@ A rota `/moderation` so deve ser considerada estabilizada de ponta a ponta quand
 - [x] scroll restoration esta tratado no router;
 - [x] realtime nao reaplica eco basico do proprio operador;
 - [x] a fila mostra contador de pendentes restantes e posicao atual;
-- [ ] benchmark em homolog foi executado com a release correta;
-- [ ] politica de JIT foi validada em homolog/producao;
-- [ ] observabilidade minima da rota esta ligada;
-- [ ] testes backend e frontend da moderacao rodam no CI.
+- [x] benchmark em homolog foi executado com a release correta;
+- [x] politica de JIT foi validada em homolog/producao;
+- [x] observabilidade minima da rota esta ligada;
+- [x] testes backend e frontend da moderacao rodam no CI.
 
 ## Duvidas ainda em aberto
 
 Estas duvidas nao bloqueiam o estado local atual, mas precisam de fechamento antes do encerramento definitivo:
 
-1. `Nao moderadas` vira default do produto ou preferencia configuravel?
-2. qual `rootMargin` final entrega melhor equilibrio entre continuidade e churn no ambiente real?
-3. vale limitar `maxPages` na rota de moderacao ou isso piora scroll restoration?
-4. `stats` devem expor somente visao operacional ou tambem contagens brutas em bloco separado?
-5. o painel lateral deve prefetch do proximo item pendente por teclado ou manter apenas o aquecimento do proximo item carregado?
+1. qual `rootMargin` final entrega melhor equilibrio entre continuidade e churn no ambiente real?
+2. vale limitar `maxPages` na rota de moderacao ou isso piora scroll restoration?
+3. `stats` devem expor somente visao operacional ou tambem contagens brutas em bloco separado?
+4. o painel lateral deve prefetch do proximo item pendente por teclado ou manter apenas o aquecimento do proximo item carregado?
 
 ## Recomendacao final
 
-O proximo passo correto nao e abrir mais feature de moderacao.
+O proximo passo correto nao e abrir mais fundacao de moderacao.
 
 A ordem correta agora e:
 
-1. publicar a release atual da moderacao em homolog;
-2. rodar o benchmark oficial no ambiente remoto e fechar JIT;
-3. ligar observabilidade minima da rota;
-4. levar a bateria atual para o CI;
-5. so depois abrir refinos opcionais de UX/performance guiados por medicao.
+1. observar o comportamento real da rota em homolog com a instrumentacao ligada;
+2. validar a primeira execucao do workflow de CI no GitHub;
+3. fechar apenas as duas decisoes de produto remanescentes (`stats` bruto e estrategia final de prefetch);
+4. so depois abrir refinos opcionais de UX/performance guiados por medicao.

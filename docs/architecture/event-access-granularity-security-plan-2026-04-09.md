@@ -1435,6 +1435,25 @@ Motivo:
 
 Esta e a ordem pragmatica para transformar o desenho em produto utilizavel sem abrir brechas de seguranca.
 
+### Status consolidado em `2026-04-10 14:32:00 -03:00`
+
+- [x] `active_context` e `workspaces` ja saem de `/auth/me`.
+- [x] `POST /auth/context/organization` e `POST /auth/context/event` ja persistem troca de contexto.
+- [x] `MeResponse`, `AuthProvider` e o redirect pos-login ja respeitam sessao event-scoped.
+- [x] `/my-events`, `EventWorkspaceLayout`, `/my-events/:eventId` e placeholders seguros por modulo ja existem no front.
+- [x] `EventAccessService` ja consulta `event_team_members`.
+- [x] `GET /events` ja respeita o escopo event-scoped quando nao existe `currentOrganization()`.
+- [x] `GET /access/presets` ja expoe presets simples de organizacao e evento.
+- [x] `EventTeamController` agora usa autorizacao por `events.manage_team`, binding forte de `Event` e validacao de pertencimento do membro ao evento.
+- [x] `PATCH /events/{event}/team/{member}` ja aceita `preset_key` e preserva o escopo do evento.
+- [x] convites pendentes por evento ja existem em `event_team_invitations`.
+- [x] criacao de convite por evento ja reutiliza `existing_user_id` quando o usuario da plataforma ja existe por WhatsApp/e-mail.
+- [x] listagem de convites pendentes por evento ja esta separada da equipe ativa.
+- [ ] aceite publico do convite por evento ainda nao foi implementado.
+- [ ] reenvio/revogacao do convite por evento ainda nao foi implementado.
+- [ ] envio do convite por WhatsApp do evento/organizacao ainda nao foi implementado.
+- [ ] a UI administrativa `/events/:eventId/access` ainda nao foi criada.
+
 ### Etapa 1 - `active_context` e `workspaces` em `/auth/me`
 
 Objetivo:
@@ -1725,3 +1744,33 @@ Type-check:
 
 - `npm run type-check`
 - resultado: `ok`
+
+## Validacao executada nesta implementacao
+
+Backend:
+
+- `php artisan test tests/Feature/Auth/EventOnlySessionCharacterizationTest.php tests/Feature/Auth/MeTest.php tests/Feature/Auth/MultiOrganizationWorkspaceContractTest.php tests/Feature/EventTeam/EventPermissionPresetContractTest.php tests/Feature/EventTeam/EventTeamInvitationContractTest.php tests/Feature/Events/EventScopedAccessCharacterizationTest.php tests/Feature/Events/EventScopedAccessContractTest.php tests/Feature/Events/ListEventsTest.php tests/Feature/MediaProcessing/ModerationMediaTest.php`
+- resultado: `56 passed`, `7 todo`, `656 assertions`
+
+Frontend:
+
+- `npx vitest run src/modules/auth/MyEventsPage.test.tsx src/modules/auth/workspace-utils.test.ts src/app/layouts/AppSidebar.test.tsx src/modules/auth/workspace-selector.contract.test.tsx src/modules/auth/my-events-page.contract.test.tsx`
+- resultado: `8 passed`, `19 todo`
+
+Type-check:
+
+- `npm run type-check`
+- resultado: `ok`
+
+O que essa rodada fechou:
+
+- sessao multi-workspace e entrada `/my-events` deixaram de ser apenas contrato e viraram implementacao real;
+- `EventTeam` deixou de aceitar mutacao fora do escopo do evento;
+- a troca de role por preset agora esta validada por teste;
+- o dominio inicial de convite por evento ja existe sem duplicar usuario da plataforma;
+- o aceite publico ainda segue como proxima slice porque o OTP atual continua acoplado a criacao de organizacao nova.
+
+Rotas novas confirmadas:
+
+- `GET /api/v1/events/{event}/access/invitations`
+- `POST /api/v1/events/{event}/access/invitations`
