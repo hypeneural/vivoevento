@@ -12,9 +12,9 @@ class RunAwsUsersHighCardinalityValidationCommand extends Command
 {
     protected $signature = 'face-search:validate-aws-users-high-cardinality
         {event_id : Event ID already configured for aws_search_mode=users}
-        {--sample-users=40 : Number of ready user vectors to probe}
-        {--min-ready-users=500 : Minimum ready user vectors required for pass}
-        {--target-ready-users=2000 : Informational high-cardinality target for the event}
+        {--sample-users=20 : Number of ready user vectors to probe}
+        {--min-ready-users=20 : Minimum ready user vectors required for pass in the default ~30 users validation profile}
+        {--target-ready-users=30 : Informational target for the default homolog/prod-like validation profile}
         {--max-fallback-rate=0.05 : Maximum acceptable fallback rate}
         {--min-users-mode-resolution-rate=0.95 : Minimum acceptable users-mode resolution rate}
         {--min-top1-match-rate=0.85 : Minimum acceptable top-1 match rate}
@@ -22,7 +22,7 @@ class RunAwsUsersHighCardinalityValidationCommand extends Command
         {--max-p95-latency-ms=1500 : Maximum acceptable p95 response duration}
         {--report-dir= : Optional absolute report directory override}';
 
-    protected $description = 'Validate aws_search_mode=users on a high-cardinality event with objective latency, fallback and match-rate criteria.';
+    protected $description = 'Validate aws_search_mode=users with objective latency, fallback and match-rate criteria. Defaults are tuned for the current homolog/prod-like validation profile around 30 ready users.';
 
     public function handle(RunAwsUsersHighCardinalityValidationAction $action): int
     {

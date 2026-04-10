@@ -12,6 +12,7 @@ use App\Modules\MediaProcessing\Actions\DeactivateEventMediaSenderBlockAction;
 use App\Modules\MediaProcessing\Actions\DeleteEventMediaAction;
 use App\Modules\MediaProcessing\Actions\RejectEventMediaAction;
 use App\Modules\MediaProcessing\Actions\ReprocessEventMediaStageAction;
+use App\Modules\MediaProcessing\Actions\UndoEventMediaDecisionAction;
 use App\Modules\MediaProcessing\Actions\UpsertEventMediaSenderBlockAction;
 use App\Modules\MediaProcessing\Enums\MediaReprocessStage;
 use App\Modules\MediaProcessing\Actions\UpdateEventMediaFeaturedAction;
@@ -35,6 +36,7 @@ use App\Modules\MediaProcessing\Http\Resources\EventMediaPipelineMetricsResource
 use App\Modules\MediaProcessing\Http\Resources\EventMediaResource;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Queries\ListCatalogMediaQuery;
+use App\Modules\MediaProcessing\Queries\ListDuplicateClusterMediaQuery;
 use App\Modules\MediaProcessing\Queries\ListModerationMediaQuery;
 use App\Modules\MediaProcessing\Services\MediaAuditLogger;
 use App\Modules\MediaProcessing\Services\MediaPipelineMetricsService;
@@ -223,6 +225,23 @@ class EventMediaController extends BaseController
         return $this->success(new EventMediaDetailResource(
             $eventMedia
         ));
+    }
+
+    public function duplicateCluster(
+        Request $request,
+        EventMedia $eventMedia,
+        EventAccessService $eventAccess,
+        EventMediaSenderContextService $senderContext,
+    ): JsonResponse
+    {
+        $eventMedia->loadMissing('event');
+
+        abort_unless($eventAccess->can($request->user(), $eventMedia->event, 'media.view'), 403);
+
+        $cluster = (new ListDuplicateClusterMediaQuery($eventMedia))->get();
+        $senderContext->hydrateCollection($cluster);
+
+        return $this->success(EventMediaResource::collection($cluster)->resolve());
     }
 
     public function aiDebug(
@@ -441,6 +460,25 @@ class EventMediaController extends BaseController
             $eventMedia,
             $request->user(),
             $validated['reason'] ?? null,
+        );
+        $broadcaster->broadcastUpdated($eventMedia);
+
+        return $this->success(new EventMediaResource($eventMedia));
+    }
+
+    public function undoDecision(
+        Request $request,
+        EventMedia $eventMedia,
+        EventAccessService $eventAccess,
+        UndoEventMediaDecisionAction $action,
+        ModerationBroadcasterService $broadcaster,
+    ): JsonResponse
+    {
+        abort_unless($eventAccess->can($request->user(), $eventMedia->event, 'media.moderate'), 403);
+
+        $eventMedia = $action->execute(
+            $eventMedia,
+            $request->user(),
         );
         $broadcaster->broadcastUpdated($eventMedia);
 

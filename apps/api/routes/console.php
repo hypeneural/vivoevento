@@ -25,6 +25,16 @@ Schedule::job(new PruneWallRuntimeSnapshotsJob())
     ->daily()
     ->withoutOverlapping();
 
+Schedule::command('billing:subscriptions:reconcile --limit=50 --contract-status=active,future,canceled')
+    ->hourly()
+    ->withoutOverlapping()
+    ->onOneServer();
+
+Schedule::command('billing:subscriptions:finalize-period-end-cancellations --limit=50')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();
+
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');

@@ -2,6 +2,7 @@
 
 namespace App\Modules\FaceSearch\Http\Resources;
 
+use App\Modules\FaceSearch\Services\EventFaceSearchOperationalSummaryService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -43,6 +44,7 @@ class EventFaceSearchSettingResource extends JsonResource
             'aws_index_profile_key' => $this->aws_index_profile_key,
             'aws_detection_attributes_json' => $this->aws_detection_attributes_json,
             'delete_remote_vectors_on_event_close' => (bool) $this->delete_remote_vectors_on_event_close,
+            'operational_summary' => app(EventFaceSearchOperationalSummaryService::class)->build($this->resource),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

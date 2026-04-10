@@ -110,6 +110,8 @@ export function cloneWallSettings(settings: ApiWallSettings): ApiWallSettings {
     ad_frequency: clampInteger(settings.ad_frequency, 5, 1, 100),
     ad_interval_minutes: clampInteger(settings.ad_interval_minutes, 3, 1, 60),
     video_enabled: settings.video_enabled ?? true,
+    public_upload_video_enabled: settings.public_upload_video_enabled ?? true,
+    private_inbound_video_enabled: settings.private_inbound_video_enabled ?? true,
     video_playback_mode: normalizeVideoPlaybackMode(settings.video_playback_mode),
     video_max_seconds: clampInteger(settings.video_max_seconds, 30, 5, 300),
     video_resume_mode: normalizeVideoResumeMode(settings.video_resume_mode),
@@ -128,6 +130,8 @@ export function prepareWallSettingsPayload(settings: ApiWallSettings): ApiWallSe
     ad_frequency: clampInteger(settings.ad_frequency, 5, 1, 100),
     ad_interval_minutes: clampInteger(settings.ad_interval_minutes, 3, 1, 60),
     video_enabled: settings.video_enabled ?? true,
+    public_upload_video_enabled: settings.public_upload_video_enabled ?? true,
+    private_inbound_video_enabled: settings.private_inbound_video_enabled ?? true,
     video_playback_mode: normalizeVideoPlaybackMode(settings.video_playback_mode),
     video_max_seconds: clampInteger(settings.video_max_seconds, 30, 5, 300),
     video_resume_mode: normalizeVideoResumeMode(settings.video_resume_mode),
@@ -181,6 +185,8 @@ export function areWallSettingsEqual(
     && clampInteger(left.ad_frequency, 5, 1, 100) === clampInteger(right.ad_frequency, 5, 1, 100)
     && clampInteger(left.ad_interval_minutes, 3, 1, 60) === clampInteger(right.ad_interval_minutes, 3, 1, 60)
     && (left.video_enabled ?? true) === (right.video_enabled ?? true)
+    && (left.public_upload_video_enabled ?? true) === (right.public_upload_video_enabled ?? true)
+    && (left.private_inbound_video_enabled ?? true) === (right.private_inbound_video_enabled ?? true)
     && normalizeVideoPlaybackMode(left.video_playback_mode) === normalizeVideoPlaybackMode(right.video_playback_mode)
     && clampInteger(left.video_max_seconds, 30, 5, 300) === clampInteger(right.video_max_seconds, 30, 5, 300)
     && normalizeVideoResumeMode(left.video_resume_mode) === normalizeVideoResumeMode(right.video_resume_mode)
@@ -250,7 +256,7 @@ export function resolveWallSelectionModeOption(
 }
 
 export function buildWallVideoPolicySummary(
-  settings: Pick<ApiWallSettings, 'video_enabled' | 'video_playback_mode' | 'video_max_seconds' | 'video_resume_mode' | 'video_audio_policy' | 'video_multi_layout_policy' | 'video_preferred_variant'>,
+  settings: Pick<ApiWallSettings, 'video_enabled' | 'public_upload_video_enabled' | 'private_inbound_video_enabled' | 'video_playback_mode' | 'video_max_seconds' | 'video_resume_mode' | 'video_audio_policy' | 'video_multi_layout_policy' | 'video_preferred_variant'>,
 ): string {
   if (!settings.video_enabled) {
     return 'Videos estao bloqueados neste telao. O wall segue aceitando apenas imagens na exibicao.';
@@ -267,6 +273,8 @@ export function buildWallVideoPolicySummary(
     `Audio ${settings.video_audio_policy === 'muted' ? 'sempre mudo' : 'com politica personalizada'}.`,
     `${layoutPolicy}.`,
     `${variantPolicy}.`,
+    `Canal publico ${settings.public_upload_video_enabled ?? true ? 'liberado para 1 video curto por envio' : 'mantido apenas com fotos'}.`,
+    `Canal privado ${settings.private_inbound_video_enabled ?? true ? 'segue gerando variantes do wall quando o tooling estiver pronto' : 'fica no fluxo legado sem rollout oficial de video'}.`,
   ].join(' ');
 }
 

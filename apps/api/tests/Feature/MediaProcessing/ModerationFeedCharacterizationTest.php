@@ -82,3 +82,40 @@ it('does not expose original-backed moderation surfaces in the feed when dedicat
         ->and(data_get($payload, 'moderation_preview_url'))->toBeNull()
         ->and(data_get($payload, 'moderation_preview_source'))->toBeNull();
 });
+
+it('routes exact event title search through the event filter before the broad search document path', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+        'title' => 'Evento Corporativo Hot Path',
+    ]);
+
+    $otherEvent = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+        'title' => 'Outro Evento',
+    ]);
+
+    $eventMedia = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'created_at' => now(),
+    ]);
+
+    $decoyMedia = EventMedia::factory()->create([
+        'event_id' => $otherEvent->id,
+        'created_at' => now()->subMinute(),
+    ]);
+
+    \Illuminate\Support\Facades\DB::table('event_media')
+        ->where('id', $decoyMedia->id)
+        ->update(['moderation_search_document' => 'Evento Corporativo Hot Path']);
+
+    $response = $this->apiGet('/media/feed?per_page=10&search='.urlencode('Evento Corporativo Hot Path'));
+
+    $response->assertOk();
+
+    $ids = collect($response->json('data'))->pluck('id')->all();
+
+    expect($ids)->toContain($eventMedia->id)
+        ->and($ids)->not->toContain($decoyMedia->id);
+});

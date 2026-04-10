@@ -473,14 +473,37 @@ export interface ApiBillingSubscription {
   plan_name: string | null;
   billing_cycle: string | null;
   status: string;
+  contract_status?: string | null;
+  billing_status?: string | null;
+  access_status?: string | null;
+  payment_method?: string | null;
   starts_at: string | null;
   trial_ends_at: string | null;
+  current_period_started_at?: string | null;
+  current_period_ends_at?: string | null;
   renews_at: string | null;
+  next_billing_at?: string | null;
   ends_at: string | null;
   canceled_at: string | null;
   cancel_at_period_end: boolean;
   cancellation_effective_at: string | null;
+  gateway_provider?: string | null;
+  gateway_subscription_id?: string | null;
+  gateway_customer_id?: string | null;
+  gateway_card_id?: string | null;
   features: Record<string, string | null>;
+}
+
+export interface ApiBillingCard {
+  id: string;
+  brand: string | null;
+  holder_name: string | null;
+  last_four: string | null;
+  exp_month: number | null;
+  exp_year: number | null;
+  status: string | null;
+  is_default: boolean;
+  label: string;
 }
 
 export interface ApiBillingInvoice {
@@ -550,6 +573,24 @@ export interface ApiBillingCancelSubscriptionResponse {
   message: string;
   cancel_effective: 'period_end' | 'immediately';
   access_until: string | null;
+  subscription: ApiBillingSubscription;
+}
+
+export interface ApiBillingUpdateCardResponse {
+  message: string;
+  subscription: ApiBillingSubscription;
+}
+
+export interface ApiBillingReconcileResponse {
+  provider_key: string;
+  subscription_id: number;
+  gateway_subscription_id: string;
+  cycles_reconciled: number;
+  invoices_reconciled: number;
+  charges_reconciled: number;
+  charge_details_loaded: number;
+  page: number;
+  size: number;
   subscription: ApiBillingSubscription;
 }
 
@@ -912,6 +953,27 @@ export interface ApiEventWallSummary {
   public_url: string | null;
 }
 
+export interface ApiEventFaceSearchOperationalSummary {
+  status: 'disabled' | 'local_only' | 'provisioning' | 'converging' | 'ready_for_internal_validation' | 'ready_for_guests' | string;
+  search_mode: 'faces' | 'users' | string;
+  collection_ready: boolean;
+  catalog_ready: boolean;
+  is_converging: boolean;
+  internal_search_ready: boolean;
+  guest_search_ready: boolean;
+  requires_attention: boolean;
+  counts: {
+    total_media: number;
+    queued_media: number;
+    processing_media: number;
+    indexed_media: number;
+    failed_media: number;
+    skipped_media: number;
+    searchable_records: number;
+    distinct_ready_users: number;
+  };
+}
+
 export interface ApiEventFaceSearchSettings {
   id: number | null;
   event_id: number;
@@ -946,6 +1008,7 @@ export interface ApiEventFaceSearchSettings {
   aws_index_profile_key: string;
   aws_detection_attributes_json: string[];
   delete_remote_vectors_on_event_close: boolean;
+  operational_summary?: ApiEventFaceSearchOperationalSummary | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -1444,6 +1507,11 @@ export interface ApiPublicHubResponse {
     builder_config: ApiHubBuilderConfig;
     buttons: ApiHubButton[];
   };
+  face_search: {
+    public_search_enabled: boolean;
+    find_me_url: string | null;
+    gallery_url: string | null;
+  };
 }
 
 export interface ApiHubHeroUploadResponse {
@@ -1495,6 +1563,8 @@ export interface ApiWallSettings {
   show_side_thumbnails: boolean;
   accepted_orientation: 'all' | 'landscape' | 'portrait';
   video_enabled: boolean;
+  public_upload_video_enabled?: boolean;
+  private_inbound_video_enabled?: boolean;
   video_playback_mode: ApiWallVideoPlaybackMode;
   video_max_seconds: number;
   video_resume_mode: ApiWallVideoResumeMode;
@@ -1594,6 +1664,14 @@ export interface ApiWallHeartbeatPayload {
   current_video_playback_ready?: boolean | null;
   current_video_playing_confirmed?: boolean | null;
   current_video_startup_degraded?: boolean | null;
+  hardware_concurrency?: number | null;
+  device_memory_gb?: number | null;
+  network_effective_type?: 'slow-2g' | '2g' | '3g' | '4g' | 'unknown' | null;
+  network_save_data?: boolean | null;
+  network_downlink_mbps?: number | null;
+  network_rtt_ms?: number | null;
+  prefers_reduced_motion?: boolean | null;
+  document_visibility_state?: 'visible' | 'hidden' | 'prerender' | 'unloaded' | null;
   ready_count: number;
   loading_count: number;
   error_count: number;
@@ -1650,6 +1728,14 @@ export interface ApiWallDiagnosticsPlayer {
   current_video_playback_ready?: boolean | null;
   current_video_playing_confirmed?: boolean | null;
   current_video_startup_degraded?: boolean | null;
+  hardware_concurrency?: number | null;
+  device_memory_gb?: number | null;
+  network_effective_type?: ApiWallHeartbeatPayload['network_effective_type'];
+  network_save_data?: boolean | null;
+  network_downlink_mbps?: number | null;
+  network_rtt_ms?: number | null;
+  prefers_reduced_motion?: boolean | null;
+  document_visibility_state?: ApiWallHeartbeatPayload['document_visibility_state'];
   current_sender_key?: string | null;
   ready_count: number;
   loading_count: number;
@@ -1910,6 +1996,12 @@ export interface ApiEventMediaItem {
   safety_status?: string | null;
   face_index_status?: string | null;
   vlm_status?: string | null;
+  safety_decision?: string | null;
+  safety_is_blocking?: boolean;
+  context_decision?: string | null;
+  context_is_blocking?: boolean;
+  operator_decision?: string | null;
+  publication_decision?: string | null;
   decision_source?: 'none_mode' | 'manual_review' | 'ai_safety' | 'ai_vlm' | 'user_override' | string | null;
   decision_overridden_at?: string | null;
   decision_overridden_by_user_id?: number | null;
@@ -2117,6 +2209,21 @@ export interface PublicFaceSearchBootstrap {
     find_me_api_url: string;
     gallery_url: string | null;
     hub_url: string | null;
+  };
+}
+
+export interface ApiPublicGalleryResponse {
+  data: ApiEventMediaItem[];
+  meta: {
+    page: number;
+    per_page: number;
+    total: number;
+    last_page: number;
+    request_id: string;
+    face_search: {
+      public_search_enabled: boolean;
+      find_me_url: string | null;
+    };
   };
 }
 

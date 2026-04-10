@@ -1,9 +1,12 @@
 import { api } from '@/lib/api';
 import type {
   ApiBillingCancelSubscriptionResponse,
+  ApiBillingCard,
   ApiBillingCheckoutResponse,
   ApiBillingInvoice,
+  ApiBillingReconcileResponse,
   ApiBillingSubscription,
+  ApiBillingUpdateCardResponse,
   ApiPaginationMeta,
   ApiPlan,
 } from '@/lib/api-types';
@@ -45,6 +48,27 @@ export interface CancelSubscriptionPayload {
   reason?: string;
 }
 
+export interface UpdateSubscriptionCardPayload {
+  card_id?: string;
+  card_token?: string;
+  billing_address?: {
+    street?: string;
+    number?: string;
+    district?: string;
+    complement?: string;
+    zip_code?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+  };
+}
+
+export interface ReconcileSubscriptionPayload {
+  page?: number;
+  size?: number;
+  with_charge_details?: boolean;
+}
+
 export const plansService = {
   listCatalog() {
     return api.get<ApiPlan[]>('/plans');
@@ -70,6 +94,22 @@ export const plansService = {
 
   cancelSubscription(payload: CancelSubscriptionPayload = {}) {
     return api.post<ApiBillingCancelSubscriptionResponse>('/billing/subscription/cancel', {
+      body: payload,
+    });
+  },
+
+  listWalletCards() {
+    return api.get<ApiBillingCard[]>('/billing/subscription/cards');
+  },
+
+  updateSubscriptionCard(payload: UpdateSubscriptionCardPayload) {
+    return api.patch<ApiBillingUpdateCardResponse>('/billing/subscription/card', {
+      body: payload,
+    });
+  },
+
+  reconcileSubscription(payload: ReconcileSubscriptionPayload = {}) {
+    return api.post<ApiBillingReconcileResponse>('/billing/subscription/reconcile', {
       body: payload,
     });
   },

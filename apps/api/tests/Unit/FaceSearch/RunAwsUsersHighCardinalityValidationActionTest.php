@@ -20,6 +20,7 @@ it('runs high-cardinality users validation and aggregates objective match, fallb
 
     \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
         'event_id' => $event->id,
+        'provider_key' => 'compreface',
         'recognition_enabled' => true,
         'search_backend_key' => 'aws_rekognition',
         'fallback_backend_key' => 'local_pgvector',
@@ -215,4 +216,42 @@ it('runs high-cardinality users validation and aggregates objective match, fallb
 
     expect(File::exists($probePathA))->toBeFalse()
         ->and(File::exists($probePathB))->toBeFalse();
+});
+
+it('skips users validation early when local fallback or shadow depends on a noop baseline provider', function () {
+    $event = Event::factory()->active()->create([
+        'title' => 'FaceSearch users validation with noop baseline',
+    ]);
+
+    \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'provider_key' => 'noop',
+        'recognition_enabled' => true,
+        'search_backend_key' => 'aws_rekognition',
+        'fallback_backend_key' => 'local_pgvector',
+        'routing_policy' => 'aws_primary_local_shadow',
+        'aws_search_mode' => 'users',
+        'shadow_mode_percentage' => 100,
+    ]);
+
+    $healthCheck = m::mock(RunEventFaceSearchHealthCheckAction::class);
+    $backend = m::mock(AwsRekognitionFaceSearchBackend::class);
+    $readiness = m::mock(AwsUserVectorReadinessService::class);
+    $probeBuilder = m::mock(AwsUserHighCardinalityProbeBuilder::class);
+    $searchBySelfie = m::mock(SearchFacesBySelfieAction::class);
+
+    $action = new RunAwsUsersHighCardinalityValidationAction(
+        healthCheck: $healthCheck,
+        backend: $backend,
+        searchBySelfie: $searchBySelfie,
+        readiness: $readiness,
+        probeBuilder: $probeBuilder,
+    );
+
+    $result = $action->execute($event);
+
+    expect($result['status'])->toBe('skipped')
+        ->and($result['skipped_reason'])->toBe('local_baseline_provider_noop')
+        ->and($result['current_settings']['provider_key'])->toBe('noop')
+        ->and($result['message'])->toContain('provider_key=compreface');
 });

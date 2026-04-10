@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -87,7 +88,7 @@ const faceSearchSettingsSchema = z.object({
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['allow_public_selfie_search'],
-      message: 'A busca publica por selfie exige FaceSearch habilitado.',
+      message: 'A busca publica por selfie exige o reconhecimento facial habilitado.',
     });
   }
 
@@ -103,7 +104,7 @@ const faceSearchSettingsSchema = z.object({
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['recognition_enabled'],
-      message: 'O backend AWS exige recognition_enabled=true.',
+      message: 'Para usar a AWS como busca principal, ligue a opcao "Usar busca principal da AWS".',
     });
   }
 
@@ -111,7 +112,7 @@ const faceSearchSettingsSchema = z.object({
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['aws_region'],
-      message: 'Informe a regiao AWS quando o backend for aws_rekognition.',
+      message: 'Informe a regiao da AWS quando a busca principal usar esse motor.',
     });
   }
 
@@ -274,6 +275,11 @@ export function EventFaceSearchSettingsForm({
   const recognitionEnabled = form.watch('recognition_enabled');
   const searchBackendKey = form.watch('search_backend_key');
   const awsBackendSelected = searchBackendKey === 'aws_rekognition';
+  const moderationModeLabel = eventModerationMode === 'ai'
+    ? 'IA'
+    : eventModerationMode === 'manual'
+      ? 'Manual'
+      : 'Sem moderacao';
 
   const submit = form.handleSubmit((values) => onSubmit(toPayload(values)));
 
@@ -284,10 +290,10 @@ export function EventFaceSearchSettingsForm({
           <p>
             Modo atual do evento:
             {' '}
-            <span className="font-medium text-foreground">{eventModerationMode}</span>
+            <span className="font-medium text-foreground">{moderationModeLabel}</span>
           </p>
           <p className="mt-1">
-            `FaceSearch` continua fora do gate de moderacao e roda como enrichment no heavy lane.
+            Esta busca funciona separada da aprovacao das fotos. Ligar ou desligar aqui nao muda sozinho a moderacao do evento.
           </p>
         </div>
 
@@ -299,14 +305,14 @@ export function EventFaceSearchSettingsForm({
               <FormItem className="rounded-2xl border border-slate-200 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <FormLabel>FaceSearch habilitado</FormLabel>
+                    <FormLabel>Reconhecimento facial ativo</FormLabel>
                     <FormDescription>
-                      Liga a indexacao por face sem bloquear publish nem moderacao.
+                      Liga a preparacao das fotos para a busca de pessoas.
                     </FormDescription>
                   </div>
                   <FormControl>
                     <Switch
-                      aria-label="Habilitar FaceSearch"
+                      aria-label="Ativar reconhecimento facial"
                       checked={field.value}
                       onCheckedChange={field.onChange}
                       disabled={disabled || isPending}
@@ -325,9 +331,9 @@ export function EventFaceSearchSettingsForm({
               <FormItem className="rounded-2xl border border-slate-200 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <FormLabel>Busca publica por selfie</FormLabel>
+                    <FormLabel>Liberar busca para convidados</FormLabel>
                     <FormDescription>
-                      Controla a experiencia de "encontre minhas fotos" para convidados.
+                      Mostra o caminho "Encontrar minhas fotos" para convidados.
                     </FormDescription>
                   </div>
                   <FormControl>
@@ -351,9 +357,9 @@ export function EventFaceSearchSettingsForm({
               <FormItem className="rounded-2xl border border-slate-200 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <FormLabel>Reconhecimento gerenciado</FormLabel>
+                    <FormLabel>Usar busca principal da AWS</FormLabel>
                     <FormDescription>
-                      Permite usar backend gerenciado por evento quando o roteamento apontar para AWS.
+                      Ativa a estrutura completa da AWS para este evento.
                     </FormDescription>
                   </div>
                   <FormControl>
@@ -371,26 +377,32 @@ export function EventFaceSearchSettingsForm({
           />
         </div>
 
+        <Accordion type="single" collapsible className="rounded-2xl border border-slate-200 px-4">
+          <AccordionItem value="advanced-settings" className="border-b-0">
+            <AccordionTrigger className="py-3 text-sm font-medium hover:no-underline">
+              Configuracao avancada e integracao AWS
+            </AccordionTrigger>
+            <AccordionContent className="space-y-5 pb-4 pt-1">
         <div className="grid gap-4 md:grid-cols-4">
           <FormField
             control={form.control}
             name="provider_key"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Provider atual</FormLabel>
+                <FormLabel>Motor local</FormLabel>
                 <Select value={field.value} onValueChange={field.onChange} disabled={disabled || isPending}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione o provider" />
+                      <SelectValue placeholder="Selecione o motor local" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="noop">Noop</SelectItem>
+                    <SelectItem value="noop">Sem busca local (noop)</SelectItem>
                     <SelectItem value="compreface">CompreFace</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormDescription>
-                  CompreFace usa deteccao facial com `calculator` para embeddings.
+                  O CompreFace e a opcao local usada quando o evento precisa de comparacao fora da AWS.
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -402,11 +414,11 @@ export function EventFaceSearchSettingsForm({
             name="vector_store_key"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Vector store</FormLabel>
+                <FormLabel>Base vetorial local</FormLabel>
                 <Select value={field.value} onValueChange={field.onChange} disabled={disabled || isPending}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione o vector store" />
+                      <SelectValue placeholder="Selecione a base vetorial" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -423,20 +435,20 @@ export function EventFaceSearchSettingsForm({
             name="search_strategy"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Estrategia</FormLabel>
+                <FormLabel>Tipo de busca local</FormLabel>
                 <Select value={field.value} onValueChange={field.onChange} disabled={disabled || isPending}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione a estrategia" />
+                      <SelectValue placeholder="Selecione o tipo de busca" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="exact">Exact</SelectItem>
-                    <SelectItem value="ann">ANN</SelectItem>
+                    <SelectItem value="exact">Busca precisa</SelectItem>
+                    <SelectItem value="ann">Busca acelerada</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormDescription>
-                  Use ANN apenas apos benchmark por evento.
+                  Use a busca acelerada so depois de medir o evento em ambiente real.
                 </FormDescription>
                 <FormMessage />
               </FormItem>
@@ -448,7 +460,7 @@ export function EventFaceSearchSettingsForm({
             name="embedding_model_key"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Modelo de embedding</FormLabel>
+                <FormLabel>Modelo vetorial local</FormLabel>
                 <FormControl>
                   <Input {...field} disabled={disabled || isPending} placeholder="face-embedding-foundation-v1" />
                 </FormControl>
@@ -459,9 +471,9 @@ export function EventFaceSearchSettingsForm({
         </div>
 
         <div className="rounded-2xl border border-slate-200 p-4">
-          <h3 className="text-sm font-semibold">Roteamento de backend</h3>
+          <h3 className="text-sm font-semibold">Caminho principal da busca</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Separa lane local `pgvector` do backend gerenciado e define fallback por evento.
+            Define se o evento usa busca local, AWS ou comparacao silenciosa entre os dois motores.
           </p>
           <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <FormField
@@ -469,16 +481,16 @@ export function EventFaceSearchSettingsForm({
               name="search_backend_key"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Backend principal</FormLabel>
+                  <FormLabel>Motor principal</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange} disabled={disabled || isPending}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione o backend" />
+                        <SelectValue placeholder="Selecione o motor principal" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="local_pgvector">local_pgvector</SelectItem>
-                      <SelectItem value="aws_rekognition">aws_rekognition</SelectItem>
+                      <SelectItem value="local_pgvector">Busca local</SelectItem>
+                      <SelectItem value="aws_rekognition">AWS Rekognition</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -491,17 +503,17 @@ export function EventFaceSearchSettingsForm({
               name="fallback_backend_key"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Backend de fallback</FormLabel>
+                  <FormLabel>Reserva em caso de falha</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange} disabled={disabled || isPending}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione o fallback" />
+                        <SelectValue placeholder="Selecione a reserva" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="none">Nenhum</SelectItem>
-                      <SelectItem value="local_pgvector">local_pgvector</SelectItem>
-                      <SelectItem value="aws_rekognition">aws_rekognition</SelectItem>
+                      <SelectItem value="local_pgvector">Busca local</SelectItem>
+                      <SelectItem value="aws_rekognition">AWS Rekognition</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -514,18 +526,18 @@ export function EventFaceSearchSettingsForm({
               name="routing_policy"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Politica de rota</FormLabel>
+                  <FormLabel>Comportamento entre motores</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange} disabled={disabled || isPending}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione a politica" />
+                        <SelectValue placeholder="Selecione o comportamento" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="local_only">local_only</SelectItem>
-                      <SelectItem value="aws_primary_local_fallback">aws_primary_local_fallback</SelectItem>
-                      <SelectItem value="aws_primary_local_shadow">aws_primary_local_shadow</SelectItem>
-                      <SelectItem value="local_primary_aws_on_error">local_primary_aws_on_error</SelectItem>
+                      <SelectItem value="local_only">Somente local</SelectItem>
+                      <SelectItem value="aws_primary_local_fallback">AWS principal com reserva local</SelectItem>
+                      <SelectItem value="aws_primary_local_shadow">AWS principal com comparacao silenciosa</SelectItem>
+                      <SelectItem value="local_primary_aws_on_error">Local principal com AWS em erro</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -538,12 +550,12 @@ export function EventFaceSearchSettingsForm({
               name="shadow_mode_percentage"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Shadow mode (%)</FormLabel>
+                  <FormLabel>Comparacao silenciosa (%)</FormLabel>
                   <FormControl>
                     <Input {...field} inputMode="numeric" disabled={disabled || isPending} />
                   </FormControl>
                   <FormDescription>
-                    Use `0` no MVP e aumente so depois do rollout controlado.
+                    Use `0` enquanto o evento ainda nao estiver em observacao controlada.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -554,9 +566,9 @@ export function EventFaceSearchSettingsForm({
 
         <div className="grid gap-4 xl:grid-cols-2">
           <div className="rounded-2xl border border-slate-200 p-4">
-            <h3 className="text-sm font-semibold">Qualidade minima para indexacao</h3>
+            <h3 className="text-sm font-semibold">Qualidade minima para preparar fotos</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Define quando uma face entra no indice vetorial do evento.
+              Define quando uma foto ja pode entrar na busca do evento.
             </p>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <FormField
@@ -564,12 +576,12 @@ export function EventFaceSearchSettingsForm({
                 name="min_face_size_px"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tamanho minimo da face (px)</FormLabel>
+                    <FormLabel>Tamanho minimo do rosto (px)</FormLabel>
                     <FormControl>
                       <Input {...field} inputMode="numeric" disabled={disabled || isPending} />
                     </FormControl>
                     <FormDescription>
-                      Default homologado atual: `24 px`. Abaixo disso o recall melhora, mas o ruído tende a subir.
+                      O valor homologado atual e `24 px`. Abaixo disso entram mais rostos, mas tambem sobe o ruido.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -581,7 +593,7 @@ export function EventFaceSearchSettingsForm({
                 name="min_quality_score"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Quality score minimo</FormLabel>
+                    <FormLabel>Qualidade minima</FormLabel>
                     <FormControl>
                       <Input {...field} inputMode="decimal" disabled={disabled || isPending} />
                     </FormControl>
@@ -593,9 +605,9 @@ export function EventFaceSearchSettingsForm({
           </div>
 
           <div className="rounded-2xl border border-slate-200 p-4">
-            <h3 className="text-sm font-semibold">Busca e retention</h3>
+            <h3 className="text-sm font-semibold">Busca e descarte</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Controla recall inicial e a janela de descarte da selfie temporaria.
+              Controla a sensibilidade inicial da busca e por quanto tempo a selfie temporaria fica guardada.
             </p>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <FormField
@@ -603,12 +615,12 @@ export function EventFaceSearchSettingsForm({
                 name="search_threshold"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Threshold de busca</FormLabel>
+                    <FormLabel>Sensibilidade da busca</FormLabel>
                     <FormControl>
                       <Input {...field} inputMode="decimal" disabled={disabled || isPending} />
                     </FormControl>
                     <FormDescription>
-                      Distancia maxima inicial usada no recall do evento.
+                      Quanto menor, mais resultados entram; quanto maior, mais rigida fica a busca.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -620,7 +632,7 @@ export function EventFaceSearchSettingsForm({
                 name="top_k"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Top K</FormLabel>
+                    <FormLabel>Quantidade maxima de resultados</FormLabel>
                     <FormControl>
                       <Input {...field} inputMode="numeric" disabled={disabled || isPending} />
                     </FormControl>
@@ -634,12 +646,12 @@ export function EventFaceSearchSettingsForm({
                 name="selfie_retention_hours"
                 render={({ field }) => (
                   <FormItem className="md:col-span-2">
-                    <FormLabel>Retencao da selfie (horas)</FormLabel>
+                    <FormLabel>Tempo para descartar selfie temporaria (horas)</FormLabel>
                     <FormControl>
                       <Input {...field} inputMode="numeric" disabled={!faceSearchEnabled || disabled || isPending} />
                     </FormControl>
                     <FormDescription>
-                      Tempo maximo para selfies temporarias quando a busca publica estiver aberta.
+                      Esse prazo vale quando a busca para convidados estiver liberada.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -650,9 +662,9 @@ export function EventFaceSearchSettingsForm({
         </div>
 
         <div className="rounded-2xl border border-slate-200 p-4">
-          <h3 className="text-sm font-semibold">AWS Rekognition</h3>
+          <h3 className="text-sm font-semibold">Ajustes tecnicos da AWS</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Configura a collection do evento, thresholds nativos da AWS e a politica de indexacao do backend gerenciado.
+            Normalmente a equipe nao precisa mexer aqui no dia a dia. Use este bloco apenas para calibracao e rollout.
           </p>
 
           <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -661,7 +673,7 @@ export function EventFaceSearchSettingsForm({
               name="aws_region"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Regiao AWS</FormLabel>
+                  <FormLabel>Regiao da AWS</FormLabel>
                   <FormControl>
                     <Input {...field} disabled={disabled || isPending} placeholder="eu-central-1" />
                   </FormControl>
@@ -675,20 +687,20 @@ export function EventFaceSearchSettingsForm({
               name="aws_search_mode"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Modo de busca AWS</FormLabel>
+                  <FormLabel>Modo principal da AWS</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange} disabled={disabled || isPending}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione o modo" />
+                        <SelectValue placeholder="Selecione o modo principal" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="faces">faces</SelectItem>
-                      <SelectItem value="users">users</SelectItem>
+                      <SelectItem value="faces">Fotos individuais</SelectItem>
+                      <SelectItem value="users">Pessoas agrupadas</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormDescription>
-                    `users` so deve entrar depois da fase 2 com vetores consolidados.
+                    Pessoas agrupadas so devem entrar depois da validacao tecnica completa do evento.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -700,17 +712,17 @@ export function EventFaceSearchSettingsForm({
               name="aws_index_profile_key"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Perfil de indexacao</FormLabel>
+                  <FormLabel>Perfil de preparacao</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange} disabled={disabled || isPending}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione o perfil" />
+                        <SelectValue placeholder="Selecione o perfil de preparacao" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="selfie_friendly_event">selfie_friendly_event</SelectItem>
-                      <SelectItem value="social_gallery_event">social_gallery_event</SelectItem>
-                      <SelectItem value="corporate_stage_event">corporate_stage_event</SelectItem>
+                      <SelectItem value="selfie_friendly_event">Evento com foco em selfie</SelectItem>
+                      <SelectItem value="social_gallery_event">Galeria social</SelectItem>
+                      <SelectItem value="corporate_stage_event">Palco corporativo</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -723,7 +735,7 @@ export function EventFaceSearchSettingsForm({
               name="aws_max_faces_per_image"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Max faces por imagem</FormLabel>
+                  <FormLabel>Maximo de rostos por foto</FormLabel>
                   <FormControl>
                     <Input {...field} inputMode="numeric" disabled={disabled || isPending} />
                   </FormControl>
@@ -739,7 +751,7 @@ export function EventFaceSearchSettingsForm({
               name="aws_index_quality_filter"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Quality filter no index</FormLabel>
+                  <FormLabel>Filtro de qualidade na preparacao</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange} disabled={disabled || isPending}>
                     <FormControl>
                       <SelectTrigger>
@@ -762,7 +774,7 @@ export function EventFaceSearchSettingsForm({
               name="aws_search_faces_quality_filter"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Quality filter em SearchFacesByImage</FormLabel>
+                  <FormLabel>Filtro de qualidade na busca por foto</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange} disabled={disabled || isPending}>
                     <FormControl>
                       <SelectTrigger>
@@ -785,7 +797,7 @@ export function EventFaceSearchSettingsForm({
               name="aws_search_users_quality_filter"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Quality filter em SearchUsersByImage</FormLabel>
+                  <FormLabel>Filtro de qualidade na busca por pessoa</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange} disabled={disabled || isPending}>
                     <FormControl>
                       <SelectTrigger>
@@ -810,7 +822,7 @@ export function EventFaceSearchSettingsForm({
               name="aws_search_face_match_threshold"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Threshold faces</FormLabel>
+                  <FormLabel>Confianca minima em fotos</FormLabel>
                   <FormControl>
                     <Input {...field} inputMode="decimal" disabled={disabled || isPending} />
                   </FormControl>
@@ -824,7 +836,7 @@ export function EventFaceSearchSettingsForm({
               name="aws_search_user_match_threshold"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Threshold users</FormLabel>
+                  <FormLabel>Confianca minima em pessoas</FormLabel>
                   <FormControl>
                     <Input {...field} inputMode="decimal" disabled={disabled || isPending} />
                   </FormControl>
@@ -838,7 +850,7 @@ export function EventFaceSearchSettingsForm({
               name="aws_associate_user_match_threshold"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Threshold de associacao</FormLabel>
+                  <FormLabel>Confianca minima para agrupar fotos</FormLabel>
                   <FormControl>
                     <Input {...field} inputMode="decimal" disabled={disabled || isPending} />
                   </FormControl>
@@ -848,9 +860,9 @@ export function EventFaceSearchSettingsForm({
             />
 
             <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">Semantica separada</p>
+              <p className="font-medium text-foreground">Atencao sobre as comparacoes</p>
               <p className="mt-1">
-                Esses thresholds sao `0-100` da AWS e nao equivalem ao `search_threshold` local do `pgvector`.
+                Esses numeros sao da AWS e nao equivalem a sensibilidade da busca local.
               </p>
             </div>
           </div>
@@ -863,14 +875,14 @@ export function EventFaceSearchSettingsForm({
                 <FormItem className="rounded-2xl border border-slate-200 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <FormLabel>DetectionAttributes: FACE_OCCLUDED</FormLabel>
+                      <FormLabel>Detectar rosto parcialmente encoberto</FormLabel>
                       <FormDescription>
-                        O MVP sempre envia `DEFAULT`; esta flag adiciona `FACE_OCCLUDED` sem usar `ALL`.
+                        Mantem a leitura padrao e adiciona a checagem de rosto parcialmente coberto.
                       </FormDescription>
                     </div>
                     <FormControl>
                       <Switch
-                        aria-label="Ativar FACE_OCCLUDED"
+                        aria-label="Detectar rosto parcialmente encoberto"
                         checked={field.value}
                         onCheckedChange={field.onChange}
                         disabled={disabled || isPending}
@@ -889,9 +901,9 @@ export function EventFaceSearchSettingsForm({
                 <FormItem className="rounded-2xl border border-slate-200 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <FormLabel>Limpar collection no encerramento</FormLabel>
+                      <FormLabel>Apagar estrutura AWS ao encerrar</FormLabel>
                       <FormDescription>
-                        Remove vetores remotos quando o evento for encerrado e a politica operacional exigir cleanup.
+                        Remove a estrutura remota quando o evento for encerrado e a politica operacional pedir limpeza.
                       </FormDescription>
                     </div>
                     <FormControl>
@@ -911,18 +923,18 @@ export function EventFaceSearchSettingsForm({
 
           {(settings.aws_collection_id || settings.aws_collection_arn || settings.aws_face_model_version) ? (
             <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-              <p className="font-semibold">Collection provisionada</p>
+              <p className="font-semibold">Estrutura AWS pronta</p>
               <div className="mt-2 grid gap-2 md:grid-cols-3">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-emerald-700">Collection ID</p>
+                  <p className="text-xs uppercase tracking-wide text-emerald-700">ID da estrutura</p>
                   <p className="break-all font-medium">{settings.aws_collection_id ?? 'n/a'}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-emerald-700">Face model</p>
+                  <p className="text-xs uppercase tracking-wide text-emerald-700">Modelo facial</p>
                   <p className="font-medium">{settings.aws_face_model_version ?? 'n/a'}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-emerald-700">Region</p>
+                  <p className="text-xs uppercase tracking-wide text-emerald-700">Regiao</p>
                   <p className="font-medium">{settings.aws_region}</p>
                 </div>
               </div>
@@ -934,15 +946,18 @@ export function EventFaceSearchSettingsForm({
 
           {awsBackendSelected && !recognitionEnabled ? (
             <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-              O backend `aws_rekognition` so pode ser salvo com `recognition_enabled=true`.
+              A busca principal na AWS so pode ser salva quando a opcao "Usar busca principal da AWS" estiver ligada.
             </div>
           ) : null}
         </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
 
         <div className="flex justify-end">
           <Button type="submit" disabled={disabled || isPending}>
             <Save className="mr-1.5 h-4 w-4" />
-            {isPending ? 'Salvando...' : 'Salvar FaceSearch'}
+            {isPending ? 'Salvando...' : 'Salvar reconhecimento facial'}
           </Button>
         </div>
       </form>

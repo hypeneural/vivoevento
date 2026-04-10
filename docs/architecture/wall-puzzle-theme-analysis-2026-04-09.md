@@ -13,6 +13,14 @@ Este documento consolida:
 
 Este material foi produzido por leitura direta do codigo frontend e backend do modulo `Wall`.
 
+Plano derivado desta analise:
+
+- `docs/architecture/wall-puzzle-theme-execution-plan-2026-04-09.md`
+
+Analise complementar desta rodada:
+
+- `docs/architecture/wall-puzzle-video-and-theme-extensibility-analysis-2026-04-09.md`
+
 ---
 
 ## Veredito executivo
@@ -746,7 +754,7 @@ export interface WallMotionTokens {
 
 Beneficio real:
 
-- `fullscreen`, `cinematic`, `grid`, `mosaic`, `carousel` e `puzzle` deixam de inventar fisicas incompatveis;
+- `fullscreen`, `cinematic`, `grid`, `mosaic`, `carousel` e `puzzle` deixam de inventar fisicas incompativeis;
 - reduced motion passa a ser policy, nao excecao espalhada;
 - fica mais barato introduzir temas premium sem quebrar a assinatura do wall.
 
@@ -898,7 +906,7 @@ Para nao criar custo oculto de manutencao, eu recomendo:
 - manter um catalogo pequeno de variantes reaproveitaveis, por exemplo `6` a `10` shapes base;
 - normalizar os paths para uso relativo;
 - reutilizar `defs` por variante e orientacao, em vez de gerar um SVG unico por slot;
-- tratar `clipPathUnits=\"objectBoundingBox\"` como padrao do sistema.
+- tratar `clipPathUnits="objectBoundingBox"` como padrao do sistema.
 
 ## 2. Mascaramento
 
@@ -1217,7 +1225,7 @@ export interface WallLayoutDefinition {
 
 Isso reduz o acoplamento ao `switch/case` manual e deixa novos temas mais baratos de adicionar.
 
-## 3. Criar um subsystema compartilhado para layouts de board
+## 3. Criar um subsistema compartilhado para layouts de board
 
 `carousel`, `mosaic`, `grid` e o futuro `puzzle` compartilham uma natureza parecida:
 
@@ -1229,7 +1237,7 @@ Isso reduz o acoplamento ao `switch/case` manual e deixa novos temas mais barato
 
 Melhoria recomendada:
 
-- extrair um subsystema pequeno, mas formal, para board layouts.
+- extrair um subsistema pequeno, mas formal, para board layouts.
 
 Exemplos de componentes/hooks compartilhados:
 
@@ -1444,7 +1452,7 @@ Validacoes relevantes:
 
 Nuance importante:
 
-- `useSyncExternalStore` e uma boa trilha para realtime se o player comecar a mostrar tearing, churn ou reconciliares mais pesadas;
+- `useSyncExternalStore` e uma boa trilha para realtime se o player comecar a mostrar tearing, churn ou reconciliacoes mais pesadas;
 - sem esse sintoma, eu manteria isso como melhoria condicional e nao como P0.
 
 ## TanStack Query
@@ -1536,7 +1544,7 @@ Fundacao minima:
 - capabilities formais por tema;
 - bloqueio funcional de combinacoes incompativeis no editor.
 
-### 3. Subsystema de board layouts + `usePuzzleBoard`
+### 3. Subsistema de board layouts + `usePuzzleBoard`
 
 Se `puzzle` nascer fora de uma base compartilhada, ele vira o primeiro layout "especial demais".
 
@@ -1697,7 +1705,7 @@ Continuam relevantes como base anterior:
 
 ## Roadmap recomendado
 
-## Fase 1 - fundacao do systema de temas
+## Fase 1 - fundacao do sistema de temas
 
 - criar `layout registry`;
 - introduzir `theme_config`;

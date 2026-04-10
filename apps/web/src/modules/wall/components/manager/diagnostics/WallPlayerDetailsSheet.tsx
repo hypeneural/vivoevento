@@ -8,7 +8,11 @@ import {
   formatBytes,
   formatConnectionStatus,
   formatCurrentSender,
+  formatDeviceProfile,
+  formatDeviceProfileDetail,
   formatFallbackReason,
+  formatNetworkProfile,
+  formatNetworkProfileDetail,
   formatOperationalGuidance,
   formatPercentLabel,
   formatPersistentStorage,
@@ -71,6 +75,8 @@ function WallPlayerDetailsBody({ player }: { player: ApiWallDiagnosticsPlayer | 
         <DetailBlock label="Fila pronta" value={readinessSummary} detail="Mostra o quanto essa tela ja carregou para seguir sem travar." />
         <DetailBlock label="Aproveitamento do cache" value={formatPercentLabel(player.cache_hit_rate)} detail={`Acertos ${player.cache_hit_count} | Falhas ${player.cache_miss_count} | Desatualizadas ${player.cache_stale_fallback_count}`} />
         <DetailBlock label="Espaco usado no navegador" value={`${formatBytes(player.cache_usage_bytes)} de ${formatBytes(player.cache_quota_bytes)}`} detail={`Armazenamento ${formatPersistentStorage(player.persistent_storage)}`} />
+        <DetailBlock label="Perfil da maquina" value={formatDeviceProfile(player)} detail={formatDeviceProfileDetail(player)} />
+        <DetailBlock label="Rede percebida" value={formatNetworkProfile(player)} detail={formatNetworkProfileDetail(player)} />
         {player.current_media_type === 'video' ? (
           <>
             <DetailBlock

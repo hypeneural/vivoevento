@@ -47,7 +47,7 @@ const PublicGamePage = lazy(routeImports.publicGame);
 const HubPage = lazy(routeImports.hub);
 const PublicHubPage = lazy(routeImports.publicHub);
 const PublicFaceSearchPage = lazy(routeImports.publicFaceSearch);
-const PublicEventCheckoutPage = lazy(routeImports.publicEventCheckout);
+const PublicEventCheckoutEntryPage = lazy(routeImports.publicEventCheckout);
 const WhatsAppInstancesPage = lazy(routeImports.whatsappInstances);
 const WhatsAppInstanceDetailPage = lazy(routeImports.whatsappInstanceDetail);
 const PartnersPage = lazy(routeImports.partners);
@@ -132,7 +132,7 @@ const router = createBrowserRouter(
       <Route path="/login" element={<LoginRoute />} />
       <Route path="/wall/player/:code" element={<WallPlayerPage />} />
       <Route path="/upload/:code" element={<PublicEventUploadPage />} />
-      <Route path="/checkout/evento" element={<PublicEventCheckoutPage />} />
+      <Route path="/checkout/evento" element={<PublicEventCheckoutEntryPage />} />
       <Route path="/e/:slug" element={<PublicHubPage />} />
       <Route path="/e/:slug/gallery" element={<PublicGalleryPage />} />
       <Route path="/e/:slug/find-me" element={<PublicFaceSearchPage />} />

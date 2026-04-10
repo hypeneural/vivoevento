@@ -60,6 +60,8 @@ it('allows a same-organization manager to update wall settings', function () {
         'selection_mode' => 'inclusive',
         'event_phase' => 'reception',
         'video_enabled' => true,
+        'public_upload_video_enabled' => false,
+        'private_inbound_video_enabled' => true,
         'video_playback_mode' => 'play_to_end_if_short_else_cap',
         'video_max_seconds' => 20,
         'video_resume_mode' => 'restart_from_zero',
@@ -91,6 +93,8 @@ it('allows a same-organization manager to update wall settings', function () {
         ->and($settings->selection_mode->value)->toBe('inclusive')
         ->and($settings->event_phase->value)->toBe('reception')
         ->and($settings->video_enabled)->toBeTrue()
+        ->and($settings->public_upload_video_enabled)->toBeFalse()
+        ->and($settings->private_inbound_video_enabled)->toBeTrue()
         ->and($settings->video_playback_mode)->toBe('play_to_end_if_short_else_cap')
         ->and($settings->video_max_seconds)->toBe(20)
         ->and($settings->video_resume_mode)->toBe('restart_from_zero')

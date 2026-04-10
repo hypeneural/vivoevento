@@ -12,6 +12,7 @@ use App\Modules\MediaProcessing\Services\MediaToolingStatusService;
 use App\Modules\MediaProcessing\Services\ModerationBroadcasterService;
 use App\Modules\MediaProcessing\Services\RemoteInboundMediaDownloaderService;
 use App\Modules\MediaProcessing\Services\VideoMetadataExtractorService;
+use App\Modules\Wall\Models\EventWallSetting;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -61,8 +62,8 @@ class DownloadInboundMediaJob implements ShouldQueue
         $body = $download['body'];
         $mimeType = $download['mime_type'] ?? 'application/octet-stream';
         $mediaType = $this->mediaTypeFor($inboundMessage->message_type, $mimeType);
-        $usesVariantPipeline = $this->usesVariantPipeline($mediaType);
-        $usesVideoVariants = $this->usesVideoVariants($mediaType);
+        $usesVariantPipeline = $this->usesVariantPipeline($mediaType, $inboundMessage);
+        $usesVideoVariants = $this->usesVideoVariants($mediaType, $inboundMessage);
 
         $extension = $this->extensionFor($mimeType, $inboundMessage->message_type);
         $filename = "{$inboundMessage->message_id}.{$extension}";
@@ -172,14 +173,18 @@ class DownloadInboundMediaJob implements ShouldQueue
         };
     }
 
-    private function usesVariantPipeline(string $mediaType): bool
+    private function usesVariantPipeline(string $mediaType, InboundMessage $inboundMessage): bool
     {
-        return $mediaType === 'image' || $this->usesVideoVariants($mediaType);
+        return $mediaType === 'image' || $this->usesVideoVariants($mediaType, $inboundMessage);
     }
 
-    private function usesVideoVariants(string $mediaType): bool
+    private function usesVideoVariants(string $mediaType, InboundMessage $inboundMessage): bool
     {
         if ($mediaType !== 'video') {
+            return false;
+        }
+
+        if (! $this->privateInboundVideoEnabled($inboundMessage)) {
             return false;
         }
 
@@ -235,5 +240,15 @@ class DownloadInboundMediaJob implements ShouldQueue
             'mime_type' => $download['mime_type'] ?? $inboundMessage->mime_type,
             'container' => $download['mime_type'] ?? $inboundMessage->mime_type,
         ]);
+    }
+
+    private function privateInboundVideoEnabled(InboundMessage $inboundMessage): bool
+    {
+        $settings = $inboundMessage->event?->relationLoaded('wallSettings')
+            ? $inboundMessage->event->getRelation('wallSettings')
+            : EventWallSetting::query()->where('event_id', $inboundMessage->event_id)->first();
+
+        return $settings?->resolvedPrivateInboundVideoEnabled()
+            ?? (bool) config('media_processing.private_inbound.video_enabled', true);
     }
 }

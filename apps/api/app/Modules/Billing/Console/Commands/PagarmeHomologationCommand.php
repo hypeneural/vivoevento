@@ -9,12 +9,13 @@ use Illuminate\Support\Facades\File;
 class PagarmeHomologationCommand extends Command
 {
     protected $signature = 'billing:pagarme:homologate
-        {--scenario=all : all|pix-cancel|card-refund|simulator-dossier}
+        {--scenario=all : all|pix-cancel|card-refund|simulator-dossier|recurring-lifecycle}
         {--amount=19900 : Amount in cents for the probe}
         {--poll-attempts=4 : Number of GET /orders and GET /charges snapshots}
         {--poll-sleep-ms=1500 : Delay in milliseconds between snapshots}
         {--card=4000000000000010 : Credit card number for card-refund}
-        {--cvv=123 : Credit card CVV for card-refund or simulator dossier}';
+        {--cvv=123 : Credit card CVV for card-refund or simulator dossier}
+        {--hook-id= : Optional Pagar.me hook id configured for the Cloudflare webhook URL}';
 
     protected $description = 'Run direct Pagar.me v5 homologation probes for cancel/refund and simulator dossiers.';
 
@@ -26,6 +27,7 @@ class PagarmeHomologationCommand extends Command
         $pollSleepMs = (int) $this->option('poll-sleep-ms');
         $card = (string) $this->option('card');
         $cvv = (string) $this->option('cvv');
+        $hookId = filled($this->option('hook-id')) ? (string) $this->option('hook-id') : null;
 
         $payload = match ($scenario) {
             'all' => [
@@ -36,11 +38,12 @@ class PagarmeHomologationCommand extends Command
             'pix-cancel' => $service->runPixCancelProbe($amount, null, $pollAttempts, $pollSleepMs),
             'card-refund' => $service->runCreditCardRefundProbe($card, $cvv, $amount, null, $pollAttempts, $pollSleepMs),
             'simulator-dossier' => $service->runGatewaySimulatorDossier($amount, $cvv, $pollAttempts, $pollSleepMs),
+            'recurring-lifecycle' => $service->runRecurringLifecycleProbe($amount, $hookId, $pollAttempts, $pollSleepMs),
             default => null,
         };
 
         if ($payload === null) {
-            $this->error('Invalid scenario. Use all, pix-cancel, card-refund or simulator-dossier.');
+            $this->error('Invalid scenario. Use all, pix-cancel, card-refund, simulator-dossier or recurring-lifecycle.');
 
             return self::INVALID;
         }

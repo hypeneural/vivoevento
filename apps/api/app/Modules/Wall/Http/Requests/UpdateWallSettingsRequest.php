@@ -48,6 +48,8 @@ class UpdateWallSettingsRequest extends FormRequest
             'show_side_thumbnails' => ['sometimes', 'boolean'],
             'accepted_orientation' => ['sometimes', Rule::enum(WallAcceptedOrientation::class)],
             'video_enabled' => ['sometimes', 'boolean'],
+            'public_upload_video_enabled' => ['sometimes', 'boolean'],
+            'private_inbound_video_enabled' => ['sometimes', 'boolean'],
             'video_playback_mode' => ['sometimes', Rule::in(['fixed_interval', 'play_to_end', 'play_to_end_if_short_else_cap'])],
             'video_max_seconds' => ['sometimes', 'integer', 'min:5', 'max:300'],
             'video_resume_mode' => ['sometimes', Rule::in(['resume_if_same_item', 'restart_from_zero', 'resume_if_same_item_else_restart'])],

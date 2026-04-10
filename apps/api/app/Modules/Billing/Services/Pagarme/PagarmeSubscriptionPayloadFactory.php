@@ -41,11 +41,11 @@ class PagarmeSubscriptionPayloadFactory
             'start_at' => $context['start_at'] ?? null,
             'customer_id' => filled($gatewayCustomerId) ? (string) $gatewayCustomerId : null,
             'customer' => filled($gatewayCustomerId) ? null : $this->customerNormalizer->normalize($payer),
-            'card' => $paymentMethod === 'credit_card'
-                ? array_filter([
-                    'card_id' => filled($gatewayCardId) ? (string) $gatewayCardId : null,
-                    'card_token' => blank($gatewayCardId) && filled($cardToken) ? (string) $cardToken : null,
-                ], fn (mixed $value): bool => $value !== null && $value !== '')
+            'card_id' => $paymentMethod === 'credit_card' && filled($gatewayCardId)
+                ? (string) $gatewayCardId
+                : null,
+            'card_token' => $paymentMethod === 'credit_card' && blank($gatewayCardId) && filled($cardToken)
+                ? (string) $cardToken
                 : null,
             'installments' => 1,
             'metadata' => array_filter([

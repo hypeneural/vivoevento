@@ -155,6 +155,14 @@ it('persists video runtime fields in diagnostics and marks waiting video playbac
         'current_video_playback_ready' => false,
         'current_video_playing_confirmed' => false,
         'current_video_startup_degraded' => true,
+        'hardware_concurrency' => 8,
+        'device_memory_gb' => 16,
+        'network_effective_type' => '4g',
+        'network_save_data' => false,
+        'network_downlink_mbps' => 24.5,
+        'network_rtt_ms' => 68,
+        'prefers_reduced_motion' => false,
+        'document_visibility_state' => 'visible',
         'ready_count' => 2,
         'loading_count' => 1,
         'error_count' => 0,
@@ -181,7 +189,15 @@ it('persists video runtime fields in diagnostics and marks waiting video playbac
         ->assertJsonPath('data.players.0.current_video_failure_reason', 'network_error')
         ->assertJsonPath('data.players.0.current_video_stall_count', 1)
         ->assertJsonPath('data.players.0.current_video_poster_visible', true)
-        ->assertJsonPath('data.players.0.current_video_startup_degraded', true);
+        ->assertJsonPath('data.players.0.current_video_startup_degraded', true)
+        ->assertJsonPath('data.players.0.hardware_concurrency', 8)
+        ->assertJsonPath('data.players.0.device_memory_gb', 16)
+        ->assertJsonPath('data.players.0.network_effective_type', '4g')
+        ->assertJsonPath('data.players.0.network_save_data', false)
+        ->assertJsonPath('data.players.0.network_downlink_mbps', 24.5)
+        ->assertJsonPath('data.players.0.network_rtt_ms', 68)
+        ->assertJsonPath('data.players.0.prefers_reduced_motion', false)
+        ->assertJsonPath('data.players.0.document_visibility_state', 'visible');
 });
 
 it('broadcasts diagnostics updates on the private event wall channel when the aggregate changes', function () {

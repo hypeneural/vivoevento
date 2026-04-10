@@ -34,6 +34,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import type {
   ApiBillingCheckoutResponse,
+  ApiBillingCard,
   ApiBillingInvoice,
   ApiBillingSubscription,
   ApiPlan,
@@ -45,6 +46,7 @@ import { EmptyState } from '@/shared/components/EmptyState';
 import { PageHeader } from '@/shared/components/PageHeader';
 
 import { plansService } from './api';
+import { RecurringCardUpdateDialog } from './components/RecurringCardUpdateDialog';
 import { RecurringPlanCheckoutDialog } from './components/RecurringPlanCheckoutDialog';
 
 const PLAN_FEATURE_LABELS: Record<string, (value: string | null) => string | null> = {
@@ -542,16 +544,30 @@ function InvoicesMobileList({ invoices }: { invoices: ApiBillingInvoice[] }) {
 function SubscriptionPanel({
   organizationName,
   subscription,
+  walletCards,
+  isWalletLoading,
   canManageSubscription,
   isCancelling,
+  isReconciling,
+  isUpdatingCard,
   onCancel,
+  onReconcile,
+  onOpenCardDialog,
+  onUseSavedCard,
   onOpenCatalog,
 }: {
   organizationName: string;
   subscription: ApiBillingSubscription | null;
+  walletCards: ApiBillingCard[];
+  isWalletLoading: boolean;
   canManageSubscription: boolean;
   isCancelling: boolean;
+  isReconciling: boolean;
+  isUpdatingCard: boolean;
   onCancel: (reason?: string) => void;
+  onReconcile: () => void;
+  onOpenCardDialog: () => void;
+  onUseSavedCard: (cardId: string) => void;
   onOpenCatalog: () => void;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -580,6 +596,7 @@ function SubscriptionPanel({
     && ['active', 'trialing', 'trial', 'past_due'].includes(subscription.status || '');
   const accessUntil = subscription.cancellation_effective_at || subscription.ends_at || subscription.renews_at;
   const isCanceledPendingEnd = subscription.cancel_at_period_end && Boolean(accessUntil);
+  const canManageCard = canManageSubscription && Boolean(subscription.gateway_subscription_id);
 
   return (
     <>
@@ -620,6 +637,15 @@ function SubscriptionPanel({
           </div>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
+            <Button
+              variant="outline"
+              disabled={isReconciling}
+              onClick={onReconcile}
+            >
+              {isReconciling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Sincronizar provider
+            </Button>
+
             {canCancelSubscription ? (
               <Button
                 variant="destructive"
@@ -660,6 +686,63 @@ function SubscriptionPanel({
           ) : (
             <p className="mt-4 text-sm text-muted-foreground">Nenhuma feature foi retornada para o plano vinculado a esta assinatura.</p>
           )}
+
+          <div className="mt-6 border-t border-border/60 pt-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Pagamento recorrente</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {subscription.payment_method === 'credit_card' ? 'Cartao de credito mensal' : subscription.payment_method || 'Metodo nao informado'}
+                </p>
+              </div>
+              {canManageCard ? (
+                <Button type="button" size="sm" variant="outline" onClick={onOpenCardDialog}>
+                  Trocar cartao
+                </Button>
+              ) : null}
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {isWalletLoading ? (
+                <div className="rounded-2xl border border-border/60 bg-background/30 p-4 text-sm text-muted-foreground">
+                  Carregando wallet...
+                </div>
+              ) : null}
+
+              {!isWalletLoading && walletCards.length === 0 ? (
+                <div className="rounded-2xl border border-border/60 bg-background/30 p-4 text-sm text-muted-foreground">
+                  Nenhum cartao salvo retornado pelo provider.
+                </div>
+              ) : null}
+
+              {walletCards.slice(0, 3).map((card) => (
+                <div key={card.id} className="rounded-2xl border border-border/60 bg-background/30 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        {card.label || `${card.brand || 'Cartao'} final ${card.last_four || '----'}`}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {card.is_default ? 'Cartao padrao atual' : card.status || 'active'}
+                      </p>
+                    </div>
+                    {!card.is_default && canManageCard ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={isUpdatingCard}
+                        onClick={() => onUseSavedCard(card.id)}
+                      >
+                        {isUpdatingCard ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
+                        Usar
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -701,6 +784,7 @@ export default function PlansPage() {
   const [pendingCheckout, setPendingCheckout] = useState<ApiBillingCheckoutResponse | null>(null);
   const [selectedCycles, setSelectedCycles] = useState<Record<number, string>>({});
   const [checkoutDialog, setCheckoutDialog] = useState<CheckoutDialogState>(null);
+  const [cardDialogOpen, setCardDialogOpen] = useState(false);
 
   const canManageBilling = can('billing.manage');
   const canPurchaseBilling = can('billing.purchase') || canManageBilling;
@@ -780,17 +864,76 @@ export default function PlansPage() {
     },
   });
 
+  const currentSubscription = subscriptionQuery.data ?? null;
+
+  const walletCardsQuery = useQuery({
+    queryKey: [...queryKeys.plans.billing(), 'wallet-cards', currentSubscription?.id ?? 'none'],
+    queryFn: () => plansService.listWalletCards(),
+    enabled: canViewBilling && Boolean(currentSubscription?.gateway_subscription_id),
+    staleTime: 60 * 1000,
+  });
+
+  const reconcileSubscriptionMutation = useMutation({
+    mutationFn: plansService.reconcileSubscription,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.plans.billing() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.auth.me() }),
+      ]);
+
+      toast({
+        title: 'Assinatura sincronizada',
+        description: 'Os ciclos, invoices e charges recorrentes foram reconciliados com o provider.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Falha ao sincronizar provider',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const updateCardMutation = useMutation({
+    mutationFn: plansService.updateSubscriptionCard,
+    onSuccess: async () => {
+      setCardDialogOpen(false);
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.plans.billing() }),
+        walletCardsQuery.refetch(),
+      ]);
+
+      toast({
+        title: 'Cartao atualizado',
+        description: 'A assinatura recorrente passara a usar o cartao selecionado.',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Falha ao atualizar cartao',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const plans = Array.isArray(catalogQuery.data) ? catalogQuery.data : [];
   const hasMalformedCatalog = Boolean(catalogQuery.data && !Array.isArray(catalogQuery.data));
-  const currentSubscription = subscriptionQuery.data ?? null;
   const invoices = Array.isArray(invoicesQuery.data?.data) ? invoicesQuery.data.data : [];
+  const walletCards = Array.isArray(walletCardsQuery.data) ? walletCardsQuery.data : [];
   const hasMalformedInvoices = Boolean(invoicesQuery.data && !Array.isArray(invoicesQuery.data.data));
   const invoicesMeta = invoicesQuery.data?.meta;
 
   const currentPlanKey = currentSubscription?.plan_key ?? null;
   const latestInvoice = invoices[0] ?? null;
   const organizationName = meOrganization?.name || 'Organizacao atual';
-  const isRefreshing = catalogQuery.isFetching || subscriptionQuery.isFetching || invoicesQuery.isFetching;
+  const isRefreshing = catalogQuery.isFetching
+    || subscriptionQuery.isFetching
+    || invoicesQuery.isFetching
+    || walletCardsQuery.isFetching
+    || reconcileSubscriptionMutation.isPending;
   const visiblePendingCheckout = currentSubscription?.status === 'active' ? null : pendingCheckout;
 
   const plansWithPricing = useMemo(() => (
@@ -804,11 +947,26 @@ export default function PlansPage() {
   ), [plans]);
 
   const refreshBilling = async () => {
-    await Promise.all([
-      catalogQuery.refetch(),
-      subscriptionQuery.refetch(),
-      invoicesQuery.refetch(),
-    ]);
+    try {
+      if (currentSubscription?.gateway_subscription_id && canManageSubscription) {
+        await reconcileSubscriptionMutation.mutateAsync({
+          page: 1,
+          size: 20,
+          with_charge_details: true,
+        });
+
+        return;
+      }
+
+      await Promise.all([
+        catalogQuery.refetch(),
+        subscriptionQuery.refetch(),
+        invoicesQuery.refetch(),
+        walletCardsQuery.refetch(),
+      ]);
+    } catch {
+      // mutateAsync surfaces the toast through onError.
+    }
   };
 
   const openCheckoutDialog = (plan: ApiPlan, price: ApiPlanPrice) => {
@@ -907,6 +1065,15 @@ export default function PlansPage() {
         userEmail={meUser?.email ?? null}
         isSubmitting={checkoutMutation.isPending}
         onSubmit={(payload) => checkoutMutation.mutateAsync(payload)}
+      />
+
+      <RecurringCardUpdateDialog
+        open={cardDialogOpen}
+        onOpenChange={setCardDialogOpen}
+        cards={walletCards}
+        isCardsLoading={walletCardsQuery.isFetching}
+        isSubmitting={updateCardMutation.isPending}
+        onSubmit={(payload) => updateCardMutation.mutateAsync(payload)}
       />
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as BillingTab)}>
@@ -1066,12 +1233,23 @@ export default function PlansPage() {
             <SubscriptionPanel
               organizationName={organizationName}
               subscription={currentSubscription}
+              walletCards={walletCards}
+              isWalletLoading={walletCardsQuery.isFetching}
               canManageSubscription={canManageSubscription}
               isCancelling={cancelSubscriptionMutation.isPending}
+              isReconciling={reconcileSubscriptionMutation.isPending}
+              isUpdatingCard={updateCardMutation.isPending}
               onCancel={(reason) => cancelSubscriptionMutation.mutate({
                 effective: 'period_end',
                 reason,
               })}
+              onReconcile={() => void reconcileSubscriptionMutation.mutate({
+                page: 1,
+                size: 20,
+                with_charge_details: true,
+              })}
+              onOpenCardDialog={() => setCardDialogOpen(true)}
+              onUseSavedCard={(cardId) => updateCardMutation.mutate({ card_id: cardId })}
               onOpenCatalog={() => setActiveTab('plans')}
             />
           ) : null}

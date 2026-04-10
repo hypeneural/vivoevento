@@ -40,23 +40,52 @@ O repositorio ja tem uma base boa para isso:
 - webhook idempotente e processamento assincrono;
 - cancelamento local ao fim do ciclo e recalculo de entitlements.
 
-Mas a recorrencia real ainda nao existe no caminho da conta:
+A base recorrente ja existe no caminho da conta, mas ainda restam gaps para fechar o lifecycle completo:
 
-- `PagarmeBillingGateway::createSubscriptionCheckout()` ainda lanca `RuntimeException`;
-- a trilha nova de recorrencia no backend ja aceita `payment_method`, `payer` e `credit_card.card_token`, mas a tela `/plans` ainda nao coleta esses campos;
-- a tela `/plans` nao coleta `payment_method`, `payer`, `billing_address` nem `card_token`;
-- `CancelCurrentSubscriptionAction` cancela apenas localmente, sem `DELETE /subscriptions/{id}`;
-- `RegisterBillingGatewayPaymentAction` ainda trata a assinatura como derivacao de um checkout pago e usa `gateway_order_id` como fallback para `gateway_subscription_id`;
+- `PagarmeBillingGateway::createSubscriptionCheckout()` continua legacy/incompleto, mas o checkout real da conta ja segue pela trilha recorrente nova em `CreateSubscriptionCheckoutAction` + `PagarmeSubscriptionGatewayService`;
+- a tela `/plans` ja coleta `payer`, `billing_address` e dados de cartao, tokeniza no submit final e envia apenas `card_token`;
+- `CancelCurrentSubscriptionAction` ja sincroniza cancelamento imediato com `DELETE /subscriptions/{id}`, e o boundary local de `cancel_at_period_end` ja tem comando e scheduler dedicados;
+- `RegisterBillingGatewayPaymentAction` ainda trata a assinatura manual antiga como derivacao de um checkout pago e usa `gateway_order_id` como fallback para `gateway_subscription_id`;
 - o checkout da conta ja tem `PagarmePlanPayloadFactory`, `PagarmeSubscriptionPayloadFactory`, `BillingSubscriptionGatewayInterface` e `PagarmeSubscriptionGatewayService`, com `ensurePlan`, `billing_profile`, `customer`, `card` e `POST /subscriptions`;
-- ainda faltam `subscription_cycles`, reconciliacao por `invoice/charge`, cancelamento sincronizado e o front administrativo real;
-- o webhook atual mapeia `order.*` e `charge.*`, mas nao `subscription.*` nem `invoice.*`.
+- `subscription_cycles`, projection por `invoice/charge` e ids recorrentes em `billing_gateway_events` ja existem localmente;
+- o webhook atual ja projeta `subscription`, `invoice`, `charge`, `subscription_cycle`, `invoice` e `payment`, e o modulo ja tem reconcile batch assistido, wallet/troca de cartao e homologacao ponta a ponta do lifecycle recorrente.
 
 Conclusao pratica:
 
 - o Eventovivo esta pronto para evoluir para recorrencia real;
-- o checkout recorrente da conta ja cria plano externo, billing profile e assinatura real na Pagar.me pelo backend;
-- se `billing.gateways.subscription=pagarme` for ligado hoje, a API ja responde ao fluxo recorrente, mas a UX administrativa ainda nao esta fechada e a projection financeira recorrente ainda nao esta completa;
+- o checkout recorrente da conta ja cria plano externo, billing profile e assinatura real na Pagar.me pelo backend e pela tela administrativa;
+- se `billing.gateways.subscription=pagarme` for ligado hoje, a API e a UX de checkout da conta ja respondem ao fluxo recorrente principal;
+- os gaps remanescentes ficam concentrados em politicas de inadimplencia/grace period, meios de pagamento alem de `credit_card` e tooling operacional mais refinado;
 - a migracao correta nao e reaproveitar `orders` para mensalidade, e sim plugar os endpoints nativos de recorrencia e tratar `invoice/charge` como fonte de verdade operacional do pagamento.
+
+## Atualizacao validada em homologacao
+
+Nesta rodada, a trilha recorrente foi validada com as chaves de homologacao da conta `acc_A1dYEVzhnIzEwG5z`, pelo comando:
+
+```bash
+cd apps/api && php artisan billing:pagarme:homologate --scenario=recurring-lifecycle --amount=1990 --poll-attempts=1 --poll-sleep-ms=0 --hook-id=hook_NQnjE65KiRIyVeKA
+```
+
+Evidencia gerada:
+
+- `apps/api/storage/app/pagarme-homologation/20260409-235218-recurring-lifecycle.json`
+
+Fluxos comprovados contra o provider:
+
+- tokenizacao real em `POST /tokens`;
+- criacao de `customer` e wallet com dois cartoes;
+- criacao de `plan` mensal;
+- criacao de `subscription` real;
+- leitura de `cycles`, `invoices`, `charges` e `GET /charges/{charge_id}`;
+- troca de cartao da assinatura;
+- cancelamento sincronizado com `DELETE /subscriptions/{id}`;
+- entrega real de webhooks recorrentes pela URL Cloudflare ja configurada.
+
+Achados operacionais importantes:
+
+- a referencia publica de `POST /subscriptions` descreve `card` como objeto, mas a homologacao real aceitou `card_id` e `card_token` no topo do payload; o shape aninhado `card.card_id` retornou `422`;
+- os eventos `subscription.created`, `subscription.updated` e `subscription.canceled` chegam com o id da assinatura em `data.id`, entao o parser local precisou promover esse valor para `gateway_subscription_id`;
+- a trilha real de webhook armazenou eventos `subscription.created`, `invoice.created`, `charge.paid`, `invoice.paid`, `subscription.updated` e `subscription.canceled` em `billing_gateway_events`.
 
 ## Fontes validadas
 
@@ -71,11 +100,13 @@ Conclusao pratica:
 - `apps/api/app/Modules/Billing/Services/BillingSubscriptionGatewayInterface.php`
 - `apps/api/app/Modules/Billing/Services/ManualSubscriptionGatewayService.php`
 - `apps/api/app/Modules/Billing/Actions/CreateSubscriptionCheckoutAction.php`
+- `apps/api/app/Modules/Billing/Actions/ProjectRecurringBillingStateAction.php`
 - `apps/api/app/Modules/Billing/Actions/RegisterBillingGatewayPaymentAction.php`
 - `apps/api/app/Modules/Billing/Actions/CancelCurrentSubscriptionAction.php`
 - `apps/api/app/Modules/Billing/Actions/ProcessBillingWebhookAction.php`
 - `apps/api/app/Modules/Billing/Actions/ReceiveBillingWebhookAction.php`
 - `apps/api/app/Modules/Billing/Models/Subscription.php`
+- `apps/api/app/Modules/Billing/Models/SubscriptionCycle.php`
 - `apps/api/app/Modules/Billing/Models/BillingProfile.php`
 - `apps/api/app/Modules/Billing/Models/Invoice.php`
 - `apps/api/app/Modules/Billing/Models/Payment.php`
@@ -94,9 +125,14 @@ Conclusao pratica:
 - `apps/api/database/migrations/2026_04_09_180000_expand_plan_prices_for_recurring_gateway_plans.php`
 - `apps/api/database/migrations/2026_04_09_181000_expand_subscriptions_for_recurring_gateway_state.php`
 - `apps/api/database/migrations/2026_04_09_182000_create_billing_profiles_table.php`
+- `apps/api/database/migrations/2026_04_09_190000_create_subscription_cycles_table.php`
+- `apps/api/database/migrations/2026_04_09_191000_add_recurring_fields_to_invoices_table.php`
+- `apps/api/database/migrations/2026_04_09_192000_add_recurring_fields_to_payments_table.php`
+- `apps/api/database/migrations/2026_04_09_193000_add_recurring_fields_to_billing_gateway_events_table.php`
 - `apps/web/src/lib/pagarme-tokenization.ts`
 - `apps/web/src/modules/plans/api.ts`
 - `apps/web/src/modules/plans/PlansPage.tsx`
+- `apps/web/src/modules/plans/components/RecurringPlanCheckoutDialog.tsx`
 - `apps/web/src/modules/billing/PublicEventCheckoutPage.tsx`
 
 ### Documentacao oficial Pagar.me v5 validada
@@ -390,9 +426,9 @@ Leitura pratica para a recorrencia:
 
 ## O que falta para recorrencia real
 
-### 1. O provider de assinatura ainda nao foi implementado
+### 1. O provider recorrente ja existe, mas o caminho legacy ainda nao deve ser reutilizado
 
-Hoje, em `PagarmeBillingGateway`, o metodo `createSubscriptionCheckout()` ainda nao existe de fato.
+Hoje, em `PagarmeBillingGateway`, o metodo `createSubscriptionCheckout()` continua legacy/incompleto.
 
 Ao mesmo tempo, o repo ja tem uma trilha recorrente nova e separada para a conta:
 
@@ -406,107 +442,92 @@ Impacto:
 
 - a assinatura da conta ja consegue fazer `POST /plans` e `POST /subscriptions` no backend;
 - `gateway_plan_id`, `gateway_subscription_id`, `gateway_customer_id`, `gateway_card_id` e `billing_profile` ja sao persistidos;
-- ainda nao ha projection completa por `subscription_cycle`, `invoice` e `charge`.
+- o metodo legacy nao deve voltar a ser usado como motor do fluxo de conta.
 
-### 2. O frontend da conta ainda nao coleta dados de pagamento
+### 2. O frontend da conta ja coleta dados de pagamento reais
 
 Hoje:
 
 - `StoreSubscriptionCheckoutRequest` ja aceita payload real quando `billing.gateways.subscription=pagarme`;
 - `plansService.checkout()` ja pode carregar `payment_method`, `payer` e `credit_card`;
-- `PlansPage.tsx` nao coleta `payer`, `billing_address`, `payment_method` nem `card_token`.
+- `PlansPage.tsx` + `RecurringPlanCheckoutDialog.tsx` ja coletam `payer`, `billing_address`, tokenizam no submit final e enviam apenas `card_token`.
 
 Impacto:
 
-- a API ja suporta o checkout recorrente no cartao;
-- o admin ainda nao consegue contratar assinatura real na tela `/plans` sem adaptar a UX e a tokenizacao desse fluxo.
+- o admin ja consegue iniciar assinatura recorrente real na tela `/plans`;
+- o fluxo preserva a regra de nao trafegar PAN/CVV pelo backend;
+- o gap remanescente na UX fica concentrado em wallet, troca de cartao e autosservico mais amplo.
 
-### 3. O cancelamento ainda e so local
+### 3. O cancelamento imediato ja sincroniza com o provider
 
 `CancelCurrentSubscriptionAction` hoje:
 
 - muda `status`, `canceled_at`, `ends_at` e `renews_at` no banco local;
-- nao chama a Pagar.me.
+- chama `DELETE /subscriptions/{id}` quando o cancelamento e imediato e a assinatura esta na Pagar.me;
+- preserva `period_end` como regra local do produto.
 
 Impacto:
 
-- a conta pode parecer cancelada no Eventovivo, mas seguir ativa no provider;
-- ou o inverso, se alguem cancelar fora da plataforma.
+- cancelamento imediato ja nao fica divergente entre Eventovivo e provider;
+- o gap remanescente e executar o `DELETE` real no boundary do `cancel_at_period_end` e fechar a automacao desse scheduler.
 
-### 4. A maquina de estados financeira e orientada a order/charge, nao a subscription/invoice
+### 4. A maquina de estados recorrente ja projeta subscription/invoice/charge
 
 Hoje:
 
-- `PagarmeStatusMapper` mapeia `order.*` e `charge.*`;
-- `ProcessBillingWebhookAction` resolve `billing_order_uuid` ou `gateway_order_id`;
-- nao existe correlacao por `gateway_subscription_id`, `gateway_invoice_id` ou `gateway_cycle_id`.
+- `PagarmeStatusMapper` ja mapeia `subscription.*`, `invoice.*` e `charge.*` recorrente;
+- `ProcessBillingWebhookAction` + `ProjectRecurringBillingStateAction` ja correlacionam `gateway_subscription_id`, `gateway_invoice_id` e `gateway_cycle_id`;
+- `billing_gateway_events` ja persiste ids recorrentes, `payload_hash` e correlacao de customer/cycle.
 
 Impacto:
 
-- invoice renewal do provider nao encontra objeto local adequado;
-- falhas recorrentes e chargebacks de assinatura nao entram no fluxo certo.
+- renewal, payment failure e chargeback ja entram no read model recorrente certo;
+- o gap remanescente fica no reconcile batch paginado e na homologacao completa do lifecycle.
 
-### 5. O modelo local ainda nao trata cycle como entidade de primeira classe
+### 5. Cycle ja virou entidade de primeira classe
 
-Hoje o repo enxerga a trilha recorrente sobretudo por `Subscription`, `Invoice` e `Payment`.
+Hoje o repo ja tem `SubscriptionCycle` e projection local com:
 
-Mas a modelagem oficial da Pagar.me deixa `cycle` como objeto proprio da assinatura, com `billing_at`, `start_at`, `end_at` e `status`.
+- `gateway_cycle_id`;
+- `billing_at`;
+- `period_start_at`;
+- `period_end_at`;
+- `status`;
+- ligacao direta com `invoice`.
 
 Impacto:
 
-- o sistema tende a reconstruir competencia por heuristica a partir de `invoice` e `charge`;
-- `cancel_at_period_end`, grace period, conciliacao e auditoria ficam mais opacos;
-- o proximo vencimento da assinatura fica espalhado entre campos da subscription e payloads soltos.
+- competencia recorrente, proximo vencimento, auditoria e chargeback ja nao dependem so de heuristica em `invoice`/`charge`;
+- o gap remanescente fica em sync batch e operacao manual assistida.
 
-### 6. O modelo local de invoices e payments ainda nao representa todo o ciclo recorrente
+### 6. Invoice e Payment ja representam o ciclo recorrente
 
 Hoje `Invoice` e `Payment`:
 
-- dependem basicamente de `billing_order_id`;
-- nao possuem `subscription_id`;
-- nao possuem `gateway_invoice_id`;
-- nao possuem `gateway_cycle_id`;
-- nao guardam tentativa de cobranca nem payload bruto normalizado da charge.
+- continuam convivendo com `billing_order_id` da compra unica;
+- agora tambem guardam `subscription_id`, `subscription_cycle_id`, `gateway_invoice_id`, `gateway_charge_id`, `gateway_cycle_id` e payload bruto recorrente.
 
 Impacto:
 
-- fica dificil reconciliar a cobranca de cada ciclo sem criar heuristica em `snapshot_json`;
-- replay de webhook e chargeback perdem rastreabilidade fina;
-- suporte operacional fica dependente de consulta manual ao provider.
+- replay de webhook, troubleshoot e chargeback ja tem rastreabilidade fina por ciclo;
+- o gap remanescente fica em reconcile batch e surfaces administrativas mais detalhadas.
 
-### 7. O modelo local de plano nao esta mapeado para o plan externo correto
+### 7. O plano externo ja e mapeado corretamente por plan_price
 
 Hoje:
 
-- `Plan` representa o produto;
-- `PlanPrice` representa o ciclo (`monthly`, `yearly`);
-- `PlanPrice` ja tem `gateway_price_id`, mas nao `gateway_plan_id`.
+- `Plan` continua representando o produto;
+- `PlanPrice` continua representando o ciclo (`monthly`, `yearly`);
+- `PlanPrice` ja guarda `gateway_plan_id`, payload externo e configuracao recorrente do plan.
 
-Como o `plan` da Pagar.me ja embute frequencia e precificacao, a relacao correta para recorrencia real e:
+Impacto:
 
-- `1 plan_price local` -> `1 gateway plan`.
+- a relacao `1 plan_price local -> 1 gateway plan` ja esta implementada;
+- o gap remanescente e disciplina de versionamento comercial e migracao consciente de assinaturas quando o plano mudar.
 
-Entao:
+### 8. O estado local da assinatura ja separa contrato, cobranca e acesso
 
-- mapear o provider no `Plan` raiz seria insuficiente;
-- reutilizar `gateway_price_id` para guardar `plan_...` seria semanticamente ruim;
-- o modelo precisa de `gateway_plan_id` por `plan_price`.
-
-### 8. O estado local da assinatura ainda mistura contrato, cobranca e acesso
-
-Hoje a `Subscription` local conhece sobretudo:
-
-- `status`
-- `billing_cycle`
-- `starts_at`
-- `trial_ends_at`
-- `renews_at`
-- `ends_at`
-- `canceled_at`
-- `gateway_customer_id`
-- `gateway_subscription_id`
-
-Mas para recorrencia real faltam pelo menos:
+Hoje a `Subscription` local ja conhece, alem do shape original:
 
 - `plan_price_id`
 - `gateway_plan_id`
@@ -526,15 +547,12 @@ Mas para recorrencia real faltam pelo menos:
 
 Impacto:
 
-- um unico `status` acaba virando mistura de contrato, cobranca e permissao de uso;
-- chargeback e inadimplencia tendem a gerar regras confusas;
-- a UX administrativa nao consegue explicar claramente se a assinatura existe, se a fatura falhou ou se o acesso segue liberado.
+- contrato, cobranca e acesso ja nao ficam esmagados em um unico `status`;
+- o gap remanescente fica em refinar politicas de inadimplencia, grace period e chargeback.
 
-### 9. Ainda nao existe um billing profile estavel da organizacao
+### 9. Ja existe um billing profile estavel por organizacao
 
-Hoje o billing recorrente da conta ainda depende demais do contexto do checkout.
-
-Mas a operacao recorrente precisa de uma entidade local estavel para:
+Hoje o billing recorrente da conta ja usa `BillingProfile` para:
 
 - `gateway_customer_id`;
 - cartao default ou `gateway_card_id`;
@@ -544,25 +562,24 @@ Mas a operacao recorrente precisa de uma entidade local estavel para:
 
 Impacto:
 
-- troca de cartao, upgrade, downgrade e recuperacao de inadimplencia ficam acoplados ao payload do checkout inicial;
-- o autosservico recorrente perde previsibilidade;
-- reconciliacao com a wallet do provider fica mais fraca.
+- checkout recorrente, renovacao e conciliacao ja partem de uma identidade estavel de cobranca;
+- o gap remanescente fica em expor wallet e troca de cartao no autosservico.
 
 ## Gap analysis resumido
 
 | Area | Ja temos | Gap para recorrencia real |
 | --- | --- | --- |
-| Tokenizacao | `POST /tokens` no frontend | Reaproveitar no checkout da conta |
-| Customer/card | `createCustomer`, `createCustomerCard` | Expor uso no fluxo de assinatura |
-| Orders/charges | Forte para compra unica | Nao serve como motor principal da mensalidade |
-| Plans externos | Nao existe | Criar/sincronizar `gateway_plan_id` por `plan_price` |
-| Subscriptions externas | Nao existe | Criar, obter, listar, cancelar, trocar cartao, trocar payment method |
-| Cycles/invoices externas | Nao existe | Ler ciclo, invoice e charge de renovacao |
-| Cycles locais | Nao existe | Persistir `subscription_cycles` e ligar invoice/payment ao ciclo |
-| Billing profile | Nao existe | Separar customer, cartao default e endereco da assinatura ativa |
-| Webhooks | Idempotencia pronta | Faltam `subscription.*` e `invoice.*` |
-| Cancelamento | Local e funcional | Falta sincronizar com `DELETE /subscriptions/{id}` |
-| UX admin | `/plans` pronto para fase 1 | Falta formulario real de cartao e autosservico recorrente |
+| Tokenizacao | `POST /tokens` no frontend e `/plans` usando tokenizacao no submit final | Expor troca de cartao e wallet |
+| Customer/card | `createCustomer`, `createCustomerCard`, wallet e troca de cartao ja expostos no painel | Abrir outros meios de pagamento e suporte mais detalhado |
+| Orders/charges | Forte para compra unica, reconcile recorrente e troubleshooting com `GET /charges/{charge_id}` | Tooling operacional mais rico |
+| Plans externos | `gateway_plan_id` por `plan_price` ja implementado | Versionamento comercial e migracao consciente |
+| Subscriptions externas | Criar, obter, listar, cancelar e trocar cartao ja existem na superficie recorrente | Payment method alem de `credit_card` |
+| Cycles/invoices externas | Projection local por `subscription_cycle`, `invoice` e `charge` ja existe | Support tooling e politicas de inadimplencia |
+| Cycles locais | `subscription_cycles` ja existe | Observabilidade e tooling de suporte |
+| Billing profile | Existe por organizacao e ja aprende com wallet real | Evolucao futura para mais meios de pagamento |
+| Webhooks | Idempotencia pronta, projection recorrente e homologacao ponta a ponta validadas | Endurecimento adicional de operacao e telemetria |
+| Cancelamento | Imediato sincronizado com `DELETE /subscriptions/{id}` e `period_end` local com scheduler | Politica comercial final de acesso no boundary |
+| UX admin | `/plans` ja faz checkout real, mostra assinatura/invoices, wallet, troca de cartao e reconcile assistido | Refinar suporte operacional e inadimplencia |
 
 ## Arquitetura recomendada para o Eventovivo
 
@@ -1131,6 +1148,7 @@ Desdobramento operacional:
 5. A pagina de `Listar cobrancas` publica filtros/status resumidos, mas a nota oficial de chargeback diz explicitamente que `GET /orders` e `GET /charges` precisam entender o novo estado `chargedback`.
 6. A busca e leitura publica da V5 nao deixaram claro um contrato atualizado de assinatura criptografica do webhook. Ate a homologacao provar o contrario, o Eventovivo deve tratar a seguranca do ingress com persistencia de corpo bruto, headers e hash de payload.
 7. A pagina oficial de bibliotecas ainda aponta PHP para `PagarmeCoreApi`, e o repositorio oficial `pagarme/pagarme-core-api-php` aparece arquivado no GitHub. Isso reforca a decisao de manter um client HTTP proprio no repo.
+8. A homologacao real de `POST /subscriptions` com as chaves de teste retornou `422` quando o cartao foi enviado em `card.card_id`; o shape aceito no probe foi `card_id` ou `card_token` no topo do payload. Para o Eventovivo, isso deve ser tratado como verdade operacional acima da ambiguidade atual da referencia publica.
 
 ## Recomendacao final
 

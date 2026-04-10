@@ -366,7 +366,7 @@ class PublicUploadController extends BaseController
     {
         $settings = $this->resolveWallSettings($event);
 
-        if (! $settings?->resolvedVideoEnabled()) {
+        if (! $settings?->resolvedPublicUploadVideoEnabled()) {
             return false;
         }
 

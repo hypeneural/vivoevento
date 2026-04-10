@@ -22,12 +22,18 @@ type MobileCheckoutFooterProps = {
     subtitle: string;
   } | null;
   summary: MobileCheckoutFooterSummary;
+  primaryActionLabel?: string | null;
+  primaryActionDisabled?: boolean;
+  onPrimaryAction?: (() => void) | null;
 };
 
 export function MobileCheckoutFooter({
   currentStep,
   selectedPackage,
   summary,
+  primaryActionLabel,
+  primaryActionDisabled = false,
+  onPrimaryAction,
 }: MobileCheckoutFooterProps) {
   if (currentStep === 'status') {
     return null;
@@ -44,6 +50,17 @@ export function MobileCheckoutFooter({
             <p className="truncate text-sm font-semibold text-slate-950">{summary.title}</p>
             <p className="truncate text-xs text-slate-600">{summary.description}</p>
           </div>
+          {primaryActionLabel && onPrimaryAction ? (
+            <Button
+              type="button"
+              data-testid="public-checkout-mobile-primary-cta"
+              className="shrink-0 rounded-2xl"
+              disabled={primaryActionDisabled}
+              onClick={onPrimaryAction}
+            >
+              {primaryActionLabel}
+            </Button>
+          ) : null}
           <DrawerTrigger asChild>
             <Button type="button" variant="outline" className="shrink-0 rounded-2xl">
               <ShieldCheck className="h-4 w-4 text-emerald-600" />

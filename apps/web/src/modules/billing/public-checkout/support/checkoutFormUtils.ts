@@ -242,7 +242,7 @@ export function buildCheckoutPayload(values: CheckoutV2FormValues, cardToken?: s
   };
 }
 
-export function buildV2LoginResumePath(packageKey?: string | null) {
+export function buildV2CheckoutResumePath(packageKey?: string | null) {
   const nextParams = new URLSearchParams({
     v2: '1',
     resume: PUBLIC_CHECKOUT_V2_AUTH_RESUME_VALUE,
@@ -252,13 +252,20 @@ export function buildV2LoginResumePath(packageKey?: string | null) {
     nextParams.set('package', packageKey.trim());
   }
 
-  return `/login?returnTo=${encodeURIComponent(`/checkout/evento?${nextParams.toString()}`)}`;
+  return `/checkout/evento?${nextParams.toString()}`;
 }
 
-export function buildResumeDraft(values: CheckoutV2FormValues): CheckoutResumeDraft {
+export function buildV2LoginResumePath(packageKey?: string | null) {
+  return `/login?returnTo=${encodeURIComponent(buildV2CheckoutResumePath(packageKey))}`;
+}
+
+export function buildResumeDraft(
+  values: CheckoutV2FormValues,
+  source: CheckoutResumeDraft['source'] = 'identity_conflict',
+): CheckoutResumeDraft {
   return {
     version: PUBLIC_CHECKOUT_V2_RESUME_DRAFT_VERSION,
-    source: 'identity_conflict',
+    source,
     saved_at: new Date().toISOString(),
     expires_at: new Date(Date.now() + PUBLIC_CHECKOUT_V2_RESUME_DRAFT_TTL_MS).toISOString(),
     responsible_name: values.responsible_name,

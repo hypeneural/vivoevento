@@ -4,8 +4,12 @@ namespace App\Modules\Billing\Http\Controllers;
 
 use App\Modules\Billing\Actions\CancelCurrentSubscriptionAction;
 use App\Modules\Billing\Actions\CreateSubscriptionCheckoutAction;
+use App\Modules\Billing\Actions\ListSubscriptionWalletCardsAction;
+use App\Modules\Billing\Actions\ReconcileRecurringSubscriptionAction;
+use App\Modules\Billing\Actions\UpdateSubscriptionCardAction;
 use App\Modules\Billing\Http\Requests\CancelCurrentSubscriptionRequest;
 use App\Modules\Billing\Http\Requests\StoreSubscriptionCheckoutRequest;
+use App\Modules\Billing\Http\Requests\UpdateSubscriptionCardRequest;
 use App\Modules\Billing\Http\Resources\BillingInvoiceResource;
 use App\Modules\Billing\Models\Subscription;
 use App\Shared\Http\BaseController;
@@ -160,6 +164,68 @@ class SubscriptionController extends BaseController
         ]);
     }
 
+    public function cards(Request $request, ListSubscriptionWalletCardsAction $action): JsonResponse
+    {
+        $this->ensureCanViewBilling($request);
+
+        $org = $request->user()->currentOrganization();
+
+        if (! $org) {
+            return $this->error('Nenhuma organizacao encontrada', 404);
+        }
+
+        return $this->success($action->execute($org));
+    }
+
+    public function updateCard(
+        UpdateSubscriptionCardRequest $request,
+        UpdateSubscriptionCardAction $action,
+    ): JsonResponse {
+        $org = $request->user()->currentOrganization();
+
+        if (! $org) {
+            return $this->error('Nenhuma organizacao encontrada', 404);
+        }
+
+        $subscription = $action->execute($org, $request->validated(), $request->user());
+
+        return $this->success([
+            'message' => 'Cartao da assinatura atualizado.',
+            'subscription' => $this->serializeSubscription($subscription),
+        ]);
+    }
+
+    public function reconcile(Request $request, ReconcileRecurringSubscriptionAction $action): JsonResponse
+    {
+        $this->ensureCanManageBilling($request);
+
+        $org = $request->user()->currentOrganization();
+
+        if (! $org) {
+            return $this->error('Nenhuma organizacao encontrada', 404);
+        }
+
+        $subscription = Subscription::query()
+            ->where('organization_id', $org->id)
+            ->latest('id')
+            ->first();
+
+        if (! $subscription) {
+            return $this->error('Nenhuma assinatura encontrada para a organizacao atual.', 404);
+        }
+
+        $validated = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'size' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'with_charge_details' => ['nullable', 'boolean'],
+        ]);
+
+        $summary = $action->execute($subscription, $validated);
+        $summary['subscription'] = $this->serializeSubscription($summary['subscription']);
+
+        return $this->success($summary);
+    }
+
     public function index(): JsonResponse
     {
         return $this->success(Subscription::with('plan')->latest()->paginate(20));
@@ -196,6 +262,8 @@ class SubscriptionController extends BaseController
             'cancellation_effective_at' => $cancelAtPeriodEnd ? $subscription->ends_at?->toISOString() : $subscription->canceled_at?->toISOString(),
             'gateway_provider' => $subscription->gateway_provider,
             'gateway_subscription_id' => $subscription->gateway_subscription_id,
+            'gateway_customer_id' => $subscription->gateway_customer_id,
+            'gateway_card_id' => $subscription->gateway_card_id,
             'features' => $subscription->plan?->features?->pluck('feature_value', 'feature_key')->all() ?? [],
         ];
     }
@@ -210,6 +278,20 @@ class SubscriptionController extends BaseController
                     $user->can('billing.view')
                     || $user->can('billing.manage')
                     || $user->can('billing.purchase')
+                    || $user->can('billing.manage_subscription')
+                ),
+            403
+        );
+    }
+
+    private function ensureCanManageBilling(Request $request): void
+    {
+        $user = $request->user();
+
+        abort_unless(
+            $user
+                && (
+                    $user->can('billing.manage')
                     || $user->can('billing.manage_subscription')
                 ),
             403

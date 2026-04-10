@@ -2304,9 +2304,9 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                 <div className="rounded-3xl border border-border/60 bg-background/60 p-4 md:col-span-2">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <h3 className="text-sm font-semibold">Busca por selfie</h3>
+                      <h3 className="text-sm font-semibold">Ativar reconhecimento facial</h3>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Controla se o evento prepara indexacao facial para busca por pessoa. Essa camada e opcional e independente da moderacao.
+                        Quando ligado, o evento prepara as fotos para que cada pessoa encontre as proprias imagens com uma selfie.
                       </p>
                     </div>
                     <FormField
@@ -2314,7 +2314,7 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                       name="face_search.enabled"
                       render={({ field }) => (
                         <FormItem className="flex items-center gap-3">
-                          <FormLabel className="sr-only">Habilitar busca por selfie</FormLabel>
+                          <FormLabel className="sr-only">Ativar reconhecimento facial</FormLabel>
                           <FormControl>
                             <Switch checked={field.value} onCheckedChange={field.onChange} />
                           </FormControl>
@@ -2331,9 +2331,9 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                         <FormItem className={`rounded-2xl border p-4 transition-colors ${watchedFaceSearch.enabled ? 'border-primary/20 bg-primary/5' : 'border-border/60 bg-muted/20'}`}>
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <FormLabel className="text-sm">Busca publica</FormLabel>
+                              <FormLabel className="text-sm">Liberar para convidados</FormLabel>
                               <FormDescription className="mt-1 text-xs">
-                                Permite expor a experiencia publica de "encontre minhas fotos" para convidados.
+                                Mostra a opcao "Encontrar minhas fotos" para convidados nas paginas publicas do evento.
                               </FormDescription>
                             </div>
                             <FormControl>
@@ -2354,7 +2354,7 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                       name="face_search.selfie_retention_hours"
                       render={({ field }) => (
                         <FormItem className={`rounded-2xl border p-4 transition-colors ${watchedFaceSearch.enabled ? 'border-primary/20 bg-primary/5' : 'border-border/60 bg-muted/20'}`}>
-                          <FormLabel>Retencao da selfie temporaria</FormLabel>
+                          <FormLabel>Tempo para descartar a selfie enviada</FormLabel>
                           <FormControl>
                             <Input
                               {...field}
@@ -2366,7 +2366,7 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                             />
                           </FormControl>
                           <FormDescription>
-                            Numero de horas para descarte da selfie temporaria quando a busca publica estiver habilitada.
+                            Numero de horas para apagar a selfie enviada na busca publica.
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -2485,7 +2485,7 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                   </p>
                   <p className="flex items-center gap-2">
                     <ImageIcon className="h-4 w-4" />
-                    Busca por selfie {watchedFaceSearch.enabled ? 'ativada' : 'desligada'}
+                    Reconhecimento facial {watchedFaceSearch.enabled ? 'ativado' : 'desligado'}
                   </p>
                   <p className="flex items-center gap-2">
                     <Users className="h-4 w-4" />

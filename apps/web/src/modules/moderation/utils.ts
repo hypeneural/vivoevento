@@ -73,32 +73,55 @@ export function resolveQuickFilter(
   featuredOnly: boolean,
   pinnedOnly: boolean,
   blockedSenderOnly: boolean,
+  mediaTypeFilter: string,
+  duplicatesOnly: boolean,
+  aiReviewOnly: boolean,
 ): ModerationQuickFilterKey | null {
-  if (!featuredOnly && !pinnedOnly && !blockedSenderOnly && statusFilter === 'all') {
+  if (!featuredOnly && !pinnedOnly && !blockedSenderOnly && mediaTypeFilter === 'all' && !duplicatesOnly && !aiReviewOnly && statusFilter === 'all') {
     return 'all';
   }
 
-  if (!featuredOnly && !pinnedOnly && !blockedSenderOnly && statusFilter === 'pending_moderation') {
+  if (!featuredOnly && !pinnedOnly && !blockedSenderOnly && mediaTypeFilter === 'all' && !duplicatesOnly && !aiReviewOnly && statusFilter === 'pending_moderation') {
     return 'pending_moderation';
   }
 
-  if (!featuredOnly && !pinnedOnly && !blockedSenderOnly && statusFilter === 'approved') {
+  if (!featuredOnly && !pinnedOnly && !blockedSenderOnly && mediaTypeFilter === 'all' && !duplicatesOnly && !aiReviewOnly && statusFilter === 'approved') {
     return 'approved';
   }
 
-  if (!featuredOnly && !pinnedOnly && !blockedSenderOnly && statusFilter === 'rejected') {
+  if (!featuredOnly && !pinnedOnly && !blockedSenderOnly && mediaTypeFilter === 'all' && !duplicatesOnly && !aiReviewOnly && statusFilter === 'rejected') {
     return 'rejected';
   }
 
-  if (featuredOnly && !pinnedOnly && !blockedSenderOnly && statusFilter === 'all') {
+  if (!featuredOnly && !pinnedOnly && !blockedSenderOnly && mediaTypeFilter === 'all' && !duplicatesOnly && !aiReviewOnly && statusFilter === 'error') {
+    return 'error';
+  }
+
+  if (!featuredOnly && !pinnedOnly && !blockedSenderOnly && mediaTypeFilter === 'image' && !duplicatesOnly && !aiReviewOnly && statusFilter === 'all') {
+    return 'images';
+  }
+
+  if (!featuredOnly && !pinnedOnly && !blockedSenderOnly && mediaTypeFilter === 'video' && !duplicatesOnly && !aiReviewOnly && statusFilter === 'all') {
+    return 'videos';
+  }
+
+  if (!featuredOnly && !pinnedOnly && !blockedSenderOnly && mediaTypeFilter === 'all' && !duplicatesOnly && aiReviewOnly && statusFilter === 'all') {
+    return 'ai_review';
+  }
+
+  if (!featuredOnly && !pinnedOnly && !blockedSenderOnly && mediaTypeFilter === 'all' && duplicatesOnly && !aiReviewOnly && statusFilter === 'all') {
+    return 'duplicates';
+  }
+
+  if (featuredOnly && !pinnedOnly && !blockedSenderOnly && mediaTypeFilter === 'all' && !duplicatesOnly && !aiReviewOnly && statusFilter === 'all') {
     return 'featured';
   }
 
-  if (pinnedOnly && !featuredOnly && !blockedSenderOnly && statusFilter === 'all') {
+  if (pinnedOnly && !featuredOnly && !blockedSenderOnly && mediaTypeFilter === 'all' && !duplicatesOnly && !aiReviewOnly && statusFilter === 'all') {
     return 'pinned';
   }
 
-  if (blockedSenderOnly && !featuredOnly && !pinnedOnly && statusFilter === 'all') {
+  if (blockedSenderOnly && !featuredOnly && !pinnedOnly && mediaTypeFilter === 'all' && !duplicatesOnly && !aiReviewOnly && statusFilter === 'all') {
     return 'blocked_sender';
   }
 

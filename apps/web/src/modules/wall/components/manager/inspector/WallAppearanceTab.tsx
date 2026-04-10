@@ -205,6 +205,34 @@ export function WallAppearanceTab({
             />
           </div>
 
+          <div className="grid gap-4 rounded-2xl border border-border/60 bg-background/60 p-4 md:grid-cols-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-foreground">Rollout publico</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Libera 1 video curto por envio no link publico deste evento quando a pipeline estiver pronta.
+                </p>
+              </div>
+              <Switch
+                checked={wallSettings.public_upload_video_enabled ?? true}
+                onCheckedChange={(checked) => onDraftChange('public_upload_video_enabled', checked)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-foreground">Rollout privado</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Define se videos vindos de WhatsApp e Telegram entram na trilha oficial com variantes de wall.
+                </p>
+              </div>
+              <Switch
+                checked={wallSettings.private_inbound_video_enabled ?? true}
+                onCheckedChange={(checked) => onDraftChange('private_inbound_video_enabled', checked)}
+              />
+            </div>
+          </div>
+
           <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
             <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Resumo efetivo</p>
             <p className="mt-2 text-sm leading-relaxed text-foreground/85">{videoPolicySummary}</p>

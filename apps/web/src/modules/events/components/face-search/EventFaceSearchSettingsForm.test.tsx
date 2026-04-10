@@ -53,7 +53,7 @@ describe('EventFaceSearchSettingsForm', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /salvar facesearch/i }));
+    fireEvent.click(screen.getByRole('button', { name: /salvar reconhecimento facial/i }));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith({
@@ -100,7 +100,8 @@ describe('EventFaceSearchSettingsForm', () => {
     );
 
     expect(screen.getByRole('button', { name: /salvando/i })).toBeDisabled();
-    expect(screen.getByText(/continua fora do gate de moderacao/i)).toBeInTheDocument();
+    expect(screen.getByText(/funciona separada da aprovacao das fotos/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /configuracao avancada e integracao aws/i })).toBeInTheDocument();
   });
 
   it('preserves compreface provider when it comes from the API', async () => {
@@ -118,7 +119,7 @@ describe('EventFaceSearchSettingsForm', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /salvar facesearch/i }));
+    fireEvent.click(screen.getByRole('button', { name: /salvar reconhecimento facial/i }));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
@@ -142,7 +143,7 @@ describe('EventFaceSearchSettingsForm', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /salvar facesearch/i }));
+    fireEvent.click(screen.getByRole('button', { name: /salvar reconhecimento facial/i }));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
@@ -184,7 +185,7 @@ describe('EventFaceSearchSettingsForm', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /salvar facesearch/i }));
+    fireEvent.click(screen.getByRole('button', { name: /salvar reconhecimento facial/i }));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
@@ -207,7 +208,8 @@ describe('EventFaceSearchSettingsForm', () => {
       }));
     });
 
-    expect(screen.getByText(/collection provisionada/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /configuracao avancada e integracao aws/i }));
+    expect(screen.getByText(/estrutura aws pronta/i)).toBeInTheDocument();
     expect(screen.getAllByText(/eventovivo-face-search-event-42/i).length).toBeGreaterThan(0);
   });
 });

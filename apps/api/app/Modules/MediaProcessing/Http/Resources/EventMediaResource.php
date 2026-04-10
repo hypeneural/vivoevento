@@ -12,10 +12,10 @@ class EventMediaResource extends JsonResource
     public function toArray(Request $request): array
     {
         $assets = app(MediaAssetUrlService::class);
-        $thumbnailAsset = $assets->thumbnailAsset($this->resource);
-        $previewAsset = $assets->previewAsset($this->resource);
-        $moderationThumbnailAsset = $assets->moderationThumbnailAsset($this->resource);
-        $moderationPreviewAsset = $assets->moderationPreviewAsset($this->resource);
+        $thumbnailAsset = $this->normalizeAsset($assets->thumbnailAsset($this->resource));
+        $previewAsset = $this->normalizeAsset($assets->previewAsset($this->resource));
+        $moderationThumbnailAsset = $this->normalizeAsset($assets->moderationThumbnailAsset($this->resource));
+        $moderationPreviewAsset = $this->normalizeAsset($assets->moderationPreviewAsset($this->resource));
         $state = app(MediaEffectiveStateResolver::class)->resolve($this->resource);
         $effectiveState = is_string($this->resource->getAttribute('moderation_feed_effective_state'))
             ? $this->resource->getAttribute('moderation_feed_effective_state')
@@ -117,6 +117,30 @@ class EventMediaResource extends JsonResource
             default => 'upload',
         };
     }
+
+    /**
+     * @param  mixed  $asset
+     * @return array{url: ?string, source: ?string}
+     */
+    private function normalizeAsset(mixed $asset): array
+    {
+        if (! is_array($asset)) {
+            return ['url' => null, 'source' => null];
+        }
+
+        $url = array_key_exists('url', $asset) && is_string($asset['url'])
+            ? $asset['url']
+            : null;
+        $source = array_key_exists('source', $asset) && is_string($asset['source'])
+            ? $asset['source']
+            : null;
+
+        return [
+            'url' => $url,
+            'source' => $source,
+        ];
+    }
+
     private function orientation(): string
     {
         $width = (int) ($this->width ?? 0);

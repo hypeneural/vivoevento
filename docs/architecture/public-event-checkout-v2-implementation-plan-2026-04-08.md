@@ -6,6 +6,10 @@ Documento base:
 
 - `docs/architecture/public-event-checkout-ux-analysis-2026-04-08.md`
 
+Plano complementar de hardening da jornada:
+
+- `docs/architecture/public-event-checkout-friction-hardening-plan-2026-04-09.md`
+
 ## Objetivo
 
 Implementar a V2 de `/checkout/evento` como uma jornada comercial curta, clara e confiavel para usuario final.
@@ -31,7 +35,7 @@ Backend:
 
 Frontend:
 
-- `npm run test -- PublicEventCheckoutPage.test.tsx public-event-packages.service.test.ts PlansPage.test.tsx`
+- `npm run test -- src/modules/billing/PublicEventCheckoutEntryPage.test.tsx src/modules/billing/public-checkout src/modules/billing/services/public-event-packages.service.test.ts src/modules/plans/PlansPage.test.tsx`
 - `npm run type-check`
 
 Resultado:
@@ -61,7 +65,7 @@ Backend:
 
 Frontend:
 
-- `npm run test -- src/modules/billing/PublicEventCheckoutEntryPage.test.tsx src/modules/billing/public-checkout/hooks/usePublicCheckoutWizard.test.tsx src/modules/billing/public-checkout/PublicCheckoutPageV2.test.tsx src/modules/billing/public-checkout/components/IdentityAssistInline.test.tsx src/modules/billing/public-checkout/hooks/useCheckoutIdentityPrecheck.test.tsx src/modules/billing/public-checkout/services/public-checkout-identity.service.test.ts src/modules/billing/PublicEventCheckoutPage.test.tsx`
+- `npm run test -- src/modules/billing/PublicEventCheckoutEntryPage.test.tsx src/modules/billing/public-checkout/hooks/usePublicCheckoutWizard.test.tsx src/modules/billing/public-checkout/PublicCheckoutPageV2.test.tsx src/modules/billing/public-checkout/components/IdentityAssistInline.test.tsx src/modules/billing/public-checkout/hooks/useCheckoutIdentityPrecheck.test.tsx src/modules/billing/public-checkout/services/public-checkout-identity.service.test.ts`
 - `npm run type-check`
 
 Resultado:
@@ -74,7 +78,6 @@ Resultado:
 Frontend:
 
 - `npm run test -- src/modules/billing/public-checkout`
-- `npm run test -- src/modules/billing/PublicEventCheckoutPage.test.tsx`
 - `npm run type-check`
 - `npx playwright test`
 
@@ -102,7 +105,7 @@ Backend:
 
 Frontend:
 
-- `npm run test -- src/modules/billing/public-checkout src/modules/billing/PublicEventCheckoutEntryPage.test.tsx src/modules/billing/PublicEventCheckoutPage.test.tsx src/modules/billing/services/public-event-packages.service.test.ts src/modules/plans/PlansPage.test.tsx`
+- `npm run test -- src/modules/billing/public-checkout src/modules/billing/PublicEventCheckoutEntryPage.test.tsx src/modules/billing/services/public-event-packages.service.test.ts src/modules/plans/PlansPage.test.tsx`
 - `npm run type-check`
 - `npx playwright test`
 
@@ -112,6 +115,89 @@ Validacao operacional:
 - o comando de homologacao real executou com sucesso em `2026-04-09`
 - a conta da Pagar.me continua com hooks apontando para `https://webhooks-local.eventovivo.com.br/api/v1/webhooks/billing/pagarme`
 - o endpoint externo respondeu `401` sem credencial e mudou de comportamento com o `Basic Auth` configurado localmente, confirmando a trilha de protecao
+
+### Validacao complementar da observacao curta e corte do legado
+
+Backend:
+
+- `php artisan test --filter=PublicCheckoutIdentityPrecheckTest`
+- `php artisan test --filter=PublicEventCheckoutPayloadContractTest`
+- `php artisan test --filter=PublicEventCheckoutTest`
+- `php artisan test --filter=EventPackageCatalogTest`
+- `php artisan test --filter=BillingTest`
+- `php artisan billing:pagarme:homologate --scenario=pix-cancel --poll-attempts=1 --poll-sleep-ms=500`
+
+Frontend:
+
+- `npm run test -- src/modules/billing/public-checkout src/modules/billing/PublicEventCheckoutEntryPage.test.tsx src/modules/billing/services/public-event-packages.service.test.ts src/modules/plans/PlansPage.test.tsx`
+- `npm run type-check`
+- `npx playwright test`
+
+Resultado:
+
+- `61` testes Vitest verdes
+- `6` cenarios Playwright verdes
+- `54` testes PHP verdes na bateria rodada do checkout/billing
+- homologacao real da Pagar.me verde com evidencia em `apps/api/storage/app/pagarme-homologation/20260409-185345-pix-cancel.json`
+- a entry route publica deixou de aceitar rollback por `legacy=1` sem regressao detectada
+
+### Validacao real ponta a ponta final via Cloudflare + Pagar.me
+
+Backend:
+
+- `php artisan migrate --path=database/migrations/2026_04_09_193000_add_recurring_fields_to_billing_gateway_events_table.php --force`
+- `php artisan test --filter=BillingWebhookTest`
+- `php artisan test --filter=PublicEventCheckoutPayloadContractTest`
+- `php artisan test --filter=PublicEventCheckoutTest`
+- `php artisan test --filter=PublicCheckoutIdentityPrecheckTest`
+- `php artisan test --filter=EventPackageCatalogTest`
+- `php artisan test --filter=BillingTest`
+
+Frontend:
+
+- `npm run test -- src/modules/billing/PublicEventCheckoutEntryPage.test.tsx src/modules/billing/public-checkout public-event-packages.service.test.ts PlansPage.test.tsx`
+- `npm run type-check`
+- `npx playwright test e2e/public-checkout-pix.spec.ts e2e/public-checkout-card.spec.ts e2e/public-checkout-resume.spec.ts e2e/public-checkout-mobile.spec.ts e2e/public-checkout-status-resume.spec.ts`
+
+Validacao operacional:
+
+- o endpoint real de webhook continua em `https://webhooks-local.eventovivo.com.br/api/v1/webhooks/billing/pagarme`
+- o primeiro Pix real expôs uma migration pendente no banco local:
+  - `2026_04_09_193000_add_recurring_fields_to_billing_gateway_events_table.php`
+  - sem essa migration, o webhook falhava ao gravar `hook_id` em `billing_gateway_events`
+- a trilha de processamento do webhook tambem expôs um guard faltando em `ProcessBillingWebhookAction`:
+  - quando a Pagar.me enviava `code` nao-UUID, o resolver tentava consultar `billing_orders.uuid` com valor invalido
+  - a busca agora so consulta por UUID quando `billing_order_uuid` realmente e UUID e cai para `gateway_order_id` no restante
+- depois dessas duas correcoes, a trilha publica passou ponta a ponta no webhook real
+
+Evidencias reais:
+
+- Pix inicial que expôs o problema de schema:
+  - `apps/api/storage/app/pagarme-homologation/public-checkout-pix-20260409170532.json`
+- Pix validado ponta a ponta apos o ajuste:
+  - `apps/api/storage/app/pagarme-homologation/public-checkout-pix-retry-20260409171011.json`
+- Cartao validado ponta a ponta:
+  - `apps/api/storage/app/pagarme-homologation/public-checkout-card-20260409171236.json`
+
+Estados finais confirmados no endpoint publico:
+
+- Pix:
+  - `status = refunded`
+  - `summary.state = refunded`
+  - `payment.meta.gateway_status = canceled`
+  - `payment.meta.charge_status = canceled`
+- cartao:
+  - `status = canceled`
+  - `summary.state = refunded`
+  - `payment.meta.gateway_status = canceled`
+  - `payment.meta.charge_status = canceled`
+
+Leitura pratica:
+
+- o payload semantico ficou responsavel pela linguagem do comprador
+- `payment.meta` agora reflete o estado bruto reconciliado do gateway
+- no Pix pendente, esse estado bruto real e `pending_payment`, nao `pending`
+- o checkout publico ficou validado com Pix e cartao usando a API real da Pagar.me e recebendo webhook pela URL do Cloudflare local
 
 ## Status De Execucao Em `2026-04-09`
 
@@ -194,14 +280,14 @@ Validacao operacional:
   - `/checkout/evento?v2=1` continua funcionando para links antigos
   - a rota publica continua passando pelo entry page para manter decisao centralizada
   - `legacy=1` deixou de desviar para a tela antiga
+  - `PublicEventCheckoutPage.tsx` e a suite legada foram removidos do frontend
 
 - bateria automatizada da fase verde
-- regressao legada do checkout verde em execucao isolada
 
 ### Ainda pendente da Fase 1 fora da V2
 
 - o pre-check ja esta integrado na V2
-- ele continua fora da tela antiga de proposito, porque a intencao e migrar a jornada, nao aumentar o monolito legado
+- o monolito legado foi removido do frontend, entao o pre-check segue apenas na V2 publica
 
 ### Estado real da Fase 2 agora
 
@@ -226,7 +312,6 @@ Ainda segue pendente:
 ### Proximo passo recomendado
 
 - decidir se o catalogo comercial vai continuar dirigido por `feature_key` ou se merece schema dedicado no futuro
-- decidir quando remover fisicamente `PublicEventCheckoutPage.tsx`, que agora ficou apenas como referencia/regressao isolada
 
 ## Validacao Do Toolkit De UI
 
@@ -271,22 +356,24 @@ Stack confirmada:
 - `Textarea`
 - `Tooltip`
 
-### Componentes realmente usados hoje no checkout atual
+### Componentes realmente usados na V2 publica
 
-No estado atual, `PublicEventCheckoutPage.tsx` usa principalmente:
+No estado atual, a jornada publica usa principalmente:
 
-- `Badge`
-- `Button`
+- `Form`
+- `Accordion`
+- `Progress`
+- `Tabs`
+- `Collapsible`
+- `Drawer`
 - `Card`
+- `Button`
 - `Input`
-- `Separator`
-- `Textarea`
 
 Leitura pratica:
 
-- a tela atual ainda nao usa `Form`, `Accordion`, `Progress`, `Tabs`, `Collapsible`, `Drawer` ou `Dialog`
-- isso confirma que a V2 nao e so troca de copy ou restyling
-- a V2 e uma refatoracao estrutural da jornada e da composicao dos componentes
+- a V2 deixou de depender do conjunto minimo do monolito antigo
+- a refatoracao estrutural da jornada ja se refletiu na composicao real dos componentes
 
 ### Validacao nas docs oficiais
 
@@ -320,55 +407,52 @@ Leitura pratica:
 - a pasta `apps/web/e2e` ja existe com a bateria minima da jornada publica
 - o pre-check deve seguir resposta neutra e rate limit para nao virar enumeracao de conta
 
-## Achados Confirmados No Checkout Atual
+## Achados Confirmados Na V2 Publica
 
-### 1. O monolito de formulario e real
+### 1. O acoplamento do monolito legado saiu da rota publica
 
-Validado em `PublicEventCheckoutPage.tsx`:
+Validado no estado atual:
 
-- `useForm()` fica no page root
-- existe uso massivo de `form.watch(...)`
-- a pagina tambem concentra `useSearchParams`, polling, local storage, montagem de payload e renderizacao da UI
-
-Implicacao:
-
-- o plano de migrar para `FormProvider + useFormContext + useWatch + useFormState` nao e perfumaria
-- ele responde a um acoplamento real ja presente na implementacao
-
-### 2. O checkout atual ainda depende de semantica tecnica
-
-Validado em `PublicEventCheckoutPage.tsx` e `PublicEventCheckoutPayloadBuilder.php`:
-
-- a UI ainda deriva estado de `payment.gateway_status`
-- o payload publico ainda expoe `provider`, `gateway ids`, `gateway_status`, `uuid`
+- `PublicEventCheckoutPage.tsx` foi removido
+- a rota publica usa apenas `PublicCheckoutPageV2`
+- o estado de jornada, pagamento e acompanhamento ficou dividido em hooks, mappers e componentes finos
 
 Implicacao:
 
-- os adapters de payload entram cedo por necessidade real
-- a UI V2 nao deve continuar lendo `gateway_status` diretamente
+- a V2 deixou de carregar o custo estrutural do checkout antigo
 
-### 3. O rascunho de retomada ainda depende de `localStorage`
+### 2. A UI publica ja nao le semantica tecnica diretamente nos componentes
 
-Validado em `PublicEventCheckoutPage.tsx`:
+Validado em `checkoutResponseAdapters.ts`, `checkoutStatusViewModel.ts` e `PublicEventCheckoutPayloadBuilder.php`:
 
-- existe persistencia de `last-uuid`
-- existe persistencia de `resume-draft`
-
-Implicacao:
-
-- o hardening de `version`, `expires_at`, limpeza automatica e avaliacao de `sessionStorage` continua necessario
-
-### 4. O cartao hoje e sem parcelamento real
-
-Validado em `PublicEventCheckoutPage.tsx` e no backend:
-
-- o frontend monta `installments: 1`
-- o backend aceita `installments`, mas o fluxo atual de UI nao expoe parcelamento como escolha real
+- a UI publica nao depende mais de `gateway_status` nos componentes
+- o payload semantico ja cobre labels, descricao e proximo passo
 
 Implicacao:
 
-- a V2 nao deve sugerir parcelamento
-- qualquer copy sobre flexibilidade de cartao precisa respeitar esse limite atual
+- o acoplamento mais perigoso do checkout antigo foi removido da interface publica
+
+### 3. O rascunho seguro saiu do desenho antigo
+
+Validado na V2:
+
+- a retomada agora prefere `sessionStorage`
+- o draft seguro segue sem restaurar `PAN/CVV`
+
+Implicacao:
+
+- o fluxo ativo de compra ficou mais seguro e previsivel
+
+### 4. O cartao continua sem parcelamento real
+
+Validado na V2 e no backend:
+
+- o frontend continua operando com `installments: 1`
+- o backend aceita `installments`, mas a UI publica nao promete parcelamento
+
+Implicacao:
+
+- a copy comercial continua alinhada ao que o backend realmente suporta
 
 ## Referencias De Checkout Profissional Com Baixa Friccao
 
@@ -611,7 +695,7 @@ Backend:
 
 Frontend:
 
-- `npm run test -- PublicEventCheckoutPage.test.tsx public-event-packages.service.test.ts PlansPage.test.tsx`
+- `npm run test -- src/modules/billing/PublicEventCheckoutEntryPage.test.tsx public-event-packages.service.test.ts PlansPage.test.tsx`
 - `npm run type-check`
 
 ## Fase 1 - Pre-Check Silencioso De Identidade
@@ -851,6 +935,8 @@ Objetivo:
 4. integrar `IdentityAssistInline`
 
 5. manter CTA discreto `Ja tenho conta`
+   - na rodada de friction hardening, o clique manual passou a salvar draft seguro antes da saida
+   - comprador autenticado agora pula `/login` e retoma direto em `payment`
 
 6. preservar regra:
    - e-mail nao bloqueia Pix
@@ -1152,9 +1238,8 @@ Status atual:
 
 Frontend:
 
-- `npm run test -- PublicEventCheckoutPage.test.tsx public-event-packages.service.test.ts PlansPage.test.tsx`
+- `npm run test -- src/modules/billing/PublicEventCheckoutEntryPage.test.tsx src/modules/billing/public-checkout src/modules/billing/services/public-event-packages.service.test.ts src/modules/plans/PlansPage.test.tsx`
 - `npm run test -- src/modules/billing/public-checkout`
-- `npm run test -- src/modules/billing/PublicEventCheckoutPage.test.tsx`
 - `npm run type-check`
 
 Frontend E2E:
@@ -1171,9 +1256,7 @@ Backend:
 
 Observacao pratica:
 
-- a suite legada `PublicEventCheckoutPage.test.tsx` passa verde isolada
-- quando ela e batelada junto com a suite extensa da V2, o runtime local pode encostar no timeout de 5s por teste
-- isso foi observado como limitacao de execucao do runner local, nao como regressao funcional
+- a bateria publica agora roda apenas sobre a V2 e os contratos ainda ativos
 
 ## Sequencia Recomendada De PRs
 

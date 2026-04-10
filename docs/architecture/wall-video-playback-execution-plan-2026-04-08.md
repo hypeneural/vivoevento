@@ -58,6 +58,10 @@ Backend:
   - `51 testes`
   - `361 assertions`
   - `PASS`
+- `cd apps/api && php artisan test tests/Unit/Modules/MediaProcessing/MediaToolingStatusServiceTest.php tests/Feature/MediaProcessing/BackfillWallVideoVariantsCommandTest.php tests/Feature/InboundMedia/PublicUploadTest.php tests/Feature/InboundMedia/InboundMediaPipelineTest.php tests/Feature/Wall/WallInsightsTest.php tests/Feature/Wall/WallDiagnosticsTest.php tests/Feature/Wall/WallLiveSnapshotTest.php`
+  - `42 testes`
+  - `405 assertions`
+  - `PASS`
 - `cd apps/api && php artisan test tests/Unit/Modules/MediaProcessing/MediaVariantGeneratorServiceTest.php tests/Unit/Modules/MediaProcessing/MediaAssetUrlServiceTest.php tests/Feature/Wall/PublicWallBootTest.php tests/Feature/MediaProcessing/MediaPipelineJobsTest.php tests/Unit/MediaProcessing/HorizonConfigTest.php`
   - `21 testes`
   - `196 assertions`
@@ -90,7 +94,45 @@ Backend:
   - `7 arquivos`
   - `75 testes`
   - `PASS`
+- `cd apps/web && npx.cmd vitest run src/modules/wall/components/manager/recent/WallRecentMediaDetailsSheet.test.tsx src/modules/wall/components/manager/stage/WallUpcomingTimeline.test.tsx src/modules/wall/components/manager/stage/WallHeroStage.test.tsx`
+  - `3 arquivos`
+  - `6 testes`
+  - `PASS`
 - `cd apps/web && npm.cmd run type-check`
+  - `PASS`
+- `winget install --id Gyan.FFmpeg --accept-source-agreements --accept-package-agreements`
+  - `PASS`
+- `cd apps/api && php artisan media:tooling-status`
+  - `Status: ready`
+- `php inline bootstrap -> MediaToolingStatusService::payload()`
+  - `ready = true`
+  - `ffmpeg_available = true`
+  - `ffprobe_available = true`
+- `C:\\Program Files\\Git\\bin\\bash.exe -n scripts/ops/bootstrap-host.sh scripts/ops/verify-host.sh scripts/ops/homologate-wall-video.sh`
+  - `PASS`
+- `C:\\Program Files\\Git\\bin\\bash.exe scripts/ops/homologate-wall-video.sh --help`
+  - `PASS`
+- `C:\\Program Files\\Git\\bin\\bash.exe -n scripts/ops/bootstrap-host.sh scripts/ops/verify-host.sh scripts/ops/homologate-wall-video.sh scripts/deploy/healthcheck.sh scripts/deploy/deploy.sh scripts/deploy/smoke-test.sh`
+  - `PASS`
+- `cd apps/api && php artisan test tests/Feature/MediaProcessing/MediaToolingStatusCommandTest.php tests/Feature/Wall/WallAuthorizationTest.php tests/Feature/InboundMedia/PublicUploadTest.php tests/Feature/InboundMedia/InboundMediaPipelineTest.php tests/Feature/Wall/WallDiagnosticsTest.php tests/Feature/Wall/WallVideoAnalyticsTrackingTest.php`
+  - `37 testes`
+  - `327 assertions`
+  - `PASS`
+- `cd apps/api && php artisan test tests/Feature/Wall/PublicWallBootTest.php tests/Feature/Wall/WallInsightsTest.php tests/Feature/Wall/WallLiveSnapshotTest.php tests/Unit/Modules/Wall/WallEligibilityServiceTest.php`
+  - `31 testes`
+  - `239 assertions`
+  - `PASS`
+- `cd apps/api && php artisan test tests/Unit/Shared/WallVideoOpsRunbookCharacterizationTest.php tests/Feature/MediaProcessing/MediaToolingStatusCommandTest.php tests/Feature/InboundMedia/PublicUploadTest.php tests/Feature/InboundMedia/InboundMediaPipelineTest.php tests/Feature/Wall/WallVideoAnalyticsTrackingTest.php`
+  - `24 testes`
+  - `221 assertions`
+  - `PASS`
+- `cd apps/api && php artisan test tests/Unit/Shared/WallVideoOpsRunbookCharacterizationTest.php tests/Feature/MediaProcessing/MediaToolingStatusCommandTest.php tests/Feature/InboundMedia/PublicUploadTest.php tests/Feature/InboundMedia/InboundMediaPipelineTest.php tests/Feature/Wall/WallVideoAnalyticsTrackingTest.php tests/Feature/Wall/WallDiagnosticsTest.php`
+  - `32 testes`
+  - `310 assertions`
+  - `PASS`
+- `cd apps/web && npx.cmd vitest run src/modules/wall/components/manager/inspector/WallAppearanceTab.test.tsx src/modules/wall/components/manager/diagnostics/WallPlayerDetailsSheet.test.tsx src/modules/wall/player/runtime-profile.test.ts src/modules/wall/player/hooks/useWallPlayer.test.tsx`
+  - `4 arquivos`
+  - `11 testes`
   - `PASS`
 - `cd apps/api && php artisan test tests/Feature/Wall/PublicWallBootTest.php`
   - `4 testes`
@@ -133,14 +175,29 @@ Leituras confirmadas pelos testes e codigo atual:
 - `MediaAssetUrlServiceTest` confirma preferencia por variante de wall, poster dedicado e fallback para original quando necessario;
 - `MediaVariantGeneratorServiceTest` confirma geracao real de `wall_video_720p`, `wall_video_1080p` opcional e `wall_video_poster`;
 - `MediaPipelineJobsTest` confirma que `GenerateMediaVariantsJob` usa a trilha `ffmpeg` para video e persiste `wall_video_*` + `wall_video_poster`;
-- `PublicUploadTest` agora confirma policy publica coerente para video curto e rejeicao quando a policy global desabilita video ou quando a duracao excede o limite;
+- `PublicUploadTest` agora confirma policy publica coerente para video curto e rejeicao quando o rollout publico do wall/canal ou a policy base desabilitam video, ou quando a duracao excede o limite;
 - `PublicEventUploadPage.test.tsx` confirma que a UI publica envia video como `file`, preserva lote de imagens em `files[]` e rejeita mistura de imagem + video;
 - `WallEligibilityServiceTest`, `PublicWallBootTest`, `WallDiagnosticsTest` e `MediaPipelineEventsTest` confirmam que o gate final de video agora ja vale para boot, realtime e simulacao;
 - `EventWallManagerPage.test.tsx` confirma que o manager agora mostra resumo da policy ativa, readiness de `ffmpeg` / `ffprobe` e avisos operacionais do runtime de video;
-- `WallPlayerDetailsSheet.test.tsx` confirma que o detalhe operacional do player renderiza fase, progresso, motivo de saida e falha para video;
-- o ambiente local atual continua sem `ffmpeg`/`ffprobe` no `PATH`, mas os binarios agora sao configuraveis por `MEDIA_FFMPEG_BIN` e `MEDIA_FFPROBE_BIN`;
+- `WallPlayerDetailsSheet.test.tsx` confirma que o detalhe operacional do player renderiza fase, progresso, motivo de saida, falha e perfil de hardware/rede;
+- `WallAppearanceTab.test.tsx` confirma rollout por canal no proprio wall (`public_upload_video_enabled` / `private_inbound_video_enabled`);
+- `WallVideoAnalyticsTrackingTest` confirma eventos consolidados de analytics de video e dedupe de `play_rejected`;
+- `MediaToolingStatusCommandTest` confirma readiness operacional de `ffmpeg` / `ffprobe` por comando;
+- `runtime-profile.test.ts` confirma leitura de hints de hardware/rede no player sem quebrar o heartbeat;
+- a maquina local agora tem `ffmpeg` / `ffprobe` provisionados fora do repositorio em `%LOCALAPPDATA%\\Programs\\FFmpeg\\bin`, com `.env` apontando para esses binarios;
+- o repo agora tem scripts operacionais para provisionamento remoto em `scripts/ops/install-ffmpeg-windows.ps1` e `scripts/ops/install-ffmpeg-ubuntu.sh`;
+- o repo agora tambem integrou a trilha oficial de video aos scripts base de host:
+  - `bootstrap-host.sh` instala `ffmpeg` no Ubuntu;
+  - `verify-host.sh` valida `ffmpeg` / `ffprobe` e executa `php artisan media:tooling-status` quando a release atual existe;
+  - `healthcheck.sh` valida `php artisan media:tooling-status` antes do switch da release por default;
+  - `homologate-wall-video.sh` gera o relatorio versionado da matriz de homologacao por `device_class` / `network_class`;
 - `WallRuntimeMediaService` agora filtra boot e simulacao com o mesmo `WallEligibilityService` usado pelo realtime;
 - `PublicWallBootTest`, `MediaPipelineEventsTest` e `WallDiagnosticsTest` agora validam a mesma regra de orientacao entre boot, broadcast e simulacao.
+
+Observacao importante:
+
+- uma rerodada mais ampla com `php artisan test --filter=Wall`, `--filter=InboundMedia` e `--filter=BackfillWallVideoVariantsCommandTest` esbarrou num problema paralelo do workspace em SQLite/migrations (`duplicate column name: billing_order_id`);
+- esse erro nao veio desta trilha de video e nao foi usado como bloqueio para o fechamento desta rodada.
 
 ## Restricoes oficiais do navegador validadas
 
@@ -176,7 +233,7 @@ Leitura de produto derivada dessas limitacoes:
 - preferir variante otimizada antes de apostar em cache agressivo;
 - bloquear video em layout multi-slot por padrao na primeira entrega;
 - manter rollout incremental, com guardrails e feature flags por evento/wall;
-- nao ligar oficialmente upload publico de video fora dos ambientes em que a policy global de duracao, metadata e UX ja esteja validada.
+- nao ligar oficialmente upload publico de video fora dos ambientes em que o rollout por wall/canal, a policy base de duracao e a UX ja estejam validados.
 
 ## Status de execucao atual
 
@@ -195,9 +252,15 @@ Leitura de produto derivada dessas limitacoes:
 - [x] `3.1` guard rail minimo puxado para frente: video corrente agora nao entra em layout multi-slot e cai para single-item
 - [x] `6.2` heartbeat enriquecido com estado atual de video, progresso, `readyState`, `exit_reason`, `failure_reason` e sinais de degradacao
 - [x] `6.3` manager/diagnostics mostrando `Policy Summary`, status de pipeline de variantes e alertas operacionais de video
-- [ ] provisionamento operacional real de `ffmpeg` / `ffprobe` fora do repositorio
-- [ ] expor razoes de inelegibilidade do backend no manager de forma detalhada por item
-- [ ] fechar a trilha de rollout oficial do upload publico por evento/wall, em vez de apenas pela policy global
+- [x] `6.4` manager expondo admissao do backend por item em `recentItems`, timeline e live snapshot
+- [x] `6.5` analytics consolidados de video por transicao e telemetria de hardware/rede no heartbeat
+- [x] provisionamento operacional local de `ffmpeg` / `ffprobe` fora do repositorio na maquina de desenvolvimento
+- [x] alinhamento inicial de intake privado, legados e rollout oficial do upload publico com policy + tooling readiness
+- [x] rollout oficial por evento/wall/canal no manager e no backend (`public_upload_video_enabled` / `private_inbound_video_enabled`)
+- [x] scripts e comando operacional para replicar provisionamento de `ffmpeg` / `ffprobe` fora do repositorio
+- [x] automacao de host Ubuntu e runbook versionado para homologacao real do wall video
+- [ ] provisionar `ffmpeg` / `ffprobe` nos workers reais e ambientes remotos
+- [ ] executar a matriz real de homologacao por classe de device e rede em ambiente controlado
 
 ## Escopo da primeira entrega
 
@@ -331,11 +394,11 @@ Subtarefas:
   - `media_type` permitido;
   - orientacao aceita.
 - [x] impedir que o player receba no boot um item que o realtime nao pode republicar, ou o inverso, para as regras atuais do wall;
-- [x] estender o mesmo gate para criterios especificos de video com rollout global:
+- [x] estender o mesmo gate para criterios especificos de video com rollout por wall/canal:
   - `video_enabled`;
   - politica de duracao/admissao de video;
   - existencia da variante/poster exigidos pelo rollout.
-- [ ] expor razoes de inelegibilidade que possam alimentar diagnostico e manager:
+- [x] expor razoes de inelegibilidade que alimentam diagnostico e manager:
   - `orientation_blocked`
   - `video_disabled`
   - `duration_blocked`
@@ -345,9 +408,9 @@ Subtarefas:
 
 Criterio de aceite:
 
-- criterio parcialmente atingido:
+- criterio atingido nesta fase:
   - o mesmo item agora e aceito ou rejeitado da mesma forma em boot, realtime e simulacao, inclusive para a policy configurada no wall;
-  - ainda falta expor razoes de inelegibilidade operacional no manager e em superficies de diagnostico por item.
+  - as razoes de admissao/inelegibilidade de video ja alimentam o manager e as superficies operacionais por item.
 
 ### 1.2 Persistir metadata real de video
 
@@ -411,10 +474,9 @@ Subtarefas:
 
 Criterio de aceite:
 
-- criterio parcialmente atingido:
+- criterio atingido para a elegibilidade e rollout oficial do dominio:
   - o backend agora explica no payload e no detalhe da midia porque um video entra, entra com fallback ou ficaria bloqueado;
-  - essa classificacao ja governa o gate efetivo usando settings reais do wall para `video_enabled`, cap e variante preferida;
-  - ainda falta alinhar o rollout publico e os fluxos legados que continuam dependentes de policy global de ambiente.
+  - essa classificacao agora governa o gate efetivo usando settings reais do wall para `video_enabled`, cap, variante preferida e rollout por canal.
 
 ### 1.4 Gerar variantes de video para wall
 
@@ -442,6 +504,10 @@ Subtarefas:
   - `MEDIA_FFMPEG_BIN`
   - `MEDIA_FFPROBE_BIN`
   - `apps/api/config/media_processing.php`
+- [x] materializar verificacao e runbook operacional:
+  - `php artisan media:tooling-status`
+  - `scripts/ops/install-ffmpeg-windows.ps1`
+  - `scripts/ops/install-ffmpeg-ubuntu.sh`
 
 Criterio de aceite:
 
@@ -449,7 +515,9 @@ Criterio de aceite:
   - o wall agora entrega `url` otimizada e `preview_url` com poster quando as variantes existem;
   - o pipeline de variantes agora usa a trilha `ffmpeg` para video e a lane `media-variants` foi alinhada para timeout compativel;
   - o payload agora informa `served_variant_key` e `preview_variant_key`;
-  - ainda falta apenas o provisionamento operacional real de `ffmpeg`/`ffprobe` fora do repositorio, porque o ambiente local segue sem esses binarios no `PATH`.
+  - a maquina de desenvolvimento ja foi provisionada fora do repositorio e o backend local resolve `ffmpeg`/`ffprobe` por `.env`;
+  - o repo agora ja oferece comando de readiness e scripts de provisionamento para Windows/Ubuntu;
+  - ainda falta executar isso nos workers reais e ambientes remotos.
 
 ### 1.5 Limpar o intake publico de video
 
@@ -464,14 +532,20 @@ Subtarefas:
 - [x] alinhar a UI publica para comunicar corretamente imagem x video;
 - [x] adaptar `GenerateMediaVariantsJob` para a nova trilha de variantes de video;
 - [x] manter upload multiplo como imagens apenas na primeira entrega;
-- [x] rejeitar upload publico de video quando a policy global estiver desabilitada ou quando a duracao exceder o cap configurado.
+- [x] rejeitar upload publico de video quando a policy do wall/canal estiver desabilitada ou quando a duracao exceder o cap configurado.
+- [x] esconder oficialmente suporte publico a video quando o tooling nao estiver pronto.
+- [x] fazer o intake privado de video entrar na trilha de variantes quando o tooling estiver pronto.
+- [x] criar comando de backfill para videos legados sem metadata ou sem variantes de wall.
 
 Criterio de aceite:
 
-- criterio atingido para a politica global atual:
+- criterio atingido para o rollout oficial atual:
   - o bootstrap, a UI e o backend agora comunicam a mesma regra;
   - imagem continua em lote;
-  - video fica restrito ao caminho unitario e ao cap configurado.
+  - video fica restrito ao caminho unitario e ao cap configurado;
+  - upload publico so liga oficialmente quando `public_upload_video_enabled` + tooling readiness permitem;
+  - intake privado so entra na trilha oficial quando `private_inbound_video_enabled` + tooling readiness permitem;
+  - legados ja tem comando de backfill para convergir com a policy final.
 
 ## Fase 2 - Reducer e subsistema de playback de video
 
@@ -917,7 +991,7 @@ Arquivos centrais:
 
 Subtarefas:
 
-- [ ] adicionar eventos:
+- [x] adicionar eventos:
   - `video_start`
   - `video_first_frame`
   - `video_complete`
@@ -947,14 +1021,23 @@ Subtarefas:
   - `current_video_playback_ready`
   - `current_video_playing_confirmed`
   - `current_video_startup_degraded`
+- [x] enriquecer heartbeat com hints de homologacao por device/rede:
+  - `hardware_concurrency`
+  - `device_memory_gb`
+  - `network_effective_type`
+  - `network_save_data`
+  - `network_downlink_mbps`
+  - `network_rtt_ms`
+  - `prefers_reduced_motion`
+  - `document_visibility_state`
 - [x] mostrar alertas de wall degradado por video no manager.
-- [ ] adicionar a mesma taxonomia aos eventos/analytics de video de forma consolidada.
+- [x] adicionar a mesma taxonomia aos eventos/analytics de video de forma consolidada.
 
 Criterio de aceite:
 
-- criterio parcialmente atingido:
-  - o manager e os diagnostics ja mostram fase, progresso, motivo de saida, falha de playback e guidance operacional para waiting/stalled;
-  - ainda falta fechar a trilha de analytics/eventos e expor inelegibilidade detalhada do backend na operacao.
+- criterio atingido para a trilha de observabilidade:
+  - o manager e os diagnostics ja mostram fase, progresso, motivo de saida, falha de playback, guidance operacional e perfil de hardware/rede;
+  - o backend agora registra analytics consolidados de video por transicao relevante, com dedupe por heartbeat.
 
 ## Fase 7 - Rollout e homologacao real
 
@@ -964,7 +1047,7 @@ Objetivo:
 
 Subtarefas:
 
-- [ ] liberar por evento/wall com flag;
+- [x] liberar por evento/wall com flag e rollout por canal no manager;
 - [ ] homologar primeiro apenas layouts single-item;
 - [ ] rodar matriz real por classe de device:
   - desktop forte
@@ -988,9 +1071,29 @@ Subtarefas:
   - item deletado durante playback
   - fila com imagem + video + anuncio
 
+Passos operacionais restantes:
+
+- Windows worker ou host de homologacao:
+  - `powershell -ExecutionPolicy Bypass -File scripts/ops/install-ffmpeg-windows.ps1`
+  - configurar `MEDIA_FFMPEG_BIN` e `MEDIA_FFPROBE_BIN` quando o script nao puder escrever no perfil padrao
+  - validar com `cd apps/api && php artisan media:tooling-status`
+- Ubuntu worker ou host de homologacao:
+  - `bash scripts/ops/install-ffmpeg-ubuntu.sh`
+  - validar com `cd apps/api && php artisan media:tooling-status`
+- em todos os ambientes reais:
+  - confirmar que `GenerateMediaVariantsJob` esta rodando na lane correta;
+  - gerar pelo menos um video novo e validar `wall_video_720p`, `wall_video_poster`, `served_variant_key` e `preview_variant_key`;
+  - validar no manager que `ffmpeg_ready = true`, `ffprobe_ready = true` e que a policy do wall/canal esta refletida na timeline e no live snapshot.
+- no deploy:
+  - manter `REQUIRE_MEDIA_TOOLING=1` para hosts que participam do rollout de video;
+  - usar `REQUIRE_MEDIA_TOOLING=0` apenas em host que ainda nao deve processar video de wall;
+  - confirmar que `eventovivo-horizon.service` recicla Horizon por `ExecReload=php artisan horizon:terminate`.
+
 Criterio de aceite:
 
-- video premium so sobe quando o comportamento esta previsivel em runtime, nao apenas bonito em laboratorio.
+- video premium so sobe quando o comportamento esta previsivel em runtime, nao apenas bonito em laboratorio;
+- pelo menos um ambiente remoto Windows ou Ubuntu precisa fechar `media:tooling-status` como `ready`;
+- a matriz de homologacao precisa produzir heartbeat com perfil de hardware/rede e confirmar pelo menos um caso de `video_start`, `video_first_frame` e `video_complete` ou `video_interrupted_by_cap` sem ambiguidade operacional.
 
 ## Mapa de arquivos a tocar
 
@@ -1052,7 +1155,7 @@ Frontend:
 - [x] teste de startup com `startup_timeout` sem bloquear a fila
 - [x] teste de `waiting/stalled` com `poster_then_skip`
 - [x] teste para bloqueio de video em multi-slot
-- [ ] testes do manager para `Video Decision Inspector`
+- [x] testes do manager para `Video Decision Inspector`
 - [x] testes do manager para settings de video e avisos operacionais
 
 ## Smokes reais obrigatorios
@@ -1066,7 +1169,7 @@ Frontend:
 - [ ] fila com imagem, video comum e anuncio em video nao entra em corrida de scheduler;
 - [ ] o mesmo video e aceito ou rejeitado da mesma forma em boot, realtime e resync;
 - [ ] `waiting` evolui para fallback operacional sem tela preta prolongada;
-- [ ] upload publico e intake privado seguem a politica oficial sem divergencia de UX.
+- [x] upload publico e intake privado seguem a politica oficial inicial sem divergencia de UX quando o tooling esta pronto.
 
 ## Definicao de pronto da primeira entrega
 

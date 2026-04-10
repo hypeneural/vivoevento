@@ -187,8 +187,67 @@ describe('ModerationReviewPanel', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch', { name: /bloquear remetente/i }));
 
     expect(onSenderBlockToggle).toHaveBeenCalledWith(false);
+  });
+
+  it('exposes auto-advance controls and approve-and-next from the review panel', () => {
+    const onApproveAndNext = vi.fn();
+    const onAutoAdvanceChange = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <ModerationReviewPanel
+          media={media}
+          canModerate
+          isBusy={() => false}
+          onAction={vi.fn()}
+          onApproveAndNext={onApproveAndNext}
+          onOpenPreview={vi.fn()}
+          autoAdvanceEnabled
+          onAutoAdvanceChange={onAutoAdvanceChange}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /aprovar e proxima/i }));
+    fireEvent.click(screen.getByRole('switch', { name: /ativar auto-advance/i }));
+
+    expect(onApproveAndNext).toHaveBeenCalledTimes(1);
+    expect(onAutoAdvanceChange).toHaveBeenCalledWith(false);
+  });
+
+  it('renders the duplicate cluster and exposes review actions for the remaining items', () => {
+    const onOpenDuplicateItem = vi.fn();
+    const onRejectDuplicateCluster = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <ModerationReviewPanel
+          media={{ ...media, duplicate_group_key: 'dup-777', is_duplicate_candidate: true }}
+          canModerate
+          isBusy={() => false}
+          onAction={vi.fn()}
+          onOpenPreview={vi.fn()}
+          duplicateClusterItems={[
+            { ...media, id: 202, duplicate_group_key: 'dup-777', is_duplicate_candidate: true, sender_name: 'Ana' },
+            { ...media, id: 203, duplicate_group_key: 'dup-777', is_duplicate_candidate: true, sender_name: 'Bruno' },
+          ]}
+          onOpenDuplicateItem={onOpenDuplicateItem}
+          onRejectDuplicateCluster={onRejectDuplicateCluster}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText(/cluster de duplicata/i)).toBeInTheDocument();
+    expect(screen.getByText('Ana')).toBeInTheDocument();
+    expect(screen.getByText('Bruno')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /abrir duplicata 202/i }));
+    fireEvent.click(screen.getByRole('button', { name: /rejeitar demais como duplicada/i }));
+
+    expect(onOpenDuplicateItem).toHaveBeenCalledWith(202);
+    expect(onRejectDuplicateCluster).toHaveBeenCalledTimes(1);
   });
 });

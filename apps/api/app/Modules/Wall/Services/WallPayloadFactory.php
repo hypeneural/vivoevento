@@ -93,6 +93,8 @@ class WallPayloadFactory
             'show_side_thumbnails' => (bool) ($settings->show_side_thumbnails ?? true),
             'accepted_orientation' => $settings->accepted_orientation?->value ?? 'all',
             'video_enabled' => $settings->resolvedVideoEnabled(),
+            'public_upload_video_enabled' => $settings->resolvedPublicUploadVideoEnabled(),
+            'private_inbound_video_enabled' => $settings->resolvedPrivateInboundVideoEnabled(),
             'video_playback_mode' => $settings->resolvedVideoPlaybackMode(),
             'video_max_seconds' => $settings->resolvedVideoMaxSeconds(),
             'video_resume_mode' => $settings->resolvedVideoResumeMode(),

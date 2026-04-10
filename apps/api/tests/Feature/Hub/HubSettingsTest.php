@@ -2,6 +2,7 @@
 
 use App\Modules\Events\Models\Event;
 use App\Modules\Events\Models\EventModule;
+use App\Modules\FaceSearch\Models\EventFaceSearchSetting;
 use App\Modules\Hub\Models\EventHubSetting;
 use App\Modules\Wall\Models\EventWallSetting;
 
@@ -250,6 +251,13 @@ it('returns the public hub payload with visible actionable buttons only', functi
     EventModule::query()->create(['event_id' => $event->id, 'module_key' => 'wall', 'is_enabled' => false]);
     EventModule::query()->create(['event_id' => $event->id, 'module_key' => 'play', 'is_enabled' => false]);
     EventModule::query()->create(['event_id' => $event->id, 'module_key' => 'hub', 'is_enabled' => true]);
+    EventFaceSearchSetting::factory()->publicSelfieSearch()->create([
+        'event_id' => $event->id,
+        'recognition_enabled' => true,
+        'search_backend_key' => 'aws_rekognition',
+        'routing_policy' => 'aws_primary_local_fallback',
+        'aws_collection_id' => "eventovivo-face-search-event-{$event->id}",
+    ]);
 
     EventHubSetting::query()->create([
         'event_id' => $event->id,
@@ -292,7 +300,9 @@ it('returns the public hub payload with visible actionable buttons only', functi
         ->assertJsonPath('data.event.title', 'Evento Publico')
         ->assertJsonPath('data.hub.builder_config.layout_key', 'classic-cover')
         ->assertJsonPath('data.hub.buttons.0.label', 'Enviar agora')
-        ->assertJsonPath('data.hub.buttons.1.label', 'Site do casal');
+        ->assertJsonPath('data.hub.buttons.1.label', 'Site do casal')
+        ->assertJsonPath('data.face_search.public_search_enabled', true)
+        ->assertJsonPath('data.face_search.find_me_url', $event->publicFindMeUrl());
 
     expect($response->json('data.hub.buttons'))->toHaveCount(2);
 });

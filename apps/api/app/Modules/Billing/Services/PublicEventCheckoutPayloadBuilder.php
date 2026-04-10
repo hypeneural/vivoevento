@@ -74,6 +74,14 @@ class PublicEventCheckoutPayloadBuilder
             paymentExpiresAt: is_string($paymentExpiresAt) ? $paymentExpiresAt : null,
             acquirerMessage: is_string($acquirerMessage) ? $acquirerMessage : null,
         );
+        $paymentMeta = array_filter(array_merge(
+            (array) ($gateway['meta'] ?? []),
+            [
+                'charge_status' => $paymentGatewayStatus,
+                'gateway_status' => $paymentGatewayStatus,
+                'payment_method' => $paymentMethod,
+            ],
+        ), fn (mixed $value): bool => $value !== null && $value !== '');
 
         return [
             'message' => $extra['message'] ?? null,
@@ -139,7 +147,7 @@ class PublicEventCheckoutPayloadBuilder
                             $notifications->firstWhere('notification_type', BillingOrderNotificationType::PaymentRefunded),
                         ),
                     ],
-                    'meta' => $gateway['meta'] ?? [],
+                    'meta' => $paymentMeta,
                 ],
                 'package' => $primaryItem?->snapshot_json['package'] ?? null,
                 'items' => $order->items->map(fn ($item) => [

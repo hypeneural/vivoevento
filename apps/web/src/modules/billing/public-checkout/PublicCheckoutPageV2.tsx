@@ -2,7 +2,7 @@ import { startTransition, useEffect, useMemo, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm, useWatch } from 'react-hook-form';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '@/app/providers/AuthProvider';
 import { Form } from '@/components/ui/form';
@@ -34,6 +34,7 @@ import { findCommercialPackageBySelectionKey, mapPackageToCommercialCard } from 
 import { checkoutV2Schema, initialCheckoutV2Values, type CheckoutV2FormValues } from './support/checkoutFormSchema';
 import {
   buildCheckoutPayload,
+  buildV2CheckoutResumePath,
   buildV2LoginResumePath,
   digitsOnly,
   formatPhone,
@@ -65,6 +66,7 @@ function findIdentityConflictMessage(error: ApiError): string | null {
 
 export function PublicCheckoutPageV2() {
   const { isAuthenticated, refreshSession } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -104,11 +106,6 @@ export function PublicCheckoutPageV2() {
     [packagesQuery.data],
   );
   const formSelectedPackage = commercialPackages.find((pkg) => String(pkg.id) === packageId) ?? null;
-  const loginResumePath = useMemo(
-    () => buildV2LoginResumePath(formSelectedPackage?.deepLinkKey ?? packageQuery),
-    [formSelectedPackage?.deepLinkKey, packageQuery],
-  );
-
   const identityPrecheck = useCheckoutIdentityPrecheck({
     whatsapp: whatsapp ?? '',
     email: email ?? '',
@@ -148,6 +145,17 @@ export function PublicCheckoutPageV2() {
     selectedPackage,
     statusViewModel,
   }), [selectedPackage, statusViewModel, wizard.currentStep]);
+  const mobilePrimaryActionLabel = useMemo(() => {
+    if (wizard.currentStep === 'details') {
+      return 'Continuar para pagamento';
+    }
+
+    if (wizard.currentStep === 'payment') {
+      return paymentMethod === 'credit_card' ? 'Finalizar com cartao' : 'Gerar meu Pix';
+    }
+
+    return null;
+  }, [paymentMethod, wizard.currentStep]);
 
   function handleSelectPackage(pkg: (typeof commercialPackages)[number]) {
     form.setValue('package_id', String(pkg.id), { shouldDirty: true, shouldValidate: true });
@@ -228,6 +236,25 @@ export function PublicCheckoutPageV2() {
     }
 
     wizard.goToStep('payment');
+  }
+
+  function handleUseExistingAccount() {
+    const values = form.getValues();
+    const packageKey = formSelectedPackage?.deepLinkKey ?? packageQuery;
+
+    writeDraft(values, 'manual_login');
+    setIdentityConflict(null);
+    setSubmitError(null);
+    setResumeNotice(null);
+    setResumeInitialized(false);
+    setResumeAutoSubmitted(false);
+
+    if (isAuthenticated) {
+      navigate(buildV2CheckoutResumePath(packageKey), { replace: true });
+      return;
+    }
+
+    navigate(buildV2LoginResumePath(packageKey));
   }
 
   useEffect(() => {
@@ -352,10 +379,16 @@ export function PublicCheckoutPageV2() {
             description: 'Retomamos os dados seguros da sua jornada. Para sua seguranca, os campos do cartao precisam ser preenchidos novamente.',
             mode: 'manual',
           }
-        : {
+        : resumeDraft.source === 'identity_conflict'
+          ? {
             title: 'Sessao retomada com a sua conta',
             description: 'Seu rascunho foi restaurado e o checkout Pix sera retomado automaticamente.',
             mode: 'auto',
+          }
+          : {
+            title: 'Sessao retomada com a sua conta',
+            description: 'Seus dados foram restaurados. Agora e so seguir para o pagamento.',
+            mode: 'manual',
           },
     );
     setResumeInitialized(true);
@@ -372,6 +405,7 @@ export function PublicCheckoutPageV2() {
       || resumeAutoSubmitted
       || createCheckoutMutation.isPending
       || resumeDraft.payment_method !== 'pix'
+      || resumeDraft.source !== 'identity_conflict'
     ) {
       return;
     }
@@ -434,7 +468,7 @@ export function PublicCheckoutPageV2() {
         identityState={identityPrecheck.identityAssist}
         isCheckingIdentity={identityPrecheck.isChecking}
         onContinue={() => void handleContinueToPayment()}
-        loginHref={loginResumePath}
+        onUseExistingAccount={handleUseExistingAccount}
       />
     ),
     payment: wizard.currentStep === 'status'
@@ -485,6 +519,13 @@ export function PublicCheckoutPageV2() {
             currentStep={wizard.currentStep}
             selectedPackage={selectedPackage}
             summary={mobileFooterSummary}
+            primaryActionLabel={mobilePrimaryActionLabel}
+            primaryActionDisabled={createCheckoutMutation.isPending}
+            onPrimaryAction={wizard.currentStep === 'details'
+              ? () => void handleContinueToPayment()
+              : wizard.currentStep === 'payment'
+                ? () => void handleSubmitCheckout()
+                : null}
           />
         )}
       />

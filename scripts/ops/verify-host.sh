@@ -13,12 +13,16 @@ PSQL_BIN="${PSQL_BIN:-psql}"
 SYSTEMD_ANALYZE_BIN="${SYSTEMD_ANALYZE_BIN:-systemd-analyze}"
 REDIS_CLI_BIN="${REDIS_CLI_BIN:-redis-cli}"
 PG_ISREADY_BIN="${PG_ISREADY_BIN:-pg_isready}"
+FFMPEG_BIN="${FFMPEG_BIN:-ffmpeg}"
+FFPROBE_BIN="${FFPROBE_BIN:-ffprobe}"
 POSTGRES_HOST="${POSTGRES_HOST:-127.0.0.1}"
 POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 REDIS_HOST="${REDIS_HOST:-127.0.0.1}"
 REDIS_PORT="${REDIS_PORT:-6379}"
 TLS_CERT_PATH="${TLS_CERT_PATH:-/etc/ssl/certs/eventovivo-origin.crt}"
 TLS_KEY_PATH="${TLS_KEY_PATH:-/etc/ssl/private/eventovivo-origin.key}"
+CURRENT_API_DIR="${CURRENT_API_DIR:-$APP_ROOT/current/apps/api}"
+SHARED_ENV_FILE="${SHARED_ENV_FILE:-$APP_ROOT/shared/.env}"
 USE_SUDO="${USE_SUDO:-1}"
 REQUIRE_SHARED_ENV="${REQUIRE_SHARED_ENV:-0}"
 
@@ -122,6 +126,8 @@ require_command "$PSQL_BIN"
 require_command "$SYSTEMD_ANALYZE_BIN"
 require_command "$REDIS_CLI_BIN"
 require_command "$PG_ISREADY_BIN"
+require_command "$FFMPEG_BIN"
+require_command "$FFPROBE_BIN"
 
 log "Checking required runtime binaries"
 run_as_root "$PHP_BIN" --version >/dev/null
@@ -129,6 +135,8 @@ run_as_root "$COMPOSER_BIN" --version >/dev/null
 run_as_root "$NODE_BIN" --version >/dev/null
 run_as_root "$NPM_BIN" --version >/dev/null
 run_as_root "$PSQL_BIN" --version >/dev/null
+run_as_root "$FFMPEG_BIN" -version >/dev/null
+run_as_root "$FFPROBE_BIN" -version >/dev/null
 
 log "Checking TLS assets required by nginx"
 [[ -f "$TLS_CERT_PATH" ]] || fail "missing TLS certificate: $TLS_CERT_PATH"
@@ -182,6 +190,21 @@ if [[ "$REQUIRE_SHARED_ENV" == "1" ]]; then
         || fail "missing VITE_REVERB_HOST in $APP_ROOT/shared/apps-web.env.production"
     grep -q '^VITE_ADMIN_URL=' "$APP_ROOT/shared/apps-landing.env.production" \
         || fail "missing VITE_ADMIN_URL in $APP_ROOT/shared/apps-landing.env.production"
+fi
+
+if [[ -d "$CURRENT_API_DIR" && -f "$CURRENT_API_DIR/artisan" ]]; then
+    log "Checking media tooling readiness through artisan"
+    (
+        cd "$CURRENT_API_DIR"
+        if [[ -f "$SHARED_ENV_FILE" ]]; then
+            run_as_root "$PHP_BIN" artisan media:tooling-status >/dev/null \
+                || fail "artisan media:tooling-status reported tooling not ready"
+        else
+            log "shared env not present yet; skipping artisan media tooling readiness"
+        fi
+    )
+else
+    log "Current API release not available yet; skipping artisan media tooling readiness"
 fi
 
 log "Host verification completed"

@@ -1,4 +1,4 @@
-import { Check, ChevronLeft, ChevronRight, Copy, ImageIcon, Pin, ShieldBan, ShieldCheck, Star, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Copy, FastForward, ImageIcon, Pin, ShieldBan, ShieldCheck, Star, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { AspectRatio } from '@/components/ui/aspect-ratio';
@@ -20,15 +20,22 @@ interface ModerationReviewPanelProps {
   canModerate: boolean;
   isBusy: (action?: ModerationMediaAction) => boolean;
   onAction: (action: ModerationMediaAction) => void;
+  onApproveAndNext?: () => void;
   onOpenPreview: () => void;
   canGoPrevious?: boolean;
   canGoNext?: boolean;
   onPrevious?: () => void;
   onNext?: () => void;
+  autoAdvanceEnabled?: boolean;
+  onAutoAdvanceChange?: (checked: boolean) => void;
   senderBlockBusy?: boolean;
   senderBlockDuration?: string;
   onSenderBlockDurationChange?: (value: string) => void;
   onSenderBlockToggle?: (checked: boolean) => void;
+  duplicateClusterItems?: ApiEventMediaItem[];
+  duplicateClusterBusy?: boolean;
+  onOpenDuplicateItem?: (mediaId: number) => void;
+  onRejectDuplicateCluster?: () => void;
 }
 
 function hasAiEvaluations(media: ApiEventMediaItem | ApiEventMediaDetail): media is ApiEventMediaDetail {
@@ -44,15 +51,22 @@ export function ModerationReviewPanel({
   canModerate,
   isBusy,
   onAction,
+  onApproveAndNext,
   onOpenPreview,
   canGoPrevious = false,
   canGoNext = false,
   onPrevious,
   onNext,
+  autoAdvanceEnabled = false,
+  onAutoAdvanceChange,
   senderBlockBusy = false,
   senderBlockDuration = '7d',
   onSenderBlockDurationChange,
   onSenderBlockToggle,
+  duplicateClusterItems = [],
+  duplicateClusterBusy = false,
+  onOpenDuplicateItem,
+  onRejectDuplicateCluster,
 }: ModerationReviewPanelProps) {
   if (!media) {
     return (
@@ -89,6 +103,7 @@ export function ModerationReviewPanel({
       ? `Bloqueado ate ${formatDateTime(media.sender_block_expires_at)}`
       : 'Bloqueio sem prazo definido'
     : 'Remetente liberado para novas midias';
+  const decisionReason = media.decision_override_reason ?? null;
 
   return (
     <div className="overflow-hidden rounded-[28px] border border-border/60 bg-background/90 shadow-sm">
@@ -134,6 +149,38 @@ export function ModerationReviewPanel({
           </div>
         </div>
 
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-border/60 bg-muted/20 p-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Ritmo</p>
+            <p className="mt-1 text-sm font-medium text-foreground">Auto-advance move o foco para a proxima pendente depois de aprovar ou reprovar com sucesso.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Use Shift + A para aprovar e avancar mesmo com o toggle desligado.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-full"
+              disabled={!canModerate || !canApprove || isBusy('approve')}
+              onClick={onApproveAndNext}
+            >
+              <FastForward className="h-4 w-4" />
+              Aprovar e proxima
+            </Button>
+            <div className="flex items-center gap-3 rounded-full border border-border/60 bg-background/80 px-4 py-2">
+              <div>
+                <p className="text-sm font-medium">Auto-advance</p>
+                <p className="text-[11px] text-muted-foreground">{autoAdvanceEnabled ? 'Ligado' : 'Desligado'}</p>
+              </div>
+              <Switch
+                checked={autoAdvanceEnabled}
+                disabled={!canModerate || !onAutoAdvanceChange}
+                onCheckedChange={onAutoAdvanceChange}
+                aria-label="Ativar auto-advance"
+              />
+            </div>
+          </div>
+        </div>
+
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <MediaStatusBadge status={media.status as never} />
@@ -164,6 +211,15 @@ export function ModerationReviewPanel({
             <p className="text-sm text-muted-foreground">{media.sender_name || 'Convidado'}</p>
           </div>
         </div>
+
+        {decisionReason ? (
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Motivo da decisao</p>
+            <p className="rounded-3xl border border-border/60 bg-background/70 p-4 text-sm leading-6 text-muted-foreground">
+              {decisionReason}
+            </p>
+          </div>
+        ) : null}
 
         <div className="grid gap-3 rounded-3xl border border-border/60 bg-muted/20 p-4 sm:grid-cols-2">
           <div>
@@ -205,6 +261,61 @@ export function ModerationReviewPanel({
             </p>
           </div>
         </div>
+
+        {media.is_duplicate_candidate ? (
+          <div className="space-y-3 rounded-3xl border border-border/60 bg-muted/20 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Cluster de duplicata</p>
+                <p className="mt-1 text-sm font-medium text-foreground">
+                  {duplicateClusterItems.length > 0
+                    ? `${duplicateClusterItems.length} midia${duplicateClusterItems.length > 1 ? 's' : ''} semelhante${duplicateClusterItems.length > 1 ? 's' : ''} pronta${duplicateClusterItems.length > 1 ? 's' : ''} para revisar.`
+                    : 'Nenhuma outra midia do grupo foi carregada para revisao agora.'}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Grupo {media.duplicate_group_key || 'sem chave'}.
+                </p>
+              </div>
+
+              {canModerate && duplicateClusterItems.length > 0 && onRejectDuplicateCluster ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-full"
+                  disabled={duplicateClusterBusy}
+                  onClick={onRejectDuplicateCluster}
+                >
+                  <Copy className="h-4 w-4" />
+                  Rejeitar demais como duplicada
+                </Button>
+              ) : null}
+            </div>
+
+            {duplicateClusterItems.length > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {duplicateClusterItems.map((clusterItem) => (
+                  <button
+                    key={clusterItem.id}
+                    type="button"
+                    className="overflow-hidden rounded-3xl border border-border/60 bg-background/80 text-left transition hover:border-primary/40 hover:bg-background"
+                    onClick={() => onOpenDuplicateItem?.(clusterItem.id)}
+                    aria-label={`Abrir duplicata ${clusterItem.id}`}
+                  >
+                    <AspectRatio ratio={1}>
+                      <ModerationMediaSurface media={clusterItem} className="h-full w-full" />
+                    </AspectRatio>
+                    <div className="space-y-1 p-3">
+                      <p className="text-sm font-semibold text-foreground">{clusterItem.sender_name || 'Convidado'}</p>
+                      <p className="line-clamp-2 text-xs text-muted-foreground">
+                        {clusterItem.caption || clusterItem.event_title || 'Sem legenda adicional'}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="space-y-3 rounded-3xl border border-border/60 bg-muted/20 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -282,6 +393,7 @@ export function ModerationReviewPanel({
                 checked={!!media.sender_blocked}
                 disabled={!canManageSenderBlock || senderBlockBusy}
                 onCheckedChange={onSenderBlockToggle}
+                aria-label="Bloquear remetente"
               />
             </div>
           </div>

@@ -34,6 +34,8 @@ class EventWallSettingFactory extends Factory
             'show_side_thumbnails' => true,
             'accepted_orientation' => 'all',
             'video_enabled' => true,
+            'public_upload_video_enabled' => true,
+            'private_inbound_video_enabled' => true,
             'video_playback_mode' => 'play_to_end_if_short_else_cap',
             'video_max_seconds' => 30,
             'video_resume_mode' => 'resume_if_same_item_else_restart',

@@ -214,6 +214,7 @@ describe('PublicCheckoutPageV2 mobile layout', () => {
     renderPage();
 
     expect(await screen.findByTestId('public-checkout-mobile-footer')).toBeInTheDocument();
+    expect(screen.queryByTestId('public-checkout-mobile-primary-cta')).not.toBeInTheDocument();
     expect(screen.queryByText(/^Seu pacote$/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /ver resumo/i }));
@@ -227,6 +228,29 @@ describe('PublicCheckoutPageV2 mobile layout', () => {
     expect(screen.getByRole('heading', { name: /pagamento seguro/i })).toBeInTheDocument();
   }, 10000);
 
+  it('uses the sticky footer as the primary mobile CTA for details and payment', async () => {
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: /escolher este pacote/i }));
+    fillDetailsStep();
+
+    const detailsCta = screen.getByTestId('public-checkout-mobile-primary-cta');
+
+    expect(detailsCta).toHaveTextContent(/continuar para pagamento/i);
+
+    fireEvent.click(detailsCta);
+
+    const paymentCta = await screen.findByTestId('public-checkout-mobile-primary-cta');
+
+    expect(paymentCta).toHaveTextContent(/gerar meu pix/i);
+
+    fireEvent.click(paymentCta);
+
+    await waitFor(() => {
+      expect(createCheckoutMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('keeps the buyer data when the user goes back from payment on mobile', async () => {
     renderPage();
 
@@ -234,7 +258,7 @@ describe('PublicCheckoutPageV2 mobile layout', () => {
     expect(screen.getByTestId('public-checkout-mobile-footer')).toHaveTextContent('Casamento Essencial');
 
     fillDetailsStep();
-    fireEvent.click(screen.getByRole('button', { name: /continuar para pagamento/i }));
+    fireEvent.click(screen.getByTestId('public-checkout-mobile-primary-cta'));
 
     expect(await screen.findByRole('button', { name: /gerar meu pix/i })).toBeInTheDocument();
 

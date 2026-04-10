@@ -3,6 +3,8 @@ import { useFormContext } from 'react-hook-form';
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 
+import { formatPhone } from '../support/checkoutFormUtils';
+
 type CheckoutFormValues = {
   responsible_name: string;
   whatsapp: string;
@@ -34,7 +36,13 @@ export function BuyerIdentityFields() {
           <FormItem>
             <FormLabel>WhatsApp</FormLabel>
             <FormControl>
-              <Input placeholder="(48) 99999-9999" {...field} />
+              <Input
+                placeholder="(48) 99999-9999"
+                inputMode="tel"
+                autoComplete="tel"
+                {...field}
+                onChange={(event) => field.onChange(formatPhone(event.target.value))}
+              />
             </FormControl>
             <FormMessage />
           </FormItem>

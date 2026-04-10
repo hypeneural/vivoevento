@@ -85,8 +85,11 @@ function clearPersistedResumeDraft() {
 export function useCheckoutResumeDraft(initialValues: CheckoutV2FormValues) {
   const [resumeDraft, setResumeDraft] = useState<CheckoutResumeDraft | null>(() => readStoredResumeDraft());
 
-  const writeDraft = useCallback((values: CheckoutV2FormValues) => {
-    const draft = buildResumeDraft(values);
+  const writeDraft = useCallback((
+    values: CheckoutV2FormValues,
+    source: CheckoutResumeDraft['source'] = 'identity_conflict',
+  ) => {
+    const draft = buildResumeDraft(values, source);
 
     persistResumeDraft(draft);
     setResumeDraft(draft);

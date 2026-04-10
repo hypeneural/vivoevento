@@ -124,6 +124,10 @@ class MediaEffectiveStateResolver
             return 'rejected';
         }
 
+        if ($media->processing_status === MediaProcessingStatus::Failed) {
+            return 'error';
+        }
+
         if (
             ($safetyIsBlocking && in_array($safetyDecision, ['pending', 'review', 'failed'], true))
             || ($contextIsBlocking && in_array($contextDecision, ['pending', 'review', 'failed'], true))
@@ -152,7 +156,6 @@ class MediaEffectiveStateResolver
         }
 
         return match ($media->processing_status) {
-            MediaProcessingStatus::Failed => 'error',
             MediaProcessingStatus::Downloaded, MediaProcessingStatus::Processed => 'processing',
             default => 'received',
         };

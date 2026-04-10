@@ -50,6 +50,10 @@ describe('PublicGalleryPage', () => {
       ],
       meta: {
         total: 1,
+        face_search: {
+          public_search_enabled: true,
+          find_me_url: 'https://eventovivo.test/e/casamento/find-me',
+        },
       },
     });
 
@@ -57,6 +61,10 @@ describe('PublicGalleryPage', () => {
 
     expect(await screen.findByText('1 foto(s) publicadas para este evento.')).toBeInTheDocument();
     expect(getPublicGalleryMock).toHaveBeenCalledWith('casamento');
+    expect(screen.getByRole('link', { name: /encontrar minhas fotos/i })).toHaveAttribute(
+      'href',
+      'https://eventovivo.test/e/casamento/find-me',
+    );
 
     const image = screen.getByRole('img', { name: 'Noiva entrando na festa' });
     expect(image).toHaveAttribute('src', 'https://cdn.eventovivo.test/thumb.webp');
@@ -69,11 +77,16 @@ describe('PublicGalleryPage', () => {
       data: [],
       meta: {
         total: 0,
+        face_search: {
+          public_search_enabled: false,
+          find_me_url: null,
+        },
       },
     });
 
     renderPage();
 
     expect(await screen.findByText('Ainda nao existem imagens publicadas para esta galeria.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /encontrar minhas fotos/i })).not.toBeInTheDocument();
   });
 });

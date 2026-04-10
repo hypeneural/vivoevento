@@ -3,7 +3,9 @@ namespace App\Modules\Billing\Providers;
 
 use App\Modules\Billing\Actions\SyncEventEntitlementsAction;
 use App\Modules\Billing\Actions\SyncOrganizationEventEntitlementsAction;
+use App\Modules\Billing\Console\Commands\FinalizePeriodEndSubscriptionCancellationsCommand;
 use App\Modules\Billing\Console\Commands\PagarmeHomologationCommand;
+use App\Modules\Billing\Console\Commands\ReconcileRecurringBillingCommand;
 use App\Modules\Billing\Models\EventAccessGrant;
 use App\Modules\Billing\Models\EventPurchase;
 use App\Modules\Billing\Models\Subscription;
@@ -36,7 +38,9 @@ class BillingServiceProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole()) {
             $this->commands([
+                FinalizePeriodEndSubscriptionCancellationsCommand::class,
                 PagarmeHomologationCommand::class,
+                ReconcileRecurringBillingCommand::class,
             ]);
         }
 

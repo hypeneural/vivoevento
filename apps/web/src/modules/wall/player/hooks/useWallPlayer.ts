@@ -9,6 +9,7 @@ import {
   resolveWallPersistentStorage,
   writeWallHeartbeatMeta,
 } from '../heartbeat-storage';
+import { resolveWallRuntimeProfile } from '../runtime-profile';
 import { resolveWallCacheEnabled } from '../runtime-capabilities';
 import type { WallConnectionStatus, WallPlayerCommandPayload, WallRuntimeItem } from '../types';
 import { useWallEngine } from './useWallEngine';
@@ -90,6 +91,7 @@ export function useWallPlayer(code: string) {
     const snapshot = engineRef.current;
     const counts = countAssetsByStatus(snapshot.state.items);
     const cacheDiagnostics = await getWallCacheDiagnostics();
+    const runtimeProfile = resolveWallRuntimeProfile();
 
     try {
       await sendWallHeartbeat(code, {
@@ -123,6 +125,7 @@ export function useWallPlayer(code: string) {
         cache_hit_count: cacheDiagnostics.hitCount,
         cache_miss_count: cacheDiagnostics.missCount,
         cache_stale_fallback_count: cacheDiagnostics.staleFallbackCount,
+        ...runtimeProfile,
         last_sync_at: lastSyncAtRef.current,
         last_fallback_reason: snapshot.errorMessage ?? null,
       });

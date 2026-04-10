@@ -7,11 +7,13 @@ use App\Modules\FaceSearch\DTOs\FaceSearchMatchData;
 use App\Modules\FaceSearch\Models\EventFaceSearchSetting;
 use App\Modules\FaceSearch\Services\FaceSearchBackendInterface;
 use App\Modules\FaceSearch\Services\FaceSearchRouter;
+use App\Modules\FaceSearch\Services\FaceSearchTelemetryService;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use Aws\Command;
 use Aws\Exception\AwsException;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Mockery as m;
 
 it('routes to the configured aws backend when recognition is enabled', function () {
     $local = new class implements FaceSearchBackendInterface
@@ -231,7 +233,18 @@ it('falls back to local search when the aws primary fails with a transient provi
         public function deleteEventBackend(Event $event, EventFaceSearchSetting $settings): void {}
     };
 
-    $router = new FaceSearchRouter([$local, $aws]);
+    $telemetry = m::mock(FaceSearchTelemetryService::class);
+    $telemetry->shouldReceive('recordRouterFallbackTriggered')
+        ->once()
+        ->withArgs(function (Event $resolvedEvent, EventFaceSearchSetting $resolvedSettings, array $payload): bool {
+            return $resolvedEvent->exists === false
+                && $resolvedSettings->routing_policy === 'aws_primary_local_fallback'
+                && ($payload['primary_backend_key'] ?? null) === 'aws_rekognition'
+                && ($payload['response_backend_key'] ?? null) === 'local_pgvector'
+                && ($payload['primary_failure']['reason_code'] ?? null) === 'throttled';
+        });
+
+    $router = new FaceSearchRouter([$local, $aws], telemetry: $telemetry);
     $settings = new EventFaceSearchSetting(array_merge(
         EventFaceSearchSetting::defaultAttributes(),
         [

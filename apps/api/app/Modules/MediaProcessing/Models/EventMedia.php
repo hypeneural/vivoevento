@@ -6,12 +6,14 @@ use App\Modules\MediaProcessing\Enums\MediaDecisionSource;
 use App\Modules\MediaProcessing\Enums\MediaProcessingStatus;
 use App\Modules\MediaProcessing\Enums\ModerationStatus;
 use App\Modules\MediaProcessing\Enums\PublicationStatus;
+use App\Modules\MediaProcessing\Services\ModerationSearchDocumentBuilder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Schema;
 
 class EventMedia extends Model
 {
@@ -34,6 +36,7 @@ class EventMedia extends Model
         'checksum', 'processing_status', 'moderation_status',
         'publication_status', 'safety_status', 'face_index_status', 'vlm_status',
         'decision_source', 'decision_overridden_at', 'decision_overridden_by_user_id', 'decision_override_reason',
+        'moderation_search_document',
         'pipeline_version', 'last_pipeline_error_code', 'last_pipeline_error_message',
         'is_featured', 'sort_order', 'published_at',
     ];
@@ -54,6 +57,22 @@ class EventMedia extends Model
         'decision_overridden_at' => 'datetime',
         'published_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (EventMedia $media) {
+            if (! Schema::hasColumn('event_media', 'moderation_search_document')) {
+                return;
+            }
+
+            if (! $media->shouldRefreshModerationSearchDocument()) {
+                return;
+            }
+
+            $media->moderation_search_document = app(ModerationSearchDocumentBuilder::class)
+                ->buildForMedia($media);
+        });
+    }
 
     public function event(): BelongsTo
     {
@@ -138,6 +157,23 @@ class EventMedia extends Model
     public function displayFilename(): ?string
     {
         return $this->client_filename ?: $this->original_filename;
+    }
+
+    private function shouldRefreshModerationSearchDocument(): bool
+    {
+        if (! $this->exists || ! $this->moderation_search_document) {
+            return true;
+        }
+
+        return $this->isDirty([
+            'event_id',
+            'inbound_message_id',
+            'caption',
+            'title',
+            'source_label',
+            'original_filename',
+            'client_filename',
+        ]);
     }
 
     // ─── Scopes ────────────────────────────────────────────

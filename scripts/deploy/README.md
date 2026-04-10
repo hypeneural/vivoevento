@@ -19,7 +19,8 @@ Scripts versionados de deploy por release para a VPS de producao.
 2. criar `/var/www/eventovivo/shared/.env`
 3. executar `deploy.sh`
 4. validar o go-live base com `smoke-test.sh`
-5. se necessario, usar `rollback.sh`
+5. se o host participa do rollout de video do wall, rodar `scripts/ops/homologate-wall-video.sh`
+6. se necessario, usar `rollback.sh`
 
 ## Observacoes
 
@@ -31,6 +32,9 @@ Scripts versionados de deploy por release para a VPS de producao.
 - `healthcheck.sh` tambem valida `storage/app/public` quando a fase 1 usa
   `FILESYSTEM_DISK=public`
 - `smoke-test.sh` exige `/health/live` e `/health/ready` por padrao
+- `healthcheck.sh` valida `php artisan media:tooling-status` por padrao antes
+  do switch da release; use `REQUIRE_MEDIA_TOOLING=0` apenas se o host ainda
+  nao participa do rollout de video do wall
 - se a Cloudflare continuar servindo `/sw.js` ou chunks antigos como
   `CF-Cache-Status: HIT`, purgar o cache no painel antes de validar o navegador
 - `deploy.sh` e `rollback.sh` assumem que o usuario `deploy` tem acesso

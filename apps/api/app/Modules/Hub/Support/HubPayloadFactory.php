@@ -121,6 +121,7 @@ class HubPayloadFactory
     {
         $event->loadMissing(['modules', 'wallSettings']);
         $builderConfig = $this->builderConfig($event, $settings);
+        $links = $this->eventLinks->links($event)['links'];
 
         return [
             'event' => [
@@ -149,6 +150,11 @@ class HubPayloadFactory
                     ->filter(fn (array $button) => $button['is_visible'] && $button['is_available'] && $button['resolved_url'])
                     ->values()
                     ->all(),
+            ],
+            'face_search' => [
+                'public_search_enabled' => (bool) ($links['find_me']['enabled'] ?? false),
+                'find_me_url' => $links['find_me']['url'] ?? null,
+                'gallery_url' => $links['gallery']['url'] ?? null,
             ],
         ];
     }

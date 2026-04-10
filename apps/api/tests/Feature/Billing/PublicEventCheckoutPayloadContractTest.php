@@ -93,6 +93,8 @@ it('returns a semantic pending Pix summary for the public checkout payload', fun
     $statusResponse->assertJsonPath('data.checkout.summary.payment_status_label', 'Aguardando pagamento');
     $statusResponse->assertJsonPath('data.checkout.summary.next_action', 'complete_payment');
     $statusResponse->assertJsonPath('data.checkout.summary.is_waiting_payment', true);
+    $statusResponse->assertJsonPath('data.checkout.payment.meta.gateway_status', 'pending_payment');
+    $statusResponse->assertJsonPath('data.checkout.payment.meta.charge_status', 'pending_payment');
 });
 
 it('returns a semantic paid summary after the public checkout is confirmed', function () {
@@ -131,6 +133,8 @@ it('returns a semantic paid summary after the public checkout is confirmed', fun
     $confirmResponse->assertJsonPath('data.checkout.summary.next_action', 'open_event');
     $confirmResponse->assertJsonPath('data.checkout.summary.is_waiting_payment', false);
     $confirmResponse->assertJsonPath('data.checkout.summary.can_retry', false);
+    $confirmResponse->assertJsonPath('data.checkout.payment.meta.gateway_status', 'paid');
+    $confirmResponse->assertJsonPath('data.checkout.payment.meta.charge_status', 'paid');
 
     expect((string) $confirmResponse->json('data.checkout.summary.payment_status_description'))
         ->toContain('pacote')
@@ -228,6 +232,8 @@ it('returns a semantic failed summary when the credit card checkout is rejected'
     $response->assertJsonPath('data.checkout.summary.next_action', 'retry_payment');
     $response->assertJsonPath('data.checkout.summary.is_waiting_payment', false);
     $response->assertJsonPath('data.checkout.summary.can_retry', true);
+    $response->assertJsonPath('data.checkout.payment.meta.gateway_status', 'failed');
+    $response->assertJsonPath('data.checkout.payment.meta.charge_status', 'failed');
 
     expect($response->json('data.checkout.summary.payment_status_description'))->toBe('Nao autorizado');
 });

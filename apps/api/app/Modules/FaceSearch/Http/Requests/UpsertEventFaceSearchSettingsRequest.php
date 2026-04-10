@@ -70,14 +70,14 @@ class UpsertEventFaceSearchSettingsRequest extends FormRequest
             if ($searchBackend === 'aws_rekognition' && ! $recognitionEnabled) {
                 $validator->errors()->add(
                     'recognition_enabled',
-                    'O backend AWS Rekognition exige recognition_enabled=true para o evento.',
+                    'Para usar a AWS como busca principal, ligue a opcao de busca principal da AWS no evento.',
                 );
             }
 
             if ($searchBackend === 'aws_rekognition' && $awsRegion === '') {
                 $validator->errors()->add(
                     'aws_region',
-                    'Informe a regiao AWS quando o backend do evento for aws_rekognition.',
+                    'Informe a regiao da AWS quando o evento usar esse motor como busca principal.',
                 );
             }
         });

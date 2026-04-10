@@ -58,6 +58,7 @@ export const queryKeys = {
     feed: (filters: Record<string, unknown>) => [...queryKeys.media.feeds(), filters] as const,
     feedStats: (filters: Record<string, unknown>) => [...queryKeys.media.feeds(), 'stats', filters] as const,
     detail: (id: string) => [...queryKeys.media.all(), 'detail', id] as const,
+    duplicateCluster: (id: string) => [...queryKeys.media.detail(id), 'duplicates'] as const,
   },
 
   // Gallery

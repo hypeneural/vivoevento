@@ -40,9 +40,90 @@ Itens concluidos nesta rodada:
 - [x] adicionar chave estavel de scroll restoration para `/moderation`;
 - [x] corrigir o bloqueio de indice duplicado na migration `2026_04_09_192000_add_recurring_fields_to_payments_table.php` para destravar a suite.
 
+## Status da quarta entrega
+
+Itens concluidos nesta rodada:
+
+- [x] criar migration dedicada com indices compostos do feed de moderacao para `event_media`;
+- [x] adicionar indices GIN com `pg_trgm` para a busca multi-campo de `event_media` e `inbound_messages` no PostgreSQL;
+- [x] remover o `orWhereHas('inboundMessage')` do hot path da busca do `/media/feed`, trocando por `left join` direto;
+- [x] adicionar `prefetch` do proximo detalhe carregado a partir da midia focada;
+- [x] ampliar a cobertura com busca por `event title` e identidade do remetente no backend;
+- [x] ampliar a cobertura com teste de arquitetura para o prefetch do proximo detalhe no frontend.
+
+## Status da quinta entrega
+
+Itens concluidos nesta rodada:
+
+- [x] aplicar a migration de indices da moderacao no PostgreSQL local real;
+- [x] validar o caminho quente do feed com `EXPLAIN ANALYZE` a partir do proprio `ListModerationMediaQuery`;
+- [x] validar a busca por `event title` e `sender name` com `EXPLAIN ANALYZE` no PostgreSQL local;
+- [x] corrigir o nome explicito do indice de `publication_status + processing_status` para respeitar o limite real de 63 caracteres do PostgreSQL;
+- [x] validar, em sonda adicional, que a forma atual da busca ainda nao fecha naturalmente no GIN de `pg_trgm`;
+- [x] decidir, com base na primeira medicao real local, que `partial index` adicional ficava fora desta rodada e que `search document` so deveria subir se a busca estourasse o budget em volume maior.
+
+## Status da sexta entrega
+
+Itens concluidos nesta rodada:
+
+- [x] criar `ModerationFeedExplainAnalyzeService` para repetir o benchmark da moderacao em PostgreSQL real com `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)`;
+- [x] criar o comando `php artisan media:moderation-feed-explain` com budgets explicitos de `feed = 700ms` e `search = 500ms`;
+- [x] adicionar `--fail-on-budget` e `--output` para transformar a validacao de homolog em runbook repetivel;
+- [x] rerodar o benchmark local com a ferramenta nova e confirmar que a busca continua dentro do budget operacional;
+- [x] ampliar a cobertura com testes dedicados do service e do command.
+
+## Status da setima entrega
+
+Itens concluidos nesta rodada:
+
+- [x] confirmar que nao ha credencial/configuracao de homolog disponivel no workspace atual;
+- [x] confirmar que o `.env` local desta maquina aponta para `APP_ENV=local` com PostgreSQL em `127.0.0.1:5433`, nao para uma base homologada separada;
+- [x] adicionar modo transacional `--synthetic-media` ao comando para simular volume maior em PostgreSQL real sem persistir dados de benchmark;
+- [x] rodar sonda sintetica com `5.000` midias e confirmar que `search_sender_name_hot` passava de `500ms` na forma anterior;
+- [x] promover `search document` dedicado em `event_media.moderation_search_document`, com backfill e indice GIN `event_media_moderation_search_document_trgm_idx`;
+- [x] remover a busca por `OR` espalhado entre `event_media`, `events` e `inbound_messages` do hot path do `/media/feed`;
+- [x] adicionar `--disable-jit` ao benchmark, porque a sonda mostrou que JIT do PostgreSQL pode dominar a latencia de busca OLTP;
+- [x] rerodar a sonda de `5.000` midias com `search document` + `--disable-jit` e manter todos os cenarios dentro do budget.
+- [x] repetir a sonda local com `20.000` midias sinteticas e reabrir a decisao quando `search_event_title_hot` saiu de `500ms`;
+- [x] adicionar fast path para busca por titulo exato de evento, aplicando `event_id` antes do documento textual amplo;
+- [x] rerodar a sonda de `20.000` midias com o fast path e manter `feed` e `search` dentro dos budgets (`search_event_title_hot ~= 254ms`, `search_sender_name_hot ~= 30ms`).
+
+## Status da oitava entrega
+
+Itens concluidos nesta rodada:
+
+- [x] remover `ModerationPagination.tsx` e travar sua ausencia em teste de arquitetura;
+- [x] propagar `reason` no frontend para `reject` e `bulkReject`, mantendo o contrato pronto tambem para `approve` e `bulkApprove`;
+- [x] extrair helper `resolveNextPendingModerationItem()` para auto-advance deterministicamente alinhado a ordem visivel da fila;
+- [x] adicionar toggle de `auto-advance` no painel lateral;
+- [x] adicionar `Aprovar e proxima` no painel e `Shift + A` no teclado;
+- [x] adicionar dialog de reprovacao com motivos rapidos, motivo customizado e suporte a lote;
+- [x] ampliar a cobertura com testes de service, helper, painel e arquitetura do modulo.
+
+## Status da nona entrega
+
+Itens concluidos nesta rodada:
+
+- [x] criar endpoint dedicado `GET /media/{eventMedia}/duplicates` para revisar o cluster de duplicata no proprio fluxo da moderacao;
+- [x] criar `ListDuplicateClusterMediaQuery` com escopo por `event_id + duplicate_group_key`;
+- [x] criar endpoint dedicado `POST /media/{eventMedia}/undo-decision` com `UndoEventMediaDecisionAction`;
+- [x] devolver decisoes manuais desfeitas para `pending + draft`, limpando `decision_source` e metadados de override;
+- [x] adicionar a secao de cluster de duplicata no `ModerationReviewPanel` com abertura de item do grupo e acao `Rejeitar demais como duplicada`;
+- [x] adicionar toast `Desfazer` para acoes unitarias de `approve`, `reject`, `favorite` e `pin`;
+- [x] ampliar a cobertura com testes de feature, service, helper, painel e arquitetura para cluster + undo.
+
 Itens ainda pendentes deste plano:
 
-- [ ] revisar indices e busca textual com medicao real.
+- [ ] repetir `EXPLAIN ANALYZE` em ambiente homologado real quando houver credencial/configuracao disponivel;
+- [ ] validar a politica de JIT do PostgreSQL em homolog/producao para queries OLTP do painel.
+
+Comando recomendado para homolog:
+
+- `cd apps/api && php artisan media:moderation-feed-explain --disable-jit --fail-on-budget --output=storage/app/reports/moderation-feed-explain-homolog.json`
+
+Comando recomendado para sonda local de volume:
+
+- `cd apps/api && php artisan media:moderation-feed-explain --synthetic-media=20000 --disable-jit --fail-on-budget --output=storage/app/reports/moderation-feed-explain-synthetic-20000.json`
 
 Este plano responde 9 perguntas:
 
@@ -60,9 +141,14 @@ Este plano responde 9 perguntas:
 
 - `docs/architecture/moderation-page-current-state-analysis-2026-04-09.md`
 - `apps/api/app/Modules/MediaProcessing/Queries/ListModerationMediaQuery.php`
+- `apps/api/app/Modules/MediaProcessing/Queries/ListDuplicateClusterMediaQuery.php`
 - `apps/api/app/Modules/MediaProcessing/Http/Resources/EventMediaResource.php`
 - `apps/api/app/Modules/MediaProcessing/Services/MediaEffectiveStateResolver.php`
 - `apps/api/app/Modules/MediaProcessing/Services/MediaAssetUrlService.php`
+- `apps/api/app/Modules/MediaProcessing/Services/ModerationFeedExplainAnalyzeService.php`
+- `apps/api/app/Modules/MediaProcessing/Services/ModerationSearchDocumentBuilder.php`
+- `apps/api/app/Modules/MediaProcessing/Console/RunModerationFeedExplainCommand.php`
+- `apps/api/app/Modules/MediaProcessing/Actions/UndoEventMediaDecisionAction.php`
 - `apps/web/src/modules/moderation/ModerationPage.tsx`
 - `apps/web/src/modules/moderation/feed-utils.ts`
 - `apps/web/src/modules/moderation/components/ModerationVirtualGrid.tsx`
@@ -72,15 +158,27 @@ Este plano responde 9 perguntas:
 - `apps/web/src/lib/api.ts`
 - `apps/web/src/App.tsx`
 - `apps/web/src/app/routing/scroll-restoration.ts`
+- `apps/web/src/modules/moderation/moderation-architecture.test.ts`
 - `apps/api/tests/Feature/MediaProcessing/ModerationFeedCharacterizationTest.php`
+- `apps/api/tests/Feature/MediaProcessing/RunModerationFeedExplainCommandTest.php`
 - `apps/api/tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php`
+- `apps/api/tests/Unit/Modules/MediaProcessing/ModerationFeedExplainAnalyzeServiceTest.php`
+- `apps/api/tests/Unit/Modules/MediaProcessing/ModerationSearchDocumentBuilderTest.php`
 - `apps/api/tests/Unit/Modules/MediaProcessing/MediaAssetUrlServiceTest.php`
+- `apps/api/database/migrations/2026_04_09_230000_add_moderation_feed_indexes.php`
+- `apps/api/database/migrations/2026_04_09_232000_add_moderation_search_document_to_event_media.php`
 - `apps/web/src/lib/api.realtime.test.ts`
 - `apps/web/src/app/routing/router-architecture.test.ts`
 - `apps/web/src/app/routing/scroll-restoration.test.ts`
+- `apps/web/src/modules/moderation/services/moderation.service.test.ts`
 - `apps/web/src/modules/moderation/feed-utils.test.ts`
 - `apps/web/src/modules/moderation/components/ModerationReviewPanel.test.tsx`
 - `apps/web/src/modules/moderation/components/ModerationMediaSurface.test.tsx`
+
+## Referencias oficiais usadas nesta rodada
+
+- TanStack Query docs sobre `useMutation`, `onMutate` e rollback de optimistic updates:
+  - https://tanstack.com/query/latest/docs/framework/react/guides/optimistic-updates
 
 ## Validacao executada nesta rodada
 
@@ -88,10 +186,15 @@ Este plano responde 9 perguntas:
 
 - `apps/api/tests/Feature/MediaProcessing/ModerationFeedCharacterizationTest.php`
 - `apps/api/tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php`
+- `apps/api/tests/Feature/MediaProcessing/RunModerationFeedExplainCommandTest.php`
+- `apps/api/tests/Unit/Modules/MediaProcessing/ModerationFeedExplainAnalyzeServiceTest.php`
+- `apps/api/tests/Unit/Modules/MediaProcessing/ModerationSearchDocumentBuilderTest.php`
 - `apps/api/tests/Unit/Modules/MediaProcessing/MediaAssetUrlServiceTest.php`
 - `apps/web/src/lib/api.realtime.test.ts`
 - `apps/web/src/app/routing/router-architecture.test.ts`
+- `apps/web/src/modules/moderation/services/moderation.service.test.ts`
 - `apps/web/src/modules/moderation/feed-utils.test.ts`
+- `apps/web/src/modules/moderation/moderation-architecture.test.ts`
 
 ### Comandos executados
 
@@ -122,6 +225,32 @@ Frontend:
   - `PASS`
 - `cd apps/web && npm.cmd run type-check`
   - `PASS`
+- `cd apps/web && npm.cmd run test -- src/modules/moderation/services/moderation.service.test.ts src/modules/moderation/feed-utils.test.ts src/modules/moderation/components/ModerationReviewPanel.test.tsx src/modules/moderation/moderation-architecture.test.ts`
+  - `4 arquivos`
+  - `19 testes`
+  - `PASS`
+- `cd apps/web && npm.cmd run type-check`
+  - `PASS`
+- `cd apps/api && php artisan test tests/Feature/MediaProcessing/ModerationMediaTest.php tests/Feature/MediaProcessing/EventMediaListTest.php tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php`
+  - `21 testes`
+  - `336 assertions`
+  - `PASS`
+
+Frontend:
+
+- `cd apps/web && npm.cmd run test -- src/modules/moderation/services/moderation.service.test.ts src/modules/moderation/feed-utils.test.ts src/modules/moderation/components/ModerationReviewPanel.test.tsx src/modules/moderation/moderation-architecture.test.ts`
+  - `4 arquivos`
+  - `24 testes`
+  - `PASS`
+- `cd apps/web && npm.cmd run type-check`
+  - `PASS`
+
+Backend:
+
+- `cd apps/api && php artisan test tests/Feature/MediaProcessing/ModerationMediaTest.php tests/Feature/MediaProcessing/EventMediaListTest.php tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php`
+  - `24 testes`
+  - `365 assertions`
+  - `PASS`
 
 Backend:
 
@@ -139,6 +268,54 @@ Frontend:
 - `cd apps/web && npm.cmd run test -- src/lib/api.realtime.test.ts src/modules/moderation/services/moderation.service.test.ts src/modules/moderation/feed-utils.test.ts src/modules/moderation/components/ModerationReviewPanel.test.tsx src/modules/moderation/components/ModerationMediaSurface.test.tsx src/app/routing/router-architecture.test.ts src/app/routing/scroll-restoration.test.ts`
   - `7 arquivos`
   - `19 testes`
+  - `PASS`
+- `cd apps/web && npm.cmd run test -- src/lib/api.realtime.test.ts src/modules/moderation/services/moderation.service.test.ts src/modules/moderation/feed-utils.test.ts src/modules/moderation/components/ModerationReviewPanel.test.tsx src/modules/moderation/components/ModerationMediaSurface.test.tsx src/modules/moderation/moderation-architecture.test.ts src/app/routing/router-architecture.test.ts src/app/routing/scroll-restoration.test.ts`
+  - `8 arquivos`
+  - `21 testes`
+  - `PASS`
+- `cd apps/web && npm.cmd run type-check`
+  - `PASS`
+
+Backend:
+
+- `cd apps/api && php artisan test tests/Feature/MediaProcessing/ModerationFeedCharacterizationTest.php tests/Feature/MediaProcessing/ModerationMediaTest.php tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php tests/Unit/Modules/MediaProcessing/MediaAssetUrlServiceTest.php tests/Feature/MediaProcessing/EventMediaListTest.php tests/Feature/MediaProcessing/MediaPipelineJobsTest.php`
+  - `37 testes`
+  - `416 assertions`
+  - `2 falhas laterais em MediaPipelineJobsTest.php`
+- `cd apps/api && php artisan media:moderation-feed-explain`
+  - `PASS`
+  - busca continua dentro do budget local de `500ms`
+  - `search_document.promote = no`
+- `cd apps/api && php artisan test tests/Feature/MediaProcessing/RunModerationFeedExplainCommandTest.php tests/Unit/Modules/MediaProcessing/ModerationFeedExplainAnalyzeServiceTest.php tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php tests/Feature/MediaProcessing/ModerationFeedCharacterizationTest.php tests/Feature/MediaProcessing/ModerationMediaTest.php tests/Unit/Modules/MediaProcessing/MediaAssetUrlServiceTest.php tests/Feature/MediaProcessing/EventMediaListTest.php`
+  - `33 testes`
+  - `388 assertions`
+  - `PASS`
+- `cd apps/api && php artisan media:moderation-feed-explain --synthetic-media=5000 --disable-jit --fail-on-budget --output=storage/app/reports/moderation-feed-explain-synthetic-5000-search-document-disable-jit.json`
+  - `PASS`
+  - `search_sender_name_hot ~= 56ms`
+  - `search_document.promote = no` apos a promocao do documento dedicado
+- `cd apps/api && php artisan media:moderation-feed-explain --synthetic-media=20000 --disable-jit --fail-on-budget --output=storage/app/reports/moderation-feed-explain-synthetic-20000-search-document-disable-jit.json`
+  - `FAIL` antes do fast path de titulo exato
+  - `search_event_title_hot` saiu do budget de `500ms`
+  - decisao correta apos ajuste do comando: `search_document.present = yes`, `search_document.promote = no`, `search_document.requires_follow_up = yes`
+- `cd apps/api && php artisan media:moderation-feed-explain --synthetic-media=20000 --disable-jit --fail-on-budget --output=storage/app/reports/moderation-feed-explain-synthetic-20000-search-document-event-title-fast-path.json`
+  - `PASS`
+  - `search_event_title_hot ~= 254ms`
+  - `search_sender_name_hot ~= 30ms`
+  - `search_document.requires_follow_up = no`
+- `cd apps/api && php artisan media:moderation-feed-explain --disable-jit --fail-on-budget --output=storage/app/reports/moderation-feed-explain-local-event-title-fast-path.json`
+  - `PASS`
+  - dataset local real segue dentro do budget depois do fast path
+- `cd apps/api && php artisan media:moderation-feed-explain --disable-jit --fail-on-budget --output=storage/app/reports/moderation-feed-explain-current-env.json`
+  - `PASS`
+  - ambiente efetivo desta maquina continua `APP_ENV=local`, `DB_HOST=127.0.0.1`, `DB_PORT=5433`, `DB_DATABASE=eventovivo`
+- `cd apps/api && php artisan test tests/Feature/MediaProcessing/ModerationFeedCharacterizationTest.php tests/Unit/Modules/MediaProcessing/ModerationFeedExplainAnalyzeServiceTest.php tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php`
+  - `11 testes`
+  - `68 assertions`
+  - `PASS`
+- `cd apps/api && php artisan test tests/Feature/MediaProcessing/RunModerationFeedExplainCommandTest.php tests/Unit/Modules/MediaProcessing/ModerationFeedExplainAnalyzeServiceTest.php tests/Unit/Modules/MediaProcessing/ModerationSearchDocumentBuilderTest.php tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php tests/Feature/MediaProcessing/ModerationFeedCharacterizationTest.php tests/Feature/MediaProcessing/ModerationMediaTest.php tests/Unit/Modules/MediaProcessing/MediaAssetUrlServiceTest.php tests/Feature/MediaProcessing/EventMediaListTest.php`
+  - `35 testes`
+  - `398 assertions`
   - `PASS`
 
 ### Leituras oficiais validadas
@@ -171,6 +348,8 @@ TanStack Query:
   - o cache sincronico ajuda scroll restoration quando o layout fica estavel e os dados continuam disponiveis.
 - `https://tanstack.com/query/latest/docs/framework/react/guides/request-waterfalls`
   - waterfalls devem ser achatados por contrato de leitura melhor ou por `prefetch`.
+- `https://tanstack.com/query/latest/docs/framework/react/guides/prefetching`
+  - `prefetchQuery` respeita `staleTime` e serve para aquecer detalhes antes da navegacao real.
 
 MDN:
 
@@ -201,8 +380,14 @@ PostgreSQL:
 - `https://www.postgresql.org/docs/current/indexes-partial.html`
   - partial index so compensa quando o predicado casa de forma reconhecivel com o `WHERE` real.
   - clausulas parametrizadas nao costumam casar bem com a implicacao de predicado.
+- `https://www.postgresql.org/docs/current/pgtrgm.html`
+  - `pg_trgm` suporta aceleracao de `LIKE`/`ILIKE` e comparacoes por similaridade com GIN/GiST.
 - `https://www.postgresql.org/docs/current/using-explain.html`
   - `EXPLAIN ANALYZE` executa a query de verdade e e a base para validar plano e custo real.
+- `https://www.postgresql.org/docs/current/jit-decision.html`
+  - JIT tende a beneficiar queries longas/analiticas, mas pode custar mais do que economiza em queries curtas.
+- `https://www.postgresql.org/docs/current/jit-configuration.html`
+  - `jit`, `jit_above_cost`, `jit_inline_above_cost` e `jit_optimize_above_cost` controlam quando o PostgreSQL compila a query.
 - `https://www.postgresql.org/docs/current/auto-explain.html`
   - `auto_explain` permite registrar planos de queries lentas em producao com rollout controlado.
 

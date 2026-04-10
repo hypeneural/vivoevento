@@ -40,6 +40,8 @@ class EventWallSetting extends Model
         'selection_policy',
         'accepted_orientation',
         'video_enabled',
+        'public_upload_video_enabled',
+        'private_inbound_video_enabled',
         'video_playback_mode',
         'video_max_seconds',
         'video_resume_mode',
@@ -74,6 +76,8 @@ class EventWallSetting extends Model
         'selection_policy' => 'array',
         'accepted_orientation' => WallAcceptedOrientation::class,
         'video_enabled' => 'boolean',
+        'public_upload_video_enabled' => 'boolean',
+        'private_inbound_video_enabled' => 'boolean',
         'video_max_seconds' => 'integer',
         'show_qr' => 'boolean',
         'show_branding' => 'boolean',
@@ -118,6 +122,14 @@ class EventWallSetting extends Model
 
             if ($setting->video_enabled === null) {
                 $setting->video_enabled = (bool) config('media_processing.wall_video.enabled', true);
+            }
+
+            if ($setting->public_upload_video_enabled === null) {
+                $setting->public_upload_video_enabled = (bool) config('media_processing.public_upload.video_enabled', true);
+            }
+
+            if ($setting->private_inbound_video_enabled === null) {
+                $setting->private_inbound_video_enabled = (bool) config('media_processing.private_inbound.video_enabled', true);
             }
 
             if (empty($setting->video_playback_mode)) {
@@ -256,6 +268,24 @@ class EventWallSetting extends Model
     public function resolvedVideoEnabled(): bool
     {
         return (bool) ($this->video_enabled ?? config('media_processing.wall_video.enabled', true));
+    }
+
+    public function resolvedPublicUploadVideoEnabled(): bool
+    {
+        if (! $this->resolvedVideoEnabled()) {
+            return false;
+        }
+
+        return (bool) ($this->public_upload_video_enabled ?? config('media_processing.public_upload.video_enabled', true));
+    }
+
+    public function resolvedPrivateInboundVideoEnabled(): bool
+    {
+        if (! $this->resolvedVideoEnabled()) {
+            return false;
+        }
+
+        return (bool) ($this->private_inbound_video_enabled ?? config('media_processing.private_inbound.video_enabled', true));
     }
 
     public function resolvedVideoPlaybackMode(): string

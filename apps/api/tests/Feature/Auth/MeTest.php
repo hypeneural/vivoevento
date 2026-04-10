@@ -118,6 +118,51 @@ it('returns the global super-admin role even with organization membership', func
     expect($response->json('data.user.role.key'))->toBe('super-admin');
 });
 
+it('characterizes that /auth/me collapses a multi-organization user into a single current organization', function () {
+    $this->seedPermissions();
+
+    $organizationA = $this->createOrganization([
+        'trade_name' => 'Organizacao Principal',
+    ]);
+
+    $organizationB = $this->createOrganization([
+        'trade_name' => 'Segunda Organizacao',
+    ]);
+
+    $user = $this->createUser([
+        'email' => 'multi-org@eventovivo.test',
+        'phone' => '5511999001122',
+    ]);
+
+    \App\Modules\Organizations\Models\OrganizationMember::query()->create([
+        'organization_id' => $organizationA->id,
+        'user_id' => $user->id,
+        'role_key' => 'partner-manager',
+        'is_owner' => false,
+        'status' => 'active',
+        'joined_at' => now(),
+    ]);
+
+    \App\Modules\Organizations\Models\OrganizationMember::query()->create([
+        'organization_id' => $organizationB->id,
+        'user_id' => $user->id,
+        'role_key' => 'partner-manager',
+        'is_owner' => false,
+        'status' => 'active',
+        'joined_at' => now(),
+    ]);
+
+    $user->assignRole('partner-manager');
+    $this->actingAs($user);
+
+    $response = $this->apiGet('/auth/me');
+
+    $this->assertApiSuccess($response);
+
+    expect($response->json('data.organization.id'))->toBe($organizationA->id);
+    expect($response->json('data.organization.name'))->toBe('Organizacao Principal');
+});
+
 it('maps subscription code and feature flags using the real plan schema', function () {
     [$user, $organization] = $this->actingAsOwner();
 

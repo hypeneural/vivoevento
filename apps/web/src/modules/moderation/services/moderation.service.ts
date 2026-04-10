@@ -26,12 +26,28 @@ export const moderationService = {
     return api.get<ApiEventMediaDetail>(`/media/${mediaId}`, { signal });
   },
 
-  async approve(mediaId: number | string) {
-    return api.post<ApiEventMediaItem>(`/media/${mediaId}/approve`);
+  async listDuplicateCluster(mediaId: number | string, signal?: AbortSignal) {
+    return api.get<ApiEventMediaItem[]>(`/media/${mediaId}/duplicates`, { signal });
   },
 
-  async reject(mediaId: number | string) {
-    return api.post<ApiEventMediaItem>(`/media/${mediaId}/reject`);
+  async approve(mediaId: number | string, reason?: string) {
+    return api.post<ApiEventMediaItem>(`/media/${mediaId}/approve`, {
+      body: {
+        reason,
+      },
+    });
+  },
+
+  async reject(mediaId: number | string, reason?: string) {
+    return api.post<ApiEventMediaItem>(`/media/${mediaId}/reject`, {
+      body: {
+        reason,
+      },
+    });
+  },
+
+  async undoDecision(mediaId: number | string) {
+    return api.post<ApiEventMediaItem>(`/media/${mediaId}/undo-decision`);
   },
 
   async updateFavorite(mediaId: number | string, isFeatured: boolean) {
@@ -60,15 +76,15 @@ export const moderationService = {
     return api.delete<ApiEventMediaItem>(`/media/${mediaId}/sender-block`);
   },
 
-  async bulkApprove(ids: number[]) {
+  async bulkApprove(ids: number[], reason?: string) {
     return api.post<ModerationBulkActionResponse>('/media/bulk/approve', {
-      body: { ids },
+      body: { ids, reason },
     });
   },
 
-  async bulkReject(ids: number[]) {
+  async bulkReject(ids: number[], reason?: string) {
     return api.post<ModerationBulkActionResponse>('/media/bulk/reject', {
-      body: { ids },
+      body: { ids, reason },
     });
   },
 

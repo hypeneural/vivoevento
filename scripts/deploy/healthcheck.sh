@@ -3,6 +3,7 @@ set -Eeuo pipefail
 IFS=$'\n\t'
 
 PHP_BIN="${PHP_BIN:-php}"
+REQUIRE_MEDIA_TOOLING="${REQUIRE_MEDIA_TOOLING:-1}"
 
 usage() {
     cat <<'EOF'
@@ -45,6 +46,10 @@ LANDING_ENV_FILE="$LANDING_DIR/.env.production.local"
 (
     cd "$API_DIR"
     "$PHP_BIN" artisan about >/dev/null
+
+    if [[ "$REQUIRE_MEDIA_TOOLING" == "1" ]]; then
+        "$PHP_BIN" artisan media:tooling-status >/dev/null
+    fi
 )
 
 # The app still uses public storage in parts of the pipeline. The deploy must

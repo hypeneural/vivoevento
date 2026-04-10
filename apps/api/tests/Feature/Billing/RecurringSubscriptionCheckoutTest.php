@@ -146,7 +146,7 @@ it('creates a pagarme recurring subscription checkout using gateway plan custome
             && $request->url() === 'https://api.pagar.me/core/v5/subscriptions'
             && data_get($request->data(), 'plan_id') === 'plan_recurring_123'
             && data_get($request->data(), 'customer_id') === 'cus_recurring_123'
-            && data_get($request->data(), 'card.card_id') === 'card_recurring_123'
+            && data_get($request->data(), 'card_id') === 'card_recurring_123'
             && data_get($request->data(), 'installments') === 1;
     });
 });

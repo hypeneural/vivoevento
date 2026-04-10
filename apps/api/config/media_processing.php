@@ -23,4 +23,8 @@ return [
         ),
         'accept_hint' => env('PUBLIC_UPLOAD_ACCEPT_HINT', 'image/*,video/mp4,video/quicktime'),
     ],
+
+    'private_inbound' => [
+        'video_enabled' => env('PRIVATE_INBOUND_VIDEO_ENABLED', true),
+    ],
 ];

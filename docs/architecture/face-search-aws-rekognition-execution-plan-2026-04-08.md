@@ -71,32 +71,70 @@ Este plano existe para responder 7 perguntas de execucao:
 - [x] validacao funcional de produto documentada para toggle por evento, reindex do acervo legado e latencia real observada apos envio da selfie.
 - [x] primeiro corte de user vectors AWS implementado com readiness gate, `CreateUser`, `AssociateFaces`, `SearchUsersByImage` e fallback seguro para `faces`.
 - [x] comando operacional `face-search:validate-aws-users-high-cardinality` implementado com criterio objetivo de latencia, fallback, resolucao de `users` e taxa de match.
-- [ ] ainda falta rodar esse comando em um evento real com massa na faixa de `2000` users prontos; o inventario local de `2026-04-09` ainda nao trouxe candidato acima de `4` registros AWS pesquisaveis e `0` `user_id` distintos.
+- [x] defaults do comando reparados para o corte homolog/prod-like atual de `~30 users` prontos.
+- [x] validacao limitada da pasta `FINAL` executada em evento tecnico `349`, registrando achados operacionais reais e um report versionado.
+- [x] rodada real de `users` executada em evento tecnico multi-identidade `354`, com `LFW` exportado em `30` identidades.
+- [x] validacao final de `users` passou em collection limpa com `ready_users=25`, `users_mode_resolution_rate=1.0`, `fallback_rate=0`, `top_1_match_rate=0.95`, `top_k_match_rate=0.95` e `p95_response_duration_ms=482`.
+- [x] observabilidade curta do FaceSearch endurecida com logs estruturados para `query.completed`, `query.validation_failed`, `query.failed`, `router.fallback_triggered`, `router.shadow_failed` e `aws.operation_failed`.
+- [ ] ainda e recomendado repetir a rodada em um evento organico antes do rollout amplo final, mas o gating tecnico de `~30 users` ja foi fechado.
 
 Ultima bateria executada:
 
 - comando:
   - `php artisan test tests/Feature/Events/CreateEventTest.php tests/Feature/FaceSearch tests/Unit/FaceSearch`
 - resultado:
-  - `156 passed`
+  - `158 passed`
   - `7 skipped`
-  - `1140 assertions`
+  - `1152 assertions`
 - leitura:
   - a rodada final incluiu o `CRUD` de `Events` para validar persistencia do toggle base de `FaceSearch` no create/update do evento;
-  - a trilha `H1 + H2 + H3 + H4 + H5 + H6 + H7-T1 + H7-T2` continuou estavel depois da entrada da validacao operacional de alta cardinalidade para `users`;
+  - a trilha `H1 + H2 + H3 + H4 + H5 + H6 + H7-T1 + H7-T2` continuou estavel depois da entrada da validacao operacional real de `users`, do rebuild limpo da collection tecnica e da telemetria estruturada do FaceSearch;
   - os `7 skipped` continuam sendo apenas os contratos TDD AWS em modo opt-in;
-  - a regressao ampla do modulo permaneceu totalmente verde nesta rodada, incluindo user vectors, `SearchUsersByImage`, backfill legado automatico e o novo comando `face-search:validate-aws-users-high-cardinality`.
+  - a regressao ampla do modulo permaneceu totalmente verde nesta rodada, incluindo user vectors, `SearchUsersByImage`, backfill legado automatico, o guard rail para `provider_key=noop`, o novo perfil default de `~30 users` no comando `face-search:validate-aws-users-high-cardinality` e os logs estruturados da trilha de busca;
+  - os casos idempotentes esperados da AWS (`ResourceAlreadyExistsException`, `ConflictException` em `CreateUser` e `ResourceNotFoundException` em `DeleteCollection`) nao geram falso `aws.operation_failed`.
+
+Bateria de contratos AWS opt-in executada:
+
+- comando:
+  - `$env:RUN_FACE_SEARCH_AWS_TDD='1'; php artisan test tests/Unit/FaceSearch/FaceSearchAwsConfigContractTest.php tests/Unit/FaceSearch/AwsRekognitionClientFactoryContractTest.php tests/Unit/FaceSearch/FaceSearchRouterContractTest.php tests/Unit/FaceSearch/SelfiePreflightServiceContractTest.php tests/Feature/FaceSearch/FaceSearchAwsSettingsContractTest.php tests/Unit/FaceSearch/SearchFacesBySelfieAwsArchitectureContractTest.php tests/Unit/FaceSearch/FaceSearchProviderRecordContractTest.php`
+- resultado:
+  - `7 passed`
+  - `42 assertions`
+- leitura:
+  - os contratos arquiteturais AWS continuam verdes quando a bateria opt-in e explicitamente ligada.
 
 Bateria frontend executada:
 
 - comandos:
   - `npm run type-check`
-  - `npx.cmd vitest run src/modules/events/components/face-search`
+  - `npx.cmd vitest run src/modules/events/components/face-search/EventFaceSearchSettingsCard.test.tsx src/modules/events/components/face-search/EventFaceSearchSettingsForm.test.tsx`
 - resultado:
   - `type-check = PASS`
   - `EventFaceSearchSettingsForm.test.tsx + EventFaceSearchSettingsCard.test.tsx = 7 passed`
 - leitura:
   - o painel agora aceita o contrato AWS por evento e expoe operacao de `health/reindex/reconcile/delete collection` sem quebrar tipagem nem fluxo do form.
+
+Bateria executada para validar a lista final de faltantes de UX e produto:
+
+- backend:
+  - `php artisan test tests/Feature/Events/CreateEventTest.php tests/Feature/FaceSearch/FaceSearchSettingsTest.php tests/Feature/FaceSearch/FaceSearchSelfieEndpointsTest.php`
+  - resultado:
+    - `34 passed`
+    - `306 assertions`
+- frontend:
+  - `npx.cmd vitest run src/modules/face-search/face-search-product-ux-characterization.test.ts src/modules/events/components/face-search/EventFaceSearchSettingsCard.test.tsx src/modules/events/components/face-search/EventFaceSearchSettingsForm.test.tsx src/modules/face-search/components/FaceSearchSearchPanel.test.tsx src/modules/face-search/components/EventFaceSearchSearchCard.test.tsx src/modules/face-search/PublicFaceSearchPage.test.tsx`
+  - resultado:
+    - `15 passed`
+- type-check:
+  - `npm.cmd run type-check`
+  - resultado:
+    - `PASS`
+- leitura:
+  - a rodada confirmou em codigo e teste que:
+    - o CRUD simples do evento ja persiste a camada basica de `FaceSearch`;
+    - a busca interna e publica por selfie ja existem no frontend;
+    - naquele recorte, a galeria e o hub publicos ainda nao chamavam diretamente a experiencia `Encontrar minhas fotos`;
+    - naquele recorte, o editor simples ainda usava a linguagem `Busca por selfie`.
 
 Bateria executada apos a validacao funcional de produto:
 
@@ -1493,7 +1531,8 @@ Status atual:
   - `search_mode_resolved`
   - `search_mode_fallback_reason`
 - [x] validacao operacional ganhou um comando dedicado para `users` com relatorio estruturado e thresholds objetivos.
-- [ ] ainda falta rodar esse comando em um evento real na faixa de `2000` users prontos antes de liberar rollout amplo.
+- [x] a rodada tecnica de `users` ja passou no corte atual de `~30 users` com report versionado e collection limpa.
+- [ ] ainda vale repetir essa rodada em um evento organico antes do rollout amplo.
 
 Objetivo:
 
@@ -1520,6 +1559,15 @@ Definicao de pronto:
 Status atual:
 
 - [x] comando `face-search:validate-aws-users-high-cardinality` criado.
+- [x] defaults do comando agora nascem alinhados ao corte homolog/prod-like atual de `~30 users`:
+  - `sample_users=20`
+  - `min_ready_users=20`
+  - `target_ready_users=30`
+  - `max_fallback_rate=0.05`
+  - `min_users_mode_resolution_rate=0.95`
+  - `min_top1_match_rate=0.85`
+  - `min_topk_match_rate=0.95`
+  - `max_p95_latency_ms=1500`
 - [x] a rodada agora mede por relatorio:
   - `ready_user_count`
   - `users_mode_resolution_rate`
@@ -1537,15 +1585,120 @@ Status atual:
   - `min_top1_match_rate`
   - `min_topk_match_rate`
   - `max_p95_latency_ms`
-- [ ] inventario local de `2026-04-09` ainda nao trouxe um candidato real de alta cardinalidade:
-  - evento `330`: `4` registros AWS pesquisaveis, `0` `user_id` distintos
-  - evento `346`: `4` registros AWS pesquisaveis, `0` `user_id` distintos
-  - evento `348`: `4` registros AWS pesquisaveis, `0` `user_id` distintos
-- [ ] a rodada real com acervo na faixa de `2000` users continua pendente de ambiente com massa suficiente.
+- [x] guard rail operacional novo:
+  - a validacao agora aborta cedo com `skipped_reason=local_baseline_provider_noop` quando o evento usa fallback/shadow local, mas `provider_key=noop`
+  - isso evita rodar `users` sobre um lane em que a baseline local esta morta no nascimento
+- [x] validacao limitada usando a pasta `C:\Users\Usuario\Desktop\ddddd\FINAL`:
+  - inventario da pasta:
+    - `963` arquivos
+    - extensao unica: `.jpg`
+    - volume total aproximado: `6.19 GB`
+    - tamanho medio aproximado: `6.42 MB`
+    - prefixo de nome dominante: `Natali`
+  - leitura:
+    - o dataset serve para validacao operacional limitada de importacao/indexacao
+    - ele nao serve como evidencia de `~30 users` porque e mono-identidade e ainda inclui imagens sem rosto elegivel
+  - evento tecnico criado:
+    - `event_id=349`
+    - titulo: `FaceSearch FINAL limited validation 40`
+    - collection AWS: `eventovivo-face-search-event-349`
+  - report real:
+    - `apps/api/storage/app/private/face-search-users-high-cardinality/20260409-195741-face-search-aws-users-high-cardinality.json`
+    - `status=skipped`
+    - `skipped_reason=no_ready_user_vectors`
+  - estado consolidado apos a rodada:
+    - `provider_records=15`
+    - `aws_searchable_records=0`
+    - `aws_user_ids=0`
+    - `local_faces=7`
+    - `local_searchable_faces=0`
+- [x] evento tecnico multi-identidade `354` criado a partir de `LFW`:
+  - export:
+    - `30` identidades
+    - `6` imagens por identidade
+    - manifest: `apps/api/storage/app/face-search-datasets/lfw/20260409-205710-lfw/manifest.json`
+  - primeira rodada real positiva apos recalibracao de gate:
+    - report: `apps/api/storage/app/private/face-search-users-validation-seed/20260409-213046-lfw-users-validation-30-q015.json`
+    - `aws_searchable=190`
+    - `ready_count=25`
+  - primeira validacao em collection reaproveitada:
+    - report: `apps/api/storage/app/private/face-search-users-high-cardinality/20260409-213831-face-search-aws-users-high-cardinality.json`
+    - leitura:
+      - `users_mode_resolution_rate=1.0`
+      - `fallback_rate=0`
+      - `p95_response_duration_ms=423`
+      - `top_1_match_rate=0.40`
+      - `top_k_match_rate=0.75`
+      - o problema nao era latencia; era drift de collection/reassociacao depois de varias recalibracoes no mesmo evento
+  - rebuild limpo da collection e rerodada final:
+    - seed report: `apps/api/storage/app/private/face-search-users-validation-seed/20260409-214357-lfw-users-validation-30-clean-q015.json`
+    - report final de validacao: `apps/api/storage/app/private/face-search-users-high-cardinality/20260409-214510-face-search-aws-users-high-cardinality.json`
+    - metricas finais:
+      - `ready_users=25`
+      - `users_mode_resolution_rate=1.0`
+      - `fallback_rate=0`
+      - `top_1_match_rate=0.95`
+      - `top_k_match_rate=0.95`
+      - `p95_response_duration_ms=482`
+      - `passed=true`
+- [x] aprendizado operacional novo:
+  - se o evento passou por varias recalibracoes de gate ou reindexs pesados durante a validacao de `users`, a collection deve ser recriada antes da rodada final
+  - na pratica:
+    - `delete collection`
+    - `reindex`
+    - `sync user vectors`
+    - so depois `validate-aws-users-high-cardinality`
+- [x] observabilidade curta do fluxo ponta a ponta reforcada:
+  - canal: `storage/logs/queue-telemetry-YYYY-MM-DD.log`
+  - eventos novos:
+    - `face_search.query.completed`
+    - `face_search.query.validation_failed`
+    - `face_search.query.failed`
+    - `face_search.router.fallback_triggered`
+    - `face_search.router.shadow_failed`
+    - `face_search.aws.operation_failed`
+  - campos praticos:
+    - `event_id`
+    - `face_search_request_id`
+    - `face_search_query_id`
+    - `routing_policy`
+    - `primary_backend_key`
+    - `response_backend_key`
+    - `search_mode_requested`
+    - `search_mode_resolved`
+    - `response_duration_ms`
+  - ruido operacional evitado:
+    - `ResourceAlreadyExistsException` em `CreateCollection`
+    - `ConflictException` em `CreateUser`
+    - `ResourceNotFoundException` em `DeleteCollection`
+    - esses casos continuam sendo tratados como idempotencia esperada, nao falha real de AWS
+- [ ] o inventario organico local de `2026-04-09` ainda nao trouxe um candidato real acima de `4` registros AWS pesquisaveis, entao a rodada final ficou tecnicamente fechada em dataset multi-identidade controlado, nao em galeria organica.
 
 Objetivo:
 
 - fechar a liberacao de `users` com criterio operacional objetivo, nao por impressao visual.
+
+Linha operacional homolog/prod-like atual (`~30 users`):
+
+1. precondicoes minimas antes do comando:
+   - `enabled=true`
+   - `recognition_enabled=true`
+   - `search_backend_key=aws_rekognition`
+   - `aws_search_mode=users`
+   - se `routing_policy` usar fallback/shadow local, `provider_key` precisa ser `compreface`, nunca `noop`
+2. preparo de acervo:
+   - deixar o backfill/reindex do evento concluir
+   - rodar `reconcile` do evento antes da amostra final
+   - observar que `SyncAwsUserVectorJob` ja e disparado automaticamente pelo `IndexMediaFacesJob` e pelo `ReconcileAwsCollectionJob`
+3. linha exata recomendada para a rodada:
+   - `php artisan face-search:validate-aws-users-high-cardinality <event_id> --sample-users=20 --min-ready-users=20 --target-ready-users=30 --max-fallback-rate=0.05 --min-users-mode-resolution-rate=0.95 --min-top1-match-rate=0.85 --min-topk-match-rate=0.95 --max-p95-latency-ms=1500`
+4. observacao:
+   - a chamada curta `php artisan face-search:validate-aws-users-high-cardinality <event_id>` hoje ja aplica exatamente esse mesmo perfil default
+5. quando houver recalibracao forte antes da rodada final:
+   - recriar a collection do evento
+   - rerodar `reindex`
+   - deixar o `SyncAwsUserVectorJob` convergir
+   - so depois capturar o report final
 
 Subtarefas:
 
@@ -1567,7 +1720,8 @@ Definicao de pronto:
   - `fallback_rate` dentro do threshold acordado;
   - `top_1_match_rate` e `top_k_match_rate` dentro do threshold acordado;
   - `p95_response_duration_ms` dentro do threshold acordado;
-  - `target_ready_users` atendido quando o produto exigir validacao na faixa de `2000` pessoas.
+  - `min_ready_users` atendido no corte homolog/prod-like atual de `~30` pessoas;
+  - se o produto depois quiser certificacao de escala maior, a mesma rodada deve ser repetida com override explicito para `100`/`200+` users ou acima.
 
 ---
 
@@ -1975,14 +2129,20 @@ Validacao funcional de produto em `2026-04-09`:
 - limite desta validacao:
   - o recorte real mais recente ainda foi feito em `3` eventos piloto pequenos;
   - ele prova que o caminho de busca por `faces` esta rapido e estavel quando o acervo ja esta indexado;
-  - ele ainda nao certifica com a mesma evidencia uma galeria unica com aproximadamente `2000` pessoas pesquisaveis no mesmo evento;
-  - para afirmar isso com seguranca, ainda falta um soak real dedicado de alta cardinalidade.
+  - para `users`, agora ja existe uma rodada tecnica positiva em dataset multi-identidade controlado:
+    - evento `354`
+    - `25` ready users
+    - `top_1_match_rate=0.95`
+    - `top_k_match_rate=0.95`
+    - `p95_response_duration_ms=482`
+  - a rodada tecnica do evento `349` continua servindo apenas como validacao operacional negativa, nao como prova de match rate;
+  - ainda vale repetir a mesma rodada em um evento organico quando houver massa real suficiente, mas o gating tecnico do lane `users` ja foi fechado.
 - leitura executiva atual:
   - para o MVP atual de `SearchFacesByImage` e para o primeiro corte de `SearchUsersByImage`, a AWS ja esta operacional;
   - para dizer que a integracao AWS esta `100%` no modulo inteiro ainda faltam:
-    - validacao real especifica para evento grande com acervo na faixa de `2000` pessoas indexadas;
-    - janela curta de observacao operacional do modo `users`;
-    - UX final no CRUD simples do evento com o CTA direto `Ativar Reconhecimento Facial`, deixando o card AWS avancado para operacao e ajuste fino.
+    - repetir a rodada de `users` em um evento organico quando houver massa real suficiente;
+    - janela curta de observacao operacional do modo `users` em trafego nao-tecnico;
+    - este bloco de UX do backoffice ja foi fechado; resta apenas o rollout organico do modo `users`.
 
 Principais descobertas operacionais:
 
@@ -1995,6 +2155,9 @@ Principais descobertas operacionais:
 - nesta rodada curta a divergencia residual caiu para zero nas queries efetivamente executadas;
 - o ajuste de timeout + retry no `CompreFaceClient` removeu a quebra observada na rodada anterior e devolveu amostra `3/3`;
 - o soak curto confirmou que o risco imediato deixou de ser estabilidade tecnica do fallback e passou a ser apenas janela de observacao operacional antes do proximo bloco.
+- a rodada tecnica de `users` mostrou um risco operacional especifico:
+  - collection AWS reaproveitada depois de varias recalibracoes pode degradar `top_1_match_rate` por associacoes antigas;
+  - o runbook correto para essa situacao agora esta claro: `delete collection -> reindex -> sync user vectors -> validate`.
 
 Testes obrigatorios:
 
@@ -2142,13 +2305,169 @@ Leitura:
 
 ## Proximo Passo Recomendado
 
-Com `H1`, `H2`, `H3`, `H4`, `H5`, `H6`, `H7-T1`, `H7-T2` e o novo comando de validacao operacional de `users` concluido, o proximo bloco deve ser:
+Com `H1`, `H2`, `H3`, `H4`, `H5`, `H6`, `H7-T1`, `H7-T2` e a rodada tecnica positiva de validacao operacional de `users` concluida, o proximo bloco deve ser:
 
-1. selecionar um evento real com massa suficiente para a rodada grande:
-   - idealmente com `target_ready_users` na faixa de `2000`
-   - e com `aws_search_mode=users` ja ativo
-2. rodar `face-search:validate-aws-users-high-cardinality` com thresholds explicitos:
-   - acompanhando `users_mode_resolution_rate`, fallback, latencia, `top_1_match_rate` e `top_k_match_rate`
-   - mantendo `reindex`, `reconcile` e o rollback reverso do report `20260409-142612-face-search-aws-fallback-rollout.json` prontos
-3. se o report real passar, consolidar o rollout do modo `users` como opcao operacional segura por evento;
-4. no fechamento de UX do rollout, simplificar o CRUD base do evento com o CTA direto `Ativar Reconhecimento Facial`, mantendo o card avancado de `FaceSearch` para backend, thresholds e operacao.
+1. repetir a rodada em um evento organico quando houver massa suficiente:
+   - idealmente com `target_ready_users` na faixa de `30`
+   - com `aws_search_mode=users` ja ativo
+   - e, se houver fallback/shadow local, com `provider_key=compreface`
+2. garantir que o acervo legado terminou de convergir:
+   - backfill/reindex concluido
+   - `reconcile` do evento rodado
+   - sync de user vectors deixado seguir pelo pipeline automatico de index/reconcile
+   - se a collection tiver sofrido varias recalibracoes no meio da homologacao, fazer rebuild limpo antes da rodada final
+3. rodar a linha operacional exata:
+   - `php artisan face-search:validate-aws-users-high-cardinality <event_id> --sample-users=20 --min-ready-users=20 --target-ready-users=30 --max-fallback-rate=0.05 --min-users-mode-resolution-rate=0.95 --min-top1-match-rate=0.85 --min-topk-match-rate=0.95 --max-p95-latency-ms=1500`
+4. se o report real passar, abrir uma janela curta de observacao do modo `users` antes do rollout amplo;
+5. no fechamento do rollout, consolidar a rodada organica final e a janela curta de observacao, mantendo o card avancado para backend, thresholds e operacao.
+
+---
+
+## Lista Atualizada Das Faltantes Para 100% Funcional E Polido
+
+### Revalidacao oficial AWS usada nesta rodada
+
+Fontes oficiais relidas:
+
+- `SearchUsersByImage`:
+  - a API procura `UserIDs` a partir da maior face da imagem enviada;
+  - retorna `UnsearchedFaces` para rostos detectados mas nao usados;
+  - aceita `MaxUsers` ate `500`;
+  - aceita `QualityFilter = NONE | AUTO | LOW | MEDIUM | HIGH`;
+  - `UserMatchThreshold` default continua `80`.
+- `CreateUser`:
+  - segue com `ClientRequestToken` para idempotencia de criacao.
+
+Leitura pratica para o produto:
+
+- a experiencia de busca do convidado continua sendo selfie de uma pessoa por vez; foto de grupo nao cabe como UX principal desta fase;
+- a robustez de retry e reconciliacao continua dependendo de idempotencia forte e de um runbook claro para collection drift;
+- o modo `users` pode escalar no produto atual, mas ainda precisa da rodada organica final antes de ser tratado como rollout irrestrito.
+
+### Fechadas nesta rodada
+
+1. UX primaria do CRUD ja simplificada
+   - o editor simples do evento agora usa linguagem de produto:
+     - `Ativar reconhecimento facial`
+     - `Liberar para convidados`
+     - `Tempo para descartar a selfie enviada`
+   - o fluxo basico ja nao depende do termo `FaceSearch` para o primeiro contato do usuario.
+
+2. Estado operacional simples ja entrou no detalhe do evento
+   - o detalhe agora resolve e mostra um status simples com leitura real do backend, e nao apenas da configuracao salva:
+     - `Desligado`
+     - `Ligado localmente`
+     - `Preparando estrutura`
+     - `Indexando fotos antigas`
+     - `Pronto para validacao interna`
+     - `Pronto para convidados`
+   - a leitura agora considera:
+     - filas `queued` e `processing` do acervo legado;
+     - falhas pendentes de `reindex` ou `reconcile`;
+     - registros AWS ja pesquisaveis;
+     - `distinct_ready_users` quando o evento estiver em `aws_search_mode=users`;
+   - a configuracao tecnica continua separada no card operacional.
+
+3. Entrada publica da busca ja integrada no produto
+   - o hub publico agora mostra CTA de `Encontrar minhas fotos` quando a busca publica estiver habilitada;
+   - a galeria publica agora mostra o mesmo CTA no topo quando a busca publica estiver habilitada;
+   - a rota dedicada `/e/:slug/find-me` continua existindo como superficie principal da busca.
+
+4. Operacao do detalhe ficou sincronizada com as acoes AWS
+   - salvar configuracao, reindexar evento e reconciliar collection agora invalidam o detalhe do evento;
+   - isso evita que o operador veja status stale logo depois de mudar a fila do acervo legado.
+
+5. Bateria desta rodada
+   - backend:
+     - `php artisan test tests/Feature/Hub/HubSettingsTest.php tests/Feature/Gallery/PublicGalleryAvailabilityTest.php tests/Feature/Events/CreateEventTest.php tests/Feature/FaceSearch/FaceSearchSettingsTest.php tests/Feature/FaceSearch/FaceSearchSelfieEndpointsTest.php`
+     - `46 passed`
+     - `409 assertions`
+   - frontend:
+     - `npx.cmd vitest run src/modules/events/face-search-status.test.ts src/modules/face-search/face-search-product-ux-characterization.test.ts src/modules/events/components/face-search/EventFaceSearchSettingsCard.test.tsx src/modules/events/components/face-search/EventFaceSearchSettingsForm.test.tsx src/modules/face-search/components/FaceSearchSearchPanel.test.tsx src/modules/face-search/components/EventFaceSearchSearchCard.test.tsx src/modules/face-search/PublicFaceSearchPage.test.tsx src/modules/gallery/PublicGalleryPage.test.tsx src/modules/hub/PublicHubPage.test.tsx`
+     - `25 passed`
+   - type-check:
+     - `npm.cmd run type-check`
+     - `PASS`
+
+### P0. Faltantes obrigatorias para chamar de 100%
+
+1. Rodada organica final do modo `users`
+   - repetir a validacao em evento organico, nao apenas dataset tecnico controlado;
+   - alvo atual continua `~30 users` prontos;
+   - report precisa sair com:
+     - `users_mode_resolution_rate >= 0.95`
+     - `fallback_rate <= 0.05`
+     - `top_1_match_rate >= 0.85`
+     - `top_k_match_rate >= 0.95`
+     - `p95_response_duration_ms <= 1500`
+
+2. Janela curta de observacao real do modo `users`
+   - mesmo com o report organico aprovado, ainda falta uma janela curta de observacao em trafego nao-tecnico;
+   - esse bloco precisa observar:
+     - fallback inesperado;
+     - drift depois de reconcile;
+     - latencia por query;
+     - reclamacoes de match ruim ou zero resultado.
+
+### P1. Polimento de produto e reducao de friccao
+
+Status desta rodada:
+
+- o fluxo basico ja foi simplificado no CRUD;
+- o hub e a galeria publica ja ganharam CTA direto de `Encontrar minhas fotos`;
+- o detalhe do evento agora explica com clareza quando o acervo antigo ainda esta convergindo e quando ja esta pronto para convidados;
+- o card avancado do backoffice agora ficou secundario, recolhido em acordeao e com resumo visivel no topo;
+- o formulario avancado e o card operacional passaram por limpeza final de vocabulario tecnico, mantendo termos mais precisos apenas onde a operacao realmente precisa deles.
+
+Leitura atual:
+   - evitar termos como `FaceSearch`, `backend`, `routing`, `shadow`, `fallback` nas superficies leigas;
+   - reservar o vocabulário tecnico para o card operacional.
+
+2. Orientacao visual melhor para o operador
+   - o detalhe do evento ja passou a explicar:
+     - se fotos antigas ainda estao sendo preparadas;
+     - se a busca publica ja pode ser usada por convidados;
+     - se existem falhas que merecem `reindex` ou `reconcile`;
+   - o restante aqui fica em deixar essa orientacao ainda mais resumida no card avancado.
+
+3. CTA contextual no backoffice
+   - quando o reconhecimento estiver desligado, mostrar acao clara para ligar;
+   - quando estiver ligado mas ainda preparando o acervo, mostrar progresso/status;
+   - quando estiver pronto, destacar link publico e busca interna.
+
+4. Menos dependencia de operacao manual
+   - preservar `health`, `reindex`, `reconcile` e `delete collection` para operacao;
+   - mas esconder ou secundarizar isso no caminho principal do usuario comum.
+
+### P2. Robustez e observabilidade extra
+
+1. Dashboard curto do lane `users`
+   - consultas totais;
+   - latencia p50/p95;
+   - fallback rate;
+   - distribuicao de `search_mode_resolved`;
+   - erros AWS por tipo.
+
+2. Sinalizacao mais clara de backfill/reindex
+   - expor no backend e no frontend quando o evento ainda esta convergindo acervo legado;
+   - isso reduz falsa expectativa de zero-latencia com zero-indexacao.
+
+3. Runbook final de incidente
+   - consolidar no plano:
+     - quando basta `reconcile`;
+     - quando precisa `delete collection -> reindex -> sync user vectors -> validate`;
+     - quando descer temporariamente para lane local.
+
+### Conclusao objetiva desta lista
+
+Para dizer que a integracao AWS esta `100% funcional e polida`, ainda faltam:
+
+- rodada organica final de `users`;
+- pequena janela de observacao real depois dessa rodada.
+
+Tecnicamente, o backend AWS ja esta pronto para o MVP e para o primeiro corte de `users`.
+O que falta agora esta mais concentrado em:
+
+- fechamento do rollout organico;
+- limpeza final de vocabulario tecnico nas superficies administrativas;
+- ultima validacao organica de rollout.

@@ -4,7 +4,32 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('wall theme architecture characterization', () => {
-  it('still hardcodes 3 slots for multi-item layouts and does not expose a formal theme-level motion system', () => {
+  it('does not yet expose puzzle or theme_config in the shared contract, backend enum, or manager options', () => {
+    const sharedTypesSource = fs.readFileSync(
+      path.resolve(__dirname, '../../../../../../packages/shared-types/src/wall.ts'),
+      'utf8',
+    );
+    const backendEnumSource = fs.readFileSync(
+      path.resolve(__dirname, '../../../../../../apps/api/app/Modules/Wall/Enums/WallLayout.php'),
+      'utf8',
+    );
+    const managerConfigSource = fs.readFileSync(
+      path.resolve(__dirname, '../manager-config.ts'),
+      'utf8',
+    );
+    const settingsRequestSource = fs.readFileSync(
+      path.resolve(__dirname, '../../../../../../apps/api/app/Modules/Wall/Http/Requests/UpdateWallSettingsRequest.php'),
+      'utf8',
+    );
+
+    expect(sharedTypesSource).not.toContain("'puzzle'");
+    expect(sharedTypesSource).not.toContain('theme_config');
+    expect(backendEnumSource).not.toContain("case Puzzle = 'puzzle'");
+    expect(managerConfigSource).not.toContain("value: 'puzzle'");
+    expect(settingsRequestSource).not.toContain('theme_config');
+  });
+
+  it('still hardcodes 3 slots for multi-item layouts, imports framer-motion, and does not expose a formal theme-level motion system', () => {
     const layoutRendererSource = fs.readFileSync(
       path.resolve(__dirname, 'components/LayoutRenderer.tsx'),
       'utf8',
@@ -16,6 +41,8 @@ describe('wall theme architecture characterization', () => {
 
     expect(layoutRendererSource).toContain('const MULTI_ITEM_SLOT_COUNT = 3');
     expect(layoutRendererSource).toContain('AnimatePresence');
+    expect(layoutRendererSource).toContain("from 'framer-motion'");
+    expect(layoutRendererSource).not.toContain("from 'motion/react'");
     expect(layoutRendererSource).not.toContain('MotionConfig');
     expect(layoutRendererSource).not.toContain('LayoutGroup');
     expect(layoutRendererSource).not.toContain('layoutId');

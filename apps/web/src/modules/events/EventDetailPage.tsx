@@ -54,6 +54,7 @@ import { EventFaceSearchSettingsCard } from './components/face-search/EventFaceS
 import { EventMediaIntelligenceSettingsCard } from './components/media-intelligence/EventMediaIntelligenceSettingsCard';
 import { PublicLinkCard } from './components/PublicLinkCard';
 import { EventFaceSearchSearchCard } from '@/modules/face-search/components/EventFaceSearchSearchCard';
+import { resolveEventFaceSearchOperationalStatus } from './face-search-status';
 
 const MODULE_CARD_CONFIG = [
   { key: 'live', name: 'Galeria ao vivo', icon: Image },
@@ -366,6 +367,13 @@ export default function EventDetailPage() {
   const eventMedia = mediaQuery.data?.data ?? [];
   const publishedMedia = filterPublished(eventMedia);
   const shareLinks = event?.public_links ? Object.values(event.public_links).filter((link) => link.enabled) : [];
+  const faceSearchStatus = resolveEventFaceSearchOperationalStatus(event.face_search);
+  const faceSearchStatusToneClasses = {
+    neutral: 'border-slate-200 bg-slate-50 text-slate-700',
+    info: 'border-sky-200 bg-sky-50 text-sky-900',
+    warning: 'border-amber-200 bg-amber-50 text-amber-950',
+    success: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+  } as const;
   const resolvedEntitlements = (
     commercialStatus?.resolved_entitlements ?? event?.current_entitlements ?? null
   ) as EventResolvedEntitlements | null;
@@ -766,19 +774,20 @@ export default function EventDetailPage() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-muted-foreground">
                     <p>
-                      Busca por selfie: <span className="font-medium text-foreground">{event.face_search?.enabled ? 'ativada' : 'desligada'}</span>
+                      Reconhecimento facial: <span className="font-medium text-foreground">{event.face_search?.enabled ? 'ativado' : 'desligado'}</span>
                     </p>
                     <p className="mt-1">
-                      Exposicao publica: <span className="font-medium text-foreground">{event.face_search?.allow_public_selfie_search ? 'permitida' : 'fechada'}</span>
+                      Busca para convidados: <span className="font-medium text-foreground">{event.face_search?.allow_public_selfie_search ? 'liberada' : 'fechada'}</span>
                     </p>
-                    <p className="mt-1">
-                      Threshold/top K:{' '}
-                      <span className="font-medium text-foreground">
-                        {event.face_search
-                          ? `${event.face_search.search_threshold} · ${event.face_search.top_k}`
-                          : '0.5 · 50'}
-                      </span>
-                    </p>
+                  </div>
+                  <div className={`rounded-2xl border p-4 text-sm ${faceSearchStatusToneClasses[faceSearchStatus.tone]}`}>
+                    <p className="font-medium">Situacao operacional: {faceSearchStatus.label}</p>
+                    <p className="mt-1">{faceSearchStatus.description}</p>
+                    {faceSearchStatus.notes.map((note) => (
+                      <p key={note} className="mt-1 text-sm/6 opacity-90">
+                        {note}
+                      </p>
+                    ))}
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-muted-foreground">
                     <p>

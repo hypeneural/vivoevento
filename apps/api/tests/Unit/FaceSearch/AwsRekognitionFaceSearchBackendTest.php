@@ -12,6 +12,7 @@ use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Models\EventMediaVariant;
 use App\Modules\FaceSearch\Services\AwsRekognitionClientFactory;
 use App\Modules\FaceSearch\Services\AwsRekognitionFaceSearchBackend;
+use App\Modules\FaceSearch\Services\FaceSearchTelemetryService;
 use App\Modules\MediaProcessing\Services\ProviderCircuitBreaker;
 use Aws\Exception\AwsException;
 use Aws\Rekognition\RekognitionClient;
@@ -38,6 +39,9 @@ it('provisions and persists collection metadata for an aws event backend', funct
 
     $client = m::mock(RekognitionClient::class);
     $factory = m::mock(AwsRekognitionClientFactory::class);
+    $telemetry = m::mock(FaceSearchTelemetryService::class);
+
+    $telemetry->shouldNotReceive('recordAwsOperationFailed');
 
     $factory->shouldReceive('makeRekognitionClient')
         ->once()
@@ -62,7 +66,7 @@ it('provisions and persists collection metadata for an aws event backend', funct
             'FaceCount' => 0,
         ]);
 
-    $backend = new AwsRekognitionFaceSearchBackend($factory);
+    $backend = new AwsRekognitionFaceSearchBackend($factory, telemetry: $telemetry);
 
     $result = $backend->ensureEventBackend($event, $settings);
 
@@ -87,6 +91,9 @@ it('treats an existing collection as idempotent success and still refreshes meta
 
     $client = m::mock(RekognitionClient::class);
     $factory = m::mock(AwsRekognitionClientFactory::class);
+    $telemetry = m::mock(FaceSearchTelemetryService::class);
+
+    $telemetry->shouldNotReceive('recordAwsOperationFailed');
 
     $factory->shouldReceive('makeRekognitionClient')
         ->once()
@@ -112,7 +119,7 @@ it('treats an existing collection as idempotent success and still refreshes meta
             'FaceCount' => 3,
         ]);
 
-    $backend = new AwsRekognitionFaceSearchBackend($factory);
+    $backend = new AwsRekognitionFaceSearchBackend($factory, telemetry: $telemetry);
 
     $result = $backend->ensureEventBackend($event, $settings);
 
@@ -495,6 +502,78 @@ it('searches faces by image and maps aws face ids back to searchable event media
         ->and($result['matches'][0]->distance)->toBe(0.015)
         ->and($result['matches'][0]->qualityTier)->toBe('search_priority')
         ->and($result['provider_payload_json']['SearchedFaceConfidence'] ?? null)->toBe(99.1);
+});
+
+it('records structured telemetry when aws search by image fails unexpectedly', function () {
+    Storage::fake('public');
+
+    $event = Event::factory()->create();
+
+    $settings = \Database\Factories\EventFaceSearchSettingFactory::new()->enabled()->create([
+        'event_id' => $event->id,
+        'recognition_enabled' => true,
+        'search_backend_key' => 'aws_rekognition',
+        'aws_region' => 'eu-central-1',
+        'aws_collection_id' => 'eventovivo-face-search-event-' . $event->id,
+        'aws_search_mode' => 'faces',
+        'aws_search_face_match_threshold' => 82,
+    ]);
+
+    $probeMedia = EventMedia::factory()->create([
+        'event_id' => $event->id,
+    ]);
+
+    $selfiePath = UploadedFile::fake()
+        ->image('selfie.jpg', 1200, 900)
+        ->store('tmp', 'public');
+    $selfieBinary = Storage::disk('public')->get($selfiePath);
+
+    $client = m::mock(RekognitionClient::class);
+    $factory = m::mock(AwsRekognitionClientFactory::class);
+    $telemetry = m::mock(FaceSearchTelemetryService::class);
+
+    $factory->shouldReceive('makeRekognitionClient')
+        ->once()
+        ->with('query', ['region' => 'eu-central-1'])
+        ->andReturn($client);
+
+    $client->shouldReceive('searchFacesByImage')
+        ->once()
+        ->andThrow(new AwsException(
+            'throttled',
+            new Command('SearchFacesByImage'),
+            ['code' => 'ThrottlingException'],
+        ));
+
+    $telemetry->shouldReceive('recordAwsOperationFailed')
+        ->once()
+        ->withArgs(function (string $operation, Throwable $exception, array $context) use ($settings): bool {
+            return $operation === 'query'
+                && $exception instanceof AwsException
+                && ($context['collection_id'] ?? null) === $settings->aws_collection_id
+                && ($context['aws_operation'] ?? null) === 'SearchFacesByImage';
+        });
+
+    $backend = new AwsRekognitionFaceSearchBackend(
+        $factory,
+        new AwsImagePreprocessor,
+        new FaceQualityGateService,
+        telemetry: $telemetry,
+    );
+
+    expect(fn () => $backend->searchBySelfie(
+        event: $event,
+        settings: $settings,
+        probeMedia: $probeMedia,
+        binary: $selfieBinary,
+        face: new DetectedFaceData(
+            boundingBox: new FaceBoundingBoxData(40, 50, 180, 180),
+            detectionConfidence: 0.99,
+            qualityScore: 0.92,
+            isPrimaryCandidate: true,
+        ),
+        topK: 12,
+    ))->toThrow(AwsException::class);
 });
 
 it('searches aws user vectors by selfie when the event opts into users mode', function () {

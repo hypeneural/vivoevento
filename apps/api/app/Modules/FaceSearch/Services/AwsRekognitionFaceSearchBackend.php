@@ -25,6 +25,7 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
         private readonly FaceQualityGateService $qualityGate = new FaceQualityGateService,
         private readonly FaceSearchMediaSourceLoader $sourceLoader = new FaceSearchMediaSourceLoader,
         private readonly ?ProviderCircuitBreaker $circuitBreaker = null,
+        private readonly ?FaceSearchTelemetryService $telemetry = null,
     ) {}
 
     public function key(): string
@@ -43,6 +44,12 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
                 callback: fn () => $client->createCollection([
                     'CollectionId' => $collectionId,
                 ]),
+                context: [
+                    'event_id' => $event->id,
+                    'collection_id' => $collectionId,
+                    'aws_operation' => 'CreateCollection',
+                ],
+                suppressAwsErrorCodes: ['ResourceAlreadyExistsException'],
             );
         } catch (AwsException $exception) {
             if (! $this->isResourceAlreadyExists($exception)) {
@@ -55,6 +62,11 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
             callback: fn () => $client->describeCollection([
                 'CollectionId' => $collectionId,
             ]),
+            context: [
+                'event_id' => $event->id,
+                'collection_id' => $collectionId,
+                'aws_operation' => 'DescribeCollection',
+            ],
         ));
 
         $settings->forceFill([
@@ -102,6 +114,13 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
                     'MaxFaces' => $this->resolveMaxFaces($settings),
                     'DetectionAttributes' => $this->resolveDetectionAttributes($settings),
                 ]),
+                context: [
+                    'event_id' => $media->event_id,
+                    'event_media_id' => $media->id,
+                    'collection_id' => $collectionId,
+                    'aws_operation' => 'IndexFaces',
+                    'external_image_id' => $externalImageId,
+                ],
             ));
         } catch (AwsException $exception) {
             if ($this->isNoFaceFound($exception)) {
@@ -238,6 +257,13 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
                     'CollectionId' => $collectionId,
                     'FaceIds' => $rejectedFaceIds,
                 ]),
+                context: [
+                    'event_id' => $media->event_id,
+                    'event_media_id' => $media->id,
+                    'collection_id' => $collectionId,
+                    'aws_operation' => 'DeleteFaces',
+                    'face_count' => count($rejectedFaceIds),
+                ],
             );
         }
 
@@ -358,6 +384,13 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
                     'UserId' => $userId,
                     'ClientRequestToken' => $this->idempotencyToken('create-user', $collectionId, $userId),
                 ]),
+                context: [
+                    'event_id' => $event->id,
+                    'collection_id' => $collectionId,
+                    'aws_operation' => 'CreateUser',
+                    'user_id' => $userId,
+                ],
+                suppressAwsErrorCodes: ['ConflictException'],
             );
         } catch (AwsException $exception) {
             if (($exception->getAwsErrorCode() ?? null) !== 'ConflictException') {
@@ -385,6 +418,13 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
                         implode(',', $chunkFaceIds),
                     ),
                 ]),
+                context: [
+                    'event_id' => $event->id,
+                    'collection_id' => $collectionId,
+                    'aws_operation' => 'AssociateFaces',
+                    'user_id' => $userId,
+                    'requested_face_count' => count($chunkFaceIds),
+                ],
             ));
 
             $userStatus = is_string($response['UserStatus'] ?? null) ? $response['UserStatus'] : $userStatus;
@@ -473,6 +513,12 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
                     'QualityFilter' => $settings->aws_search_faces_quality_filter,
                 ]);
             },
+            context: [
+                'collection_id' => $collectionId,
+                'aws_operation' => 'SearchFacesByImage',
+                'top_k' => $topK,
+                'match_threshold' => (float) $settings->aws_search_face_match_threshold,
+            ],
         ));
     }
 
@@ -497,6 +543,12 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
                     'QualityFilter' => $settings->aws_search_users_quality_filter,
                 ]);
             },
+            context: [
+                'collection_id' => $collectionId,
+                'aws_operation' => 'SearchUsersByImage',
+                'top_k' => $topK,
+                'match_threshold' => (float) $settings->aws_search_user_match_threshold,
+            ],
         ));
     }
 
@@ -862,6 +914,12 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
                     callback: fn () => $client->deleteCollection([
                         'CollectionId' => $collectionId,
                     ]),
+                    context: [
+                        'event_id' => $event->id,
+                        'collection_id' => $collectionId,
+                        'aws_operation' => 'DeleteCollection',
+                    ],
+                    suppressAwsErrorCodes: ['ResourceNotFoundException'],
                 );
             } catch (AwsException $exception) {
                 if (($exception->getAwsErrorCode() ?? null) !== 'ResourceNotFoundException') {
@@ -1008,6 +1066,13 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
                     'CollectionId' => $collectionId,
                     'FaceIds' => $existingFaceIds,
                 ]),
+                context: [
+                    'event_id' => $media->event_id,
+                    'event_media_id' => $media->id,
+                    'collection_id' => $collectionId,
+                    'aws_operation' => 'DeleteFaces',
+                    'face_count' => count($existingFaceIds),
+                ],
             );
         }
 
@@ -1255,13 +1320,48 @@ class AwsRekognitionFaceSearchBackend implements FaceSearchBackendInterface
         return "face-search:aws-rekognition:{$operation}";
     }
 
-    private function callAws(string $operation, callable $callback): mixed
+    /**
+     * @param array<int, string> $suppressAwsErrorCodes
+     */
+    private function callAws(
+        string $operation,
+        callable $callback,
+        array $context = [],
+        array $suppressAwsErrorCodes = [],
+    ): mixed
     {
-        return $this->circuitBreaker()->call(
-            scope: $this->circuitScope($operation),
-            failureThreshold: $this->circuitBreakerFailureThreshold(),
-            openSeconds: $this->circuitBreakerOpenSeconds(),
-            callback: $callback,
-        );
+        try {
+            return $this->circuitBreaker()->call(
+                scope: $this->circuitScope($operation),
+                failureThreshold: $this->circuitBreakerFailureThreshold(),
+                openSeconds: $this->circuitBreakerOpenSeconds(),
+                callback: $callback,
+            );
+        } catch (Throwable $exception) {
+            if (! $this->shouldSuppressAwsFailureTelemetry($exception, $suppressAwsErrorCodes)) {
+                $this->telemetry()->recordAwsOperationFailed($operation, $exception, $context);
+            }
+
+            throw $exception;
+        }
+    }
+
+    /**
+     * @param array<int, string> $suppressAwsErrorCodes
+     */
+    private function shouldSuppressAwsFailureTelemetry(Throwable $exception, array $suppressAwsErrorCodes): bool
+    {
+        if (! $exception instanceof AwsException) {
+            return false;
+        }
+
+        $code = $exception->getAwsErrorCode();
+
+        return is_string($code) && in_array($code, $suppressAwsErrorCodes, true);
+    }
+
+    private function telemetry(): FaceSearchTelemetryService
+    {
+        return $this->telemetry ?? app(FaceSearchTelemetryService::class);
     }
 }

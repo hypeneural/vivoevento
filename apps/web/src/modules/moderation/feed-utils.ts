@@ -20,6 +20,16 @@ function pendingPriority(media: ApiEventMediaItem) {
   return media.status === 'pending_moderation' ? 1 : 0;
 }
 
+function isAiReviewModerationItem(media: ApiEventMediaItem) {
+  const pendingAiStates = new Set(['pending', 'review', 'failed']);
+
+  return (
+    !!media.safety_is_blocking && pendingAiStates.has(media.safety_decision ?? 'pending')
+  ) || (
+    !!media.context_is_blocking && pendingAiStates.has(media.context_decision ?? 'pending')
+  );
+}
+
 export function pickFreshestModerationItem(
   current: ApiEventMediaItem | undefined,
   incoming: ApiEventMediaItem,
@@ -61,12 +71,83 @@ export function flattenModerationPages(data?: ModerationFeedData | null) {
   return data.pages.flatMap((page) => page.data);
 }
 
+export function resolveNextModerationDetailPrefetchItem(
+  items: ApiEventMediaItem[],
+  focusedMediaId: number | null,
+) {
+  if (focusedMediaId === null) {
+    return null;
+  }
+
+  const focusedIndex = items.findIndex((item) => item.id === focusedMediaId);
+
+  if (focusedIndex < 0) {
+    return null;
+  }
+
+  return items[focusedIndex + 1] ?? null;
+}
+
+export function resolveNextPendingModerationItem(
+  items: ApiEventMediaItem[],
+  focusedMediaId: number | null,
+  options?: { excludeIds?: number[] },
+) {
+  const excludedIds = new Set(options?.excludeIds ?? []);
+
+  if (!items.length) {
+    return null;
+  }
+
+  if (focusedMediaId === null) {
+    return items.find((item) => item.status === 'pending_moderation' && !excludedIds.has(item.id)) ?? null;
+  }
+
+  const focusedIndex = items.findIndex((item) => item.id === focusedMediaId);
+
+  if (focusedIndex < 0) {
+    return items.find((item) => item.status === 'pending_moderation' && !excludedIds.has(item.id)) ?? null;
+  }
+
+  for (let offset = 1; offset <= items.length; offset += 1) {
+    const candidate = items[(focusedIndex + offset) % items.length];
+
+    if (candidate && candidate.status === 'pending_moderation' && !excludedIds.has(candidate.id)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+export function resolveDuplicateClusterSelection(
+  items: ApiEventMediaItem[],
+  focusedMediaId: number | null,
+) {
+  if (focusedMediaId === null) {
+    return [] as ApiEventMediaItem[];
+  }
+
+  const focusedItem = items.find((item) => item.id === focusedMediaId);
+  const groupKey = focusedItem?.duplicate_group_key;
+
+  if (!groupKey) {
+    return [] as ApiEventMediaItem[];
+  }
+
+  return items.filter((item) => item.id !== focusedMediaId && item.duplicate_group_key === groupKey);
+}
+
 export function moderationItemMatchesFilters(media: ApiEventMediaItem, filters: ModerationListFilters) {
   if (filters.event_id && media.event_id !== filters.event_id) {
     return false;
   }
 
   if (filters.status && media.status !== filters.status) {
+    return false;
+  }
+
+  if (filters.media_type && media.media_type !== filters.media_type) {
     return false;
   }
 
@@ -79,6 +160,14 @@ export function moderationItemMatchesFilters(media: ApiEventMediaItem, filters: 
   }
 
   if (typeof filters.sender_blocked === 'boolean' && !!media.sender_blocked !== filters.sender_blocked) {
+    return false;
+  }
+
+  if (typeof filters.duplicates === 'boolean' && !!media.is_duplicate_candidate !== filters.duplicates) {
+    return false;
+  }
+
+  if (typeof filters.ai_review === 'boolean' && isAiReviewModerationItem(media) !== filters.ai_review) {
     return false;
   }
 

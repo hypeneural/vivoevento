@@ -33,6 +33,7 @@ function enableWallVideoForPublicUpload(Event $event, array $overrides = []): vo
     EventWallSetting::factory()->live()->create(array_merge([
         'event_id' => $event->id,
         'video_enabled' => true,
+        'public_upload_video_enabled' => true,
         'video_max_seconds' => 30,
         'video_preferred_variant' => 'wall_video_720p',
     ], $overrides));
@@ -331,6 +332,33 @@ it('rejects public video uploads when video support is disabled by policy', func
     Queue::assertNothingPushed();
 
     @unlink($tmpPath);
+});
+
+it('hides public video support when rollout publico is disabled for this wall', function () {
+    $tooling = fakeVideoToolingReady();
+
+    $event = Event::factory()->active()->create([
+        'moderation_mode' => 'manual',
+    ]);
+
+    EventModule::create([
+        'event_id' => $event->id,
+        'module_key' => 'live',
+        'is_enabled' => true,
+    ]);
+    enableWallVideoForPublicUpload($event, [
+        'public_upload_video_enabled' => false,
+    ]);
+
+    $response = $this->apiGet("/public/events/{$event->upload_slug}/upload");
+
+    $this->assertApiSuccess($response);
+    $response
+        ->assertJsonPath('data.upload.accepts_video', false)
+        ->assertJsonPath('data.upload.accept_hint', 'image/*')
+        ->assertJsonPath('data.upload.instructions', 'As fotos enviadas passam por moderacao manual antes de aparecer no evento.');
+
+    cleanupVideoTooling($tooling);
 });
 
 it('hides public video support when the wall policy allows video but ffmpeg tooling is unavailable', function () {

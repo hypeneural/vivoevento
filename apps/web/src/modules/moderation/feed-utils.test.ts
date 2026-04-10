@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest';
 
 import type { ApiEventMediaItem } from '@/lib/api-types';
 
-import { compareModerationMedia, moderationItemMatchesFilters, prependModerationItems, upsertModerationItems } from './feed-utils';
+import {
+  compareModerationMedia,
+  moderationItemMatchesFilters,
+  prependModerationItems,
+  resolveDuplicateClusterSelection,
+  resolveNextPendingModerationItem,
+  resolveNextModerationDetailPrefetchItem,
+  upsertModerationItems,
+} from './feed-utils';
 import type { ModerationFeedPage } from './types';
 
 function makeMedia(overrides: Partial<ApiEventMediaItem> = {}): ApiEventMediaItem {
@@ -88,6 +96,40 @@ describe('moderation feed local helpers', () => {
     expect(moderationItemMatchesFilters(aiPending, { status: 'approved' })).toBe(false);
   });
 
+  it('matches operational filters for media type, duplicates and ai review on the client side', () => {
+    const aiReviewDuplicateImage = makeMedia({
+      id: 210,
+      media_type: 'image',
+      duplicate_group_key: 'dup-ai-1',
+      is_duplicate_candidate: true,
+      safety_status: 'review',
+      safety_decision: 'review',
+      safety_is_blocking: true,
+      context_decision: 'approved',
+      context_is_blocking: false,
+    });
+
+    const plainVideo = makeMedia({
+      id: 211,
+      media_type: 'video',
+      duplicate_group_key: null,
+      is_duplicate_candidate: false,
+      safety_status: 'skipped',
+      safety_decision: 'skipped',
+      safety_is_blocking: false,
+      context_decision: 'skipped',
+      context_is_blocking: false,
+    });
+
+    expect(moderationItemMatchesFilters(aiReviewDuplicateImage, { media_type: 'image' })).toBe(true);
+    expect(moderationItemMatchesFilters(aiReviewDuplicateImage, { duplicates: true })).toBe(true);
+    expect(moderationItemMatchesFilters(aiReviewDuplicateImage, { ai_review: true })).toBe(true);
+
+    expect(moderationItemMatchesFilters(plainVideo, { media_type: 'video' })).toBe(true);
+    expect(moderationItemMatchesFilters(plainVideo, { duplicates: true })).toBe(false);
+    expect(moderationItemMatchesFilters(plainVideo, { ai_review: true })).toBe(false);
+  });
+
   it('keeps the freshest copy of an item when an older realtime payload arrives', () => {
     const current = makeFeedPage([
       makeMedia({
@@ -136,5 +178,49 @@ describe('moderation feed local helpers', () => {
     );
 
     expect(next?.pages[0]?.data[0]?.status).toBe('rejected');
+  });
+
+  it('returns the next loaded item for detail prefetch after the focused media', () => {
+    const first = makeMedia({ id: 401 });
+    const second = makeMedia({ id: 402 });
+    const third = makeMedia({ id: 403 });
+
+    expect(resolveNextModerationDetailPrefetchItem([first, second, third], 402)?.id).toBe(403);
+    expect(resolveNextModerationDetailPrefetchItem([first, second, third], 403)).toBeNull();
+    expect(resolveNextModerationDetailPrefetchItem([first, second, third], null)).toBeNull();
+  });
+
+  it('resolves the next pending moderation item after the focused media and skips handled ids', () => {
+    const items = [
+      makeMedia({ id: 501, status: 'approved' }),
+      makeMedia({ id: 502, status: 'pending_moderation' }),
+      makeMedia({ id: 503, status: 'pending_moderation' }),
+      makeMedia({ id: 504, status: 'rejected' }),
+    ];
+
+    expect(resolveNextPendingModerationItem(items, 502, { excludeIds: [502] })?.id).toBe(503);
+    expect(resolveNextPendingModerationItem(items, 503, { excludeIds: [503] })?.id).toBe(502);
+  });
+
+  it('returns null when no pending item remains after the handled selection', () => {
+    const items = [
+      makeMedia({ id: 601, status: 'approved' }),
+      makeMedia({ id: 602, status: 'pending_moderation' }),
+      makeMedia({ id: 603, status: 'rejected' }),
+    ];
+
+    expect(resolveNextPendingModerationItem(items, 602, { excludeIds: [602] })).toBeNull();
+  });
+
+  it('returns the duplicate cluster excluding the currently focused item', () => {
+    const items = [
+      makeMedia({ id: 701, duplicate_group_key: 'dup-1', is_duplicate_candidate: true }),
+      makeMedia({ id: 702, duplicate_group_key: 'dup-1', is_duplicate_candidate: true }),
+      makeMedia({ id: 703, duplicate_group_key: 'dup-1', is_duplicate_candidate: true }),
+      makeMedia({ id: 704, duplicate_group_key: 'dup-2', is_duplicate_candidate: true }),
+    ];
+
+    expect(resolveDuplicateClusterSelection(items, 702).map((item) => item.id)).toEqual([701, 703]);
+    expect(resolveDuplicateClusterSelection(items, null)).toEqual([]);
   });
 });

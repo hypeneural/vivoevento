@@ -58,6 +58,62 @@ Conclusao pratica:
 - nao, ela nao deve nascer como canvas livre;
 - a melhor V1 e um builder guiado com trilho fixo, inspector lateral, simulacao e resumo humano automatico.
 
+## Validacao automatica adicional em `2026-04-09`
+
+Antes de sair da analise e ir para execucao, foi rodada uma bateria maior nos pontos reais que a jornada vai tocar:
+
+### Backend
+
+Comando executado:
+
+```bash
+cd apps/api
+php artisan test tests/Feature/Events/EventJourneyArchitectureCharacterizationTest.php tests/Feature/Events/EventIntakeChannelsTest.php tests/Feature/Events/EventIntakeChannelsTelegramPrivateTest.php tests/Feature/Events/EventIntakeBlacklistTest.php tests/Feature/Telegram/TelegramPrivateMediaIntakePipelineTest.php tests/Feature/Telegram/TelegramFeedbackAutomationTest.php tests/Feature/ContentModeration/ContentModerationSettingsTest.php tests/Feature/ContentModeration/ContentModerationPipelineTest.php tests/Feature/ContentModeration/ContentModerationObserveOnlyTest.php tests/Feature/MediaIntelligence/MediaIntelligenceSettingsTest.php tests/Feature/MediaIntelligence/MediaIntelligencePipelineTest.php tests/Unit/ContentModeration/UpsertEventContentModerationSettingsActionTest.php tests/Unit/MediaIntelligence/UpsertEventMediaIntelligenceSettingsActionTest.php tests/Unit/MediaIntelligence/PublishedMediaReplyTextResolverTest.php tests/Unit/MediaIntelligence/MediaReplyTextPromptResolverTest.php tests/Unit/MediaProcessing/MediaEffectiveStateResolverTest.php tests/Unit/MediaProcessing/FinalizeMediaDecisionActionTest.php
+```
+
+Resultado:
+
+- `86` testes passaram;
+- `1` teste falhou;
+- `666` assertions passaram;
+- intake, Telegram, blacklist, Safety, VLM, replies e decisao final continuam cobertos por testes reais.
+
+Falha confirmada:
+
+- `ContentModerationPipelineTest` falha quando o provider usa fallback `data_url` e o `MediaAssetUrlService` devolve asset ausente;
+- a quebra acontece em `EventMediaResource`, que acessa `thumbnail_url` e `preview_url` assumindo shape completo do asset;
+- isso e um bug real de robustez da pipeline atual, nao um problema da proposta do builder.
+
+### Frontend
+
+Comandos executados:
+
+```bash
+cd apps/web
+npm run type-check
+npm run test -- src/modules/events/intake.test.ts src/modules/events/components/content-moderation/EventContentModerationSettingsForm.test.tsx src/modules/events/components/media-intelligence/EventMediaIntelligenceSettingsForm.test.tsx src/modules/events/components/TelegramOperationalStatusCard.test.tsx src/modules/moderation/feed-utils.test.ts src/modules/moderation/moderation-architecture.test.ts src/modules/moderation/moderation-event-scope.contract.test.ts src/modules/wall/player/wall-theme-architecture-characterization.test.ts
+```
+
+Resultado:
+
+- `type-check` passou;
+- a maior parte da bateria passou em intake, forms de Safety, forms de MediaIntelligence, Telegram e caracterizacao do wall;
+- durante a validacao, houve uma mudanca local no helper de duplicate cluster e a bateria frontend voltou a ficar verde.
+
+Observacao importante:
+
+- `feed-utils.test.ts` falhou no primeiro lote, mas passou depois que o arquivo `apps/web/src/modules/moderation/feed-utils.ts` apareceu alterado no worktree atual;
+- no estado final validado desta rodada, a bateria frontend relevante fechou com `31` testes passando e `1` arquivo com cenarios skipped;
+- `moderation-architecture.test.ts` tambem passou no rerun final.
+
+Leitura pratica da bateria:
+
+- a direcao do builder continua correta;
+- a base de negocio que a jornada vai editar segue majoritariamente verde;
+- antes de iniciar a implementacao do builder, vale fazer uma fase curta de estabilizacao da baseline:
+  - blindar assets ausentes no backend;
+  - rerodar a bateria frontend completa para garantir que o ajuste local de duplicate cluster permaneceu estavel.
+
 ---
 
 ## Leitura real da stack atual
@@ -92,6 +148,7 @@ Implicacao:
 - da para construir a V1 sem mudar o modelo da aplicacao inteira;
 - se o time quiser estilo n8n, faz sentido adicionar `@xyflow/react`;
 - para a V1 nao ha necessidade tecnica de adicionar `Zustand` nem engine de auto-layout.
+- se o time quiser seguir a documentacao oficial mais recente de `React Flow`, a melhor entrada para a nossa stack atual e o core `@xyflow/react`, nao o kit `React Flow UI`, porque a trilha de UI deles hoje ja esta orientada ao stack mais novo de `React 19 + Tailwind 4`, enquanto o nosso repo segue em `React 18 + Tailwind 3`.
 
 ## Backend auditado hoje
 
@@ -394,6 +451,45 @@ Leitura pratica:
 
 ---
 
+## Benchmark externo e leitura critica
+
+Foi analisado um benchmark local de mercado baseado em `React Flow` para chatbot/automacao, com canvas livre, conexoes manuais e condicoes por handles.
+
+Leitura tecnica consolidada:
+
+- o frontend usa `React Flow` como canvas de edicao com `handles`, `controls`, `minimap` e custom nodes;
+- o backend persiste o grafo cru como `nodes + edges`;
+- o runtime executa esse grafo como engine real;
+- o branch de condicao usa handles dedicados por saida, mais um branch `default`;
+- como o grafo e livre, o sistema precisou adicionar protecao contra loops, sessao de execucao e regras extras de validacao.
+
+Esse benchmark confirma duas coisas importantes:
+
+### O que vale aproveitar
+
+- familiaridade visual de um canvas estilo flow builder;
+- branch explicito por handle estavel;
+- branch `default` para caminhos nao satisfeitos;
+- templates prontos;
+- simulacao ou sessao de execucao como ferramenta de suporte;
+- validacao de caminhos invalidos antes de salvar.
+
+### O que nao vale copiar
+
+- usar `nodes` e `edges` como fonte canonica da regra de negocio;
+- permitir canvas livre desde o primeiro dia;
+- acoplar o produto a uma engine generica de automacao;
+- deixar o usuario criar loops, excecoes arbitrarias e expressoes livres;
+- transformar a jornada do evento em uma IDE de chatbot.
+
+Conclusao pratica do benchmark:
+
+- a referencia externa e util como linguagem visual e como inspiracao de branching;
+- ela nao deve ditar a arquitetura do Evento Vivo;
+- para o nosso caso, o canvas deve continuar sendo projecao guiada de configuracao real.
+
+---
+
 ## Mapa real de capacidades atuais para o builder
 
 | Bloco | Capacidade | Estado atual | Builder V1 |
@@ -585,8 +681,13 @@ Isso ajuda em:
 ### Corpo principal
 
 - canvas vertical com quatro faixas fixas;
+- legenda fixa das quatro faixas no topo da area;
 - backbone central;
 - ramos laterais para condicoes ativas;
+- sem `MiniMap` na V1;
+- toolbar minima:
+  - `Centralizar fluxo`
+  - `Ver detalhes tecnicos`
 - edge labels curtas:
   - Sim
   - Nao
@@ -609,7 +710,8 @@ Isso ajuda em:
 - simulador de cenarios prontos;
 - botao `Ver detalhes tecnicos`;
 - botao `Comparar com template`;
-- indicador de inconsistencias.
+- indicador de inconsistencias;
+- tooltips apenas para ajuda secundaria, nao para explicar a regra principal.
 
 ## Templates iniciais recomendados
 
@@ -645,6 +747,100 @@ Resultado esperado:
 
 ## Recomendacao tecnica
 
+## 0. Decisoes agora ancoradas em fontes oficiais
+
+Para sair da zona de opiniao e ficar mais proximo do que a nossa stack realmente suporta hoje, a proposta abaixo passa a ser sustentada tambem pela documentacao oficial consultada em `2026-04-09`.
+
+### React Flow
+
+- a documentacao oficial confirma que custom nodes sao apenas componentes React registrados em `nodeTypes`; isso encaixa diretamente com a nossa arquitetura de componentes e com o padrao de cards administrativos do painel;
+- a documentacao oficial tambem confirma o uso de `ReactFlowProvider` quando precisamos ler estado do flow fora do canvas, o que combina com inspector lateral, barra de resumo e simulador;
+- o proprio `React Flow` expoe props de interacao como `nodesDraggable`, `nodesConnectable` e `elementsSelectable`, entao tecnicamente e simples travar o canvas na V1 sem hack;
+- a documentacao oficial do `NodeToolbar` reforca que quick actions por no podem aparecer sem escalar com o viewport, o que e util para a nossa ideia de acoes curtas tipo `Editar`, `Simular` e `Ver regra`;
+- a documentacao oficial de performance recomenda memoizar componentes e funcoes e evitar subscriptions largas em `nodes` e `edges`, o que sustenta a decisao de manter o canvas simples na V1;
+- a documentacao oficial de testes do `React Flow` recomenda `Cypress` ou `Playwright` para apps reais porque a lib depende de medir DOM para renderizar edges corretamente; como o repo ja usa `Playwright`, isso reforca a nossa trilha de teste principal para o canvas.
+
+### TanStack Query
+
+- a documentacao oficial reforca `useMutation` para escrita e `invalidateQueries` apos sucesso, o que sustenta a ideia de um save coeso do builder seguido de revalidacao do projection payload;
+- isso combina melhor com a pagina nova do que espalhar varios `PATCH` independentes e tentar sincronizar estado local na mao.
+
+### Vitest
+
+- a documentacao oficial confirma `jsdom` como ambiente browser-like adequado para testes de frontend em Node;
+- a documentacao oficial de timers reforca `vi.useFakeTimers()` para controlar intervalos e timeouts, o que e perfeito para testar o simulador da jornada sem esperas reais;
+- a documentacao oficial de Browser Mode mostra que, se precisarmos subir a fidelidade depois, da para rodar testes selecionados em browser real com provider Playwright e ainda gerar traces.
+
+### Playwright e Testing Library
+
+- a documentacao oficial do `Playwright` recomenda locators baseados em como o usuario percebe a pagina, especialmente `getByRole`, `getByLabel` e `getByText`, e desestimula CSS/XPath fragil;
+- a documentacao oficial do `Testing Library` segue a mesma linha, priorizando `getByRole` com nome acessivel;
+- a documentacao oficial de visual comparisons do `Playwright` e util para a nossa pagina porque o builder tem muita semantica visual, mas ela tambem deixa claro que as baselines precisam rodar em ambiente consistente.
+
+### Laravel 13
+
+- a documentacao oficial de `Validation` confirma que requests XHR recebem JSON `422` quando invalidos, o que encaixa com nossa SPA;
+- a documentacao oficial de Form Requests continua sendo o caminho certo para encapsular validacao e autorizacao do update do builder;
+- a documentacao oficial de `HTTP Tests` reforca assercoes prontas como `assertValid`, `assertInvalid` e `assertExactJsonStructure`, muito uteis para o endpoint agregador;
+- a documentacao oficial de `Database Testing` adiciona `expectsDatabaseQueryCount`, o que vale para proteger o projection endpoint de regressao e `N+1`.
+
+### Radix UI, shadcn/ui e Tailwind
+
+- o repositorio ja expoe `SheetTitle` e `SheetDescription` em `apps/web/src/components/ui/sheet.tsx`, entao o inspector lateral pode nascer acessivel sem criar primitives novas;
+- o repo ja usa tokens semanticos em `apps/web/src/index.css` e `apps/web/tailwind.config.ts`, o que sustenta mapear as quatro faixas da jornada para variaveis de tema em vez de espalhar cores soltas;
+- a trilha oficial de `Dialog` do Radix e de tema do `shadcn/ui` reforca titulo, descricao, foco previsivel e tokens CSS como base da experiencia;
+- o proprio `Tailwind` documenta `ring` e estados de foco como parte do styling, o que sustenta a regra de nunca remover foco sem substituto visivel.
+
+## O que realmente vale endurecer agora
+
+Depois da validacao da proposta, os pontos que mais aumentam qualidade real de produto e implementacao sao estes:
+
+### 1. Interacao do canvas
+
+- manter o canvas travado;
+- explicitar `selectNodesOnDrag={false}` e `zoomOnDoubleClick={false}`;
+- decidir `preventScrolling` conscientemente e, na V1, favorecer scroll natural da pagina;
+- adicionar `ariaLabelConfig` em portugues;
+- nao usar `MiniMap` e nem ruido de editor livre na V1;
+- nao ligar `onlyRenderVisibleElements` cedo, porque o grafo inicial sera pequeno e o ganho nao compensa a complexidade.
+
+### 2. Estabilidade de render
+
+- garantir container com largura e altura definidas;
+- manter `nodeTypes`, `edgeTypes` e callbacks estaveis;
+- esconder handles com `visibility` e nao com `display: none`;
+- usar `useUpdateNodeInternals` se um node mudar handles dinamicamente;
+- aplicar `nopan` em controles interativos dentro do card.
+
+### 3. UX e acessibilidade
+
+- modo simples como padrao;
+- legenda curta e fixa no topo: `Entrada`, `Processamento`, `Decisao`, `Saida`;
+- inspector com titulo e descricao formais sempre presentes;
+- botoes so com icone precisam de nome acessivel;
+- tooltip serve como ajuda complementar, nunca como instrucao critica;
+- foco visivel precisa fazer parte do design dos cards, chips e acoes.
+
+### 4. Save previsivel
+
+- manter rascunho local no inspector;
+- template aplica patch local e nao salva sozinho;
+- evitar optimistic update da projection inteira;
+- fazer mutation unica e revalidar as queries relacionadas no sucesso.
+
+### 5. Validacao cruzada e contrato
+
+- usar `after()` no `FormRequest` agregador para regras compostas;
+- tratar `assertExactJsonStructure` como defesa do contrato;
+- subir `expectsDatabaseQueryCount` para criterio de qualidade do endpoint agregador.
+
+### 6. Teste semantico, nao so visual
+
+- continuar usando `Playwright` para o canvas real;
+- adicionar `aria snapshots` alem de screenshot;
+- cobrir labels, roles e navegacao por teclado desde a V1;
+- manter `Vitest Browser Mode` como trilha futura, nao como obrigacao agora.
+
 ## 1. React Flow sim, canvas livre nao
 
 Recomendacao tecnica principal:
@@ -667,6 +863,26 @@ O que bloquear:
 - delete node;
 - reconectar handles;
 - persistencia de coordenadas do usuario.
+
+Detalhe importante:
+
+- como a documentacao oficial do `React Flow` ja expoe interaction props para isso, a V1 pode nascer com algo proximo de:
+  - `nodesDraggable = false`
+  - `nodesConnectable = false`
+  - `elementsSelectable = true`
+  - `nodesFocusable = true`
+  - `edgesFocusable = false`
+  - `deleteKeyCode = null`
+  - `selectNodesOnDrag = false`
+  - `zoomOnDoubleClick = false`
+  - `preventScrolling = false`
+  - `ariaLabelConfig = ptBrFlowAria`
+- isso entrega leitura, selecao, acessibilidade e foco, sem abrir a porta para um editor livre.
+
+Outras duas regras praticas importam bastante:
+
+- o container pai do `React Flow` precisa nascer com tamanho definido, senao o canvas falha de forma silenciosa;
+- na V1, nao vale ligar `onlyRenderVisibleElements`, porque o fluxo tera poucos nos e a documentacao oficial deixa claro que essa opcao tambem tem custo proprio.
 
 Leitura pratica:
 
@@ -705,6 +921,11 @@ Quando o produto pedir:
 
 ai sim `ELK` passa a fazer sentido.
 
+Observacao importante vinda da doc oficial:
+
+- `React Flow` tem exemplos oficiais tanto de subflows quanto de layout com `Dagre` e `ELK`, entao esse caminho continua valido para fases futuras;
+- o ponto aqui nao e limitacao tecnica da biblioteca, e sim proteger escopo, clareza de produto e custo de manutencao da V1.
+
 ## 3. Nao introduzir Zustand na primeira entrega
 
 Hoje o repo nao usa `Zustand`.
@@ -721,6 +942,12 @@ Adicionar `Zustand` so vale a pena quando houver:
 - undo/redo real;
 - subflows complexos;
 - composicao de canvas maior.
+
+Leitura refinada pela doc oficial:
+
+- a propria documentacao de `React Flow` mostra `Zustand` como boa opcao quando o app cresce e o estado precisa ser alterado de dentro dos proprios nodes;
+- isso fortalece a decisao de adiar `Zustand` agora, porque a nossa V1 tera nodes guiados, pouca mutacao interna e inspector centralizado fora do node;
+- se um dia o builder passar a suportar subflows, undo/redo e edicao rica dentro do proprio canvas, ai `Zustand` deixa de ser extra e passa a ser candidato serio.
 
 ## 4. A fonte de verdade da V1 deve continuar sendo o estado real do evento
 
@@ -804,7 +1031,9 @@ O backend agregador deve distribuir para as actions corretas:
 Importante:
 
 - o frontend nao deve chamar cinco endpoints distintos para salvar a jornada inteira;
-- a tela nova precisa de uma operacao coesa de salvar.
+- a tela nova precisa de uma operacao coesa de salvar;
+- a projection visual nao deve receber optimistic patch completo;
+- o usuario precisa trabalhar com rascunho local e confirmar no CTA de salvar antes de persistir.
 
 ## 7. Estrutura frontend recomendada
 
@@ -861,6 +1090,30 @@ apps/api/app/Modules/Events/
 `-- routes/
     `-- api.php
 ```
+
+## 9. Camada de graph adapter no frontend
+
+Para evitar que `React Flow` "vaze" para a regra de negocio, a tela deve ter uma pequena camada adaptadora.
+
+Estrutura sugerida:
+
+- `buildJourneyGraph.ts`
+- `buildJourneyScenarios.ts`
+- `journey-node-types.ts`
+- `journey-edge-types.ts`
+
+Responsabilidades:
+
+- transformar `JourneyProjection` em `nodes` e `edges` para o canvas;
+- definir handles fixos por decisao, inclusive `default`;
+- manter IDs de branch estaveis para simulacao;
+- impedir que a view dependa diretamente do formato dos settings internos do evento.
+
+Isso nos permite:
+
+- trocar o renderer visual no futuro se necessario;
+- testar regras de branching sem montar o canvas inteiro;
+- manter o contrato backend/frontend mais limpo.
 
 ---
 
@@ -969,6 +1222,31 @@ Leitura pratica:
 - o builder salva configuracao do produto, nao um desenho;
 - o desenho e sempre regenerado a partir desse estado.
 
+## 3. Modelo de branching recomendado
+
+Mesmo sem DSL propria, a projecao pode explicitar branches com uma estrutura pequena e legivel.
+
+Exemplo conceitual:
+
+```json
+{
+  "id": "decision_publication_mode",
+  "kind": "decision",
+  "label": "Como o evento decide a publicacao",
+  "branches": [
+    { "id": "approved", "label": "Aprovado" },
+    { "id": "review", "label": "Revisao" },
+    { "id": "blocked", "label": "Bloqueado" },
+    { "id": "default", "label": "Padrao" }
+  ]
+}
+```
+
+Leitura pratica:
+
+- isso aproveita a melhor ideia do benchmark externo, que e branch estavel por handle;
+- mas continua sendo projection de leitura, nao linguagem de execucao.
+
 ---
 
 ## Como mapear os nos da V1
@@ -1051,6 +1329,7 @@ Eu evitaria:
 - criar configuracao paralela a `content_moderation` e `media_intelligence`;
 - simular IA real no client;
 - prometer saidas que o backend ainda nao suporta.
+- importar `React Flow UI` como kit visual pronto sem antes alinhar com o nosso stack, porque a trilha oficial deles hoje ja esta orientada ao ecossistema mais novo de `React 19 + Tailwind 4`.
 
 Tambem evitaria substituir o editor atual de evento de uma vez.
 
@@ -1067,7 +1346,7 @@ Melhor estrategia:
 ## Fase 1 - Builder guiado e seguro
 
 - nova pagina `Jornada da midia`;
-- React Flow como renderer travado;
+- `@xyflow/react` como renderer travado;
 - backbone vertical com quatro faixas;
 - 8 a 12 nos principais;
 - inspector lateral;
@@ -1084,6 +1363,8 @@ Melhor estrategia:
 - modo `ver detalhes tecnicos`;
 - destaque de locks por entitlement;
 - resumo de impacto antes de salvar.
+- `NodeToolbar` para acoes rapidas sem abrir inspector completo;
+- visual snapshots fixos do canvas no CI.
 
 ## Fase 2 - Visual mode mais profundo
 
@@ -1092,6 +1373,8 @@ Melhor estrategia:
 - comparacao entre templates;
 - excecoes por origem ou tipo de midia;
 - possivel adocao de `ELK` se o grafo crescer.
+- possivel adocao de `Zustand` se o estado do canvas passar a ser editado de varios pontos ao mesmo tempo;
+- possivel adocao de `Vitest Browser Mode` para testes de componentes visuais de alta fidelidade.
 
 ## Fase 3 - DSL propria, se o produto merecer
 
@@ -1138,7 +1421,18 @@ Mitigacao:
 
 - V1 so projeta e atualiza o estado real existente.
 
-## R3. O canvas ficar bonito, mas cansativo
+## R3. O canvas passar nos testes unitarios e falhar no browser real
+
+Esse risco e especialmente relevante com `React Flow`, porque a propria documentacao oficial deixa claro que a biblioteca depende de medicao real de DOM para edges e interacoes.
+
+Mitigacao:
+
+- deixar regras puras em `Vitest`;
+- levar leitura visual e interacao do canvas para `Playwright`;
+- usar snapshots visuais apenas em ambiente padronizado;
+- se necessario, adotar `Vitest Browser Mode` depois para uma faixa intermediaria de testes.
+
+## R4. O canvas ficar bonito, mas cansativo
 
 Esse e o maior risco de produto.
 
@@ -1156,6 +1450,252 @@ Mitigacao:
 - manter foco em entendimento e edicao guiada;
 - usar frase humana, simulacao e templates;
 - nao tentar vencer n8n no primeiro dia.
+
+---
+
+## Estrategia de testes recomendada
+
+## 1. Backend
+
+### Feature tests do modulo `Events`
+
+Criar testes HTTP para:
+
+- `GET /api/v1/events/{event}/journey-builder`
+- `PATCH /api/v1/events/{event}/journey-builder`
+
+Cobrir:
+
+- `200` para leitura autorizada;
+- `403` para acesso sem permissao;
+- `422` para payload invalido;
+- shape exato do payload principal;
+- persistencia correta dos campos alterados;
+- invalidacao ou atualizacao das fatias relacionadas apos save.
+
+Como base oficial:
+
+- usar `Form Request` para validacao/autorizacao;
+- usar `assertValid`, `assertInvalid`, `assertForbidden` e `assertExactJsonStructure` onde fizer sentido.
+
+### Unit tests de orquestracao
+
+Criar unit tests para:
+
+- `BuildEventJourneyProjectionAction`
+- `UpdateEventJourneyAction`
+- mapeadores de summary humano
+- simulador server-side, se ele nascer no backend
+
+Cobrir:
+
+- projection de cada combinacao principal:
+  - moderacao manual
+  - moderacao IA
+  - safety desligado
+  - reply IA
+  - canais diferentes
+- branch labels corretos;
+- flags `editable`, `active`, `optional`, `blocked_by_capability`.
+
+### Protecao contra regressao de query
+
+Para o endpoint de projection, vale adicionar casos com budget de query usando `expectsDatabaseQueryCount`.
+
+Motivo:
+
+- esse endpoint vai agregar muita informacao;
+- e facil introduzir `N+1` sem perceber.
+
+## 2. Frontend com Vitest
+
+### O que deve ficar em Vitest
+
+Testar em `Vitest` tudo que for regra pura ou composicao sem depender do canvas real:
+
+- `buildJourneyGraph`
+- `buildJourneyScenarios`
+- `summary.ts`
+- `toUpdatePayload.ts`
+- `fromProjection.ts`
+- validacoes locais do inspector
+- reducers de selecao e simulacao
+
+Casos importantes:
+
+- graph muda quando `reply_text_mode` troca;
+- branch `review` aparece quando fallback exige revisao;
+- resumo humano muda por canal e modo de moderacao;
+- payload de update preserva campos nao editados.
+
+### Timers e simulacao
+
+Usar `vi.useFakeTimers()` para:
+
+- simulador de caminho;
+- banners temporarios;
+- micro interacoes internas que dependam de `setTimeout`.
+
+Isso reduz flakes e mantem os testes rapidos.
+
+### JSDOM
+
+Manter `jsdom` como ambiente padrao para estes testes.
+
+Se algum teste precisar de APIs especificas do navegador, isolar esse caso e nao contaminar toda a suite.
+
+## 3. Frontend com Playwright
+
+### O que deve ficar em Playwright
+
+Levar para `Playwright` o que depende de browser real, layout e acessibilidade:
+
+- abrir a pagina da jornada;
+- selecionar um no;
+- editar no inspector;
+- salvar e ver estado refletido;
+- trocar template;
+- rodar simulador de cenario;
+- validar destaque visual do caminho;
+- validar responsividade desktop/mobile;
+- validar navegacao por teclado nos elementos da pagina.
+
+### Seletores
+
+Seguir a linha oficial de `Playwright` e `Testing Library`:
+
+- preferir `getByRole`;
+- usar `getByLabel` em formularios;
+- usar `getByText` para leitura semantica;
+- usar `data-testid` so quando papel/nome acessivel nao forem suficientes.
+
+Isso alinha os testes com a forma como o usuario percebe a pagina e diminui fragilidade.
+
+### Visual regression
+
+Adicionar snapshots visuais para alguns estados fixos:
+
+- estado base com fluxo padrao;
+- estado com review manual ativo;
+- estado com multiplos canais ativos;
+- mobile drawer aberto;
+- branch simulado destacado.
+
+Cuidados:
+
+- rodar em ambiente CI padronizado;
+- mascarar dados dinamicos se necessario;
+- nao usar snapshot para tudo.
+
+### Aria snapshots e acessibilidade basica
+
+Adicionar tambem snapshots semanticos e smoke checks para:
+
+- pagina base;
+- inspector aberto;
+- drawer mobile aberto.
+
+Isso ajuda a pegar:
+
+- botoes sem nome acessivel;
+- hierarquia ruim de titulos e descricoes;
+- regressao de leitura por teclado e screen reader.
+
+## 4. React Flow especificamente
+
+Seguir a leitura oficial da propria lib:
+
+- `React Flow` testa melhor em browser real;
+- se for necessario testar alguma unidade com `Vitest`, manter o nivel baixo:
+  - node card puro
+  - edge label puro
+  - summary banner
+- evitar depender de medicao real do canvas em `jsdom`.
+
+## 5. Trilha opcional futura: Vitest Browser Mode
+
+Nao e requisito para a V1, mas e uma boa carta na manga.
+
+Cenarios onde ele faz sentido:
+
+- interacoes de componentes visuais que ficam caras demais em `Playwright`;
+- verificacao de comportamento em browser real sem subir suite E2E completa;
+- coleta de traces usando provider Playwright.
+
+Recomendacao:
+
+- manter fora do escopo inicial;
+- reconsiderar quando o canvas ganhar mais riqueza visual.
+
+---
+
+## Fontes oficiais consultadas em 2026-04-09
+
+## Stack real do repositorio
+
+- frontend: [apps/web/package.json](c:\laragon\www\eventovivo\apps\web\package.json)
+- backend: [apps/api/composer.json](c:\laragon\www\eventovivo\apps\api\composer.json)
+
+## React Flow
+
+- https://reactflow.dev/
+- https://reactflow.dev/learn/customization/custom-nodes
+- https://reactflow.dev/api-reference/react-flow
+- https://reactflow.dev/learn/customization/handles
+- https://reactflow.dev/api-reference/hooks/use-update-node-internals
+- https://reactflow.dev/api-reference/hooks/use-on-selection-change
+- https://reactflow.dev/api-reference/components/node-toolbar
+- https://reactflow.dev/learn/advanced-use/hooks-providers
+- https://reactflow.dev/learn/advanced-use/performance
+- https://reactflow.dev/learn/advanced-use/state-management
+- https://reactflow.dev/learn/advanced-use/testing
+- https://reactflow.dev/examples/grouping/sub-flows
+- https://reactflow.dev/ui
+- https://reactflow.dev/whats-new/2025-10-20
+
+## TanStack Query
+
+- https://tanstack.com/query/latest/docs/framework/react/guides/mutations
+- https://tanstack.com/query/v5/docs/framework/react/guides/invalidations-from-mutations
+
+## Vitest
+
+- https://vitest.dev/guide/environment.html
+- https://vitest.dev/guide/mocking/timers
+- https://vitest.dev/guide/browser/
+- https://vitest.dev/guide/browser/trace-view
+
+## Playwright
+
+- https://playwright.dev/docs/locators
+- https://playwright.dev/docs/aria-snapshots
+- https://playwright.dev/docs/accessibility-testing
+- https://playwright.dev/docs/test-snapshots
+
+## Testing Library
+
+- https://testing-library.com/docs/queries/about/
+- https://testing-library.com/docs/queries/byrole
+
+## Laravel 13
+
+- https://laravel.com/docs/13.x/validation
+- https://laravel.com/docs/13.x/validation#performing-additional-validation
+- https://laravel.com/docs/13.x/http-tests
+- https://laravel.com/docs/13.x/database-testing
+
+## Radix UI
+
+- https://www.radix-ui.com/primitives/docs/components/dialog
+
+## shadcn/ui
+
+- https://ui.shadcn.com/docs/theming
+
+## Tailwind CSS
+
+- https://tailwindcss.com/docs/ring-width
+- https://tailwindcss.com/docs/hover-focus-and-other-states
 
 ---
 
@@ -1199,4 +1739,6 @@ Esse caminho entrega:
 - clareza para o cliente final;
 - baixo risco arquitetural;
 - alto reaproveitamento da stack atual;
-- espaco real para crescer depois para um modo visual mais poderoso.
+- espaco real para crescer depois para um modo visual mais poderoso;
+- uma trilha de testes coerente com o que a stack oficial recomenda para canvas, forms e endpoints agregadores;
+- uma ordem de execucao mais segura: primeiro estabilizar baseline, depois abrir a feature.

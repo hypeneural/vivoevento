@@ -125,6 +125,18 @@ class PagarmeBillingGateway implements BillingGatewayInterface
             ?? data_get($data, 'subscription.customer_id')
             ?? data_get($data, 'metadata.gateway_customer_id');
 
+        if (str_starts_with($rawType, 'subscription.')) {
+            $gatewaySubscriptionId = data_get($data, 'id')
+                ?? data_get($data, 'subscription.id')
+                ?? $gatewaySubscriptionId;
+            $gatewayOrderId = data_get($data, 'order.id')
+                ?? data_get($data, 'order_id')
+                ?? null;
+            $gatewayCustomerId = data_get($data, 'customer.id')
+                ?? data_get($data, 'customer_id')
+                ?? $gatewayCustomerId;
+        }
+
         if (str_starts_with($rawType, 'charge.')) {
             $gatewayChargeId = data_get($data, 'id');
             $gatewayOrderId = data_get($data, 'order.id') ?? data_get($data, 'order_id');

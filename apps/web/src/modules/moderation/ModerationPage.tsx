@@ -23,10 +23,13 @@ import {
 import { useAuth } from '@/app/providers/AuthProvider';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { ToastAction } from '@/components/ui/toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
 import type { ApiEventMediaDetail, ApiEventMediaItem } from '@/lib/api-types';
@@ -52,6 +55,9 @@ import {
   moderationItemMatchesFilters,
   prependModerationItems,
   removeModerationItems,
+  resolveDuplicateClusterSelection,
+  resolveNextModerationDetailPrefetchItem,
+  resolveNextPendingModerationItem,
   upsertModerationItems,
 } from './feed-utils';
 import { useModerationRealtime } from './hooks/useModerationRealtime';
@@ -60,6 +66,7 @@ import {
   MODERATION_ORIENTATION_OPTIONS,
   MODERATION_PAGE_SIZE_OPTIONS,
   MODERATION_QUICK_FILTERS,
+  MODERATION_REJECT_REASON_PRESETS,
   MODERATION_STATUS_OPTIONS,
   type ModerationFeedPage,
   type ModerationListFilters,
@@ -74,6 +81,18 @@ type ModerationMutationPayload = {
   items: ApiEventMediaItem[];
   desiredValue?: boolean;
   mode: 'single' | 'bulk';
+  reason?: string;
+  advanceAfterSuccess?: boolean;
+};
+
+type PendingRejectPayload = Omit<ModerationMutationPayload, 'reason'> & {
+  action: 'reject';
+};
+
+type ModerationUndoPayload = {
+  action: ModerationMediaAction;
+  previousItem: ApiEventMediaItem;
+  currentItem: ApiEventMediaItem;
 };
 
 const EMPTY_STATS = { total: 0, pending: 0, approved: 0, rejected: 0, featured: 0, pinned: 0 };
@@ -93,6 +112,8 @@ function buildOptimisticItems(
   currentItems: ApiEventMediaItem[],
 ) {
   const nextTimestamp = new Date().toISOString();
+  const trimmedReason = payload.reason?.trim();
+  const decisionReason = trimmedReason ? trimmedReason : null;
   const maxSortOrderByEvent = new Map<number, number>();
   const pinOffsets = new Map<number, number>();
 
@@ -107,6 +128,7 @@ function buildOptimisticItems(
         moderation_status: 'approved',
         publication_status: 'published',
         status: 'published',
+        decision_override_reason: decisionReason,
         updated_at: nextTimestamp,
         published_at: item.published_at ?? nextTimestamp,
       };
@@ -118,7 +140,9 @@ function buildOptimisticItems(
         moderation_status: 'rejected',
         publication_status: 'draft',
         status: 'rejected',
+        decision_override_reason: decisionReason,
         updated_at: nextTimestamp,
+        published_at: null,
       };
     }
 
@@ -182,6 +206,9 @@ export default function ModerationPage() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [isNearTop, setIsNearTop] = useState(true);
   const [senderBlockDuration, setSenderBlockDuration] = useState('7d');
+  const [autoAdvanceEnabled, setAutoAdvanceEnabled] = useState(false);
+  const [pendingRejectPayload, setPendingRejectPayload] = useState<PendingRejectPayload | null>(null);
+  const [rejectReasonDraft, setRejectReasonDraft] = useState('');
 
   useEffect(() => {
     setSearch(prefilledScope.search);
@@ -207,6 +234,10 @@ export default function ModerationPage() {
 
   const feedQueryKey = useMemo(() => queryKeys.media.feed(feedFilters), [feedFilters]);
   const statsQueryKey = useMemo(() => queryKeys.media.feedStats(sharedFilters), [sharedFilters]);
+  const duplicateClusterQueryKey = useMemo(
+    () => queryKeys.media.duplicateCluster(String(focusedMediaId ?? '')),
+    [focusedMediaId],
+  );
 
   const eventsQuery = useQuery({
     queryKey: queryKeys.events.list({ scope: 'moderation-options' }),
@@ -243,6 +274,10 @@ export default function ModerationPage() {
   const activeQuickFilter = resolveQuickFilter(statusFilter, featuredOnly, pinnedOnly, blockedSenderOnly);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const virtualGridRef = useRef<ModerationVirtualGridHandle | null>(null);
+  const nextDetailPrefetchItem = useMemo(
+    () => resolveNextModerationDetailPrefetchItem(media, focusedMediaId),
+    [focusedMediaId, media],
+  );
 
   const focusedMediaDetailQuery = useQuery({
     queryKey: queryKeys.media.detail(String(focusedMediaId ?? '')),
@@ -251,7 +286,30 @@ export default function ModerationPage() {
     staleTime: 15_000,
   });
 
+  const duplicateClusterQuery = useQuery({
+    queryKey: duplicateClusterQueryKey,
+    queryFn: ({ signal }) => moderationService.listDuplicateCluster(focusedMediaId as number, signal),
+    enabled: canView && focusedMediaId !== null && !!focusedMedia?.duplicate_group_key,
+    staleTime: 15_000,
+  });
+
   const reviewMedia = (focusedMediaDetailQuery.data ?? focusedMedia) as ApiEventMediaDetail | ApiEventMediaItem | null;
+  const duplicateClusterItems = useMemo(
+    () => resolveDuplicateClusterSelection(duplicateClusterQuery.data ?? [], focusedMediaId),
+    [duplicateClusterQuery.data, focusedMediaId],
+  );
+
+  useEffect(() => {
+    if (!nextDetailPrefetchItem?.id) {
+      return;
+    }
+
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.media.detail(String(nextDetailPrefetchItem.id)),
+      queryFn: ({ signal }) => moderationService.show(nextDetailPrefetchItem.id, signal),
+      staleTime: 15_000,
+    });
+  }, [nextDetailPrefetchItem?.id, queryClient]);
 
   useEffect(() => {
     const handleScroll = () => setIsNearTop(window.scrollY < 140);
@@ -433,9 +491,9 @@ export default function ModerationPage() {
       if (payload.mode === 'single') {
         const [item] = payload.items;
         const response = payload.action === 'approve'
-          ? await moderationService.approve(item.id)
+          ? await moderationService.approve(item.id, payload.reason)
           : payload.action === 'reject'
-            ? await moderationService.reject(item.id)
+            ? await moderationService.reject(item.id, payload.reason)
             : payload.action === 'favorite'
               ? await moderationService.updateFavorite(item.id, payload.desiredValue ?? !item.is_featured)
               : await moderationService.updatePinned(item.id, payload.desiredValue ?? !item.is_pinned);
@@ -444,9 +502,9 @@ export default function ModerationPage() {
       }
 
       const response = payload.action === 'approve'
-        ? await moderationService.bulkApprove(ids)
+        ? await moderationService.bulkApprove(ids, payload.reason)
         : payload.action === 'reject'
-          ? await moderationService.bulkReject(ids)
+          ? await moderationService.bulkReject(ids, payload.reason)
           : payload.action === 'favorite'
             ? await moderationService.bulkFavorite(ids, payload.desiredValue ?? true)
             : await moderationService.bulkPinned(ids, payload.desiredValue ?? true);
@@ -478,6 +536,10 @@ export default function ModerationPage() {
       });
     },
     onSuccess: async (response, payload) => {
+      const nextPendingItem = payload.mode === 'single' && payload.advanceAfterSuccess
+        ? resolveNextPendingModerationItem(media, payload.items[0]?.id ?? null, { excludeIds: response.ids })
+        : null;
+
       upsertFeedItems(response.items);
       setIncomingItems((current) => current.filter((item) => !response.ids.includes(item.id)));
 
@@ -489,6 +551,7 @@ export default function ModerationPage() {
         queryClient.invalidateQueries({ queryKey: queryKeys.gallery.all(), refetchType: 'inactive' }),
         queryClient.invalidateQueries({ queryKey: queryKeys.events.all(), refetchType: 'inactive' }),
         queryClient.invalidateQueries({ queryKey: statsQueryKey }),
+        queryClient.invalidateQueries({ queryKey: duplicateClusterQueryKey }),
         ...response.ids.map((id) => queryClient.invalidateQueries({ queryKey: queryKeys.media.detail(String(id)) })),
       ]);
 
@@ -498,7 +561,74 @@ export default function ModerationPage() {
         ? 'A selecao foi atualizada sem recarregar a fila completa.'
         : baseMessage.description;
 
-      toast({ title, description });
+      const undoPayload = payload.mode === 'single' && response.items[0]
+        ? {
+          action: payload.action,
+          previousItem: payload.items[0],
+          currentItem: response.items[0],
+        } satisfies ModerationUndoPayload
+        : null;
+
+      toast({
+        title,
+        description,
+        action: undoPayload ? (
+          <ToastAction altText="Desfazer a ultima acao" onClick={() => undoMutation.mutate(undoPayload)}>
+            Desfazer
+          </ToastAction>
+        ) : undefined,
+      });
+
+      if (nextPendingItem) {
+        focusMedia(nextPendingItem.id, { scroll: true });
+      }
+    },
+  });
+
+  const undoMutation = useMutation({
+    mutationFn: async (payload: ModerationUndoPayload) => {
+      if (payload.action === 'approve' || payload.action === 'reject') {
+        return moderationService.undoDecision(payload.currentItem.id);
+      }
+
+      if (payload.action === 'favorite') {
+        return moderationService.updateFavorite(payload.currentItem.id, payload.previousItem.is_featured);
+      }
+
+      return moderationService.updatePinned(payload.currentItem.id, payload.previousItem.is_pinned ?? false);
+    },
+    onSuccess: async (item, payload) => {
+      upsertFeedItems([item]);
+      setIncomingItems((current) => current.filter((existing) => existing.id !== item.id));
+      queryClient.setQueryData(queryKeys.media.detail(String(item.id)), (current: ApiEventMediaDetail | ApiEventMediaItem | undefined) => (
+        current ? { ...current, ...item } : current
+      ));
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.media.detail(String(item.id)) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.gallery.all(), refetchType: 'inactive' }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.events.all(), refetchType: 'inactive' }),
+        queryClient.invalidateQueries({ queryKey: statsQueryKey }),
+        queryClient.invalidateQueries({ queryKey: duplicateClusterQueryKey }),
+      ]);
+
+      toast({
+        title: 'Acao desfeita',
+        description: payload.action === 'approve' || payload.action === 'reject'
+          ? 'A midia voltou para a fila de pendentes.'
+          : payload.action === 'favorite'
+            ? 'O destaque anterior foi restaurado.'
+            : 'A ordem anterior da galeria foi restaurada.',
+      });
+
+      focusMedia(item.id, { scroll: true });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Falha ao desfazer a acao',
+        description: error.message,
+        variant: 'destructive',
+      });
     },
   });
 
@@ -613,9 +743,59 @@ export default function ModerationPage() {
     setSelectionAnchorId(itemId);
   }, [media, selectionAnchorId]);
 
+  const buildMutationPayload = useCallback((
+    items: ApiEventMediaItem[],
+    action: ModerationMediaAction,
+    options?: {
+      mode?: 'single' | 'bulk';
+      reason?: string;
+      advanceAfterSuccess?: boolean;
+    },
+  ): ModerationMutationPayload => {
+    const mode = options?.mode ?? (items.length > 1 ? 'bulk' : 'single');
+    const shouldAdvance = mode === 'single'
+      && (action === 'approve' || action === 'reject')
+      && (options?.advanceAfterSuccess ?? autoAdvanceEnabled);
+
+    return {
+      action,
+      items,
+      desiredValue: action === 'favorite'
+        ? !(mode === 'bulk' ? items.every((item) => item.is_featured) : items[0]?.is_featured)
+        : action === 'pin'
+          ? !(mode === 'bulk' ? items.every((item) => item.is_pinned) : items[0]?.is_pinned)
+          : undefined,
+      mode,
+      reason: options?.reason,
+      advanceAfterSuccess: shouldAdvance,
+    };
+  }, [autoAdvanceEnabled]);
+
   const runAction = useCallback((payload: ModerationMutationPayload) => {
     mutation.mutate(payload);
   }, [mutation]);
+
+  const closeRejectDialog = useCallback(() => {
+    setPendingRejectPayload(null);
+    setRejectReasonDraft('');
+  }, []);
+
+  const openRejectDialog = useCallback((payload: PendingRejectPayload) => {
+    setPendingRejectPayload(payload);
+    setRejectReasonDraft(payload.items.length === 1 ? payload.items[0]?.decision_override_reason ?? '' : '');
+  }, []);
+
+  const submitReject = useCallback((reason?: string) => {
+    if (!pendingRejectPayload) {
+      return;
+    }
+
+    runAction({
+      ...pendingRejectPayload,
+      reason: reason?.trim() ? reason.trim() : undefined,
+    });
+    closeRejectDialog();
+  }, [closeRejectDialog, pendingRejectPayload, runAction]);
 
   const runSenderBlockToggle = useCallback((checked: boolean) => {
     if (!focusedMedia) {
@@ -635,20 +815,28 @@ export default function ModerationPage() {
     && (!action || mutation.variables?.action === action)
   ), [mutation.isPending, mutation.variables]);
 
-  const runSingleAction = useCallback((item: ApiEventMediaItem, action: ModerationMediaAction) => {
-    runAction({
-      action,
-      items: [item],
-      desiredValue: action === 'favorite'
-        ? !item.is_featured
-        : action === 'pin'
-          ? !item.is_pinned
-          : undefined,
+  const runSingleAction = useCallback((
+    item: ApiEventMediaItem,
+    action: ModerationMediaAction,
+    options?: { advanceAfterSuccess?: boolean },
+  ) => {
+    const payload = buildMutationPayload([item], action, {
       mode: 'single',
+      advanceAfterSuccess: options?.advanceAfterSuccess,
     });
-  }, [runAction]);
 
-  const runActionForCurrentTarget = useCallback((action: ModerationMediaAction) => {
+    if (action === 'reject') {
+      openRejectDialog(payload as PendingRejectPayload);
+      return;
+    }
+
+    runAction(payload);
+  }, [buildMutationPayload, openRejectDialog, runAction]);
+
+  const runActionForCurrentTarget = useCallback((
+    action: ModerationMediaAction,
+    options?: { advanceAfterSuccess?: boolean },
+  ) => {
     if (mutation.isPending) {
       return;
     }
@@ -663,27 +851,62 @@ export default function ModerationPage() {
       return;
     }
 
-    const isBulk = targetItems.length > 1;
-    const desiredValue = action === 'favorite'
-      ? !(isBulk ? targetItems.every((item) => item.is_featured) : targetItems[0].is_featured)
-      : action === 'pin'
-        ? !(isBulk ? targetItems.every((item) => item.is_pinned) : targetItems[0].is_pinned)
-        : undefined;
-
-    runAction({
-      action,
-      items: targetItems,
-      desiredValue,
-      mode: isBulk ? 'bulk' : 'single',
+    const payload = buildMutationPayload(targetItems, action, {
+      mode: targetItems.length > 1 ? 'bulk' : 'single',
+      advanceAfterSuccess: options?.advanceAfterSuccess,
     });
-  }, [focusedMedia, mutation.isPending, runAction, selectedItems]);
+
+    if (action === 'reject') {
+      openRejectDialog(payload as PendingRejectPayload);
+      return;
+    }
+
+    runAction(payload);
+  }, [buildMutationPayload, focusedMedia, mutation.isPending, openRejectDialog, runAction, selectedItems]);
 
   const allSelectedFeatured = selectedItems.length > 0 && selectedItems.every((item) => item.is_featured);
   const allSelectedPinned = selectedItems.length > 0 && selectedItems.every((item) => item.is_pinned);
+  const handleFocusedAction = useCallback((action: ModerationMediaAction) => {
+    if (!focusedMedia) {
+      return;
+    }
+
+    runSingleAction(focusedMedia, action);
+  }, [focusedMedia, runSingleAction]);
+  const handleFocusedApproveAndNext = useCallback(() => {
+    if (!focusedMedia) {
+      return;
+    }
+
+    runSingleAction(focusedMedia, 'approve', { advanceAfterSuccess: true });
+  }, [focusedMedia, runSingleAction]);
+  const handleOpenDuplicateItem = useCallback((itemId: number) => {
+    focusMedia(itemId, { scroll: true, openMobile: true });
+  }, []);
+  const handleRejectDuplicateCluster = useCallback(() => {
+    if (!duplicateClusterItems.length || mutation.isPending) {
+      return;
+    }
+
+    const payload = buildMutationPayload(duplicateClusterItems, 'reject', {
+      mode: duplicateClusterItems.length > 1 ? 'bulk' : 'single',
+    });
+
+    runAction({
+      ...payload,
+      reason: 'Duplicada',
+    });
+  }, [buildMutationPayload, duplicateClusterItems, mutation.isPending, runAction]);
+  const rejectDialogSelectionCount = pendingRejectPayload?.items.length ?? 0;
+  const rejectDialogWillAdvance = pendingRejectPayload?.mode === 'single' && !!pendingRejectPayload.advanceAfterSuccess;
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isInteractiveTarget(event.target)) {
+        return;
+      }
+
+      if (pendingRejectPayload) {
         return;
       }
 
@@ -751,7 +974,7 @@ export default function ModerationPage() {
 
       if (normalizedKey === 'a') {
         event.preventDefault();
-        runActionForCurrentTarget('approve');
+        runActionForCurrentTarget('approve', { advanceAfterSuccess: event.shiftKey });
         return;
       }
 
@@ -782,6 +1005,7 @@ export default function ModerationPage() {
     handleToggleSelection,
     mobileFiltersOpen,
     mobileReviewOpen,
+    pendingRejectPayload,
     previewOpen,
     runActionForCurrentTarget,
     selectAllLoaded,
@@ -868,8 +1092,8 @@ export default function ModerationPage() {
               </div>
             </>
           ) : null}
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-            <div className="flex flex-wrap items-center gap-2"><span>{stats.total} itens no recorte atual</span><Badge variant="outline">{media.length} carregadas</Badge>{!isMobile ? <Badge variant="outline">J/K navega - A/R/F/P age - X marca</Badge> : null}</div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2"><span>{stats.total} itens no recorte atual</span><Badge variant="outline">{media.length} carregadas</Badge>{!isMobile ? <Badge variant="outline">J/K navega - A/R/F/P age - Shift+A aprova e avanca - X marca</Badge> : null}</div>
             <div className="flex flex-wrap items-center gap-2">
               {isMobile ? (
                 <>
@@ -894,7 +1118,7 @@ export default function ModerationPage() {
         {media.length > 0 ? (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
             <section className="glass overflow-hidden rounded-[28px] border border-border/60">
-              <div className="border-b border-border/60 px-4 py-4 sm:px-5"><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold">Feed infinito de moderacao</p><p className="text-sm text-muted-foreground">Os cards seguem a ordem do filtro sem refazer a pagina inteira.</p><p className="mt-1 hidden text-xs text-muted-foreground md:block">Atalhos ativos: J/K navega, A aprova, R reprova, F favorita, P fixa, X marca e Enter amplia.</p></div>{feedQuery.isFetching && !feedQuery.isFetchingNextPage ? <div className="inline-flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Sincronizando</div> : null}</div></div>
+              <div className="border-b border-border/60 px-4 py-4 sm:px-5"><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold">Feed infinito de moderacao</p><p className="text-sm text-muted-foreground">Os cards seguem a ordem do filtro sem refazer a pagina inteira.</p><p className="mt-1 hidden text-xs text-muted-foreground md:block">Atalhos ativos: J/K navega, A aprova, Shift+A aprova e avanca, R reprova, F favorita, P fixa, X marca e Enter amplia.</p></div>{feedQuery.isFetching && !feedQuery.isFetchingNextPage ? <div className="inline-flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Sincronizando</div> : null}</div></div>
               <ModerationVirtualGrid
                 ref={virtualGridRef}
                 items={media}
@@ -913,16 +1137,74 @@ export default function ModerationPage() {
               />
               {feedQuery.isFetchingNextPage ? <div className="border-t border-border/60 px-4 py-4 text-center text-sm text-muted-foreground"><Loader2 className="mx-auto mb-2 h-4 w-4 animate-spin" />Buscando mais fotos...</div> : feedQuery.isFetchNextPageError ? <div className="border-t border-border/60 px-4 py-4 text-center text-sm text-destructive"><p>Falha ao carregar o proximo bloco da fila.</p><Button type="button" size="sm" variant="outline" className="mt-3 rounded-full" onClick={() => feedQuery.fetchNextPage()}>Tentar novamente</Button></div> : !feedQuery.hasNextPage ? <div className="border-t border-border/60 px-4 py-4 text-center text-sm text-muted-foreground">Voce chegou ao fim do que foi carregado ate agora.</div> : null}
             </section>
-            <aside className="hidden xl:block"><div className="sticky top-20"><ModerationReviewPanel media={reviewMedia} canModerate={canModerate} isBusy={(action) => mutation.isPending && !!focusedMedia && mutation.variables?.items.some((item) => item.id === focusedMedia.id) && (!action || mutation.variables?.action === action)} onAction={(action) => focusedMedia && runAction({ action, items: [focusedMedia], desiredValue: action === 'favorite' ? !focusedMedia.is_featured : action === 'pin' ? !focusedMedia.is_pinned : undefined, mode: 'single' })} onOpenPreview={() => setPreviewOpen(true)} canGoPrevious={focusedMediaIndex > 0} canGoNext={focusedMediaIndex >= 0 && focusedMediaIndex < media.length - 1} onPrevious={() => focusMediaByOffset(-1)} onNext={() => focusMediaByOffset(1)} senderBlockBusy={senderBlockMutation.isPending && !!focusedMedia && senderBlockMutation.variables?.item.id === focusedMedia.id} senderBlockDuration={senderBlockDuration} onSenderBlockDurationChange={setSenderBlockDuration} onSenderBlockToggle={runSenderBlockToggle} /></div></aside>
+            <aside className="hidden xl:block"><div className="sticky top-20"><ModerationReviewPanel media={reviewMedia} canModerate={canModerate} isBusy={(action) => mutation.isPending && !!focusedMedia && mutation.variables?.items.some((item) => item.id === focusedMedia.id) && (!action || mutation.variables?.action === action)} onAction={handleFocusedAction} onApproveAndNext={handleFocusedApproveAndNext} onOpenPreview={() => setPreviewOpen(true)} canGoPrevious={focusedMediaIndex > 0} canGoNext={focusedMediaIndex >= 0 && focusedMediaIndex < media.length - 1} onPrevious={() => focusMediaByOffset(-1)} onNext={() => focusMediaByOffset(1)} autoAdvanceEnabled={autoAdvanceEnabled} onAutoAdvanceChange={setAutoAdvanceEnabled} senderBlockBusy={senderBlockMutation.isPending && !!focusedMedia && senderBlockMutation.variables?.item.id === focusedMedia.id} senderBlockDuration={senderBlockDuration} onSenderBlockDurationChange={setSenderBlockDuration} onSenderBlockToggle={runSenderBlockToggle} duplicateClusterItems={duplicateClusterItems} duplicateClusterBusy={duplicateClusterQuery.isFetching || (mutation.isPending && duplicateClusterItems.some((item) => mutation.variables?.items.some((selected) => selected.id === item.id)))} onOpenDuplicateItem={handleOpenDuplicateItem} onRejectDuplicateCluster={handleRejectDuplicateCluster} /></div></aside>
           </div>
         ) : null}
       </motion.div>
 
-      <ModerationBulkActionBar selectedCount={selectedItems.length} canModerate={canModerate} isBusy={mutation.isPending} favoriteLabel={allSelectedFeatured ? 'Desfavoritar' : 'Favoritar'} pinLabel={allSelectedPinned ? 'Desafixar' : 'Fixar'} onClear={() => { setSelectedIds([]); setSelectionAnchorId(null); }} onAction={(action) => { if (!selectedItems.length) return; runAction({ action, items: selectedItems, desiredValue: action === 'favorite' ? !allSelectedFeatured : action === 'pin' ? !allSelectedPinned : undefined, mode: 'bulk' }); }} />
+      <ModerationBulkActionBar selectedCount={selectedItems.length} canModerate={canModerate} isBusy={mutation.isPending} favoriteLabel={allSelectedFeatured ? 'Desfavoritar' : 'Favoritar'} pinLabel={allSelectedPinned ? 'Desafixar' : 'Fixar'} onClear={() => { setSelectedIds([]); setSelectionAnchorId(null); }} onAction={(action) => runActionForCurrentTarget(action)} />
 
-      <Drawer open={mobileReviewOpen} onOpenChange={setMobileReviewOpen}><DrawerContent className="max-h-[92vh] rounded-t-[28px]"><DrawerHeader className="border-b border-border/60 px-5 pb-4 text-left"><DrawerTitle>Revisao rapida</DrawerTitle><DrawerDescription>Confira a midia atual e decida sem sair do feed.</DrawerDescription></DrawerHeader><div className="overflow-y-auto px-4 py-4"><ModerationReviewPanel media={reviewMedia} canModerate={canModerate} isBusy={(action) => mutation.isPending && !!focusedMedia && mutation.variables?.items.some((item) => item.id === focusedMedia.id) && (!action || mutation.variables?.action === action)} onAction={(action) => focusedMedia && runAction({ action, items: [focusedMedia], desiredValue: action === 'favorite' ? !focusedMedia.is_featured : action === 'pin' ? !focusedMedia.is_pinned : undefined, mode: 'single' })} onOpenPreview={() => setPreviewOpen(true)} canGoPrevious={focusedMediaIndex > 0} canGoNext={focusedMediaIndex >= 0 && focusedMediaIndex < media.length - 1} onPrevious={() => focusMediaByOffset(-1)} onNext={() => focusMediaByOffset(1)} senderBlockBusy={senderBlockMutation.isPending && !!focusedMedia && senderBlockMutation.variables?.item.id === focusedMedia.id} senderBlockDuration={senderBlockDuration} onSenderBlockDurationChange={setSenderBlockDuration} onSenderBlockToggle={runSenderBlockToggle} /></div></DrawerContent></Drawer>
+      <Drawer open={mobileReviewOpen} onOpenChange={setMobileReviewOpen}><DrawerContent className="max-h-[92vh] rounded-t-[28px]"><DrawerHeader className="border-b border-border/60 px-5 pb-4 text-left"><DrawerTitle>Revisao rapida</DrawerTitle><DrawerDescription>Confira a midia atual e decida sem sair do feed.</DrawerDescription></DrawerHeader><div className="overflow-y-auto px-4 py-4"><ModerationReviewPanel media={reviewMedia} canModerate={canModerate} isBusy={(action) => mutation.isPending && !!focusedMedia && mutation.variables?.items.some((item) => item.id === focusedMedia.id) && (!action || mutation.variables?.action === action)} onAction={handleFocusedAction} onApproveAndNext={handleFocusedApproveAndNext} onOpenPreview={() => setPreviewOpen(true)} canGoPrevious={focusedMediaIndex > 0} canGoNext={focusedMediaIndex >= 0 && focusedMediaIndex < media.length - 1} onPrevious={() => focusMediaByOffset(-1)} onNext={() => focusMediaByOffset(1)} autoAdvanceEnabled={autoAdvanceEnabled} onAutoAdvanceChange={setAutoAdvanceEnabled} senderBlockBusy={senderBlockMutation.isPending && !!focusedMedia && senderBlockMutation.variables?.item.id === focusedMedia.id} senderBlockDuration={senderBlockDuration} onSenderBlockDurationChange={setSenderBlockDuration} onSenderBlockToggle={runSenderBlockToggle} duplicateClusterItems={duplicateClusterItems} duplicateClusterBusy={duplicateClusterQuery.isFetching || (mutation.isPending && duplicateClusterItems.some((item) => mutation.variables?.items.some((selected) => selected.id === item.id)))} onOpenDuplicateItem={handleOpenDuplicateItem} onRejectDuplicateCluster={handleRejectDuplicateCluster} /></div></DrawerContent></Drawer>
 
       <Drawer open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}><DrawerContent className="max-h-[92vh] rounded-t-[28px]"><DrawerHeader className="border-b border-border/60 px-5 pb-4 text-left"><DrawerTitle>Filtros avancados</DrawerTitle><DrawerDescription>Ajuste o recorte da fila sem perder o contexto da moderacao.</DrawerDescription></DrawerHeader><div className="grid gap-3 overflow-y-auto px-4 py-4"><Select value={eventFilter} onValueChange={setEventFilter}><SelectTrigger><SelectValue placeholder="Evento" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os eventos</SelectItem>{events.map((eventItem) => <SelectItem key={eventItem.id} value={String(eventItem.id)}>{eventItem.title}</SelectItem>)}</SelectContent></Select><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem>{MODERATION_STATUS_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Select value={orientationFilter} onValueChange={setOrientationFilter}><SelectTrigger><SelectValue placeholder="Formato" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os formatos</SelectItem>{MODERATION_ORIENTATION_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Select value={String(perPage)} onValueChange={(value) => setPerPage(Number(value))}><SelectTrigger><SelectValue placeholder="Densidade" /></SelectTrigger><SelectContent>{MODERATION_PAGE_SIZE_OPTIONS.map((option) => <SelectItem key={option} value={String(option)}>{option} por bloco</SelectItem>)}</SelectContent></Select><div className="grid grid-cols-2 gap-2"><Button type="button" variant={featuredOnly ? 'default' : 'outline'} className="rounded-2xl" onClick={() => { setFeaturedOnly((current) => !current); setPinnedOnly(false); setBlockedSenderOnly(false); }}><Star className={cn('h-4 w-4', featuredOnly && 'fill-current')} />Favoritas</Button><Button type="button" variant={pinnedOnly ? 'default' : 'outline'} className="rounded-2xl" onClick={() => { setPinnedOnly((current) => !current); setFeaturedOnly(false); setBlockedSenderOnly(false); }}><Pin className="h-4 w-4" />Fixadas</Button><Button type="button" variant={blockedSenderOnly ? 'default' : 'outline'} className="col-span-2 rounded-2xl" onClick={() => { setBlockedSenderOnly((current) => !current); setFeaturedOnly(false); setPinnedOnly(false); setStatusFilter('all'); }}><ShieldBan className="h-4 w-4" />Remetentes bloqueados</Button></div><div className="flex flex-wrap gap-2 pt-2"><Button type="button" className="rounded-full" onClick={() => setMobileFiltersOpen(false)}>Aplicar</Button><Button type="button" variant="outline" className="rounded-full" onClick={clearFilters}>Limpar filtros</Button></div></div></DrawerContent></Drawer>
+
+      <Dialog open={!!pendingRejectPayload} onOpenChange={(open) => { if (!open) closeRejectDialog(); }}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{rejectDialogSelectionCount > 1 ? `Reprovar ${rejectDialogSelectionCount} midias` : 'Reprovar midia'}</DialogTitle>
+            <DialogDescription>
+              Escolha um motivo rapido para agilizar a fila ou escreva um contexto proprio antes de confirmar a reprovação.
+              {rejectDialogWillAdvance ? ' Ao concluir, o foco avanca para a proxima pendente.' : ''}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Motivos rapidos</Label>
+              <div className="flex flex-wrap gap-2">
+                {MODERATION_REJECT_REASON_PRESETS.map((preset) => (
+                  <Button
+                    key={preset.value}
+                    type="button"
+                    variant="outline"
+                    className="h-auto rounded-full px-4 py-2 text-left"
+                    disabled={mutation.isPending}
+                    onClick={() => submitReject(preset.value)}
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">Um clique reprova imediatamente com o motivo escolhido.</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="moderation-reject-reason">Motivo customizado</Label>
+              <Textarea
+                id="moderation-reject-reason"
+                value={rejectReasonDraft}
+                onChange={(event) => setRejectReasonDraft(event.target.value)}
+                rows={4}
+                maxLength={500}
+                placeholder="Explique o contexto da reprovação para auditoria e revisão futura."
+              />
+              <p className="text-xs text-muted-foreground">{rejectReasonDraft.trim().length}/500 caracteres</p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={closeRejectDialog} disabled={mutation.isPending}>
+              Cancelar
+            </Button>
+            <Button type="button" variant="outline" onClick={() => submitReject(undefined)} disabled={mutation.isPending}>
+              Reprovar sem motivo
+            </Button>
+            <Button type="button" variant="destructive" onClick={() => submitReject(rejectReasonDraft)} disabled={mutation.isPending}>
+              {rejectDialogWillAdvance ? 'Reprovar e avancar' : 'Confirmar reprovacao'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}><DialogContent className="max-w-5xl"><DialogHeader><DialogTitle>{focusedMedia?.event_title || 'Preview da midia'}</DialogTitle><DialogDescription>{focusedMedia ? `${focusedMedia.sender_name} - ${formatDateTime(focusedMedia.created_at)}` : 'Visualizacao ampliada'}</DialogDescription></DialogHeader>{focusedMedia ? <div className="overflow-hidden rounded-[24px] border border-border/60 bg-muted"><ModerationMediaSurface media={focusedMedia} variant="preview" className="max-h-[70vh] min-h-[20rem] w-full" mediaClassName="max-h-[70vh] w-full object-contain" fit="contain" videoPreload="auto" /></div> : <div className="flex h-80 items-center justify-center rounded-[24px] border border-dashed border-border/60 bg-muted/30 text-muted-foreground"><ImageIcon className="h-10 w-10" /></div>}</DialogContent></Dialog>
     </>

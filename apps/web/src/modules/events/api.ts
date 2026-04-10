@@ -9,6 +9,7 @@ import type {
   ApiEventFaceSearchSettings,
   ApiEventMediaIntelligenceSettings,
   ApiEventMediaItem,
+  ApiPublicGalleryResponse,
   ApiEventPublicLinksPayload,
   PaginatedResponse,
 } from '@/lib/api-types';
@@ -223,7 +224,7 @@ export function regenerateEventPublicIdentifiers(
 }
 
 export function getPublicGallery(slug: string) {
-  return api.get<PaginatedResponse<ApiEventMediaItem>>(`/public/events/${slug}/gallery`);
+  return api.get<ApiPublicGalleryResponse>(`/public/events/${slug}/gallery`);
 }
 
 export function upsertEventIntakeBlacklistEntry(

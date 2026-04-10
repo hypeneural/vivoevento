@@ -5,6 +5,7 @@ Data: `2026-04-08`
 Plano detalhado complementar:
 
 - `docs/architecture/public-event-checkout-v2-implementation-plan-2026-04-08.md`
+- `docs/architecture/public-event-checkout-friction-hardening-plan-2026-04-09.md`
 
 Validacao complementar executada em:
 
@@ -63,7 +64,7 @@ Backend:
 
 Frontend:
 
-- `npm run test -- PublicEventCheckoutPage.test.tsx public-event-packages.service.test.ts PlansPage.test.tsx`
+- `npm run test -- src/modules/billing/PublicEventCheckoutEntryPage.test.tsx src/modules/billing/public-checkout src/modules/billing/services/public-event-packages.service.test.ts src/modules/plans/PlansPage.test.tsx`
 - `npm run test -- src/modules/billing/public-checkout`
 - `npm run type-check`
 - `npx playwright test`
@@ -71,6 +72,54 @@ Frontend:
 Resultado:
 
 - tudo verde na bateria rodada
+- na observacao curta final da V2 publica, a bateria complementar tambem ficou verde:
+  - `61` testes Vitest
+  - `6` cenarios Playwright
+  - `54` testes PHP
+  - homologacao real da Pagar.me com evidencia em `apps/api/storage/app/pagarme-homologation/20260409-185345-pix-cancel.json`
+
+### Validacao real final com Pagar.me + webhook do Cloudflare local
+
+Achados reais desta rodada:
+
+- o checkout publico V2 passou em Pix e cartao usando a API real da Pagar.me
+- o webhook real continuou entrando por `https://webhooks-local.eventovivo.com.br/api/v1/webhooks/billing/pagarme`
+- o primeiro Pix real expôs um problema de schema local:
+  - faltava aplicar `2026_04_09_193000_add_recurring_fields_to_billing_gateway_events_table.php`
+  - sem essa migration, o webhook falhava ao tentar persistir `hook_id` em `billing_gateway_events`
+- a rodada real tambem expôs um problema de robustez no resolver do webhook:
+  - `ProcessBillingWebhookAction` tentava consultar `billing_orders.uuid` com `code` nao-UUID vindo da Pagar.me
+  - isso foi endurecido para consultar por UUID so quando o valor realmente e UUID e cair para `gateway_order_id` nos demais casos
+
+Depois dos ajustes, a validacao ponta a ponta ficou assim:
+
+- Pix:
+  - checkout criado na rota publica
+  - webhook `payment.paid` processado localmente
+  - acesso ativado
+  - cancelamento/refund real na Pagar.me
+  - webhook de refund processado localmente
+  - estado publico final:
+    - `status = refunded`
+    - `summary.state = refunded`
+    - `payment.meta.gateway_status = canceled`
+- cartao:
+  - tokenizacao real no navegador/Pagar.me
+  - checkout criado na rota publica
+  - webhook `payment.paid` processado localmente
+  - acesso ativado
+  - cancelamento/refund real na Pagar.me
+  - webhook de refund processado localmente
+  - estado publico final:
+    - `status = canceled`
+    - `summary.state = refunded`
+    - `payment.meta.gateway_status = canceled`
+
+Evidencias locais desta validacao:
+
+- `apps/api/storage/app/pagarme-homologation/public-checkout-pix-20260409170532.json`
+- `apps/api/storage/app/pagarme-homologation/public-checkout-pix-retry-20260409171011.json`
+- `apps/api/storage/app/pagarme-homologation/public-checkout-card-20260409171236.json`
 
 Leitura:
 
@@ -88,6 +137,7 @@ Leitura:
 - a V2 ja moveu parte desse acoplamento para adapters e view-models dedicados
 - o checkout de cartao atual opera com `installments: 1`
 - `apps/web/playwright.config.ts` ja esta funcional, o runner `@playwright/test` esta instalado e a pasta `apps/web/e2e` ja cobre os cinco cenarios criticos da jornada
+- a entry route publica agora ignora `legacy=1` e entrega sempre a V2
 
 Implicacao:
 
@@ -124,24 +174,25 @@ Ja entrou no codigo:
 - deep link por `?package=<slug|code|id>`
 - V2 como default em `/checkout/evento`
 - remocao do escape hatch `legacy=1` da entry route publica em `2026-04-09`
+- remocao fisica de `PublicEventCheckoutPage.tsx` e `PublicEventCheckoutPage.test.tsx`
 
 Validacao real adicional:
 
 - `php artisan billing:pagarme:homologate --scenario=pix-cancel --poll-attempts=1 --poll-sleep-ms=500` executado com sucesso em `2026-04-09`
 - a conta local ainda tem chaves de homologacao configuradas
 - a conta da Pagar.me continua listando hooks para `https://webhooks-local.eventovivo.com.br/api/v1/webhooks/billing/pagarme`
+- o payload semantico continua traduzindo o estado para o comprador, enquanto `payment.meta` preserva o estado bruto reconciliado do gateway
 
 Observacao complementar:
 
-- o fluxo legado ainda existe no repositorio para caracterizacao e regressao isolada
-- ele nao e mais roteado pela entrada publica do checkout
+- o fluxo legado nao e mais roteado nem mantido no frontend publico
 
 ## Escopo Da Analise
 
 Arquivos principais inspecionados:
 
-- `apps/web/src/modules/billing/PublicEventCheckoutPage.tsx`
-- `apps/web/src/modules/billing/PublicEventCheckoutPage.test.tsx`
+- `apps/web/src/modules/billing/PublicEventCheckoutEntryPage.tsx`
+- `apps/web/src/modules/billing/public-checkout/PublicCheckoutPageV2.tsx`
 - `apps/web/src/modules/billing/services/public-event-packages.service.ts`
 - `apps/api/app/Modules/Billing/Http/Controllers/PublicEventCheckoutController.php`
 - `apps/api/app/Modules/Billing/Http/Requests/StorePublicEventCheckoutRequest.php`
@@ -297,30 +348,24 @@ Problema de UX:
 - o checklist e correto, mas a copy ainda esta orientada a tokenizacao e consistencia tecnica
 - a area do cartao tem linguagem mais adequada para time de plataforma do que para comprador final
 
-### 9. O componente atual esta monolitico demais para uma jornada comercial
+### 9. O monolito antigo foi removido, e isso confirma a decisao estrutural
 
-Hoje `PublicEventCheckoutPage.tsx` concentra no mesmo arquivo:
+A rota publica ja nao depende mais de `PublicEventCheckoutPage.tsx`.
 
-- schema
-- validacoes
-- mascaras
-- checklist de cartao
-- deteccao de conflito de identidade
-- retomada de sessao
-- polling de checkout
-- montagem de payload
-- renderizacao completa da UI
+Agora a jornada esta distribuida em:
 
-Problema:
-
-- o problema nao esta so na copy
-- a tela tambem esta acoplada demais
-- isso dificulta transformar a experiencia em passos lineares e mais humanos
+- shell
+- stepper
+- etapa de pacote
+- etapa de dados
+- etapa de pagamento
+- mappers de payload
+- hooks de resume, pre-check e polling
 
 Leitura:
 
-- para a V2 ficar realmente boa, nao basta reescrever texto
-- e preciso quebrar a tela em blocos de jornada
+- a V2 nao ficou apenas mais bonita
+- ela tambem ficou estruturalmente mais sustentavel
 
 ### 10. O visual atual parece premium tecnico, nao compra simples
 
@@ -560,6 +605,13 @@ Mesmo sem endpoint novo, da para melhorar bastante no front:
 - esse CTA leva para login com `returnTo=/checkout/evento?resume=auth`
 - o texto da etapa 2 explica:
   - `Se este contato ja tiver cadastro, voce pode entrar para continuar mais rapido`
+
+Status real apos a V2 + PR1 de friction hardening:
+
+- o CTA manual ja salva draft seguro antes de sair
+- o pacote deep-linked continua preservado no `returnTo`
+- se o comprador ja estiver autenticado, a jornada nao passa por `/login`; ela retoma direto em `payment`
+- a retomada manual nao auto-submete Pix; ela devolve o comprador para o pagamento com os dados restaurados
 
 Mas a estrategia principal deve ser:
 
@@ -1079,7 +1131,6 @@ Atualizacao de execucao:
 
 - os itens `1`, `2`, `3`, `4` e `5` ja estao implementados na V2 padrao
 - o bloco que resta agora ficou menor:
-  - decidir quando apagar o codigo legado que nao e mais roteado
   - decidir se o metadata comercial merece schema dedicado no backend
 
 Em resumo:

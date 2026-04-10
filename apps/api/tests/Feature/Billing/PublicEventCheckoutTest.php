@@ -13,6 +13,7 @@ use App\Modules\Users\Models\User;
 use App\Modules\WhatsApp\Jobs\SendWhatsAppMessageJob;
 use App\Modules\WhatsApp\Models\WhatsAppInstance;
 use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 
@@ -108,6 +109,36 @@ it('creates a lightweight direct-customer checkout with pending billing order', 
     expect($event->commercial_mode?->value)->toBe('none');
     expect($event->retention_days)->toBe(90);
     expect($event->current_entitlements_json['modules']['wall'] ?? null)->toBeTrue();
+});
+
+it('accepts an event_date with local time in the public checkout contract and persists it on the event schedule', function () {
+    $this->seedPermissions();
+
+    $package = createPublicEventPackage([
+        'target_audience' => EventPackageAudience::DirectCustomer->value,
+        'amount_cents' => 19900,
+    ]);
+
+    $response = $this->apiPost('/public/event-checkouts', [
+        'responsible_name' => 'Mariana Alves',
+        'whatsapp' => '(48) 99988-1111',
+        'email' => 'mariana@example.com',
+        'package_id' => $package->id,
+        'event' => [
+            'title' => 'Casamento Mariana & Rafael',
+            'event_type' => 'wedding',
+            'event_date' => '2026-11-15T18:30',
+        ],
+    ]);
+
+    $this->assertApiSuccess($response, 201);
+
+    $event = Event::query()->findOrFail($response->json('data.event.id'));
+
+    expect($event->starts_at)->not->toBeNull();
+    expect($event->starts_at?->format('Y-m-d H:i'))->toBe(
+        Carbon::parse('2026-11-15T18:30')->format('Y-m-d H:i')
+    );
 });
 
 it('stores structured payer and payment metadata for a pix checkout', function () {

@@ -3,6 +3,8 @@
 namespace App\Modules\MediaProcessing\Providers;
 
 use App\Modules\MediaProcessing\Console\BackfillWallVideoVariantsCommand;
+use App\Modules\MediaProcessing\Console\MediaToolingStatusCommand;
+use App\Modules\MediaProcessing\Console\RunModerationFeedExplainCommand;
 use App\Modules\MediaProcessing\Events\MediaDeleted;
 use App\Modules\MediaProcessing\Listeners\QueueCleanupDeletedMediaArtifactsOnMediaDeleted;
 use Illuminate\Support\Facades\Event;
@@ -15,6 +17,8 @@ class MediaProcessingServiceProvider extends ServiceProvider
     {
         $this->commands([
             BackfillWallVideoVariantsCommand::class,
+            MediaToolingStatusCommand::class,
+            RunModerationFeedExplainCommand::class,
         ]);
     }
 

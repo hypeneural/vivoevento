@@ -33,6 +33,9 @@ class ListModerationMediaRequest extends FormRequest
             'pinned' => ['nullable', 'boolean'],
             'sender_blocked' => ['nullable', 'boolean'],
             'orientation' => ['nullable', Rule::in(['portrait', 'landscape', 'square'])],
+            'media_type' => ['nullable', Rule::in(['image', 'video'])],
+            'duplicates' => ['nullable', 'boolean'],
+            'ai_review' => ['nullable', 'boolean'],
         ];
     }
 }

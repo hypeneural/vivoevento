@@ -124,7 +124,7 @@ class ProcessBillingWebhookAction
             return BillingOrder::query()->find($gatewayEvent->billing_order_id);
         }
 
-        if (! empty($normalized['billing_order_uuid'])) {
+        if (! empty($normalized['billing_order_uuid']) && Str::isUuid((string) $normalized['billing_order_uuid'])) {
             return BillingOrder::query()
                 ->where('uuid', $normalized['billing_order_uuid'])
                 ->first();

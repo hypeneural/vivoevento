@@ -159,6 +159,58 @@ export function formatPersistentStorage(value: ApiWallPersistentStorage) {
   }
 }
 
+export function formatDeviceProfile(player: ApiWallDiagnosticsPlayer) {
+  const parts = [
+    player.hardware_concurrency ? `${player.hardware_concurrency} threads` : null,
+    player.device_memory_gb ? `${player.device_memory_gb} GB` : null,
+  ].filter(Boolean);
+
+  if (parts.length === 0) {
+    return 'Sem leitura de hardware';
+  }
+
+  return parts.join(' | ');
+}
+
+export function formatDeviceProfileDetail(player: ApiWallDiagnosticsPlayer) {
+  if (player.prefers_reduced_motion == null && !player.document_visibility_state) {
+    return 'O navegador nao expôs preferencia de movimento nem visibilidade.';
+  }
+
+  return [
+    player.prefers_reduced_motion == null
+      ? null
+      : player.prefers_reduced_motion
+        ? 'Reduced motion ativo'
+        : 'Reduced motion desligado',
+    player.document_visibility_state
+      ? `Documento ${player.document_visibility_state}`
+      : null,
+  ].filter(Boolean).join(' | ');
+}
+
+export function formatNetworkProfile(player: ApiWallDiagnosticsPlayer) {
+  if (!player.network_effective_type) {
+    return 'Sem leitura de rede';
+  }
+
+  return player.network_effective_type.toUpperCase();
+}
+
+export function formatNetworkProfileDetail(player: ApiWallDiagnosticsPlayer) {
+  const parts = [
+    player.network_downlink_mbps != null ? `${player.network_downlink_mbps} Mbps` : null,
+    player.network_rtt_ms != null ? `RTT ${player.network_rtt_ms}ms` : null,
+    player.network_save_data == null
+      ? null
+      : player.network_save_data
+        ? 'Economia de dados ativa'
+        : 'Sem economia de dados',
+  ].filter(Boolean);
+
+  return parts.join(' | ') || 'Sem detalhe de rede';
+}
+
 export function formatCurrentSender(value?: string | null) {
   if (!value) {
     return 'Nenhum convidado em foco agora';

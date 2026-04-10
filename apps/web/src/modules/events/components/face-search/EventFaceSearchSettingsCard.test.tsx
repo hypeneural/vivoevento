@@ -107,16 +107,20 @@ describe('EventFaceSearchSettingsCard', () => {
 
     renderCard();
 
-    expect(await screen.findByText(/collection provisionada/i)).toBeInTheDocument();
+    expect(await screen.findByText(/pronto para validacao interna/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /rodar health/i }));
+    fireEvent.click(screen.getByRole('button', { name: /ferramentas tecnicas e diagnostico/i }));
+
+    expect(await screen.findByText(/estrutura aws pronta/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /verificar aws/i }));
 
     await waitFor(() => {
       expect(getEventFaceSearchHealthMock).toHaveBeenCalledWith(42);
     });
 
-    expect(await screen.findByText(/health mais recente/i)).toBeInTheDocument();
-    expect(screen.getByText('healthy')).toBeInTheDocument();
+    expect((await screen.findAllByText(/ultima verificacao/i)).length).toBeGreaterThan(0);
+    expect(screen.getByText('Saudavel')).toBeInTheDocument();
     expect(screen.getByText('2026-04-09T12:00:00Z')).toBeInTheDocument();
   });
 
@@ -141,9 +145,10 @@ describe('EventFaceSearchSettingsCard', () => {
 
     expect(await screen.findByText(/form mockado de facesearch/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /reindexar evento/i }));
-    fireEvent.click(screen.getByRole('button', { name: /reconciliar collection/i }));
-    fireEvent.click(screen.getByRole('button', { name: /apagar collection aws/i }));
+    fireEvent.click(screen.getByRole('button', { name: /ferramentas tecnicas e diagnostico/i }));
+    fireEvent.click(screen.getByRole('button', { name: /preparar fotos antigas/i }));
+    fireEvent.click(screen.getByRole('button', { name: /conferir indexacao/i }));
+    fireEvent.click(screen.getByRole('button', { name: /apagar estrutura aws/i }));
 
     await waitFor(() => {
       expect(reindexEventFaceSearchMock).toHaveBeenCalledWith(42);

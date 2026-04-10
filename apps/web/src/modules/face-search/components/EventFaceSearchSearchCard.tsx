@@ -35,7 +35,7 @@ export function EventFaceSearchSearchCard({
     onSuccess: (response) => {
       setLastResponse(response);
       toast({
-        title: 'Busca facial concluida',
+        title: 'Busca concluida',
         description: response.total_results > 0
           ? `${response.total_results} foto(s) encontradas para esta selfie.`
           : 'Nenhuma foto correspondente foi encontrada.',
@@ -48,7 +48,7 @@ export function EventFaceSearchSearchCard({
 
       setErrorMessage(message);
       toast({
-        title: 'Falha na busca facial',
+        title: 'Falha na busca',
         description: message,
         variant: 'destructive',
       });
@@ -61,7 +61,7 @@ export function EventFaceSearchSearchCard({
         <div className="flex items-start justify-between gap-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <Search className="h-4 w-4 text-primary" />
-            Busca interna por selfie
+            Buscar fotos de uma pessoa
           </CardTitle>
           {publicSearchUrl ? (
             <Button asChild variant="outline" size="sm" className="rounded-full">
@@ -75,15 +75,15 @@ export function EventFaceSearchSearchCard({
       </CardHeader>
       <CardContent>
         <FaceSearchSearchPanel
-          title="Buscar pessoa no evento"
-          description="Use uma selfie para localizar fotos ja indexadas deste evento sem sair do backoffice."
+          title="Buscar fotos neste evento"
+          description="Use uma selfie para localizar fotos ja preparadas deste evento sem sair do painel."
           submitLabel="Buscar no evento"
           isPending={searchMutation.isPending}
           includePendingEnabled
           includePending={includePending}
           onIncludePendingChange={setIncludePending}
           disabled={!enabled}
-          disabledMessage={!enabled ? 'Ative o FaceSearch do evento para liberar a busca por selfie.' : null}
+          disabledMessage={!enabled ? 'Ative o reconhecimento facial do evento para liberar esta busca.' : null}
           requestMeta={lastResponse?.request ?? null}
           results={lastResponse?.results ?? []}
           errorMessage={errorMessage}

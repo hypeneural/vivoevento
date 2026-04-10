@@ -2,6 +2,8 @@
 
 use App\Modules\Events\Models\Event;
 use App\Modules\Clients\Models\Client;
+use App\Modules\FaceSearch\Models\FaceSearchProviderRecord;
+use App\Modules\MediaProcessing\Models\EventMedia;
 use Illuminate\Support\Facades\DB;
 
 // ─── Create Event ────────────────────────────────────────
@@ -280,6 +282,49 @@ it('shows event details with all relations', function () {
     ]);
     $response->assertJsonPath('data.face_search.enabled', true);
     $response->assertJsonPath('data.face_search.allow_public_selfie_search', true);
+});
+
+it('shows operational convergence summary in the event detail payload when aws is still preparing the old catalog', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    \Database\Factories\EventFaceSearchSettingFactory::new()->create([
+        'event_id' => $event->id,
+        'enabled' => true,
+        'allow_public_selfie_search' => true,
+        'recognition_enabled' => true,
+        'search_backend_key' => 'aws_rekognition',
+        'fallback_backend_key' => 'local_pgvector',
+        'routing_policy' => 'aws_primary_local_fallback',
+        'aws_collection_id' => 'eventovivo-face-search-event-' . $event->id,
+        'aws_search_mode' => 'faces',
+    ]);
+
+    EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'face_index_status' => 'queued',
+    ]);
+    EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'face_index_status' => 'indexed',
+    ]);
+
+    FaceSearchProviderRecord::factory()->create([
+        'event_id' => $event->id,
+        'collection_id' => 'eventovivo-face-search-event-' . $event->id,
+        'searchable' => true,
+    ]);
+
+    $response = $this->apiGet("/events/{$event->id}");
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.face_search.operational_summary.status', 'converging')
+        ->assertJsonPath('data.face_search.operational_summary.counts.queued_media', 1)
+        ->assertJsonPath('data.face_search.operational_summary.counts.indexed_media', 1)
+        ->assertJsonPath('data.face_search.operational_summary.counts.searchable_records', 1);
 });
 
 it('updates an event with nested branding privacy and modules payload', function () {

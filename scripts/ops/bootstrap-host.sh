@@ -98,6 +98,7 @@ apt-get install -y \
     ca-certificates \
     curl \
     fail2ban \
+    ffmpeg \
     git \
     gnupg \
     jq \

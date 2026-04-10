@@ -156,7 +156,7 @@ export type CheckoutResumeDraft = Omit<
   'card_number' | 'card_holder_name' | 'card_exp_month' | 'card_exp_year' | 'card_cvv'
 > & {
   version: number;
-  source: 'identity_conflict';
+  source: 'identity_conflict' | 'manual_login';
   saved_at: string;
   expires_at: string | null;
 };

@@ -24,14 +24,14 @@ type BuyerEventStepProps = {
   identityState?: PublicCheckoutIdentityCheckResponse | null;
   isCheckingIdentity?: boolean;
   onContinue: () => void;
-  loginHref: string;
+  onUseExistingAccount: () => void;
 };
 
 export function BuyerEventStep({
   identityState,
   isCheckingIdentity = false,
   onContinue,
-  loginHref,
+  onUseExistingAccount,
 }: BuyerEventStepProps) {
   const form = useFormContext<CheckoutFormValues>();
   const [showMore, setShowMore] = useState(false);
@@ -57,9 +57,9 @@ export function BuyerEventStep({
               name="event_date"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Data do evento</FormLabel>
+                  <FormLabel>Data e hora do evento</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} />
+                    <Input type="datetime-local" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -109,8 +109,8 @@ export function BuyerEventStep({
       </Collapsible>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Button variant="link" className="h-auto px-0" asChild>
-          <a href={loginHref}>Ja tenho conta</a>
+        <Button type="button" variant="link" className="h-auto px-0" onClick={onUseExistingAccount}>
+          Ja tenho conta
         </Button>
         <Button onClick={onContinue}>
           Continuar para pagamento

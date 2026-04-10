@@ -38,8 +38,6 @@ it('runs the aws users high-cardinality validation command and stores a structur
     $this->artisan('face-search:validate-aws-users-high-cardinality', [
         'event_id' => $event->id,
         '--sample-users' => 40,
-        '--min-ready-users' => 500,
-        '--target-ready-users' => 2000,
         '--report-dir' => $reportDir,
     ])->assertSuccessful();
 
@@ -52,5 +50,6 @@ it('runs the aws users high-cardinality validation command and stores a structur
     expect($report['report']['status'])->toBe('completed')
         ->and($report['report']['metrics']['ready_user_count'])->toBe(1804)
         ->and($report['report']['criteria_evaluation']['passed'])->toBeTrue()
-        ->and($report['requested_criteria']['target_ready_users'])->toBe(2000);
+        ->and($report['requested_criteria']['min_ready_users'])->toBe(20)
+        ->and($report['requested_criteria']['target_ready_users'])->toBe(30);
 });

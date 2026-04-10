@@ -22,6 +22,7 @@ class FaceSearchRouter
         iterable $backends,
         private readonly ?FaceSearchFailureClassifier $failureClassifier = null,
         private readonly ?FaceSearchMediaSourceLoader $sourceLoader = null,
+        private readonly ?FaceSearchTelemetryService $telemetry = null,
     ) {
         $this->backends = collect($backends)
             ->keyBy(fn (FaceSearchBackendInterface $backend) => $backend->key())
@@ -94,6 +95,16 @@ class FaceSearchRouter
 
         if (! isset($response['duration_ms'])) {
             $response['duration_ms'] = $primaryDurationMs;
+        }
+
+        if ($fallbackTriggered) {
+            $this->telemetry()->recordRouterFallbackTriggered($event, $settings, [
+                'primary_backend_key' => $primary->key(),
+                'response_backend_key' => $responseBackendKey,
+                'primary_duration_ms' => $primaryDurationMs,
+                'response_duration_ms' => (int) ($response['duration_ms'] ?? 0),
+                'primary_failure' => $primaryFailure,
+            ]);
         }
 
         return [
@@ -307,15 +318,23 @@ class FaceSearchRouter
                 'provider_payload_json' => $result['provider_payload_json'] ?? null,
             ];
         } catch (Throwable $exception) {
+            $failure = $this->failureClassifier()->classify($exception) + [
+                'exception_class' => $exception::class,
+                'message' => $exception->getMessage(),
+            ];
+
+            $this->telemetry()->recordRouterShadowFailed($event, $settings, [
+                'shadow_backend_key' => $backend->key(),
+                'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+                'failure' => $failure,
+            ]);
+
             return [
                 'backend_key' => $backend->key(),
                 'status' => 'failed',
                 'result_count' => 0,
                 'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
-                'failure' => $this->failureClassifier()->classify($exception) + [
-                    'exception_class' => $exception::class,
-                    'message' => $exception->getMessage(),
-                ],
+                'failure' => $failure,
             ];
         }
     }
@@ -389,6 +408,11 @@ class FaceSearchRouter
     private function sourceLoader(): FaceSearchMediaSourceLoader
     {
         return $this->sourceLoader ?? app(FaceSearchMediaSourceLoader::class);
+    }
+
+    private function telemetry(): FaceSearchTelemetryService
+    {
+        return $this->telemetry ?? app(FaceSearchTelemetryService::class);
     }
 
     private function normalizeBackendKey(?string $backendKey): string

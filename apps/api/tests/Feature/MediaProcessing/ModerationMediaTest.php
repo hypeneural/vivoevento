@@ -5,8 +5,12 @@ use App\Modules\Events\Models\EventModule;
 use App\Modules\Events\Models\EventMediaSenderBlacklist;
 use App\Modules\FaceSearch\Models\EventFaceSearchSetting;
 use App\Modules\InboundMedia\Models\InboundMessage;
+use App\Modules\MediaProcessing\Enums\MediaDecisionSource;
 use App\Modules\MediaProcessing\Enums\ModerationStatus;
+use App\Modules\MediaProcessing\Enums\PublicationStatus;
+use App\Modules\MediaProcessing\Events\MediaHidden;
 use App\Modules\MediaProcessing\Models\EventMedia;
+use Illuminate\Support\Facades\Event as EventFacade;
 use Spatie\Activitylog\Models\Activity;
 
 it('lists media catalog with organization scoped stats and smart filters', function () {
@@ -227,6 +231,176 @@ it('returns moderation stats from a dedicated endpoint aligned to the active fil
         ->assertJsonPath('data.pending', 2)
         ->assertJsonPath('data.approved', 0)
         ->assertJsonPath('data.rejected', 0);
+});
+
+it('filters the moderation feed and stats by media type, duplicate cluster, ai review and error state', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+        'moderation_mode' => 'ai',
+    ]);
+
+    \Database\Factories\EventContentModerationSettingFactory::new()->create([
+        'event_id' => $event->id,
+        'enabled' => true,
+        'mode' => 'enforced',
+    ]);
+
+    \Database\Factories\EventMediaIntelligenceSettingFactory::new()->gate()->create([
+        'event_id' => $event->id,
+        'enabled' => true,
+    ]);
+
+    $aiReviewImage = EventMedia::factory()->approved()->create([
+        'event_id' => $event->id,
+        'media_type' => 'image',
+        'safety_status' => 'review',
+        'vlm_status' => 'skipped',
+        'created_at' => now()->subMinutes(3),
+    ]);
+
+    $duplicateImage = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'media_type' => 'image',
+        'duplicate_group_key' => 'dup-filter-1',
+        'safety_status' => 'pass',
+        'vlm_status' => 'completed',
+        'created_at' => now()->subMinutes(2),
+    ]);
+
+    $videoItem = EventMedia::factory()->approved()->create([
+        'event_id' => $event->id,
+        'media_type' => 'video',
+        'mime_type' => 'video/mp4',
+        'safety_status' => 'skipped',
+        'vlm_status' => 'skipped',
+        'created_at' => now()->subMinute(),
+    ]);
+
+    $errorItem = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'media_type' => 'image',
+        'processing_status' => 'failed',
+        'moderation_status' => null,
+        'publication_status' => null,
+        'safety_status' => 'skipped',
+        'vlm_status' => 'skipped',
+    ]);
+
+    $imagesFeed = $this->apiGet('/media/feed?per_page=20&media_type=image');
+    $imagesFeed->assertOk();
+    expect(collect($imagesFeed->json('data'))->pluck('id')->all())
+        ->toContain($aiReviewImage->id, $duplicateImage->id, $errorItem->id)
+        ->not->toContain($videoItem->id);
+
+    $videosFeed = $this->apiGet('/media/feed?per_page=20&media_type=video');
+    $videosFeed->assertOk();
+    expect(collect($videosFeed->json('data'))->pluck('id')->all())
+        ->toEqual([$videoItem->id]);
+
+    $duplicatesFeed = $this->apiGet('/media/feed?per_page=20&duplicates=1');
+    $duplicatesFeed->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $duplicateImage->id);
+
+    $aiReviewFeed = $this->apiGet('/media/feed?per_page=20&ai_review=1');
+    $aiReviewFeed->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $aiReviewImage->id)
+        ->assertJsonPath('data.0.status', 'pending_moderation');
+
+    $errorFeed = $this->apiGet('/media/feed?per_page=20&status=error');
+    $errorFeed->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $errorItem->id)
+        ->assertJsonPath('data.0.status', 'error');
+
+    $aiReviewStats = $this->apiGet('/media/feed/stats?ai_review=1');
+    $this->assertApiSuccess($aiReviewStats);
+    $aiReviewStats->assertJsonPath('data.total', 1)
+        ->assertJsonPath('data.pending', 1)
+        ->assertJsonPath('data.approved', 0)
+        ->assertJsonPath('data.rejected', 0);
+
+    $videoStats = $this->apiGet('/media/feed/stats?media_type=video');
+    $this->assertApiSuccess($videoStats);
+    $videoStats->assertJsonPath('data.total', 1)
+        ->assertJsonPath('data.approved', 1);
+});
+
+it('searches the moderation feed across event title and sender identity fields', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $matchingEvent = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+        'title' => 'Festival da Identidade',
+    ]);
+
+    $matchingInbound = InboundMessage::query()->create([
+        'event_id' => $matchingEvent->id,
+        'provider' => 'zapi',
+        'message_id' => 'search-001',
+        'message_type' => 'image',
+        'chat_external_id' => '120363499999999999-group',
+        'sender_external_id' => 'sender-ana-001',
+        'sender_phone' => '554899991111',
+        'sender_lid' => 'ana-001@lid',
+        'sender_name' => 'Ana Martins',
+        'status' => 'processed',
+        'received_at' => now()->subMinutes(10),
+    ]);
+
+    $matchingMedia = EventMedia::factory()->create([
+        'event_id' => $matchingEvent->id,
+        'inbound_message_id' => $matchingInbound->id,
+        'caption' => 'Entrada principal',
+        'source_label' => 'Ana Martins',
+    ]);
+
+    $otherEvent = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+        'title' => 'Outro Evento',
+    ]);
+
+    $otherInbound = InboundMessage::query()->create([
+        'event_id' => $otherEvent->id,
+        'provider' => 'zapi',
+        'message_id' => 'search-002',
+        'message_type' => 'image',
+        'chat_external_id' => '554899992222',
+        'sender_external_id' => 'sender-caio-001',
+        'sender_phone' => '554899992222',
+        'sender_lid' => 'caio-001@lid',
+        'sender_name' => 'Caio Souza',
+        'status' => 'processed',
+        'received_at' => now()->subMinutes(9),
+    ]);
+
+    EventMedia::factory()->create([
+        'event_id' => $otherEvent->id,
+        'inbound_message_id' => $otherInbound->id,
+        'caption' => 'Outro registro',
+        'source_label' => 'Caio Souza',
+    ]);
+
+    $eventSearch = $this->apiGet('/media/feed?per_page=10&search='.urlencode('Festival da Identidade'));
+    $eventSearch->assertOk();
+
+    expect(collect($eventSearch->json('data'))->pluck('id')->all())
+        ->toContain($matchingMedia->id);
+
+    $senderNameSearch = $this->apiGet('/media/feed?per_page=10&search='.urlencode('Ana Martins'));
+    $senderNameSearch->assertOk();
+
+    expect(collect($senderNameSearch->json('data'))->pluck('id')->all())
+        ->toContain($matchingMedia->id);
+
+    $senderIdentitySearch = $this->apiGet('/media/feed?per_page=10&search='.urlencode('sender-ana-001'));
+    $senderIdentitySearch->assertOk();
+
+    expect(collect($senderIdentitySearch->json('data'))->pluck('id')->all())
+        ->toContain($matchingMedia->id);
 });
 
 it('treats whatsapp group and direct sources as the whatsapp channel in catalog filters', function () {
@@ -549,6 +723,84 @@ it('updates moderation state in bulk without leaving the organization scope', fu
     expect($mediaA->sort_order)->toBeGreaterThan(0);
     expect($mediaB->sort_order)->toBeGreaterThan(0);
     expect($mediaA->sort_order)->not->toBe($mediaB->sort_order);
+});
+
+it('lists the duplicate cluster for a moderation item within organization scope', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    $sameGroupA = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'duplicate_group_key' => 'dup-cluster-1',
+        'created_at' => now()->subMinutes(2),
+    ]);
+
+    $sameGroupB = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'duplicate_group_key' => 'dup-cluster-1',
+        'created_at' => now()->subMinute(),
+    ]);
+
+    EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'duplicate_group_key' => 'dup-cluster-2',
+    ]);
+
+    EventMedia::factory()->create([
+        'event_id' => Event::factory()->active()->create()->id,
+        'duplicate_group_key' => 'dup-cluster-1',
+    ]);
+
+    $response = $this->apiGet("/media/{$sameGroupA->id}/duplicates");
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonCount(2, 'data')
+        ->assertJsonPath('data.0.id', $sameGroupB->id)
+        ->assertJsonPath('data.1.id', $sameGroupA->id)
+        ->assertJsonPath('data.0.duplicate_group_key', 'dup-cluster-1');
+});
+
+it('undoes a manual moderation decision back to pending review', function () {
+    [$user, $organization] = $this->actingAsOwner();
+    EventFacade::fake([MediaHidden::class]);
+
+    $event = Event::factory()->active()->manualModeration()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    $media = EventMedia::factory()->approved()->create([
+        'event_id' => $event->id,
+        'publication_status' => PublicationStatus::Published->value,
+        'published_at' => now(),
+        'decision_source' => MediaDecisionSource::UserOverride->value,
+        'decision_overridden_at' => now(),
+        'decision_overridden_by_user_id' => $user->id,
+        'decision_override_reason' => 'Aprovada manualmente',
+    ]);
+
+    $response = $this->apiPost("/media/{$media->id}/undo-decision");
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.id', $media->id)
+        ->assertJsonPath('data.status', 'pending_moderation')
+        ->assertJsonPath('data.moderation_status', 'pending')
+        ->assertJsonPath('data.publication_status', 'draft')
+        ->assertJsonPath('data.decision_source', null)
+        ->assertJsonPath('data.decision_override_reason', null)
+        ->assertJsonPath('data.published_at', null);
+
+    $media->refresh();
+
+    expect($media->moderation_status)->toBe(ModerationStatus::Pending)
+        ->and($media->publication_status)->toBe(PublicationStatus::Draft)
+        ->and($media->decision_source)->toBeNull()
+        ->and($media->decision_override_reason)->toBeNull()
+        ->and($media->published_at)->toBeNull();
+
+    EventFacade::assertDispatched(MediaHidden::class);
 });
 
 it('shows pinned media first in the public gallery', function () {

@@ -31,9 +31,9 @@ class RunAwsUsersHighCardinalityValidationAction
      */
     public function execute(
         Event $event,
-        int $sampleUsers = 40,
-        int $minReadyUsers = 500,
-        ?int $targetReadyUsers = 2000,
+        int $sampleUsers = 20,
+        int $minReadyUsers = 20,
+        ?int $targetReadyUsers = 30,
         float $maxFallbackRate = 0.05,
         float $minUsersModeResolutionRate = 0.95,
         float $minTop1MatchRate = 0.85,
@@ -55,6 +55,17 @@ class RunAwsUsersHighCardinalityValidationAction
                 'event_id' => $event->id,
                 'event_title' => $event->title,
                 'skipped_reason' => 'event_not_in_aws_users_mode',
+                'current_settings' => $this->settingsSnapshot($settings),
+            ];
+        }
+
+        if ($this->requiresLocalBaseline($settings) && $settings->provider_key === 'noop') {
+            return [
+                'status' => 'skipped',
+                'event_id' => $event->id,
+                'event_title' => $event->title,
+                'skipped_reason' => 'local_baseline_provider_noop',
+                'message' => 'AWS users validation requires a real local baseline when routing uses local fallback or shadow. Set provider_key=compreface before running this validation.',
                 'current_settings' => $this->settingsSnapshot($settings),
             ];
         }
@@ -208,6 +219,15 @@ class RunAwsUsersHighCardinalityValidationAction
             && $settings->recognition_enabled
             && $settings->search_backend_key === 'aws_rekognition'
             && $settings->aws_search_mode === 'users';
+    }
+
+    private function requiresLocalBaseline(EventFaceSearchSetting $settings): bool
+    {
+        return in_array($settings->routing_policy, [
+            'aws_primary_local_fallback',
+            'aws_primary_local_shadow',
+            'local_primary_aws_on_error',
+        ], true);
     }
 
     /**

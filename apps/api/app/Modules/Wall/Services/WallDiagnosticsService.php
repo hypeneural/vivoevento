@@ -17,6 +17,7 @@ class WallDiagnosticsService
 
     public function __construct(
         private readonly WallDisplayCounterService $displayCounters,
+        private readonly WallVideoAnalyticsService $videoAnalytics,
     ) {}
 
     public function recordHeartbeat(EventWallSetting $settings, array $payload): WallPlayerRuntimeStatus
@@ -25,6 +26,7 @@ class WallDiagnosticsService
             'event_wall_setting_id' => $settings->id,
             'player_instance_id' => $payload['player_instance_id'],
         ]);
+        $previous = $player->exists ? clone $player : null;
 
         $currentItemId = $payload['current_item_id'] ?? null;
 
@@ -61,6 +63,18 @@ class WallDiagnosticsService
             'current_video_startup_degraded' => array_key_exists('current_video_startup_degraded', $payload)
                 ? (bool) $payload['current_video_startup_degraded']
                 : null,
+            'hardware_concurrency' => $payload['hardware_concurrency'] ?? null,
+            'device_memory_gb' => $payload['device_memory_gb'] ?? null,
+            'network_effective_type' => $payload['network_effective_type'] ?? null,
+            'network_save_data' => array_key_exists('network_save_data', $payload)
+                ? (bool) $payload['network_save_data']
+                : null,
+            'network_downlink_mbps' => $payload['network_downlink_mbps'] ?? null,
+            'network_rtt_ms' => $payload['network_rtt_ms'] ?? null,
+            'prefers_reduced_motion' => array_key_exists('prefers_reduced_motion', $payload)
+                ? (bool) $payload['prefers_reduced_motion']
+                : null,
+            'document_visibility_state' => $payload['document_visibility_state'] ?? null,
             'ready_count' => (int) ($payload['ready_count'] ?? 0),
             'loading_count' => (int) ($payload['loading_count'] ?? 0),
             'error_count' => (int) ($payload['error_count'] ?? 0),
@@ -82,6 +96,7 @@ class WallDiagnosticsService
         $freshPlayer = $player->fresh() ?? $player;
 
         $this->displayCounters->recordDisplayedMedia($settings, $freshPlayer);
+        $this->videoAnalytics->recordFromHeartbeat($settings, $previous, $freshPlayer);
 
         return $freshPlayer;
     }
@@ -184,6 +199,14 @@ class WallDiagnosticsService
             'current_video_playback_ready' => $player->current_video_playback_ready,
             'current_video_playing_confirmed' => $player->current_video_playing_confirmed,
             'current_video_startup_degraded' => $player->current_video_startup_degraded,
+            'hardware_concurrency' => $player->hardware_concurrency,
+            'device_memory_gb' => $player->device_memory_gb,
+            'network_effective_type' => $player->network_effective_type,
+            'network_save_data' => $player->network_save_data,
+            'network_downlink_mbps' => $player->network_downlink_mbps,
+            'network_rtt_ms' => $player->network_rtt_ms,
+            'prefers_reduced_motion' => $player->prefers_reduced_motion,
+            'document_visibility_state' => $player->document_visibility_state,
             'ready_count' => (int) $player->ready_count,
             'loading_count' => (int) $player->loading_count,
             'error_count' => (int) $player->error_count,

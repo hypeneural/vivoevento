@@ -231,7 +231,8 @@ Comportamento:
 - `staleTime` local da query: `15s`;
 - `refetchOnWindowFocus`: globalmente desativado;
 - `refetchOnReconnect`: globalmente ativado.
-- o `queryFn` atual nao consome o `signal` do TanStack Query, entao a rota ainda nao tem cancelamento real ponta a ponta.
+- o `queryFn` agora consome o `signal` do TanStack Query no feed, nas `stats` e no detalhe focado.
+- ao focar uma midia, a pagina agora tambem faz `prefetch` do proximo detalhe para reduzir waterfall no painel lateral.
 
 O infinite scroll e disparado por `IntersectionObserver` com `rootMargin: '1200px 0px'`.
 
@@ -251,7 +252,7 @@ Hoje a paginacao real da pagina e:
 
 Nao existe paginacao numerica ativa no fluxo.
 
-O componente `ModerationPagination.tsx` continua no modulo, mas nao e usado pela rota atual. Isso indica que a pagina ja passou por outra estrategia ou ficou com codigo morto no modulo.
+O componente legado `ModerationPagination.tsx` foi removido nesta entrega para travar o modulo no fluxo real de cursor + infinite scroll e reduzir ruido de manutencao.
 
 ### 4. Ordenacao atual
 
@@ -719,6 +720,7 @@ Ja existe boa base de produtividade:
 - `Ctrl/Cmd + A` para selecionar carregadas;
 - `J/K` ou setas para navegar;
 - `A` aprova;
+- `Shift + A` aprova e avanca para a proxima pendente;
 - `R` reprova;
 - `F` favorita;
 - `P` fixa;
@@ -726,7 +728,13 @@ Ja existe boa base de produtividade:
 - `Enter` amplia;
 - `Esc` fecha ou limpa selecao.
 
-Esse e um dos pontos mais fortes da pagina hoje.
+Essa entrega tambem adicionou:
+
+- toggle de `auto-advance` no painel lateral;
+- botao explicito `Aprovar e proxima`;
+- dialog de reprovacao com motivos rapidos e motivo customizado para item unico ou selecao em lote.
+
+Esse continua sendo um dos pontos mais fortes da pagina hoje.
 
 ### 12. Realtime
 
@@ -834,55 +842,91 @@ Impacto:
 
 Isso tambem contribui para sensacao de tela instavel.
 
-### P7. A rota ainda nao tem cancelamento real end-to-end
+### P7. Resolvido nesta entrega: a rota agora tem cancelamento real end-to-end
 
 Hoje:
 
-- `api.ts` consegue encaminhar `AbortSignal`;
-- mas `ModerationPage` e `moderation.service.ts` ainda nao propagam esse `signal`.
+- `api.ts` encaminha `AbortSignal`;
+- `moderation.service.ts` propaga `signal` em `list`, `listStats` e `show`;
+- `ModerationPage` consome o `signal` nas queries principais da rota.
 
 Impacto:
 
-- requests antigas de busca e filtro continuam completando;
-- respostas obsoletas podem disputar o mesmo cache e a mesma arvore visual;
-- a UX de filtro rapido perde previsibilidade.
+- requests antigas de busca e filtro deixam de disputar o mesmo cache;
+- a UX de filtro rapido fica mais previsivel;
+- o feed perde uma fonte real de churn por respostas obsoletas.
 
-### P8. Query do feed ainda nao esta indexada para este caso quente
+### P8. Validado nesta entrega: a query quente do feed agora tem indices compostos dedicados
 
-O feed ordena por:
+O backend agora ganhou uma migration operacional com:
 
-- `sort_order`
-- `moderation_status`
-- `created_at`
-- `id`
-
-Mas o schema atual nao mostra indice composto alinhado a isso.
-
-Tambem nao ha indice pensado para:
-
-- feed de moderacao por organizacao/evento;
-- filtros rapidos por `moderation_status`;
-- ordenacao combinada com `sort_order`;
-- busca textual multi-campo.
+- B-tree composta para `event_id + sort_order + moderation_status + created_at + id`;
+- B-tree composta para `event_id + publication_status + processing_status + created_at + id`;
+- predicado `WHERE deleted_at IS NULL` no caminho quente de `event_media`.
 
 Impacto:
 
-- conforme a base crescer, a fila vai degradar;
-- filtros e scroll vao depender cada vez mais de sort/scan caro.
+- o feed deixa de depender so dos indices genericos da tabela;
+- o custo do caminho quente fica mais aderente ao contrato de ordenacao e filtros;
+- a rerodagem com o comando dedicado `media:moderation-feed-explain` mostrou que o planner ainda prefere `Seq Scan` no dataset local atual, o que continua coerente com o volume ainda moderado:
+  - `event_media = 562`
+  - `inbound_messages = 43`
+  - `organization 1 = 253` midias no recorte quente
+- tempos medidos na ultima leitura local:
+  - feed por organizacao: ~`4.6ms`
+  - feed por evento quente (`event_id = 5`): ~`0.8ms`
+  - feed com `status = pending_moderation`: ~`2.6ms`
 
-### P9. Busca textual e cara
+Decisao:
 
-A busca atual faz `LIKE`/`ILIKE` em varios campos e ainda entra em `whereHas` para:
+- nao adicionar `partial index` extra agora;
+- o predicado de `effective state` ainda depende de `CASE` com joins de configuracao e nao casa bem com `partial index` reconhecivel pelo planner.
 
-- evento;
-- inbound message;
-- remetente.
+### P9. Promovida nesta entrega: a busca textual ganhou `search document` dedicado
 
-Isso funciona para escala pequena/media.
+A busca do feed agora:
 
-Nao e uma estrategia profissional de busca para fila operacional quente.
+- usa `event_media.moderation_search_document` como documento denormalizado de busca operacional;
+- deixou de fazer `left join` direto de `inbound_messages` para o hot path do `/media/feed`;
+- remove o `orWhereHas('inboundMessage')` do trecho mais sensivel da query;
+- ganhou indice GIN com `pg_trgm` em `event_media.moderation_search_document`;
+- ganhou fast path para termo que bate exatamente com titulo de evento, aplicando `event_id` antes do documento textual amplo.
 
-### P10. Painel lateral sempre busca detalhe por foco
+Impacto:
+
+- a busca deixa de depender de subquery relacional no fluxo quente;
+- o banco passa a ter uma base mais profissional para `LIKE`/`ILIKE` com wildcard em um unico campo;
+- a sonda sintetica com `5.000` midias mostrou que a forma anterior estourava o budget de `500ms` em `search_sender_name_hot`;
+- depois do `search document`, a mesma sonda com `--disable-jit` ficou dentro do budget:
+  - feed por organizacao: ~`35ms`
+  - feed por evento quente: ~`61ms`
+  - feed com `status = pending_moderation`: ~`32ms`
+  - busca por `event title`: ~`98ms`
+  - busca por `sender name`: ~`56ms`
+- a sonda ampliada com `20.000` midias reabriu a discussao porque busca pelo titulo completo do evento virou match de baixa seletividade;
+- depois do fast path por titulo exato de evento, a sonda de `20.000` midias ficou dentro do budget:
+  - feed por organizacao: ~`113ms`
+  - feed por evento quente: ~`207ms`
+  - feed com `status = pending_moderation`: ~`105ms`
+  - busca por `event title`: ~`254ms`
+  - busca por `sender name`: ~`30ms`
+- a mesma sonda com JIT habilitado mostrou que o PostgreSQL pode gastar mais de `2s` apenas com compilacao JIT nessa query, entao homolog/producao precisam validar a politica de JIT para queries OLTP do painel;
+- o modulo agora tem um comando dedicado para repetir essa medicao em PostgreSQL real sem depender de script ad hoc:
+  - `php artisan media:moderation-feed-explain`
+  - budgets formais desta rota: `feed = 700ms`, `search = 500ms`
+  - com `--synthetic-media`, o comando cria volume transacional e faz rollback;
+  - com `--disable-jit`, o comando mede a query sem custo de compilacao JIT;
+  - com `--fail-on-budget`, o comando pode virar gate operacional de homolog.
+
+Decisao:
+
+- `search document` dedicado foi promovido nesta rodada;
+- busca por titulo exato de evento nao deve mais passar pelo documento textual amplo; ela vira filtro por `event_id`;
+- nao adicionar `partial index` extra agora;
+- a validacao adicional com as chaves locais desta maquina confirmou que o ambiente efetivo ainda e `APP_ENV=local` com PostgreSQL em `127.0.0.1:5433`;
+- repetir a medicao em homolog real quando houver credencial/configuracao disponivel.
+
+### P10. Mitigado nesta entrega: o painel lateral ainda busca detalhe por foco, mas agora aquece o proximo item
 
 Isso melhora riqueza do review, mas custa:
 
@@ -890,13 +934,25 @@ Isso melhora riqueza do review, mas custa:
 - refresh do painel;
 - variacao de layout ao entrar IA e dados complementares.
 
-Em lote grande de revisao, pode gerar ruído desnecessario.
+Mitigacao aplicada:
 
-### P11. Existe codigo morto/legado no modulo
+- ao focar uma midia, a pagina faz `prefetch` do proximo detalhe carregado na fila;
+- o painel deixa de depender exclusivamente de fetch frio em navegacao sequencial.
 
-`ModerationPagination.tsx` nao entra no fluxo atual.
+Em lote grande de revisao, isso reduz ruido, mas ainda nao elimina o request extra por foco.
 
-Isso nao quebra a pagina, mas indica que o modulo ainda nao esta fechado como design final.
+### P11. Resolvido nesta entrega: o codigo morto de paginacao saiu do modulo
+
+Estado atual:
+
+- `ModerationPagination.tsx` foi removido do modulo;
+- o teste de arquitetura trava a ausencia da paginacao numerica legada;
+- o fluxo real da rota continua explicitamente cursorizado e orientado a infinite scroll.
+
+Impacto:
+
+- menos ruido cognitivo para o time;
+- menos chance de reintroduzir uma estrategia antiga por acidente.
 
 ### P12. Justificativa de IA so aparece no painel lateral
 
@@ -1072,26 +1128,38 @@ Mesmo que isso nao seja a causa principal do flicker, websocket instavel piora a
 Para reduzir duvidas na documentacao, esta rodada adicionou cobertura especifica em:
 
 - `apps/web/src/modules/moderation/components/ModerationReviewPanel.test.tsx`
-  - valida nome do remetente, badge de canal e renderer de video no painel de revisao com `preview_url` real e `poster` consistente;
+  - valida nome do remetente, badge de canal, renderer de video, toggle de `auto-advance` e acao `Aprovar e proxima` no painel de revisao;
 - `apps/web/src/modules/moderation/components/ModerationMediaSurface.test.tsx`
   - valida `loading`, `error fallback` e escolha correta de `preview_url` + `thumbnail_url` para video;
+- `apps/web/src/modules/moderation/services/moderation.service.test.ts`
+  - valida propagacao de `reason` nas acoes unitarias e em lote de moderacao;
 - `apps/web/src/lib/api.realtime.test.ts`
   - valida que `api.ts` encaminha `AbortSignal` e injeta `X-Socket-ID` quando o socket estiver ativo;
 - `apps/web/src/app/routing/router-architecture.test.ts`
   - valida que o shell agora usa data router com `RouterProvider` e `ScrollRestoration`;
 - `apps/web/src/app/routing/scroll-restoration.test.ts`
   - valida a chave estavel de restauracao de scroll para `/moderation`;
+- `apps/web/src/modules/moderation/moderation-architecture.test.ts`
+  - valida `prefetch` do proximo detalhe, ausencia da paginacao legada e o wiring de `approve-and-next` + motivos rapidos no `ModerationPage`;
 - `apps/web/src/modules/wall/player/engine/selectors.test.ts`
   - valida que `is_featured` influencia a escolha do proximo item do telao;
 - `apps/api/tests/Feature/Gallery/PublicGalleryAvailabilityTest.php`
   - valida payload de video na galeria publica com poster em `thumbnail_url` e asset de parede em `preview_url`.
 - `apps/api/tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php`
-  - valida o endpoint dedicado de `stats` e a supressao de eco da moderacao com `broadcast(...)->toOthers()`.
+  - valida o endpoint dedicado de `stats`, a supressao de eco da moderacao com `broadcast(...)->toOthers()`, a presenca da migration de indices do feed e o registro do comando de benchmark da moderacao;
+- `apps/api/tests/Unit/Modules/MediaProcessing/ModerationFeedExplainAnalyzeServiceTest.php`
+  - valida a leitura do plano JSON do PostgreSQL, a decisao de promover ou nao `search document` por budget e o estado de follow-up quando o documento ja existe mas algum cenario passa de `500ms`;
+- `apps/api/tests/Unit/Modules/MediaProcessing/ModerationSearchDocumentBuilderTest.php`
+  - valida normalizacao do documento denormalizado de busca da moderacao;
+- `apps/api/tests/Feature/MediaProcessing/RunModerationFeedExplainCommandTest.php`
+  - valida que o comando falha de forma controlada fora de PostgreSQL real.
 
 Continuam relevantes como base anterior:
 
 - `apps/api/tests/Feature/MediaProcessing/ModerationMediaTest.php`
-  - sender context, bloqueio, favorite/pin, ordenacao publica por fixacao e contrato do feed com `thumbnail_source`, `preview_source` e `updated_at`;
+  - sender context, bloqueio, favorite/pin, ordenacao publica por fixacao, contrato do feed com `thumbnail_source`, `preview_source` e `updated_at`, alem da busca por `event title` e identidade do remetente;
+- `apps/api/tests/Feature/MediaProcessing/ModerationFeedCharacterizationTest.php`
+  - valida alinhamento de estado efetivo, surfaces de moderacao sem fallback para original e fast path de busca por titulo exato de evento;
 - `apps/api/tests/Feature/MediaProcessing/EventMediaListTest.php`
   - detalhe de IA com `latest_safety_evaluation` e `latest_vlm_evaluation`, alem do contrato enriquecido de asset source.
 
@@ -1242,21 +1310,24 @@ Isso melhora manutencao e reduz ruido cognitivo para o time.
 
 ## O que melhorar para facilitar a moderacao manual
 
-### 1. Auto-advance configuravel
+### 1. Entregue nesta entrega: auto-advance configuravel
 
-Depois de aprovar ou reprovar:
+Estado atual:
 
-- avancar para o proximo `pending`;
-- opcao de manter no item atual;
-- opcao de avancar apenas quando acao for bem sucedida.
+- toggle de `auto-advance` no painel lateral;
+- o foco so avanca depois de mutation bem-sucedida;
+- quando desligado, o operador continua no item atual.
 
-### 2. Acao "aprovar e proxima"
+### 2. Entregue nesta entrega: acao "aprovar e proxima"
 
-Esse e o atalho mais valioso em fila operacional.
+Estado atual:
 
-### 3. Razoes rapidas de reprovacao
+- botao `Aprovar e proxima` no painel lateral;
+- atalho `Shift + A` para o mesmo fluxo no teclado.
 
-Adicionar presets:
+### 3. Entregue nesta entrega: razoes rapidas de reprovacao
+
+Estado atual:
 
 - conteudo inadequado;
 - baixa qualidade;
@@ -1264,10 +1335,11 @@ Adicionar presets:
 - fora do contexto;
 - spam.
 
-Com opcao de combinar com:
+O fluxo atual tambem permite:
 
-- bloquear remetente;
-- manter sem bloqueio.
+- reprovar sem motivo;
+- escrever motivo customizado com ate `500` caracteres;
+- reaproveitar o mesmo dialog para selecao em lote.
 
 ### 4. Modo "somente pendentes"
 
@@ -1277,16 +1349,20 @@ Deixar isso mais forte no produto:
 - contador de fila restante;
 - posicao do item atual na fila.
 
-### 5. Revisao por cluster de duplicata
+### 5. Resolvido nesta entrega: revisao por cluster de duplicata
 
-Hoje a pagina marca duplicata, mas ainda modera item a item.
+Estado atual:
 
-Melhor fluxo:
+- o painel lateral carrega `GET /media/{id}/duplicates` para a midia focada;
+- a lista fica restrita ao mesmo `duplicate_group_key` dentro do mesmo evento;
+- o operador consegue abrir outra captura do grupo sem sair do fluxo principal;
+- o painel expoe a acao `Rejeitar demais como duplicada`, reaproveitando `bulkReject` com motivo rapido `Duplicada`.
 
-- abrir grupo;
-- aprovar uma principal;
-- rejeitar/restante;
-- promover melhor enquadramento.
+Impacto:
+
+- a triagem de duplicatas deixa de depender de memoria ou busca manual;
+- a troca de enquadramento dentro do grupo fica imediata;
+- o fluxo de "manter a melhor e reprovar o resto" fica viavel na propria rota de moderacao.
 
 ### 6. Prefetch do proximo item
 
@@ -1297,12 +1373,21 @@ Enquanto o operador revisa o item atual:
 
 Isso reduz o refresh visual do painel lateral.
 
-### 7. Undo curto apos acoes
+### 7. Resolvido nesta entrega: undo curto apos acoes
 
-Depois de aprovar ou reprovar:
+Estado atual:
 
-- toast com desfazer por alguns segundos;
-- sem depender de achar o item de novo.
+- acoes unitarias de `approve`, `reject`, `favorite` e `pin` agora abrem toast com `Desfazer`;
+- `approve` e `reject` usam endpoint dedicado `POST /media/{id}/undo-decision`;
+- o undo de decisao manual devolve a midia para `pending + draft` e limpa `decision_source`, `decision_overridden_*` e `decision_override_reason`;
+- `favorite` e `pin` usam a trilha inversa ja existente para restaurar o estado anterior;
+- ao desfazer, a pagina atualiza feed, detalhe, stats e foco sem recarregar a rota inteira.
+
+Impacto:
+
+- o operador consegue corrigir erro operacional rapido sem "caçar" o item de novo;
+- o undo fica tecnicamente correto, sem transformar desfazer em uma nova rejeicao;
+- a fila ganha seguranca operacional sem aumentar churn estrutural do feed.
 
 ### 8. Filtros mais operacionais
 
@@ -1335,6 +1420,10 @@ Faz sentido considerar:
 
 ### Fase 3 - melhorar produtividade operacional
 
+Status atual:
+
+- `1`, `2`, `3`, `4` e `5` concluidos nesta entrega.
+
 1. auto-advance;
 2. aprovar e proxima;
 3. motivos rapidos de reprova;
@@ -1362,11 +1451,21 @@ Status consolidado ate esta entrega:
 - [x] criar `moderation_thumb` e `moderation_preview`;
 - [x] impedir fallback para original no feed da moderacao com fields dedicados;
 - [x] tratar scroll restoration no router com data router + `ScrollRestoration`;
-- [ ] adicionar indice composto para ordenacao do feed;
-- [ ] revisar busca textual do feed;
-- [ ] prefetch do proximo detalhe;
-- [ ] adicionar auto-advance e razoes de reprova;
-- [ ] remover codigo morto de paginacao nao usada.
+- [x] adicionar indice composto para ordenacao do feed;
+- [x] revisar busca textual do feed;
+- [x] prefetch do proximo detalhe;
+- [x] validar os indices do feed com `EXPLAIN ANALYZE` em PostgreSQL real;
+- [x] criar comando para repetir o benchmark do feed em PostgreSQL real com budget operacional formal;
+- [x] repetir o benchmark com volume maior sintetico e rollback transacional;
+- [x] promover `search document` dedicado apos `search_sender_name_hot` sair do budget em volume maior;
+- [x] validar `search document` com `5.000` midias sinteticas e `--disable-jit` dentro do budget;
+- [x] reabrir a sonda com `20.000` midias sinteticas e corrigir `search_event_title_hot` com fast path por `event_id`;
+- [x] validar `20.000` midias sinteticas com `search document`, fast path de titulo exato e `--disable-jit` dentro do budget;
+- [ ] repetir o benchmark com o comando novo em homolog real quando houver credencial/configuracao disponivel;
+- [x] adicionar auto-advance e razoes de reprova;
+- [x] adicionar revisao por cluster de duplicata;
+- [x] adicionar undo curto apos acoes unitarias;
+- [x] remover codigo morto de paginacao nao usada.
 
 ## Conclusao
 

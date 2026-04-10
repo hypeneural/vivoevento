@@ -2,6 +2,7 @@
 
 use App\Modules\Events\Models\Event;
 use App\Modules\Events\Models\EventModule;
+use App\Modules\FaceSearch\Models\EventFaceSearchSetting;
 use App\Modules\MediaProcessing\Enums\ModerationStatus;
 use App\Modules\MediaProcessing\Enums\PublicationStatus;
 use App\Modules\MediaProcessing\Models\EventMedia;
@@ -33,6 +34,13 @@ it('returns only approved published media with optimized public gallery metadata
     $event = Event::factory()->active()->create();
 
     EventModule::query()->create(['event_id' => $event->id, 'module_key' => 'live', 'is_enabled' => true]);
+    EventFaceSearchSetting::factory()->publicSelfieSearch()->create([
+        'event_id' => $event->id,
+        'recognition_enabled' => true,
+        'search_backend_key' => 'aws_rekognition',
+        'routing_policy' => 'aws_primary_local_fallback',
+        'aws_collection_id' => "eventovivo-face-search-event-{$event->id}",
+    ]);
 
     $published = EventMedia::factory()->published()->create([
         'event_id' => $event->id,
@@ -82,6 +90,8 @@ it('returns only approved published media with optimized public gallery metadata
     $response->assertOk()
         ->assertJsonPath('success', true)
         ->assertJsonPath('meta.total', 1)
+        ->assertJsonPath('meta.face_search.public_search_enabled', true)
+        ->assertJsonPath('meta.face_search.find_me_url', $event->publicFindMeUrl())
         ->assertJsonPath('data.0.id', $published->id)
         ->assertJsonPath('data.0.caption', 'Entrada dos noivos')
         ->assertJsonPath('data.0.orientation', 'portrait')

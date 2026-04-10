@@ -104,6 +104,8 @@ export interface WallSettings {
   show_side_thumbnails: boolean;
   accepted_orientation: WallAcceptedOrientation;
   video_enabled: boolean;
+  public_upload_video_enabled?: boolean;
+  private_inbound_video_enabled?: boolean;
   video_playback_mode: WallVideoPlaybackMode;
   video_max_seconds: number;
   video_resume_mode: WallVideoResumeMode;
@@ -180,6 +182,14 @@ export interface WallHeartbeatPayload {
   current_video_playback_ready?: boolean | null;
   current_video_playing_confirmed?: boolean | null;
   current_video_startup_degraded?: boolean | null;
+  hardware_concurrency?: number | null;
+  device_memory_gb?: number | null;
+  network_effective_type?: 'slow-2g' | '2g' | '3g' | '4g' | 'unknown' | null;
+  network_save_data?: boolean | null;
+  network_downlink_mbps?: number | null;
+  network_rtt_ms?: number | null;
+  prefers_reduced_motion?: boolean | null;
+  document_visibility_state?: 'visible' | 'hidden' | 'prerender' | 'unloaded' | null;
   ready_count: number;
   loading_count: number;
   error_count: number;
@@ -235,6 +245,14 @@ export interface WallDiagnosticsPlayer {
   current_video_playback_ready?: boolean | null;
   current_video_playing_confirmed?: boolean | null;
   current_video_startup_degraded?: boolean | null;
+  hardware_concurrency?: number | null;
+  device_memory_gb?: number | null;
+  network_effective_type?: WallHeartbeatPayload['network_effective_type'];
+  network_save_data?: boolean | null;
+  network_downlink_mbps?: number | null;
+  network_rtt_ms?: number | null;
+  prefers_reduced_motion?: boolean | null;
+  document_visibility_state?: WallHeartbeatPayload['document_visibility_state'];
   current_sender_key?: string | null;
   ready_count: number;
   loading_count: number;

@@ -32,6 +32,14 @@ function makePlayer(overrides: Partial<ApiWallDiagnosticsPlayer> = {}): ApiWallD
     cache_miss_count: 4,
     cache_stale_fallback_count: 0,
     cache_hit_rate: 86,
+    hardware_concurrency: 8,
+    device_memory_gb: 16,
+    network_effective_type: '4g',
+    network_save_data: false,
+    network_downlink_mbps: 24.5,
+    network_rtt_ms: 68,
+    prefers_reduced_motion: false,
+    document_visibility_state: 'visible',
     last_sync_at: '2026-04-08T22:04:34Z',
     last_seen_at: '2026-04-08T22:04:41Z',
     last_fallback_reason: null,
@@ -64,6 +72,8 @@ describe('WallPlayerDetailsSheet', () => {
     expect(screen.getByText(/Detalhes da tela conectada/i)).toBeInTheDocument();
     expect(screen.getByText(/Tudo esta estavel nesta tela agora/i)).toBeInTheDocument();
     expect(screen.getByText(/Convidado via WhatsApp/i)).toBeInTheDocument();
+    expect(screen.getByText(/8 threads/i)).toBeInTheDocument();
+    expect(screen.getByText(/^4G$/)).toBeInTheDocument();
   });
 
   it('usa drawer no mobile', async () => {

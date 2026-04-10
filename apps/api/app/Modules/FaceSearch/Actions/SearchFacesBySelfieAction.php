@@ -8,6 +8,7 @@ use App\Modules\FaceSearch\Models\EventFaceSearchRequest;
 use App\Modules\FaceSearch\Models\EventFaceSearchSetting;
 use App\Modules\FaceSearch\Models\FaceSearchQuery;
 use App\Modules\FaceSearch\Queries\CollapseFaceSearchMatchesQuery;
+use App\Modules\FaceSearch\Services\FaceSearchTelemetryService;
 use App\Modules\FaceSearch\Services\FaceSearchRouter;
 use App\Modules\FaceSearch\Services\SelfiePreflightService;
 use App\Modules\MediaProcessing\Enums\ModerationStatus;
@@ -26,6 +27,7 @@ class SearchFacesBySelfieAction
         private readonly FaceSearchRouter $router,
         private readonly SelfiePreflightService $selfiePreflight,
         private readonly CollapseFaceSearchMatchesQuery $collapseMatches,
+        private readonly FaceSearchTelemetryService $telemetry,
     ) {}
 
     /**
@@ -188,8 +190,20 @@ class SearchFacesBySelfieAction
                 )),
             ])->save();
 
+            $request = $request->refresh();
+            $query = $query?->refresh();
+
+            $this->telemetry->recordQueryCompleted(
+                event: $event,
+                request: $request,
+                query: $query,
+                execution: $execution,
+                results: $results,
+                publicSearch: $publicSearch,
+            );
+
             return [
-                'request' => $request->refresh(),
+                'request' => $request,
                 'results' => $results,
             ];
         } catch (ValidationException $exception) {
@@ -205,6 +219,14 @@ class SearchFacesBySelfieAction
                 'status' => 'failed',
             ])->save();
 
+            $this->telemetry->recordQueryValidationFailed(
+                event: $event,
+                request: $request->refresh(),
+                query: $query?->refresh(),
+                exception: $exception,
+                publicSearch: $publicSearch,
+            );
+
             throw $exception;
         } catch (Throwable $exception) {
             $query?->forceFill([
@@ -218,6 +240,14 @@ class SearchFacesBySelfieAction
             $request->forceFill([
                 'status' => 'failed',
             ])->save();
+
+            $this->telemetry->recordQueryFailed(
+                event: $event,
+                request: $request->refresh(),
+                query: $query?->refresh(),
+                exception: $exception,
+                publicSearch: $publicSearch,
+            );
 
             throw $exception;
         }

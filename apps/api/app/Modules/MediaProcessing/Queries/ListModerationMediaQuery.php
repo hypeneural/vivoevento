@@ -55,25 +55,7 @@ class ListModerationMediaQuery
                 'inboundMessage',
             ])
             ->when($this->eventId, fn (Builder $builder) => $builder->where('event_media.event_id', $this->eventId))
-            ->when($this->search !== null && trim($this->search) !== '', function (Builder $builder) {
-                $term = '%' . trim((string) $this->search) . '%';
-                $like = $this->likeOperator();
-
-                $builder->where(function (Builder $nested) use ($term, $like) {
-                    $nested
-                        ->where('event_media.caption', $like, $term)
-                        ->orWhere('event_media.title', $like, $term)
-                        ->orWhere('event_media.source_label', $like, $term)
-                        ->orWhere('event_media.original_filename', $like, $term)
-                        ->orWhere('events.title', $like, $term)
-                        ->orWhereHas('inboundMessage', function (Builder $query) use ($like, $term) {
-                            $query->where('sender_name', $like, $term)
-                                ->orWhere('sender_phone', $like, $term)
-                                ->orWhere('sender_lid', $like, $term)
-                                ->orWhere('sender_external_id', $like, $term);
-                        });
-                });
-            })
+            ->when($this->search !== null && trim($this->search) !== '', fn (Builder $builder) => $this->applySearch($builder))
             ->when($this->featured !== null, fn (Builder $builder) => $builder->where('event_media.is_featured', $this->featured))
             ->when($this->pinned !== null, function (Builder $builder) {
                 $operator = $this->pinned ? '>' : '=';
@@ -257,6 +239,40 @@ class ListModerationMediaQuery
     private function projection(): ModerationFeedStateProjection
     {
         return $this->projection ?? new ModerationFeedStateProjection();
+    }
+
+    private function applySearch(Builder $builder): void
+    {
+        $term = trim((string) $this->search);
+
+        if ($term === '') {
+            return;
+        }
+
+        $matchingEventIds = $this->eventIdsMatchingExactSearchTitle($term);
+
+        if ($matchingEventIds !== []) {
+            $builder->whereIn('event_media.event_id', $matchingEventIds);
+
+            return;
+        }
+
+        $like = $this->likeOperator();
+        $pattern = '%' . $term . '%';
+
+        $builder->where('event_media.moderation_search_document', $like, $pattern);
+    }
+
+    private function eventIdsMatchingExactSearchTitle(string $term): array
+    {
+        return DB::table('events')
+            ->where('organization_id', $this->organizationId)
+            ->whereNull('deleted_at')
+            ->where('title', $this->likeOperator(), $term)
+            ->limit(50)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 
     private function sortOrderExpression(): string

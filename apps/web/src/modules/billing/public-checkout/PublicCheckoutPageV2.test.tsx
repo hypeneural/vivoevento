@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError } from '@/lib/api';
@@ -190,6 +190,32 @@ function renderPage(initialEntry = '/checkout/evento?v2=1') {
   );
 }
 
+function LoginProbe() {
+  const location = useLocation();
+
+  return <div>{`login-screen:${location.search}`}</div>;
+}
+
+function renderPageWithLoginRoute(initialEntry = '/checkout/evento?v2=1') {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <Routes>
+          <Route path="/checkout/evento" element={<PublicCheckoutPageV2 />} />
+          <Route path="/login" element={<LoginProbe />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
 function fillDetailsStep() {
   fireEvent.change(screen.getByLabelText(/seu nome/i), {
     target: { value: 'Camila Rocha' },
@@ -351,6 +377,127 @@ describe('PublicCheckoutPageV2', () => {
     expect(draft.card_number).toBeUndefined();
     expect(draft.card_cvv).toBeUndefined();
   }, 10000);
+
+  it('stores a safe manual resume draft and sends the buyer to login when "Ja tenho conta" is used before payment', async () => {
+    renderPageWithLoginRoute('/checkout/evento?package=casamento-essencial');
+
+    await screen.findByLabelText(/seu nome/i);
+    fillDetailsStep();
+
+    fireEvent.click(screen.getByText(/ja tenho conta/i));
+
+    expect(await screen.findByText(/^login-screen:/i)).toHaveTextContent(
+      'returnTo=%2Fcheckout%2Fevento%3Fv2%3D1%26resume%3Dauth%26package%3Dcasamento-essencial',
+    );
+
+    const draft = JSON.parse(
+      window.sessionStorage.getItem(PUBLIC_CHECKOUT_V2_RESUME_DRAFT_STORAGE_KEY) ?? '{}',
+    ) as Record<string, unknown>;
+
+    expect(draft).toMatchObject({
+      responsible_name: 'Camila Rocha',
+      whatsapp: '(48) 99977-1111',
+      package_id: '1',
+      payment_method: 'pix',
+      source: 'manual_login',
+      version: 1,
+    });
+    expect(draft.card_number).toBeUndefined();
+    expect(draft.card_cvv).toBeUndefined();
+  });
+
+  it('formats a noisy WhatsApp input before continuing and still submits only digits in the payload', async () => {
+    const pendingResponse = makeResponse();
+    createCheckoutMock.mockResolvedValue(pendingResponse);
+    getCheckoutMock.mockResolvedValue(pendingResponse);
+
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: /escolher este pacote/i }));
+
+    fireEvent.change(screen.getByLabelText(/seu nome/i), {
+      target: { value: 'Camila Rocha' },
+    });
+    fireEvent.change(screen.getByLabelText(/whatsapp/i), {
+      target: { value: 'abc48999771111' },
+    });
+    fireEvent.change(screen.getByLabelText(/nome do evento/i), {
+      target: { value: 'Casamento Camila e Bruno' },
+    });
+
+    expect(screen.getByLabelText(/whatsapp/i)).toHaveValue('(48) 99977-1111');
+
+    await waitFor(() => {
+      expect(useCheckoutIdentityPrecheckMock).toHaveBeenLastCalledWith({
+        whatsapp: '(48) 99977-1111',
+        email: '',
+      });
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /continuar para pagamento/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /gerar meu pix/i }));
+
+    await waitFor(() => {
+      expect(createCheckoutMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(createCheckoutMock.mock.calls[0]?.[0]).toMatchObject({
+      whatsapp: '48999771111',
+      payment: { method: 'pix' },
+    });
+  });
+
+  it('keeps the optional event schedule with date and time in the public checkout payload', async () => {
+    const pendingResponse = makeResponse();
+    createCheckoutMock.mockResolvedValue(pendingResponse);
+    getCheckoutMock.mockResolvedValue(pendingResponse);
+
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: /escolher este pacote/i }));
+    fillDetailsStep();
+
+    fireEvent.click(screen.getByRole('button', { name: /adicionar mais detalhes/i }));
+    fireEvent.change(screen.getByLabelText(/data e hora do evento/i), {
+      target: { value: '2026-11-15T18:30' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /continuar para pagamento/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /gerar meu pix/i }));
+
+    await waitFor(() => {
+      expect(createCheckoutMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(createCheckoutMock.mock.calls[0]?.[0]).toMatchObject({
+      event: {
+        event_date: '2026-11-15T18:30',
+      },
+    });
+  });
+
+  it('skips the login page and lands on payment when an authenticated buyer clicks "Ja tenho conta"', async () => {
+    useAuthMock.mockReturnValue({ isAuthenticated: true, refreshSession: refreshSessionMock });
+
+    renderPage('/checkout/evento?package=casamento-essencial');
+
+    await screen.findByLabelText(/seu nome/i);
+    fillDetailsStep();
+
+    fireEvent.click(screen.getByText(/ja tenho conta/i));
+
+    expect(await screen.findByRole('button', { name: /gerar meu pix/i })).toBeInTheDocument();
+    expect(createCheckoutMock).not.toHaveBeenCalled();
+
+    const draft = JSON.parse(
+      window.sessionStorage.getItem(PUBLIC_CHECKOUT_V2_RESUME_DRAFT_STORAGE_KEY) ?? '{}',
+    ) as Record<string, unknown>;
+
+    expect(draft).toMatchObject({
+      source: 'manual_login',
+      package_id: '1',
+    });
+  });
 
   it('automatically resumes a pix draft after login inside the V2 flow', async () => {
     useAuthMock.mockReturnValue({ isAuthenticated: true, refreshSession: refreshSessionMock });

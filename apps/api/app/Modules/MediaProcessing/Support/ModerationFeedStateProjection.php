@@ -15,6 +15,7 @@ case
     when {$operatorRejected} then 'rejected'
     when {$safetyBlocking} and event_media.safety_status = 'block' then 'rejected'
     when {$contextBlocking} and event_media.vlm_status = 'rejected' then 'rejected'
+    when event_media.processing_status = 'failed' then 'error'
     when (
         {$safetyBlocking}
         and (
@@ -67,6 +68,28 @@ case
         ) then 1
     else 0
 end
+SQL;
+    }
+
+    public function aiReviewExpression(): string
+    {
+        $safetyBlocking = $this->safetyBlockingExpression();
+        $contextBlocking = $this->contextBlockingExpression();
+
+        return <<<SQL
+(
+    {$safetyBlocking}
+    and (
+        event_media.safety_status is null
+        or event_media.safety_status in ('queued', 'review', 'failed')
+    )
+) or (
+    {$contextBlocking}
+    and (
+        event_media.vlm_status is null
+        or event_media.vlm_status in ('queued', 'review', 'failed')
+    )
+)
 SQL;
     }
 

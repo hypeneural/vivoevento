@@ -15,6 +15,9 @@ Este plano cobre:
 - frontend autenticado da aba `Equipe`;
 - onboarding publico de aceite do convite;
 - scoping da instancia WhatsApp da organizacao;
+- identidade unica do usuario da plataforma;
+- reuso do mesmo usuario em multiplas organizacoes e eventos;
+- contexto ativo de workspace para usuarios multi-organizacao;
 - auditoria e estados do convite;
 - branding da organizacao em `/settings`;
 - heranca organizacao -> evento na evolucao de branding.
@@ -51,8 +54,26 @@ Este plano nao cobre:
 - aceite de convite precisa de um ramo proprio de onboarding.
 - entrega por WhatsApp precisa de um resolver especifico por organizacao.
 - ownership precisa sair do fluxo generico de equipe.
+- telefone e e-mail do convidado identificam um usuario da plataforma, nao um cadastro isolado por parceiro.
+- usuarios multi-organizacao exigem contexto ativo explicito; `currentOrganization()` sozinho nao resolve o produto.
 
 ## Decisoes de Arquitetura Ja Travadas
+
+### 0. Identidade unica da plataforma
+
+Uma pessoa = um `User`.
+
+Memberships e convites sao vinculos dessa identidade com:
+
+- organizacoes
+- eventos
+
+Consequencias:
+
+- nao criar usuario duplicado quando o WhatsApp ja existir;
+- nao bloquear convite so porque o DJ ja trabalha com outro parceiro;
+- nao criar nova organizacao no aceite de convite;
+- recuperar senha continua sendo responsabilidade do auth global, por WhatsApp ou e-mail.
 
 ### 1. Modulo backend
 
@@ -73,6 +94,12 @@ Estrutura recomendada:
 - `Http/Controllers/PublicOrganizationInvitationController.php`
 - `Http/Requests/*`
 - `Http/Resources/*`
+
+Tambem precisaremos de infraestrutura de sessao/contexto:
+
+- expandir `MeResource` para listar workspaces disponiveis;
+- criar endpoint de troca de contexto organizacional;
+- manter compatibilidade com o painel atual durante a migracao.
 
 ### 2. Ownership
 
@@ -106,12 +133,27 @@ Primeiro objetivo de branding:
 - introduzir heranca organizacao -> evento;
 - preparar mais ativos sem quebrar o CRUD atual.
 
+### 6. Matriz simples no frontend
+
+O fluxo padrao da cerimonial deve usar presets, nao matriz tecnica.
+
+Perfis alvo:
+
+- `Gerente / Secretaria`
+- `Financeiro`
+- `Operar evento`
+- `Moderar midias`
+- `Ver midias`
+
+Ownership e configuracoes avancadas ficam fora do fluxo comum.
+
 ## Contratos TDD Ja Criados
 
 ### Backend
 
 - `apps/api/tests/Feature/Organizations/OrganizationTeamInvitationCharacterizationTest.php`
 - `apps/api/tests/Feature/Organizations/OrganizationTeamInvitationContractTest.php`
+- `apps/api/tests/Feature/Auth/MultiOrganizationWorkspaceContractTest.php`
 
 ### Frontend
 
@@ -121,6 +163,58 @@ Esses testes cumprem dois papeis:
 
 - congelar o comportamento atual que precisa ser substituido;
 - explicitar o comportamento futuro antes da implementacao.
+
+## Validacao Pre-Execucao de Onboarding, Cadastro e Notificacoes
+
+### Cadastro e acesso ja estruturados
+
+O que ja esta pronto no produto hoje:
+
+- login com e-mail ou WhatsApp;
+- cadastro novo via WhatsApp OTP;
+- jornada `single_event_checkout` para cliente direto/noiva;
+- reset de senha por WhatsApp;
+- reset de senha por e-mail;
+- envio de mensagem via Z-API no auth;
+- autenticacao de canal privado de notificacoes do usuario.
+
+Evidencias em testes:
+
+- `tests/Feature/Auth/RegisterOtpTest.php`
+- `tests/Feature/Auth/PasswordResetOtpTest.php`
+- `tests/Feature/Auth/LoginTest.php`
+- `tests/Feature/Notifications/NotificationRealtimeAuthorizationTest.php`
+
+### Onde a estrutura ainda para no meio
+
+O que ainda nao esta pronto para convite organizacional e event-scoped:
+
+- aceitar convite sem criar nova organizacao;
+- reusar o mesmo onboarding publico com `users.id` existente;
+- bootstrapar `workspaces` e `active_context` em `/auth/me`;
+- redirecionar usuario event-only para `/my-events`;
+- mostrar inbox real no header do painel.
+
+### Implicacao pratica para a execucao
+
+O projeto nao precisa reinventar login, OTP ou reset.
+
+O que precisa ser construído agora e:
+
+- contexto de sessao multi-workspace;
+- convite de organizacao;
+- convite de evento;
+- inbox real no frontend quando a fase de notificacoes entrar.
+
+### Template UX recomendado para convite e aceite
+
+Para cerimonial, noiva e DJ:
+
+- formularios curtos com labels em portugues;
+- presets simples como `Operar evento`, `Moderar midias` e `Ver midias`;
+- cards com parceiro, evento, data e resumo do acesso;
+- CTA principal claro por tela;
+- nada de matriz tecnica, tabela de permissions ou menus escondidos em excesso.
 
 ## Fase 0 — Baseline e Contratos
 
@@ -132,6 +226,8 @@ Esses testes cumprem dois papeis:
 - [x] Confirmar via teste que o cadastro OTP atual cria organizacao nova.
 - [x] Confirmar via teste que o envio OTP atual usa sender global/configurado de autenticacao.
 - [x] Criar contratos TDD backend e frontend para o fluxo futuro.
+- [x] Confirmar via teste que o mesmo usuario pode ser reutilizado em mais de uma organizacao pelo mesmo WhatsApp.
+- [x] Confirmar via teste que `/auth/me` colapsa usuario multi-organizacao em uma unica organizacao atual.
 
 ### Gate de saida
 
@@ -174,6 +270,10 @@ Parar de provisionar membership imediatamente e passar a trabalhar com convite p
 - [ ] Criar action `CreateOrganizationMemberInvitationAction`.
 - [ ] Deduplicar convite pendente por `organization_id + invitee_phone + role_key`.
 - [ ] Validar que `role_key` permitido exclui `partner-owner`, `super-admin` e `platform-admin`.
+- [ ] Reutilizar `users.id` existente quando `invitee_phone` ou `invitee_email` ja pertencer a um usuario da plataforma.
+- [ ] Registrar explicitamente no convite se o destinatario ja existe:
+  - `existing_user_id nullable`
+  - ou campo derivado equivalente no resource
 - [ ] Registrar activity logs:
   - `organization.team.invitation.created`
   - `organization.team.invitation.resent`
@@ -201,6 +301,8 @@ Parar de provisionar membership imediatamente e passar a trabalhar com convite p
 - [ ] convite nao cria `organization_members` ativo no ato.
 - [ ] convite rejeita roles globais e `partner-owner`.
 - [ ] convite deduplica pendencias equivalentes.
+- [ ] convite para WhatsApp ja existente nao falha por "telefone em uso".
+- [ ] convite para usuario existente nao cria nova linha em `users`.
 
 ### Gate de saida
 
@@ -272,6 +374,8 @@ Permitir que o convidado conclua o onboarding sem criar nova organizacao.
 - [ ] Vincular usuario existente por telefone e/ou email quando aplicavel.
 - [ ] Criar membership `active` somente no aceite.
 - [ ] Invalidar convite apos aceite.
+- [ ] Se o usuario ja estiver autenticado, permitir aceite direto sem repetir onboarding completo.
+- [ ] Se o usuario existir mas nao estiver autenticado, usar OTP ou recuperacao de acesso sem criar outra conta.
 
 ### Integracao com OTP
 
@@ -290,12 +394,66 @@ Permitir que o convidado conclua o onboarding sem criar nova organizacao.
 - [ ] usuario novo aceita convite sem gerar organizacao nova.
 - [ ] usuario existente aceita convite e vira membro da organizacao correta.
 - [ ] aceite nao duplica membership existente.
+- [ ] usuario existente aceita convite sem duplicar `users`.
+- [ ] usuario existente passa a ter mais de um workspace quando aplicavel.
 
 ### Gate de saida
 
 - onboarding de equipe existe de ponta a ponta;
 - nenhuma organizacao nova e criada ao aceitar convite;
 - membership nasce no aceite, nao na emissao.
+
+## Fase 4B â€” Contexto Ativo e Workspace Selector
+
+### Objetivo
+
+Permitir que um unico usuario opere em multiplas organizacoes e acessos event-scoped sem colapsar a sessao para o primeiro membership.
+
+### Tasks backend
+
+- [ ] Expandir `GET /auth/me` com:
+  - `workspaces.organizations`
+  - `workspaces.event_accesses`
+  - `active_context`
+- [ ] Para cada `event_access`, retornar:
+  - `event_id`
+  - `event_title`
+  - `event_date`
+  - `organization_id`
+  - `organization_name`
+  - `role_key`
+  - `role_label`
+  - `capabilities`
+  - `entry_path`
+- [ ] Definir fonte de verdade do contexto ativo:
+  - preferencia persistida do usuario
+  - ou contexto por token/sessao
+- [ ] Criar `POST /auth/context/organization`.
+- [ ] Opcionalmente criar `POST /auth/context/event`.
+- [ ] Parar de depender implicitamente de `organizations()->first()` como estrategia principal.
+- [ ] Criar endpoint de presets, por exemplo `GET /access/presets`, para a UI nao hardcodar a matriz.
+
+### Tasks frontend
+
+- [ ] Adicionar seletor de workspace quando o usuario tiver mais de uma organizacao.
+- [ ] Se o usuario for apenas event-scoped, entrar direto no evento.
+- [ ] Exibir claramente o contexto atual no header/shell.
+- [ ] Criar home `/my-events` para DJ/noivos/terceiros sem acesso organizacional.
+- [ ] Agrupar cards de eventos por parceiro/organizacao.
+- [ ] Mostrar acoes por evento usando `capabilities`, nao role hardcoded.
+- [ ] Esconder sidebar organizacional quando `active_context.type = event`.
+
+### Testes obrigatorios
+
+- [ ] `/auth/me` devolve lista de workspaces para usuario multi-organizacao.
+- [ ] DJ com 4 eventos de 3 parceiros recebe 4 `event_accesses` agrupaveis.
+- [ ] troca de workspace altera o escopo dos endpoints organizacionais.
+- [ ] usuario event-scoped nao enxerga organizacoes nao vinculadas.
+- [ ] frontend mostra somente acoes permitidas pelo preset/capability daquele evento.
+
+### Gate de saida
+
+- DJ recorrente e secretaria multi-organizacao conseguem usar a mesma conta sem ambiguidade de contexto.
 
 ## Fase 4 — UI de Equipe em `/settings`
 
@@ -488,6 +646,7 @@ Mitigacao:
 - `tests/Feature/Organizations/OrganizationTest.php`
 - `tests/Feature/Organizations/OrganizationTeamInvitationCharacterizationTest.php`
 - `tests/Feature/Organizations/OrganizationTeamInvitationContractTest.php`
+- `tests/Feature/Auth/MultiOrganizationWorkspaceContractTest.php`
 - `tests/Feature/Auth/RegisterOtpTest.php`
 - `tests/Feature/Auth/MeTest.php`
 - `tests/Feature/WhatsApp/WhatsAppInstanceManagementTest.php`
@@ -503,6 +662,28 @@ Mitigacao:
 - `php artisan test ...`
 - `npx vitest run ...`
 - `npm run type-check`
+
+## Validacao executada antes da implementacao
+
+Backend:
+
+- `php artisan test tests/Feature/Auth/RegisterOtpTest.php tests/Feature/Auth/PasswordResetOtpTest.php tests/Feature/Auth/LoginTest.php tests/Feature/Auth/MeTest.php tests/Feature/Notifications/NotificationRealtimeAuthorizationTest.php tests/Feature/Notifications/NotificationCenterReadinessTest.php tests/Feature/Organizations/OrganizationTeamInvitationCharacterizationTest.php`
+- resultado: `42 passed`, `308 assertions`
+
+Contratos backend:
+
+- `php artisan test tests/Feature/Auth/MultiOrganizationWorkspaceContractTest.php tests/Feature/EventTeam/EventPermissionPresetContractTest.php tests/Feature/Events/EventScopedAccessCharacterizationTest.php tests/Feature/Events/EventScopedAccessContractTest.php`
+- resultado: `5 passed`, `19 todo`, `23 assertions`
+
+Frontend:
+
+- `npx vitest run src/modules/auth/LoginPage.test.tsx src/modules/auth/login-navigation.test.ts src/modules/auth/workspace-selector.contract.test.tsx src/modules/auth/my-events-page.contract.test.tsx src/modules/settings/SettingsTeamInvitationFlow.contract.test.tsx src/modules/moderation/moderation-event-scope.contract.test.ts src/app/layouts/AppHeader.characterization.test.tsx`
+- resultado: `4 passed`, `27 todo`
+
+Type-check:
+
+- `npm run type-check`
+- resultado: `ok`
 
 ## Ordem Recomendada de Execucao
 

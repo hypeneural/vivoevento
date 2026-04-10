@@ -38,9 +38,24 @@ class CancelCurrentSubscriptionAction
 
             if (in_array($subscription->status, ['canceled', 'expired'], true)) {
                 if ($subscription->status === 'canceled' && $effective === 'immediately' && $subscription->isCanceledPendingEnd()) {
+                    $gatewayCancellation = null;
+
+                    if (
+                        $subscription->gateway_provider === $this->subscriptionGateway->providerKey()
+                        && filled($subscription->gateway_subscription_id)
+                    ) {
+                        $gatewayCancellation = $this->subscriptionGateway->cancelSubscription($subscription, [
+                            'cancel_pending_invoices' => true,
+                        ]);
+                    }
+
                     $subscription->forceFill([
                         'ends_at' => now(),
                         'renews_at' => null,
+                        'next_billing_at' => null,
+                        'cancel_at_period_end' => false,
+                        'access_status' => 'disabled',
+                        'gateway_status_reason' => $gatewayCancellation['gateway_status'] ?? $subscription->gateway_status_reason,
                     ])->save();
                 }
 
@@ -67,8 +82,11 @@ class CancelCurrentSubscriptionAction
             $subscription->forceFill([
                 'status' => 'canceled',
                 'canceled_at' => $subscription->canceled_at ?? $canceledAt,
+                'cancel_requested_at' => $subscription->cancel_requested_at ?? $canceledAt,
+                'cancel_at_period_end' => $effective !== 'immediately',
                 'ends_at' => $endsAt,
-                'renews_at' => $effective === 'immediately' ? null : $subscription->renews_at,
+                'renews_at' => $effective === 'immediately' ? null : $endsAt,
+                'next_billing_at' => $effective === 'immediately' ? null : $subscription->next_billing_at,
                 'gateway_status_reason' => $effective === 'immediately'
                     ? (string) ($gatewayCancellation['gateway_status'] ?? 'canceled')
                     : $subscription->gateway_status_reason,

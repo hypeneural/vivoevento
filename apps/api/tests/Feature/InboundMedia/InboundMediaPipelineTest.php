@@ -11,6 +11,7 @@ use App\Modules\MediaProcessing\Jobs\DownloadInboundMediaJob;
 use App\Modules\MediaProcessing\Jobs\GenerateMediaVariantsJob;
 use App\Modules\MediaProcessing\Jobs\RunModerationJob;
 use App\Modules\MediaProcessing\Models\EventMedia;
+use App\Modules\Wall\Models\EventWallSetting;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
@@ -189,6 +190,8 @@ it('downloads inbound video as video media and falls back to legacy moderation w
     Storage::fake('public');
     Queue::fake([GenerateMediaVariantsJob::class, RunModerationJob::class]);
     Process::fake();
+    config()->set('media_processing.ffmpeg_binary', 'C:\\missing\\ffmpeg.exe');
+    config()->set('media_processing.ffprobe_binary', 'C:\\missing\\ffprobe.exe');
 
     Http::fake([
         'https://cdn.fixture.test/*' => Http::response(
@@ -369,6 +372,100 @@ it('queues wall video variants for inbound video when ffmpeg tooling is ready', 
 
     Queue::assertPushed(GenerateMediaVariantsJob::class, fn (GenerateMediaVariantsJob $job) => $job->eventMediaId === $eventMedia->id);
     Queue::assertNotPushed(RunModerationJob::class);
+    Process::assertNothingRan();
+
+    cleanupInboundVideoTooling($tooling);
+});
+
+it('keeps inbound video on the legacy moderation path when rollout privado is disabled for the wall', function () {
+    Storage::fake('public');
+    Queue::fake([GenerateMediaVariantsJob::class, RunModerationJob::class]);
+    $tooling = fakeInboundVideoToolingReady();
+    Process::fake();
+
+    Http::fake([
+        'https://cdn.fixture.test/*' => Http::response(
+            'ftypisommp42-video-binary',
+            200,
+            ['Content-Type' => 'video/mp4'],
+        ),
+    ]);
+
+    $event = Event::factory()->active()->create([
+        'moderation_mode' => 'ai',
+    ]);
+
+    EventWallSetting::factory()->live()->create([
+        'event_id' => $event->id,
+        'video_enabled' => true,
+        'private_inbound_video_enabled' => false,
+    ]);
+
+    $channel = EventChannel::query()->create([
+        'event_id' => $event->id,
+        'channel_type' => 'whatsapp_direct',
+        'provider' => 'zapi',
+        'external_id' => 'FOTOS',
+        'label' => 'WhatsApp direto',
+        'status' => 'active',
+        'config_json' => [],
+    ]);
+
+    $inboundMessage = InboundMessage::query()->create([
+        'event_id' => $event->id,
+        'event_channel_id' => $channel->id,
+        'provider' => 'zapi',
+        'message_id' => '2A2A-VIDEO-004',
+        'message_type' => 'video',
+        'sender_phone' => '554899900000',
+        'sender_name' => 'Participante Video',
+        'body_text' => 'Video privado legado',
+        'media_url' => 'https://cdn.fixture.test/zapi/private-video-legacy.mp4',
+        'normalized_payload_json' => [
+            'video' => [
+                'videoUrl' => 'https://cdn.fixture.test/zapi/private-video-legacy.mp4',
+                'mimeType' => 'video/mp4',
+            ],
+            'media' => [
+                'width' => 1080,
+                'height' => 1920,
+                'duration' => 23,
+                'has_audio' => true,
+                'video_codec' => 'h264',
+                'audio_codec' => 'aac',
+                'bitrate' => 680000,
+                'container' => 'mp4',
+            ],
+            '_event_context' => [
+                'event_id' => $event->id,
+                'event_channel_id' => $channel->id,
+                'intake_source' => 'whatsapp_direct',
+            ],
+        ],
+        'status' => 'normalized',
+        'received_at' => now(),
+    ]);
+
+    ChannelWebhookLog::query()->create([
+        'event_channel_id' => $channel->id,
+        'provider' => 'zapi',
+        'provider_update_id' => null,
+        'message_id' => '2A2A-VIDEO-004',
+        'detected_type' => 'video',
+        'routing_status' => 'normalized',
+        'payload_json' => [],
+        'inbound_message_id' => $inboundMessage->id,
+    ]);
+
+    app(DownloadInboundMediaJob::class, ['inboundMessageId' => $inboundMessage->id])->handle();
+
+    $eventMedia = EventMedia::query()->sole();
+
+    expect($eventMedia->media_type)->toBe('video')
+        ->and($eventMedia->processing_status)->toBe(MediaProcessingStatus::Processed);
+
+    Queue::assertNotPushed(GenerateMediaVariantsJob::class);
+    Queue::assertPushed(RunModerationJob::class, fn (RunModerationJob $job) => $job->eventMediaId === $eventMedia->id);
     Process::assertNothingRan();
 
     cleanupInboundVideoTooling($tooling);

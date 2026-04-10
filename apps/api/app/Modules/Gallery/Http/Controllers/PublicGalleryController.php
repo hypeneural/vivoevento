@@ -5,8 +5,11 @@ use App\Modules\Analytics\Services\AnalyticsTracker;
 use App\Modules\MediaProcessing\Http\Resources\EventMediaResource;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Shared\Http\BaseController;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Context;
+use Illuminate\Support\Str;
 
 class PublicGalleryController extends BaseController
 {
@@ -40,6 +43,29 @@ class PublicGalleryController extends BaseController
             ->orderByDesc('published_at')
             ->paginate(30);
 
-        return $this->paginated(EventMediaResource::collection($media));
+        $collection = EventMediaResource::collection($media);
+
+        return $this->publicGalleryPaginated($collection, [
+            'public_search_enabled' => $eventModel->allowsPublicSelfieSearch(),
+            'find_me_url' => $eventModel->allowsPublicSelfieSearch() ? $eventModel->publicFindMeUrl() : null,
+        ]);
+    }
+
+    protected function publicGalleryPaginated(AnonymousResourceCollection $collection, array $faceSearchMeta): JsonResponse
+    {
+        $paginator = $collection->resource;
+
+        return response()->json([
+            'success' => true,
+            'data' => $collection->resolve(),
+            'meta' => [
+                'page' => $paginator->currentPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'last_page' => $paginator->lastPage(),
+                'request_id' => (string) Context::remember('request_id', fn () => 'req_' . Str::random(12)),
+                'face_search' => $faceSearchMeta,
+            ],
+        ]);
     }
 }

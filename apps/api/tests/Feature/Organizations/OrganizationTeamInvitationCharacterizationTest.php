@@ -119,3 +119,46 @@ it('characterizes that signup otp delivery uses the configured auth sender insta
 
     Queue::assertPushed(SendWhatsAppMessageJob::class);
 });
+
+it('characterizes that inviting an existing platform user by whatsapp reuses the same account across organizations', function () {
+    [$ownerA, $organizationA] = $this->actingAsOwner();
+
+    $existingUser = User::factory()->create([
+        'name' => 'DJ Reutilizado',
+        'email' => 'dj-reutilizado@eventovivo.test',
+        'phone' => '5511999123456',
+    ]);
+
+    $responseA = $this->apiPost('/organizations/current/team', [
+        'user' => [
+            'name' => 'DJ Reutilizado',
+            'phone' => '(11) 99912-3456',
+        ],
+        'role_key' => 'event-operator',
+    ]);
+
+    $this->assertApiSuccess($responseA, 201);
+
+    $organizationB = Organization::factory()->create();
+    [$ownerB] = $this->actingAsOwner($organizationB);
+
+    $responseB = $this->apiPost('/organizations/current/team', [
+        'user' => [
+            'name' => 'DJ Reutilizado',
+            'phone' => '(11) 99912-3456',
+        ],
+        'role_key' => 'event-operator',
+    ]);
+
+    $this->assertApiSuccess($responseB, 201);
+
+    expect(User::query()->where('phone', '5511999123456')->count())->toBe(1);
+
+    $existingUser->refresh();
+
+    expect(
+        $existingUser->organizationMembers()
+            ->whereIn('organization_id', [$organizationA->id, $organizationB->id])
+            ->count()
+    )->toBe(2);
+});

@@ -57,9 +57,8 @@ it('builds a recurring pagarme subscription payload using resolved plan customer
         ->and($payload['payment_method'])->toBe('credit_card')
         ->and($payload['customer_id'])->toBe('cus_recurring_123')
         ->and($payload)->not->toHaveKey('customer')
-        ->and($payload['card'])->toBe([
-            'card_id' => 'card_recurring_123',
-        ])
+        ->and($payload['card_id'])->toBe('card_recurring_123')
+        ->and($payload)->not->toHaveKey('card')
         ->and($payload['installments'])->toBe(1)
         ->and(data_get($payload, 'metadata.billing_order_id'))->toBe((string) $order->id)
         ->and(data_get($payload, 'metadata.plan_price_id'))->toBe((string) $planPrice->id);

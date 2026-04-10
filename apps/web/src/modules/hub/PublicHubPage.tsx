@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle, Loader2, Search } from 'lucide-react';
 import { useParams } from 'react-router-dom';
+
+import { Button } from '@/components/ui/button';
 
 import { getPublicHub } from './api';
 import { HubRenderer } from './HubRenderer';
@@ -47,13 +49,33 @@ export default function PublicHubPage() {
   }
 
   const { event, hub } = hubQuery.data;
+  const publicFaceSearch = hubQuery.data.face_search;
 
   return (
-    <HubRenderer
-      event={event}
-      hub={hub}
-      className="min-h-[100dvh]"
-      innerClassName="min-h-[100dvh]"
-    />
+    <div className="min-h-[100dvh] bg-slate-950">
+      {publicFaceSearch.public_search_enabled && publicFaceSearch.find_me_url ? (
+        <div className="mx-auto w-full max-w-md px-4 pt-4">
+          <div className="rounded-[2rem] border border-emerald-400/25 bg-emerald-500/10 p-4 text-white">
+            <p className="text-sm font-semibold">Quer encontrar suas fotos mais rapido?</p>
+            <p className="mt-1 text-sm text-emerald-50/80">
+              Envie uma selfie e veja as fotos publicadas em que voce aparece.
+            </p>
+            <Button asChild className="mt-3 rounded-full bg-emerald-500 text-white hover:bg-emerald-400">
+              <a href={publicFaceSearch.find_me_url}>
+                <Search className="h-4 w-4" />
+                Encontrar minhas fotos
+              </a>
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      <HubRenderer
+        event={event}
+        hub={hub}
+        className="min-h-[100dvh]"
+        innerClassName="min-h-[100dvh]"
+      />
+    </div>
   );
 }

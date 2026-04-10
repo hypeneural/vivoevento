@@ -116,7 +116,12 @@ export function AppHeader({ onMenuToggle }: AppHeaderProps) {
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative h-8 w-8 sm:h-9 sm:w-9">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative h-8 w-8 sm:h-9 sm:w-9"
+              aria-label="Abrir notificações"
+            >
               <Bell className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
               {unreadCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-destructive text-[9px] sm:text-[10px] font-bold text-destructive-foreground flex items-center justify-center">

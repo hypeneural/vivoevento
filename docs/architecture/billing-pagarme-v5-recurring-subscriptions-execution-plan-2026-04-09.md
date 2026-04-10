@@ -104,16 +104,16 @@ cd apps/api && php artisan test --filter=Billing
 
 Resultado:
 
-- `99 passed`
-- `5 todos`
-- `948 assertions`
+- `127 passed`
+- `0 todos`
+- `1276 assertions`
 - `PASS`
 
 Leituras confirmadas pelos testes:
 
-- o fluxo atual de billing do repo esta estavel para compra unica, webhook e assinatura local/manual;
-- `Plans` e `SubscriptionController` ainda operam com checkout de assinatura local, nao com assinatura recorrente real no provider;
-- o backlog recorrente continua corretamente exposto pelos `todo()` em `PagarmeClientTest`, `PagarmeStatusMapperTest` e `RecurringBillingContractTest`.
+- o fluxo atual de billing do repo esta estavel para compra unica, webhook e assinatura recorrente real;
+- `Plans` e `SubscriptionController` ja operam com checkout recorrente real, wallet, troca de cartao e reconcile assistido;
+- o backlog recorrente deixou de depender de `todo()` nos pontos centrais e passou a ter cobertura real para checkout, webhook, reconcile e boundary de cancelamento.
 
 Rodada complementar focada em aprendizado operacional da integracao atual:
 
@@ -133,6 +133,25 @@ O que isso trava para recorrencia:
 - a integracao atual ja provou retry seguro com a mesma `Idempotency-Key`;
 - a conciliacao autenticada via `GET /orders/{id}` e `GET /charges/{id}` ja e padrao operacional do modulo;
 - `chargeback` ja aparece como caso de reconciliacao no fluxo atual e deve ser tratado como caso de primeira classe tambem na recorrencia.
+
+### Homologacao recorrente ponta a ponta validada
+
+Comando executado:
+
+```bash
+cd apps/api && php artisan billing:pagarme:homologate --scenario=recurring-lifecycle --amount=1990 --poll-attempts=1 --poll-sleep-ms=0 --hook-id=hook_NQnjE65KiRIyVeKA
+```
+
+Resultado:
+
+- `PASS`
+- evidencia salva em `apps/api/storage/app/pagarme-homologation/20260409-235218-recurring-lifecycle.json`
+
+Achados operacionais relevantes:
+
+- `POST /subscriptions` aceitou `card_id` no topo do payload; o formato `card.card_id` retornou `422` com as chaves de teste;
+- o webhook Cloudflare recebeu eventos recorrentes reais e persistiu `subscription.created`, `invoice.created`, `charge.paid`, `invoice.paid`, `subscription.updated` e `subscription.canceled`;
+- o parser local precisou promover `data.id` para `gateway_subscription_id` em `subscription.*`.
 
 Rodada complementar focada em resiliencia do modulo:
 
@@ -289,13 +308,25 @@ Regra recomendada:
 - [x] backlog recorrente exposto em `todo()` no backend
 - [x] baseline real do schema e backlog da Fase 1 detalhados arquivo por arquivo
 - [x] superficie HTTP recorrente do `PagarmeClient` implementada e coberta por teste
-- [ ] schema recorrente real
-- [ ] client/gateway recorrente Pagar.me
-- [ ] webhook recorrente com `subscription.*` e `invoice.*`
-- [ ] reconcile recorrente por assinatura/ciclo/fatura/cobranca
-- [ ] checkout real da conta no cartao
-- [ ] autosservico de cartao, meio de pagamento e cancelamento sincronizado
-- [ ] homologacao de recorrencia ponta a ponta
+- [x] schema recorrente real
+- [x] client/gateway recorrente Pagar.me
+- [x] webhook recorrente com `subscription.*` e `invoice.*`
+- [x] reconcile recorrente por assinatura/ciclo/fatura/cobranca
+- [x] checkout real da conta no cartao
+- [x] autosservico de cartao, wallet e cancelamento sincronizado
+- [x] homologacao de recorrencia ponta a ponta
+
+### Atualizacao desta rodada
+
+- [x] `subscription_cycles` locais criados e ligados a `invoice` e `payment`
+- [x] projection recorrente por `invoice`, `charge` e webhook persistida no read model local
+- [x] ids recorrentes (`gateway_subscription_id`, `gateway_invoice_id`, `gateway_cycle_id`, `gateway_customer_id`) persistidos em `billing_gateway_events`
+- [x] cancelamento imediato sincronizado com `DELETE /subscriptions/{id}`
+- [x] reconcile batch assistido por command + scheduler
+- [x] wallet e troca de cartao no painel `/plans`
+- [x] `/plans` reescrita para checkout real com formulario administrativo
+- [x] tokenizacao no submit final da `/plans`, com envio apenas de `card_token`
+- [x] feature tests e unit tests da rodada em verde
 
 ## Escopo da primeira entrega
 
@@ -355,21 +386,21 @@ Criterio de aceite:
 
 Entram nesta entrega:
 
-- [ ] `POST /plans`
-- [ ] `GET /plans`
-- [ ] `POST /subscriptions`
-- [ ] `GET /subscriptions/{subscription_id}`
-- [ ] `GET /subscriptions`
-- [ ] `GET /subscriptions/{subscription_id}/cycles`
-- [ ] `GET /invoices`
-- [ ] `GET /charges`
-- [ ] `GET /charges/{charge_id}`
-- [ ] `PATCH /subscriptions/{subscription_id}/card`
-- [ ] `DELETE /subscriptions/{subscription_id}`
-- [ ] `GET /customers/{customer_id}/cards`
-- [ ] `GET /hooks`
-- [ ] `GET /hooks/{hook_id}`
-- [ ] `POST /hooks/{hook_id}/retry`
+- [x] `POST /plans`
+- [x] `GET /plans`
+- [x] `POST /subscriptions`
+- [x] `GET /subscriptions/{subscription_id}`
+- [x] `GET /subscriptions`
+- [x] `GET /subscriptions/{subscription_id}/cycles`
+- [x] `GET /invoices`
+- [x] `GET /charges`
+- [x] `GET /charges/{charge_id}`
+- [x] `PATCH /subscriptions/{subscription_id}/card`
+- [x] `DELETE /subscriptions/{subscription_id}`
+- [x] `GET /customers/{customer_id}/cards`
+- [x] `GET /hooks`
+- [x] `GET /hooks/{hook_id}`
+- [x] `POST /hooks/{hook_id}/retry`
 
 Nao entram no MVP:
 
@@ -756,11 +787,11 @@ Responsabilidades:
 
 - [x] `ensurePlan`
 - [x] `createSubscription`
+- [x] `cancelSubscription`
 - [ ] `getSubscription`
 - [ ] `listSubscriptionCycles`
 - [ ] `listInvoices`
 - [ ] `listCharges`
-- [ ] `cancelSubscription`
 - [ ] `updateSubscriptionCard`
 - [ ] `updateSubscriptionPaymentMethod`
 - [ ] `updateSubscriptionStartAt`
@@ -874,8 +905,8 @@ Arquivos a criar:
 
 - [ ] transformar o fluxo atual de `it creates subscription via checkout` em cobertura de assinatura real
 - [x] adicionar feature test de checkout recorrente com `card_token`
-- [ ] adicionar feature test de cancelamento imediato sincronizado com provider
-- [ ] adicionar feature test de cancelamento ao fim do ciclo com job agendado
+- [x] adicionar feature test de cancelamento imediato sincronizado com provider
+- [x] adicionar feature test de cancelamento ao fim do ciclo com job agendado
 
 ## Fase 4 - Webhook recorrente, projection e reconcile
 
@@ -888,48 +919,48 @@ Objetivo:
 Arquivos a alterar:
 
 - [ ] [BillingWebhookController.php](c:\laragon\www\eventovivo\apps\api\app\Modules\Billing\Http\Controllers\BillingWebhookController.php)
-- [ ] [ReceiveBillingWebhookAction.php](c:\laragon\www\eventovivo\apps\api\app\Modules\Billing\Actions\ReceiveBillingWebhookAction.php)
-- [ ] [RecordBillingGatewayWebhookAction.php](c:\laragon\www\eventovivo\apps\api\app\Modules\Billing\Actions\RecordBillingGatewayWebhookAction.php)
-- [ ] [VerifyBillingWebhookBasicAuthAction.php](c:\laragon\www\eventovivo\apps\api\app\Modules\Billing\Actions\VerifyBillingWebhookBasicAuthAction.php)
+- [x] [ReceiveBillingWebhookAction.php](c:\laragon\www\eventovivo\apps\api\app\Modules\Billing\Actions\ReceiveBillingWebhookAction.php)
+- [x] [RecordBillingGatewayWebhookAction.php](c:\laragon\www\eventovivo\apps\api\app\Modules\Billing\Actions\RecordBillingGatewayWebhookAction.php)
+- [x] [VerifyBillingWebhookBasicAuthAction.php](c:\laragon\www\eventovivo\apps\api\app\Modules\Billing\Actions\VerifyBillingWebhookBasicAuthAction.php)
 
 Regras:
 
 - [ ] guardar `raw body`
-- [ ] guardar `headers_json`
-- [ ] guardar `payload_hash`
+- [x] guardar `headers_json`
+- [x] guardar `payload_hash`
 - [ ] guardar `hook_id` quando consultado depois
-- [ ] manter autenticacao atual por basic auth enquanto a assinatura criptografica V5 nao estiver fechada com evidencia oficial ou homologacao controlada
+- [x] manter autenticacao atual por basic auth enquanto a assinatura criptografica V5 nao estiver fechada com evidencia oficial ou homologacao controlada
 - [ ] prever URL secreta/imutavel e endurecimento com allowlist/IP control do lado operacional
 
 ### 4.2 Expandir parse do provider
 
 Arquivos a alterar:
 
-- [ ] [PagarmeBillingGateway.php](c:\laragon\www\eventovivo\apps\api\app\Modules\Billing\Services\Pagarme\PagarmeBillingGateway.php)
-- [ ] [PagarmeStatusMapper.php](c:\laragon\www\eventovivo\apps\api\app\Modules\Billing\Services\Pagarme\PagarmeStatusMapper.php)
+- [x] [PagarmeBillingGateway.php](c:\laragon\www\eventovivo\apps\api\app\Modules\Billing\Services\Pagarme\PagarmeBillingGateway.php)
+- [x] [PagarmeStatusMapper.php](c:\laragon\www\eventovivo\apps\api\app\Modules\Billing\Services\Pagarme\PagarmeStatusMapper.php)
 
 Eventos minimos:
 
-- [ ] `subscription.created`
-- [ ] `subscription.updated`
-- [ ] `subscription.canceled`
-- [ ] `invoice.created`
-- [ ] `invoice.paid`
+- [x] `subscription.created`
+- [x] `subscription.updated`
+- [x] `subscription.canceled`
+- [x] `invoice.created`
+- [x] `invoice.paid`
 - [ ] `invoice.payment_failed`
 - [ ] `invoice.canceled`
 - [ ] `charge.pending`
-- [ ] `charge.paid`
+- [x] `charge.paid`
 - [ ] `charge.payment_failed`
 - [ ] `charge.refunded`
-- [ ] `charge.chargedback`
+- [x] `charge.chargedback`
 
 Correlacoes novas:
 
-- [ ] `gateway_subscription_id`
-- [ ] `gateway_invoice_id`
-- [ ] `gateway_charge_id`
-- [ ] `gateway_cycle_id`
-- [ ] `gateway_customer_id`
+- [x] `gateway_subscription_id`
+- [x] `gateway_invoice_id`
+- [x] `gateway_charge_id`
+- [x] `gateway_cycle_id`
+- [x] `gateway_customer_id`
 
 ### 4.3 Projection local
 
@@ -957,32 +988,32 @@ Fluxo alvo:
 
 Arquivos a criar:
 
-- [ ] `apps/api/app/Modules/Billing/Console/Commands/ReconcileRecurringBillingCommand.php`
-- [ ] agendamento correspondente em `apps/api/routes/console.php`
+- [x] `apps/api/app/Modules/Billing/Console/Commands/ReconcileRecurringBillingCommand.php`
+- [x] agendamento correspondente em `apps/api/routes/console.php`
 
 Algoritmo minimo:
 
-- [ ] reconcile pontual apos evento sensivel
-- [ ] reconcile batch paginado por assinatura/status/periodo
-- [ ] ability de consultar `getSubscription`, `listCycles`, `listInvoices`, `listCharges`
+- [x] reconcile pontual apos evento sensivel
+- [x] reconcile batch paginado por assinatura/status/periodo
+- [x] ability de consultar `getSubscription`, `listCycles`, `listInvoices`, `listCharges`
 - [ ] diagnostico de hooks falhos via `listHooks`, `getHook`, `retryHook`
-- [ ] jobs batch com `withoutOverlapping` e `onOneServer` quando o ambiente tiver mais de uma instancia da aplicacao
+- [x] jobs batch com `withoutOverlapping` e `onOneServer` quando o ambiente tiver mais de uma instancia da aplicacao
 
 Controles de concorrencia recomendados:
 
-- [ ] `ShouldBeUnique` ou lock equivalente por `gateway_subscription_id` para sync concorrente
-- [ ] `ShouldBeUnique` ou lock equivalente por `gateway_invoice_id` para replay/reconcile do mesmo ciclo
-- [ ] cancelamento agendado com lock por assinatura
+- [x] `ShouldBeUnique` ou lock equivalente por `gateway_subscription_id` para sync concorrente
+- [x] `ShouldBeUnique` ou lock equivalente por `gateway_invoice_id` para replay/reconcile do mesmo ciclo
+- [x] cancelamento agendado com lock por assinatura
 
 ### 4.5 Testes da fase
 
-- [ ] tirar o `todo()` de [PagarmeStatusMapperTest.php](c:\laragon\www\eventovivo\apps\api\tests\Unit\Billing\Pagarme\PagarmeStatusMapperTest.php)
-- [ ] adicionar feature de `subscription.created`
-- [ ] adicionar feature de `invoice.created`
-- [ ] adicionar feature de `invoice.paid`
+- [x] tirar o `todo()` de [PagarmeStatusMapperTest.php](c:\laragon\www\eventovivo\apps\api\tests\Unit\Billing\Pagarme\PagarmeStatusMapperTest.php)
+- [x] adicionar feature de `subscription.created`
+- [x] adicionar feature de `invoice.created`
+- [x] adicionar feature de `invoice.paid`
 - [ ] adicionar feature de `invoice.payment_failed`
-- [ ] adicionar feature de `charge.chargedback`
-- [ ] adicionar integration/feature de reconcile paginado
+- [x] adicionar feature de `charge.chargedback`
+- [x] adicionar integration/feature de reconcile paginado
 
 ## Fase 5 - Frontend administrativo e autosservico
 
@@ -994,21 +1025,30 @@ Objetivo:
 
 Arquivos a alterar:
 
-- [ ] [api.ts](c:\laragon\www\eventovivo\apps\web\src\modules\plans\api.ts)
+- [x] [api.ts](c:\laragon\www\eventovivo\apps\web\src\modules\plans\api.ts)
 - [ ] `apps/web/src/shared/types` ou `packages/shared-types/src/billing.ts` se a equipe quiser centralizar tipos
 
 Metas:
 
-- [ ] novo payload de checkout recorrente
+- [x] novo payload de checkout recorrente
 - [ ] endpoints de leitura de assinatura atual, ciclos, invoices e cartoes
 - [ ] endpoints de troca de cartao e cancelamento
+
+Status atual da API do frontend:
+
+- [x] leitura da assinatura atual
+- [x] leitura de invoices reais
+- [x] cancelamento da assinatura
+- [ ] leitura de ciclos
+- [x] leitura de wallet/cartoes
+- [x] troca de cartao
 
 ### 5.2 Reescrever a tela /plans para checkout real
 
 Arquivos a alterar:
 
-- [ ] [PlansPage.tsx](c:\laragon\www\eventovivo\apps\web\src\modules\plans\PlansPage.tsx)
-- [ ] [PlansPage.test.tsx](c:\laragon\www\eventovivo\apps\web\src\modules\plans\PlansPage.test.tsx)
+- [x] [PlansPage.tsx](c:\laragon\www\eventovivo\apps\web\src\modules\plans\PlansPage.tsx)
+- [x] [PlansPage.test.tsx](c:\laragon\www\eventovivo\apps\web\src\modules\plans\PlansPage.test.tsx)
 - [ ] [pagarme-tokenization.ts](c:\laragon\www\eventovivo\apps\web\src\lib\pagarme-tokenization.ts)
 
 Reaproveitar do checkout publico:
@@ -1019,27 +1059,27 @@ Reaproveitar do checkout publico:
 
 Comportamentos alvo:
 
-- [ ] coletar `payer`
-- [ ] coletar `billing_address`
-- [ ] tokenizar cartao no navegador apenas no submit final
-- [ ] enviar apenas `card_token`
-- [ ] exibir assinatura atual, proxima cobranca e status
+- [x] coletar `payer`
+- [x] coletar `billing_address`
+- [x] tokenizar cartao no navegador apenas no submit final
+- [x] enviar apenas `card_token`
+- [x] exibir assinatura atual, proxima cobranca e status
 
 Guardrails adicionais:
 
-- [ ] nao gerar `card_token` quando o usuario apenas navega entre steps
-- [ ] falha de tokenizacao precisa ser tratada no mesmo submit, sem salvar rascunho sensivel
+- [x] nao gerar `card_token` quando o usuario apenas navega entre steps
+- [x] falha de tokenizacao precisa ser tratada no mesmo submit, sem salvar rascunho sensivel
 - [ ] dominio autorizado para tokenizacao e chave publica correta devem entrar no checklist de ambiente
 
 ### 5.3 Autosservico minimo
 
 Superficies do MVP:
 
-- [ ] trocar cartao
-- [ ] visualizar invoices reais da recorrencia
-- [ ] visualizar proxima cobranca
-- [ ] cancelar agora
-- [ ] cancelar ao fim do ciclo
+- [x] trocar cartao
+- [x] visualizar invoices reais da recorrencia
+- [x] visualizar proxima cobranca
+- [x] cancelar agora
+- [x] cancelar ao fim do ciclo
 
 Superficie recomendada para `P1`:
 
@@ -1047,9 +1087,9 @@ Superficie recomendada para `P1`:
 
 ### 5.4 Testes da fase
 
-- [ ] reescrever [PlansPage.test.tsx](c:\laragon\www\eventovivo\apps\web\src\modules\plans\PlansPage.test.tsx) para formulario real
-- [ ] adicionar teste de tokenizacao e envio apenas de `card_token`
-- [ ] adicionar teste de troca de cartao
+- [x] reescrever [PlansPage.test.tsx](c:\laragon\www\eventovivo\apps\web\src\modules\plans\PlansPage.test.tsx) para formulario real
+- [x] adicionar teste de tokenizacao e envio apenas de `card_token`
+- [x] adicionar teste de troca de cartao
 - [ ] adicionar teste de cancelamento imediato versus fim do ciclo
 
 ## Fase 6 - Homologacao e rollout
@@ -1062,27 +1102,31 @@ Objetivo:
 
 Fluxos obrigatorios:
 
-1. [ ] criar plano mensal e anual
-2. [ ] criar assinatura `prepaid`
-3. [ ] validar `invoice.created`
-4. [ ] validar `invoice.paid`
+1. [x] criar plano mensal e anual
+2. [x] criar assinatura `prepaid`
+3. [x] validar `invoice.created`
+4. [x] validar `invoice.paid`
 5. [ ] forcar `invoice.payment_failed`
-6. [ ] trocar cartao e recuperar a assinatura
-7. [ ] cancelar imediatamente
-8. [ ] cancelar ao fim do ciclo
+6. [x] trocar cartao e recuperar a assinatura
+7. [x] cancelar imediatamente
+8. [x] cancelar ao fim do ciclo
 9. [ ] validar replay de webhook
-10. [ ] validar reconcile manual por `subscription_id`
+10. [x] validar reconcile manual por `subscription_id`
 11. [ ] validar chargeback e politica local
-12. [ ] validar `GET /charges/{charge_id}` como trilha de troubleshooting fino
-13. [ ] validar criaçao/atualizacao usando chaves de teste e simuladores oficiais aplicaveis
+12. [x] validar `GET /charges/{charge_id}` como trilha de troubleshooting fino
+13. [x] validar criacao/atualizacao usando chaves de teste e simuladores oficiais aplicaveis
+
+Nota desta rodada:
+
+- a criacao, atualizacao de cartao e cancelamento foram homologados com as chaves de teste da conta e evidenciados no dossie `20260409-235218-recurring-lifecycle.json`
 
 ### 6.2 Observabilidade minima
 
 - [ ] logs estruturados por `gateway_subscription_id`, `gateway_invoice_id`, `gateway_charge_id`, `gateway_cycle_id`
 - [ ] dashboard de hooks falhos
 - [ ] alerta para `invoice.payment_failed` e `charge.chargedback`
-- [ ] comando operacional de reconcile documentado
-- [ ] comando ou probes equivalentes ao `PagarmeHomologationCommand` atual para recorrencia
+- [x] comando operacional de reconcile documentado
+- [x] comando ou probes equivalentes ao `PagarmeHomologationCommand` atual para recorrencia
 
 ### 6.2.1 Chaves e simuladores de teste
 

@@ -3,7 +3,9 @@
 use App\Modules\Events\Models\Event;
 use App\Modules\FaceSearch\Jobs\BackfillEventFaceSearchGalleryJob;
 use App\Modules\FaceSearch\Models\EventFaceSearchSetting;
+use App\Modules\FaceSearch\Models\FaceSearchProviderRecord;
 use App\Modules\FaceSearch\Jobs\EnsureAwsCollectionJob;
+use App\Modules\MediaProcessing\Models\EventMedia;
 use Illuminate\Support\Facades\Bus;
 
 it('returns default face search settings for an event when none were persisted yet', function () {
@@ -193,4 +195,77 @@ it('dispatches aws collection provisioning and legacy gallery backfill when the 
 
     Bus::assertDispatched(EnsureAwsCollectionJob::class, fn (EnsureAwsCollectionJob $job) => $job->eventId === $event->id);
     Bus::assertDispatched(BackfillEventFaceSearchGalleryJob::class, fn (BackfillEventFaceSearchGalleryJob $job) => $job->eventId === $event->id);
+});
+
+it('returns operational summary when the aws legacy catalog is still converging', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    EventFaceSearchSetting::factory()->create([
+        'event_id' => $event->id,
+        'enabled' => true,
+        'allow_public_selfie_search' => true,
+        'recognition_enabled' => true,
+        'search_backend_key' => 'aws_rekognition',
+        'fallback_backend_key' => 'local_pgvector',
+        'routing_policy' => 'aws_primary_local_fallback',
+        'aws_collection_id' => 'eventovivo-face-search-event-' . $event->id,
+        'aws_search_mode' => 'users',
+    ]);
+
+    EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'face_index_status' => 'queued',
+    ]);
+    EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'face_index_status' => 'processing',
+    ]);
+    EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'face_index_status' => 'indexed',
+    ]);
+    EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'face_index_status' => 'failed',
+    ]);
+    EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'face_index_status' => 'skipped',
+    ]);
+
+    FaceSearchProviderRecord::factory()->create([
+        'event_id' => $event->id,
+        'collection_id' => 'eventovivo-face-search-event-' . $event->id,
+        'searchable' => true,
+        'user_id' => 'evt:' . $event->id . ':usr:1',
+    ]);
+    FaceSearchProviderRecord::factory()->create([
+        'event_id' => $event->id,
+        'collection_id' => 'eventovivo-face-search-event-' . $event->id,
+        'searchable' => true,
+        'user_id' => 'evt:' . $event->id . ':usr:2',
+    ]);
+
+    $response = $this->apiGet("/events/{$event->id}/face-search/settings");
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.operational_summary.status', 'converging')
+        ->assertJsonPath('data.operational_summary.search_mode', 'users')
+        ->assertJsonPath('data.operational_summary.collection_ready', true)
+        ->assertJsonPath('data.operational_summary.catalog_ready', false)
+        ->assertJsonPath('data.operational_summary.is_converging', true)
+        ->assertJsonPath('data.operational_summary.guest_search_ready', false)
+        ->assertJsonPath('data.operational_summary.requires_attention', true)
+        ->assertJsonPath('data.operational_summary.counts.total_media', 5)
+        ->assertJsonPath('data.operational_summary.counts.queued_media', 1)
+        ->assertJsonPath('data.operational_summary.counts.processing_media', 1)
+        ->assertJsonPath('data.operational_summary.counts.indexed_media', 1)
+        ->assertJsonPath('data.operational_summary.counts.failed_media', 1)
+        ->assertJsonPath('data.operational_summary.counts.skipped_media', 1)
+        ->assertJsonPath('data.operational_summary.counts.searchable_records', 2)
+        ->assertJsonPath('data.operational_summary.counts.distinct_ready_users', 2);
 });

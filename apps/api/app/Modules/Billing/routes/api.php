@@ -15,6 +15,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Subscription management
     Route::get('billing/subscription', [\App\Modules\Billing\Http\Controllers\SubscriptionController::class, 'current']);
+    Route::get('billing/subscription/cards', [\App\Modules\Billing\Http\Controllers\SubscriptionController::class, 'cards']);
+    Route::patch('billing/subscription/card', [\App\Modules\Billing\Http\Controllers\SubscriptionController::class, 'updateCard']);
+    Route::post('billing/subscription/reconcile', [\App\Modules\Billing\Http\Controllers\SubscriptionController::class, 'reconcile']);
     Route::post('billing/subscription/cancel', [\App\Modules\Billing\Http\Controllers\SubscriptionController::class, 'cancel']);
     Route::get('billing/invoices', [\App\Modules\Billing\Http\Controllers\SubscriptionController::class, 'invoices']);
     Route::post('billing/checkout', [\App\Modules\Billing\Http\Controllers\SubscriptionController::class, 'checkout']);
