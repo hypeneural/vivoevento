@@ -251,6 +251,20 @@ describe('PublicCheckoutPageV2 mobile layout', () => {
     });
   });
 
+  it('shows a compact selected package summary above the active mobile step', async () => {
+    renderPage();
+
+    expect(screen.queryByTestId('public-checkout-mobile-package-summary')).not.toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole('button', { name: /escolher este pacote/i }));
+
+    const summary = await screen.findByTestId('public-checkout-mobile-package-summary');
+
+    expect(summary).toHaveTextContent('Casamento Essencial');
+    expect(summary).toHaveTextContent('R$ 199,00');
+    expect(summary).toHaveTextContent(/pacote escolhido/i);
+  });
+
   it('keeps the buyer data when the user goes back from payment on mobile', async () => {
     renderPage();
 
@@ -260,7 +274,7 @@ describe('PublicCheckoutPageV2 mobile layout', () => {
     fillDetailsStep();
     fireEvent.click(screen.getByTestId('public-checkout-mobile-primary-cta'));
 
-    expect(await screen.findByRole('button', { name: /gerar meu pix/i })).toBeInTheDocument();
+    expect(await screen.findByTestId('public-checkout-mobile-primary-cta')).toHaveTextContent(/gerar meu pix/i);
 
     fireEvent.click(screen.getByRole('button', { name: /voltar para seus dados/i }));
 

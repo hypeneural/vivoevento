@@ -11,8 +11,8 @@ class BillingInvoiceResource extends JsonResource
     {
         $snapshot = (array) ($this->snapshot_json ?? []);
         $order = $this->whenLoaded('order');
-        $payment = $this->relationLoaded('payments')
-            ? $this->payments->sortByDesc('id')->first()
+        $payment = $this->relationLoaded('latestPayment')
+            ? $this->latestPayment
             : null;
 
         if (! $payment && $this->relationLoaded('order')) {

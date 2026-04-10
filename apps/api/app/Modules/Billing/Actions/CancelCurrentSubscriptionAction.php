@@ -8,6 +8,7 @@ use App\Modules\Organizations\Models\Organization;
 use App\Modules\Users\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class CancelCurrentSubscriptionAction
@@ -22,6 +23,13 @@ class CancelCurrentSubscriptionAction
         string $effective = 'period_end',
         ?string $reason = null,
     ): Subscription {
+        Log::info('billing.recurring.subscription.cancel_requested', [
+            'organization_id' => $organization->id,
+            'actor_user_id' => $actor?->id,
+            'effective' => $effective,
+            'reason' => $reason,
+        ]);
+
         return DB::transaction(function () use ($organization, $actor, $effective, $reason) {
             /** @var Subscription|null $subscription */
             $subscription = Subscription::query()
@@ -109,6 +117,17 @@ class CancelCurrentSubscriptionAction
                     'gateway_cancellation' => $gatewayCancellation['gateway_response'] ?? null,
                 ])
                 ->log('Assinatura da conta cancelada');
+
+            Log::info('billing.recurring.subscription.canceled', [
+                'organization_id' => $organization->id,
+                'subscription_id' => $subscription->id,
+                'gateway_subscription_id' => $subscription->gateway_subscription_id,
+                'effective' => $effective,
+                'status' => $subscription->status,
+                'contract_status' => $subscription->contract_status,
+                'access_status' => $subscription->access_status,
+                'ends_at' => $subscription->ends_at?->toISOString(),
+            ]);
 
             return $subscription->fresh(['plan.features']);
         });

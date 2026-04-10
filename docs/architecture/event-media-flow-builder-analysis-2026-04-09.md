@@ -114,6 +114,202 @@ Leitura pratica da bateria:
   - blindar assets ausentes no backend;
   - rerodar a bateria frontend completa para garantir que o ajuste local de duplicate cluster permaneceu estavel.
 
+## Revalidacao da baseline em `2026-04-10`
+
+Depois do inicio da execucao, a baseline foi revalidada no estado atual do workspace.
+
+### Backend
+
+Correcao aplicada:
+
+- `EventMediaResource` agora normaliza assets ausentes ou parciais antes de serializar `thumbnail_*`, `preview_*`, `moderation_thumbnail_*` e `moderation_preview_*`.
+
+Comandos executados:
+
+```bash
+cd apps/api
+php artisan test tests/Feature/ContentModeration/ContentModerationPipelineTest.php --filter="data url fallback"
+php artisan test tests/Feature/Events/EventJourneyArchitectureCharacterizationTest.php tests/Feature/Events/EventIntakeChannelsTest.php tests/Feature/Events/EventIntakeChannelsTelegramPrivateTest.php tests/Feature/Events/EventIntakeBlacklistTest.php tests/Feature/Telegram/TelegramPrivateMediaIntakePipelineTest.php tests/Feature/Telegram/TelegramFeedbackAutomationTest.php tests/Feature/ContentModeration/ContentModerationSettingsTest.php tests/Feature/ContentModeration/ContentModerationPipelineTest.php tests/Feature/ContentModeration/ContentModerationObserveOnlyTest.php tests/Feature/MediaIntelligence/MediaIntelligenceSettingsTest.php tests/Feature/MediaIntelligence/MediaIntelligencePipelineTest.php tests/Unit/ContentModeration/UpsertEventContentModerationSettingsActionTest.php tests/Unit/MediaIntelligence/UpsertEventMediaIntelligenceSettingsActionTest.php tests/Unit/MediaIntelligence/PublishedMediaReplyTextResolverTest.php tests/Unit/MediaIntelligence/MediaReplyTextPromptResolverTest.php tests/Unit/MediaProcessing/MediaEffectiveStateResolverTest.php tests/Unit/MediaProcessing/FinalizeMediaDecisionActionTest.php
+```
+
+Resultado:
+
+- o cenario `data_url fallback` passou;
+- a bateria backend relevante fechou com `87` testes passando;
+- `670` assertions passaram.
+
+### Frontend
+
+Comandos executados:
+
+```bash
+cd apps/web
+npm run test -- src/modules/moderation/feed-utils.test.ts src/modules/moderation/moderation-architecture.test.ts
+npm run type-check
+npm run test -- src/modules/events/intake.test.ts src/modules/events/components/content-moderation/EventContentModerationSettingsForm.test.tsx src/modules/events/components/media-intelligence/EventMediaIntelligenceSettingsForm.test.tsx src/modules/events/components/TelegramOperationalStatusCard.test.tsx src/modules/moderation/feed-utils.test.ts src/modules/moderation/moderation-architecture.test.ts src/modules/moderation/moderation-event-scope.contract.test.ts src/modules/wall/player/wall-theme-architecture-characterization.test.ts
+```
+
+Resultado:
+
+- `feed-utils.test.ts` e `moderation-architecture.test.ts` passaram juntos;
+- `type-check` passou;
+- a bateria frontend relevante fechou com `31` testes passando e `1` arquivo com cenarios skipped.
+
+Leitura pratica:
+
+- a Fase 0B do plano ficou verde no estado atual do workspace;
+- o proximo passo tecnico agora e abrir a Fase 1;
+- o melhor ponto de entrada passa a ser `BuildEventJourneyProjectionAction` no backend.
+
+## Implementacao inicial da projection em `2026-04-10`
+
+A Fase 1 comecou pelo backend read-only, mantendo a decisao principal da analise: a jornada e uma projection operacional derivada do estado real do evento, nao uma DSL de automacao.
+
+Arquivos criados:
+
+- `apps/api/app/Modules/Events/Data/EventJourneyProjectionData.php`;
+- `apps/api/app/Modules/Events/Data/EventJourneyStageData.php`;
+- `apps/api/app/Modules/Events/Data/EventJourneyNodeData.php`;
+- `apps/api/app/Modules/Events/Data/EventJourneyBranchData.php`;
+- `apps/api/app/Modules/Events/Data/EventJourneyCapabilityData.php`;
+- `apps/api/app/Modules/Events/Data/EventJourneyScenarioData.php`;
+- `apps/api/app/Modules/Events/Actions/BuildEventJourneyProjectionAction.php`;
+- `apps/api/tests/Unit/Events/EventJourneyProjectionDataTest.php`;
+- `apps/api/tests/Unit/Events/BuildEventJourneyProjectionActionTest.php`.
+
+Contrato implementado:
+
+- `version`;
+- `event`;
+- `intake_defaults`;
+- `intake_channels`;
+- `settings`;
+- `capabilities`;
+- `stages`;
+- `warnings`;
+- `simulation_presets`;
+- `summary`.
+
+Nos V1 implementados na projection:
+
+- Entrada: `entry_whatsapp_direct`, `entry_whatsapp_groups`, `entry_telegram`, `entry_public_upload`, `entry_sender_blacklist`;
+- Processamento: `processing_receive_feedback`, `processing_download_media`, `processing_prepare_variants`, `processing_safety_ai`, `processing_media_intelligence`;
+- Decisao: `decision_event_moderation_mode`, `decision_safety_result`, `decision_context_gate`, `decision_media_type`, `decision_caption_presence`;
+- Saida: `output_reaction_final`, `output_reply_text`, `output_gallery`, `output_wall`, `output_print`, `output_silence`.
+
+Regras confirmadas:
+
+- os quatro blocos continuam fixos: `Entrada`, `Processamento`, `Decisao`, `Saida`;
+- branches usam IDs estaveis, incluindo `default`;
+- canais ativos sem entitlement aparecem como `locked` e geram `warnings`;
+- `Safety` reflete `enabled`, `mode`, `fallback_mode` e heranca global;
+- `MediaIntelligence` reflete `enabled`, `mode`, `fallback_mode`, `reply_text_mode` e heranca global;
+- `print` fica `unavailable` na V1;
+- `gallery` fica como destino obrigatorio;
+- `wall` depende de modulo, setting do wall e entitlement;
+- o teste de budget da action protege o cenario completo com `expectsDatabaseQueryCount(8)`.
+
+Bateria validada:
+
+```bash
+cd apps/api
+php artisan test tests/Unit/Events/EventJourneyProjectionDataTest.php tests/Unit/Events/BuildEventJourneyProjectionActionTest.php
+php artisan test tests/Unit/Events/EventJourneyProjectionDataTest.php tests/Unit/Events/BuildEventJourneyProjectionActionTest.php tests/Feature/Events/EventJourneyArchitectureCharacterizationTest.php tests/Feature/Events/EventIntakeChannelsTest.php tests/Feature/Events/EventIntakeChannelsTelegramPrivateTest.php tests/Feature/ContentModeration/ContentModerationSettingsTest.php tests/Feature/MediaIntelligence/MediaIntelligenceSettingsTest.php
+```
+
+Resultado:
+
+- `14` testes novos passaram;
+- `83` assertions novas passaram;
+- regressao direcionada passou com `36` testes;
+- regressao direcionada passou com `297` assertions.
+
+Leitura pratica:
+
+- a `Tarefa 1.1` esta concluida;
+- a `Tarefa 1.2` esta concluida no nivel de action read-only;
+- a protecao de budget deve ser repetida na `Tarefa 1.4`, quando existir endpoint `GET /events/{event}/journey-builder`;
+- a proxima entrega natural era a `Tarefa 1.3`, para separar o resumo humano em action dedicada antes do controller.
+
+## Extracao do resumo humano em `2026-04-10`
+
+A `Tarefa 1.3` foi concluida sem mudar a direcao da arquitetura:
+
+- o resumo agora mora em `BuildEventJourneySummaryAction`;
+- `BuildEventJourneyProjectionAction` so orquestra leitura e delega o texto humano;
+- o contrato externo continua simples em `summary.human_text`.
+
+Leitura pratica da extracao:
+
+- a projection nao mistura mais regra de montagem do grafo com copy de produto;
+- o resumo ficou testavel isoladamente;
+- a proxima fase pode abrir controller/rota sem carregar logica de copy dentro do endpoint.
+
+Regras validadas pela action dedicada:
+
+- manual: usa linguagem de operacao como `envia para revisao manual`;
+- AI com Safety `enforced` + VLM `gate`: resume como analise de `risco e contexto com IA`;
+- AI com Safety `observe_only` + `enrich_only`: resume como suporte de IA para entender melhor a midia e sinalizar revisao;
+- sem canais ativos: entra em fallback claro, sem prometer processamento inexistente;
+- `print` nunca aparece como promessa textual na V1.
+
+Bateria validada:
+
+```bash
+cd apps/api
+php artisan test tests/Unit/Events/BuildEventJourneySummaryActionTest.php tests/Unit/Events/BuildEventJourneyProjectionActionTest.php
+php artisan test tests/Unit/Events/EventJourneyProjectionDataTest.php tests/Unit/Events/BuildEventJourneySummaryActionTest.php tests/Unit/Events/BuildEventJourneyProjectionActionTest.php tests/Feature/Events/EventJourneyArchitectureCharacterizationTest.php tests/Feature/Events/EventIntakeChannelsTest.php tests/Feature/Events/EventIntakeChannelsTelegramPrivateTest.php tests/Feature/ContentModeration/ContentModerationSettingsTest.php tests/Feature/MediaIntelligence/MediaIntelligenceSettingsTest.php
+```
+
+Resultado:
+
+- `18` testes passaram na bateria unitária da extração;
+- `76` assertions passaram na bateria unitária da extração;
+- `41` testes passaram na regressão direcionada;
+- `304` assertions passaram na regressão direcionada.
+
+Leitura pratica:
+
+- a `Tarefa 1.3` esta concluida;
+- a proxima entrega natural agora passa a ser a `Tarefa 1.4`, abrindo `EventJourneyController` e a rota read-only `GET /events/{event}/journey-builder`.
+
+## Endpoint read-only da jornada em `2026-04-10`
+
+A parte read-only da `Tarefa 1.4` foi concluida.
+
+Entrega realizada:
+
+- `EventJourneyController` criado no modulo `Events`;
+- `EventJourneyResource` criado para serializar a projection;
+- rota `GET /api/v1/events/{event}/journey-builder` registrada em `routes/api.php`;
+- policy aplicada com `authorize('view', $event)`;
+- resposta seguindo o envelope padrao com `success`, `data` e `meta.request_id`.
+
+Bateria validada:
+
+```bash
+cd apps/api
+php artisan test tests/Feature/Events/EventJourneyControllerTest.php tests/Unit/Events/EventJourneyProjectionDataTest.php tests/Unit/Events/BuildEventJourneySummaryActionTest.php tests/Unit/Events/BuildEventJourneyProjectionActionTest.php
+```
+
+Resultado:
+
+- `22` testes passaram;
+- `135` assertions passaram.
+
+Revalidacao ampliada:
+
+- `44` testes passaram;
+- `349` assertions passaram;
+- intake, projection, summary, Safety e VLM continuaram verdes juntos depois da abertura do endpoint read-only.
+
+Regras confirmadas:
+
+- o `GET` retorna a projection read-only completa;
+- acesso cross-organization retorna `403`;
+- o budget do endpoint ficou protegido com `14` queries no cenario completo;
+- o `PATCH` ainda nao foi aberto e continua dependente da validacao agregadora e da action transacional das `Tarefas 1.5` e `1.6`.
+
 ---
 
 ## Leitura real da stack atual

@@ -6,6 +6,7 @@ use App\Modules\Billing\Models\Subscription;
 use App\Modules\Billing\Services\BillingSubscriptionGatewayInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class ReconcileRecurringSubscriptionAction
@@ -17,6 +18,15 @@ class ReconcileRecurringSubscriptionAction
 
     public function execute(Subscription $subscription, array $options = []): array
     {
+        Log::info('billing.recurring.reconcile.requested', [
+            'subscription_id' => $subscription->id,
+            'organization_id' => $subscription->organization_id,
+            'gateway_subscription_id' => $subscription->gateway_subscription_id,
+            'page' => (int) ($options['page'] ?? 1),
+            'size' => (int) ($options['size'] ?? 20),
+            'with_charge_details' => (bool) ($options['with_charge_details'] ?? true),
+        ]);
+
         if (! filled($subscription->gateway_subscription_id)) {
             throw ValidationException::withMessages([
                 'subscription' => ['Nao foi possivel reconciliar a assinatura sem gateway_subscription_id.'],
@@ -204,10 +214,22 @@ class ReconcileRecurringSubscriptionAction
                 $summary['charges_reconciled']++;
             }
 
-            return array_merge($summary, [
+            $result = array_merge($summary, [
                 'subscription_projection' => $subscriptionProjection,
                 'subscription' => $subscription->fresh(['plan.features']),
             ]);
+
+            Log::info('billing.recurring.reconcile.completed', [
+                'subscription_id' => $subscription->id,
+                'organization_id' => $subscription->organization_id,
+                'gateway_subscription_id' => $subscription->gateway_subscription_id,
+                'cycles_reconciled' => $result['cycles_reconciled'],
+                'invoices_reconciled' => $result['invoices_reconciled'],
+                'charges_reconciled' => $result['charges_reconciled'],
+                'charge_details_loaded' => $result['charge_details_loaded'],
+            ]);
+
+            return $result;
         });
     }
 

@@ -36,10 +36,17 @@ function renderFields(defaultValues?: Partial<BuyerIdentityFieldsValues>) {
 }
 
 describe('BuyerIdentityFields', () => {
+  it('uses clearer buyer labels for a low-friction checkout', () => {
+    renderFields();
+
+    expect(screen.getByLabelText(/seu nome completo/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/whatsapp com ddd/i)).toBeInTheDocument();
+  });
+
   it('formats the WhatsApp field and removes non-digit noise while the buyer types', () => {
     renderFields();
 
-    const whatsappInput = screen.getByLabelText(/whatsapp/i);
+    const whatsappInput = screen.getByLabelText(/whatsapp com ddd/i);
 
     fireEvent.change(whatsappInput, {
       target: { value: 'abc48999771111' },
@@ -51,7 +58,7 @@ describe('BuyerIdentityFields', () => {
   it('uses telephone input hints on the WhatsApp field', () => {
     renderFields();
 
-    const whatsappInput = screen.getByLabelText(/whatsapp/i);
+    const whatsappInput = screen.getByLabelText(/whatsapp com ddd/i);
 
     expect(whatsappInput).toHaveAttribute('inputmode', 'tel');
     expect(whatsappInput).toHaveAttribute('autocomplete', 'tel');

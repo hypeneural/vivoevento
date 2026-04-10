@@ -7,6 +7,20 @@ import { WallPlayerRoot } from './WallPlayerRoot';
 const useWallPlayerMock = vi.fn();
 const usePerformanceModeMock = vi.fn();
 const useSideThumbnailsMock = vi.fn();
+const motionConfigMock = vi.fn();
+
+vi.mock('framer-motion', async () => {
+  const actual = await vi.importActual<typeof import('framer-motion')>('framer-motion');
+
+  return {
+    ...actual,
+    MotionConfig: ({ children, ...props }: { children: ReactNode; reducedMotion?: string; transition?: object }) => {
+      motionConfigMock(props);
+
+      return <div data-testid="motion-config">{children}</div>;
+    },
+  };
+});
 
 vi.mock('../hooks/useWallPlayer', () => ({
   useWallPlayer: (...args: unknown[]) => useWallPlayerMock(...args),
@@ -206,6 +220,7 @@ describe('WallPlayerRoot', () => {
   it('renders the layout when no ad is active', () => {
     render(<WallPlayerRoot code="ABCD1234" />);
 
+    expect(screen.getByTestId('motion-config')).toBeInTheDocument();
     expect(screen.getByText('layout-renderer-media_1')).toBeInTheDocument();
     expect(screen.queryByText('ad-overlay-1')).not.toBeInTheDocument();
   });
@@ -237,5 +252,21 @@ describe('WallPlayerRoot', () => {
 
     expect(screen.getByText('ad-overlay-1')).toBeInTheDocument();
     expect(screen.queryByText('layout-renderer-media_1')).not.toBeInTheDocument();
+  });
+
+  it('wraps the player in MotionConfig and forces reduced motion when performance mode is active', () => {
+    usePerformanceModeMock.mockReturnValue({
+      reducedEffects: true,
+      modeLabel: 'Performance',
+    });
+
+    render(<WallPlayerRoot code="ABCD1234" />);
+
+    expect(motionConfigMock).toHaveBeenCalledWith(expect.objectContaining({
+      reducedMotion: 'always',
+      transition: expect.objectContaining({
+        duration: 0,
+      }),
+    }));
   });
 });

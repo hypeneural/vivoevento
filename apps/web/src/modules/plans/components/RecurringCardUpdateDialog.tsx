@@ -154,13 +154,13 @@ export function RecurringCardUpdateDialog({
         <DialogHeader>
           <DialogTitle>Trocar cartao da assinatura</DialogTitle>
           <DialogDescription>
-            Use um cartao salvo na wallet do cliente ou tokeniza um novo cartao apenas no submit final.
+            Escolha um cartao salvo ou cadastre um novo para as proximas cobrancas da conta.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Wallet do cliente</p>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Cartoes salvos</p>
             <div className="mt-3 space-y-3">
               {isCardsLoading ? (
                 <div className="rounded-2xl border border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground">
@@ -324,8 +324,8 @@ export function RecurringCardUpdateDialog({
                 <div className="flex items-start gap-3">
                   <ShieldCheck className="mt-0.5 h-4 w-4 text-emerald-300" />
                   <div className="space-y-1">
-                    <p className="font-medium text-foreground">Tokenizacao no submit final</p>
-                    <p>O backend recebe apenas <code>card_token</code>; numero e CVV nao saem do navegador.</p>
+                    <p className="font-medium text-foreground">Cadastro protegido</p>
+                    <p>Os dados do cartao sao validados com seguranca so no momento de salvar a troca.</p>
                   </div>
                 </div>
               </div>

@@ -367,7 +367,7 @@ export default function EventDetailPage() {
   const eventMedia = mediaQuery.data?.data ?? [];
   const publishedMedia = filterPublished(eventMedia);
   const shareLinks = event?.public_links ? Object.values(event.public_links).filter((link) => link.enabled) : [];
-  const faceSearchStatus = resolveEventFaceSearchOperationalStatus(event.face_search);
+  const faceSearchStatus = resolveEventFaceSearchOperationalStatus(event?.face_search);
   const faceSearchStatusToneClasses = {
     neutral: 'border-slate-200 bg-slate-50 text-slate-700',
     info: 'border-sky-200 bg-sky-50 text-sky-900',

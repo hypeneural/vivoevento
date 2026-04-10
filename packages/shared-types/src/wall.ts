@@ -12,7 +12,7 @@ export const WALL_EVENT_NAMES = {
 } as const;
 
 export type WallMediaType = 'image' | 'video';
-export type WallLayout = 'auto' | 'polaroid' | 'fullscreen' | 'split' | 'cinematic' | 'kenburns' | 'spotlight' | 'gallery' | 'carousel' | 'mosaic' | 'grid';
+export type WallLayout = 'auto' | 'polaroid' | 'fullscreen' | 'split' | 'cinematic' | 'kenburns' | 'spotlight' | 'gallery' | 'carousel' | 'mosaic' | 'grid' | 'puzzle';
 export type WallTransition = 'fade' | 'slide' | 'zoom' | 'flip' | 'none';
 export type WallLifecycleStatus = 'draft' | 'live' | 'paused' | 'stopped' | 'expired';
 export type WallPublicStatus = WallLifecycleStatus | 'disabled';
@@ -26,6 +26,10 @@ export type WallVideoAudioPolicy = 'muted';
 export type WallVideoMultiLayoutPolicy = 'disallow' | 'one' | 'all';
 export type WallVideoPreferredVariant = 'wall_video_720p' | 'wall_video_1080p' | 'original';
 export type WallVideoAdmissionState = 'eligible' | 'eligible_with_fallback' | 'blocked';
+export type WallThemePreset = 'compact' | 'standard';
+export type WallThemeAnchorMode = 'event_brand' | 'qr_prompt' | 'none';
+export type WallThemeBurstIntensity = 'gentle' | 'normal';
+export type WallThemeVideoBehavior = 'fallback_single_item';
 export type WallPersistentStorage =
   | 'none'
   | 'localstorage'
@@ -85,12 +89,32 @@ export interface WallVideoAdmission {
   duration_limit_seconds: number;
 }
 
+export interface WallThemeConfig {
+  preset?: WallThemePreset;
+  anchor_mode?: WallThemeAnchorMode;
+  burst_intensity?: WallThemeBurstIntensity;
+  hero_enabled?: boolean;
+  video_behavior?: WallThemeVideoBehavior;
+}
+
+export interface WallLayoutCapabilities {
+  supports_video_playback: boolean;
+  supports_video_poster_only: boolean;
+  supports_multi_video: boolean;
+  max_simultaneous_videos: number;
+  fallback_video_layout?: WallLayout | null;
+  supports_side_thumbnails: boolean;
+  supports_floating_caption: boolean;
+  supports_theme_config: boolean;
+}
+
 export interface WallSettings {
   interval_ms: number;
   queue_limit: number;
   selection_mode: WallSelectionMode;
   event_phase: WallEventPhase;
   selection_policy: WallSelectionPolicy;
+  theme_config: WallThemeConfig;
   layout: WallLayout;
   transition_effect: WallTransition;
   background_url?: string | null;

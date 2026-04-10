@@ -4,6 +4,7 @@ import type {
   ApiWallSelectionModeOption,
   ApiWallSelectionPolicy,
   ApiWallSettings,
+  ApiWallThemeConfig,
   ApiWallVideoAudioPolicy,
   ApiWallVideoMultiLayoutPolicy,
   ApiWallVideoPlaybackMode,
@@ -102,6 +103,34 @@ export function normalizeWallSelectionPolicy(
   };
 }
 
+export function normalizeWallThemeConfig(
+  config?: Partial<ApiWallThemeConfig> | null,
+): ApiWallThemeConfig {
+  const normalized: ApiWallThemeConfig = {};
+
+  if (isWallThemePreset(config?.preset)) {
+    normalized.preset = config.preset;
+  }
+
+  if (isWallThemeAnchorMode(config?.anchor_mode)) {
+    normalized.anchor_mode = config.anchor_mode;
+  }
+
+  if (isWallThemeBurstIntensity(config?.burst_intensity)) {
+    normalized.burst_intensity = config.burst_intensity;
+  }
+
+  if (typeof config?.hero_enabled === 'boolean') {
+    normalized.hero_enabled = config.hero_enabled;
+  }
+
+  if (config?.video_behavior === 'fallback_single_item') {
+    normalized.video_behavior = config.video_behavior;
+  }
+
+  return normalized;
+}
+
 export function cloneWallSettings(settings: ApiWallSettings): ApiWallSettings {
   return {
     ...settings,
@@ -118,6 +147,7 @@ export function cloneWallSettings(settings: ApiWallSettings): ApiWallSettings {
     video_audio_policy: normalizeVideoAudioPolicy(settings.video_audio_policy),
     video_multi_layout_policy: normalizeVideoMultiLayoutPolicy(settings.video_multi_layout_policy),
     video_preferred_variant: normalizeVideoPreferredVariant(settings.video_preferred_variant),
+    theme_config: normalizeWallThemeConfig(settings.theme_config),
     selection_policy: normalizeWallSelectionPolicy(settings.selection_policy),
   };
 }
@@ -138,6 +168,7 @@ export function prepareWallSettingsPayload(settings: ApiWallSettings): ApiWallSe
     video_audio_policy: normalizeVideoAudioPolicy(settings.video_audio_policy),
     video_multi_layout_policy: normalizeVideoMultiLayoutPolicy(settings.video_multi_layout_policy),
     video_preferred_variant: normalizeVideoPreferredVariant(settings.video_preferred_variant),
+    theme_config: normalizeWallThemeConfig(settings.theme_config),
     selection_policy: normalizeWallSelectionPolicy(settings.selection_policy),
     neon_text: blankToNull(settings.neon_text),
     instructions_text: blankToNull(settings.instructions_text),
@@ -193,6 +224,7 @@ export function areWallSettingsEqual(
     && normalizeVideoAudioPolicy(left.video_audio_policy) === normalizeVideoAudioPolicy(right.video_audio_policy)
     && normalizeVideoMultiLayoutPolicy(left.video_multi_layout_policy) === normalizeVideoMultiLayoutPolicy(right.video_multi_layout_policy)
     && normalizeVideoPreferredVariant(left.video_preferred_variant) === normalizeVideoPreferredVariant(right.video_preferred_variant)
+    && serializeWallThemeConfig(left.theme_config) === serializeWallThemeConfig(right.theme_config)
     && blankToNull(left.instructions_text) === blankToNull(right.instructions_text);
 }
 
@@ -356,6 +388,31 @@ function normalizeVideoPreferredVariant(value?: ApiWallVideoPreferredVariant | s
   }
 
   return 'wall_video_720p';
+}
+
+function isWallThemePreset(value: unknown): value is ApiWallThemeConfig['preset'] {
+  return value === 'compact' || value === 'standard';
+}
+
+function isWallThemeAnchorMode(value: unknown): value is ApiWallThemeConfig['anchor_mode'] {
+  return value === 'event_brand' || value === 'qr_prompt' || value === 'none';
+}
+
+function isWallThemeBurstIntensity(value: unknown): value is ApiWallThemeConfig['burst_intensity'] {
+  return value === 'gentle' || value === 'normal';
+}
+
+function serializeWallThemeConfig(config?: Partial<ApiWallThemeConfig> | null): string {
+  const normalized = normalizeWallThemeConfig(config);
+  const sorted = Object.keys(normalized)
+    .sort()
+    .reduce<Record<string, unknown>>((acc, key) => {
+      acc[key] = normalized[key as keyof ApiWallThemeConfig];
+
+      return acc;
+    }, {});
+
+  return JSON.stringify(sorted);
 }
 
 function describePlaybackMode(mode: ApiWallVideoPlaybackMode | string | null | undefined, maxSeconds: number): string {

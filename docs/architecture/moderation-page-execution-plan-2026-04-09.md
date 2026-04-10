@@ -125,6 +125,28 @@ Comando recomendado para sonda local de volume:
 
 - `cd apps/api && php artisan media:moderation-feed-explain --synthetic-media=20000 --disable-jit --fail-on-budget --output=storage/app/reports/moderation-feed-explain-synthetic-20000.json`
 
+## Status da decima entrega
+
+Itens concluidos nesta rodada:
+
+- [x] ampliar o contrato do `/media/feed` e `/media/feed/stats` com `media_type`, `duplicates` e `ai_review`;
+- [x] endurecer a projecao operacional para expor `error` quando `processing_status = failed`, antes da queda para `pending_moderation`;
+- [x] criar projecao SQL dedicada de `ai review` para reaproveitar a mesma semantica de safety/VLM bloqueante;
+- [x] expor quick filters operacionais para `Com erro`, `Imagens`, `Videos`, `IA em review` e `Duplicatas`;
+- [x] adicionar controles avancados de `media type`, `IA em review` e `duplicatas` na UI da moderacao;
+- [x] ampliar a cobertura com TDD em `ModerationMediaTest.php`, `feed-utils.test.ts`, `moderation.service.test.ts` e `moderation-architecture.test.ts`.
+
+## Status da decima primeira entrega
+
+Itens concluidos nesta rodada:
+
+- [x] criar `resolveModerationQueueProgress()` para calcular posicao carregada, posicao pendente e pendentes restantes a partir da ordem real do feed;
+- [x] usar `stats.pending` da query dedicada como total autoritativo da fila pendente no recorte ativo;
+- [x] expor `Pendentes restantes` e `Posicao atual` no topo da fila de moderacao;
+- [x] expor posicao, pendentes depois da midia atual e amostra carregada no `ModerationReviewPanel`;
+- [x] validar no backend que `stats.pending` continua alinhado aos filtros ativos de moderacao;
+- [x] ampliar a cobertura TDD em `feed-utils.test.ts`, `ModerationReviewPanel.test.tsx`, `moderation-architecture.test.ts` e `ModerationMediaTest.php`.
+
 Este plano responde 9 perguntas:
 
 1. o que foi validado nesta rodada por codigo, testes e documentacao oficial;
@@ -159,6 +181,7 @@ Este plano responde 9 perguntas:
 - `apps/web/src/App.tsx`
 - `apps/web/src/app/routing/scroll-restoration.ts`
 - `apps/web/src/modules/moderation/moderation-architecture.test.ts`
+- `apps/api/tests/Feature/MediaProcessing/ModerationMediaTest.php`
 - `apps/api/tests/Feature/MediaProcessing/ModerationFeedCharacterizationTest.php`
 - `apps/api/tests/Feature/MediaProcessing/RunModerationFeedExplainCommandTest.php`
 - `apps/api/tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php`
@@ -194,9 +217,24 @@ Este plano responde 9 perguntas:
 - `apps/web/src/app/routing/router-architecture.test.ts`
 - `apps/web/src/modules/moderation/services/moderation.service.test.ts`
 - `apps/web/src/modules/moderation/feed-utils.test.ts`
+- `apps/web/src/modules/moderation/components/ModerationReviewPanel.test.tsx`
 - `apps/web/src/modules/moderation/moderation-architecture.test.ts`
+- `apps/api/tests/Feature/MediaProcessing/ModerationMediaTest.php`
 
 ### Comandos executados
+
+Entrega atual:
+
+- `cd apps/web && npm.cmd run test -- src/modules/moderation/feed-utils.test.ts src/modules/moderation/services/moderation.service.test.ts src/modules/moderation/components/ModerationReviewPanel.test.tsx src/modules/moderation/components/ModerationMediaSurface.test.tsx src/modules/moderation/moderation-architecture.test.ts`
+  - `5 arquivos`
+  - `35 testes`
+  - `PASS`
+- `cd apps/web && npm.cmd run type-check`
+  - `PASS`
+- `cd apps/api && php artisan test tests/Feature/MediaProcessing/ModerationFeedCharacterizationTest.php tests/Feature/MediaProcessing/ModerationMediaTest.php tests/Feature/MediaProcessing/EventMediaListTest.php tests/Unit/MediaProcessing/MediaEffectiveStateResolverTest.php tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php`
+  - `32 testes`
+  - `439 assertions`
+  - `PASS`
 
 Backend:
 
@@ -316,6 +354,23 @@ Backend:
 - `cd apps/api && php artisan test tests/Feature/MediaProcessing/RunModerationFeedExplainCommandTest.php tests/Unit/Modules/MediaProcessing/ModerationFeedExplainAnalyzeServiceTest.php tests/Unit/Modules/MediaProcessing/ModerationSearchDocumentBuilderTest.php tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php tests/Feature/MediaProcessing/ModerationFeedCharacterizationTest.php tests/Feature/MediaProcessing/ModerationMediaTest.php tests/Unit/Modules/MediaProcessing/MediaAssetUrlServiceTest.php tests/Feature/MediaProcessing/EventMediaListTest.php`
   - `35 testes`
   - `398 assertions`
+  - `PASS`
+- `cd apps/api && php artisan test tests/Feature/MediaProcessing/ModerationFeedCharacterizationTest.php tests/Feature/MediaProcessing/ModerationMediaTest.php tests/Feature/MediaProcessing/EventMediaListTest.php tests/Unit/MediaProcessing/MediaEffectiveStateResolverTest.php tests/Unit/Modules/MediaProcessing/ModerationArchitectureCharacterizationTest.php`
+  - `31 testes`
+  - `425 assertions`
+  - `PASS`
+
+Frontend:
+
+- `cd apps/web && npm.cmd run test -- src/modules/moderation/feed-utils.test.ts src/modules/moderation/services/moderation.service.test.ts src/modules/moderation/moderation-architecture.test.ts`
+  - `3 arquivos`
+  - `21 testes`
+  - `PASS`
+- `cd apps/web && npm.cmd run test -- src/modules/moderation/feed-utils.test.ts src/modules/moderation/services/moderation.service.test.ts src/modules/moderation/components/ModerationReviewPanel.test.tsx src/modules/moderation/components/ModerationMediaSurface.test.tsx src/modules/moderation/moderation-architecture.test.ts`
+  - `5 arquivos`
+  - `31 testes`
+  - `PASS`
+- `cd apps/web && npm.cmd run type-check`
   - `PASS`
 
 ### Leituras oficiais validadas

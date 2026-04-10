@@ -2142,7 +2142,6 @@ Validacao funcional de produto em `2026-04-09`:
   - para dizer que a integracao AWS esta `100%` no modulo inteiro ainda faltam:
     - repetir a rodada de `users` em um evento organico quando houver massa real suficiente;
     - janela curta de observacao operacional do modo `users` em trafego nao-tecnico;
-    - este bloco de UX do backoffice ja foi fechado; resta apenas o rollout organico do modo `users`.
 
 Principais descobertas operacionais:
 
@@ -2420,24 +2419,16 @@ Status desta rodada:
 - o formulario avancado e o card operacional passaram por limpeza final de vocabulario tecnico, mantendo termos mais precisos apenas onde a operacao realmente precisa deles.
 
 Leitura atual:
-   - evitar termos como `FaceSearch`, `backend`, `routing`, `shadow`, `fallback` nas superficies leigas;
-   - reservar o vocabulário tecnico para o card operacional.
+- esse bloco de UX do backoffice pode ser tratado como fechado para o MVP;
+- o caminho principal do operador comum ja esta centrado em:
 
-2. Orientacao visual melhor para o operador
-   - o detalhe do evento ja passou a explicar:
-     - se fotos antigas ainda estao sendo preparadas;
-     - se a busca publica ja pode ser usada por convidados;
-     - se existem falhas que merecem `reindex` ou `reconcile`;
-   - o restante aqui fica em deixar essa orientacao ainda mais resumida no card avancado.
+- ligar o reconhecimento;
+- liberar convidados;
+- ler o status simples do evento;
+- usar a busca interna ou abrir o link publico.
 
-3. CTA contextual no backoffice
-   - quando o reconhecimento estiver desligado, mostrar acao clara para ligar;
-   - quando estiver ligado mas ainda preparando o acervo, mostrar progresso/status;
-   - quando estiver pronto, destacar link publico e busca interna.
+- as ferramentas tecnicas continuam disponiveis, mas agora ficam recolhidas e mais secundarias.
 
-4. Menos dependencia de operacao manual
-   - preservar `health`, `reindex`, `reconcile` e `delete collection` para operacao;
-   - mas esconder ou secundarizar isso no caminho principal do usuario comum.
 
 ### P2. Robustez e observabilidade extra
 
@@ -2469,5 +2460,4 @@ Tecnicamente, o backend AWS ja esta pronto para o MVP e para o primeiro corte de
 O que falta agora esta mais concentrado em:
 
 - fechamento do rollout organico;
-- limpeza final de vocabulario tecnico nas superficies administrativas;
 - ultima validacao organica de rollout.

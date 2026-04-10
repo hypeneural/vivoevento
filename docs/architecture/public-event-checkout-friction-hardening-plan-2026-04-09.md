@@ -102,7 +102,7 @@ Decisao:
 
 - manter o payload key `event_date`
 - trocar o campo da UI para `datetime-local`
-- revisar copy para `Data e hora do evento`
+- usar copy final `Quando seu evento acontece?`
 - manter opcional dentro de `Adicionar mais detalhes`
 
 ## 3. O CTA `Ja tenho conta` era semanticamente certo, mas estava operacionalmente incompleto
@@ -165,7 +165,7 @@ Ordem real de importancia:
 
 1. continuidade do fluxo `Ja tenho conta`
 2. mascara e teclado do WhatsApp
-3. `Data e hora do evento` na UI
+3. data e hora do evento na UI
 4. rodape mobile CTA-first
 5. compressao visual do hero e da dobra inicial no celular
 
@@ -260,6 +260,10 @@ Bateria executada nesta fase:
 
 ## Fase 2 - Hardening do campo WhatsApp
 
+Status:
+
+- concluida e validada localmente
+
 Prioridade:
 
 - P0
@@ -295,7 +299,26 @@ Aceite:
 - o teclado mobile de telefone abre corretamente
 - o contrato enviado continua identico do ponto de vista do backend
 
+Implementado:
+
+- `BuyerIdentityFields.tsx`
+  - aplica `formatPhone()` no `onChange`
+  - expoe `inputMode="tel"` e `autoComplete="tel"`
+- `BuyerIdentityFields.test.tsx`
+  - cobre mascara visual e hints de teclado
+- `PublicCheckoutPageV2.test.tsx`
+  - cobre digitacao ruidosa e payload final em digitos
+
+Bateria executada nesta fase:
+
+- `npm run test -- src/modules/billing/public-checkout/components/BuyerIdentityFields.test.tsx src/modules/billing/public-checkout/PublicCheckoutPageV2.test.tsx`
+- `npm run type-check`
+
 ## Fase 3 - `Data e hora do evento`
+
+Status:
+
+- concluida e validada localmente
 
 Prioridade:
 
@@ -319,7 +342,7 @@ Backend:
 Mudancas:
 
 - trocar `type="date"` por `type="datetime-local"`
-- trocar label para `Data e hora do evento`
+- trocar label para `Quando seu evento acontece?`
 - manter dentro de `Adicionar mais detalhes`
 - opcionalmente adicionar helper de copy: `Se ainda estiver definindo, voce pode preencher depois`
 
@@ -334,7 +357,30 @@ Aceite:
 - o horario do evento deixa de se perder
 - a jornada continua leve porque o campo segue opcional
 
+Implementado:
+
+- `BuyerEventStep.tsx`
+  - campo opcional mudou para `type="datetime-local"`
+  - label final de UX ajustado depois para `Quando seu evento acontece?`
+- `BuyerEventStep.test.tsx`
+  - cobre o campo com data e hora
+- `PublicCheckoutPageV2.test.tsx`
+  - cobre envio de `event.event_date` com horario
+- `PublicEventCheckoutTest.php`
+  - segue cobrindo persistencia do horario em `events.starts_at`
+
+Bateria executada nesta fase:
+
+- `npm run test -- src/modules/billing/public-checkout/components/BuyerEventStep.test.tsx src/modules/billing/public-checkout/PublicCheckoutPageV2.test.tsx`
+- `php artisan test --filter=\"accepts an event_date with local time in the public checkout contract and persists it on the event schedule\"`
+- `npm run type-check`
+
 ## Fase 4 - Mobile-first CTA
+
+Status:
+
+- CTA-first concluido e validado localmente
+- compactacao extra de hero e resumo compacto concluidos na Fase 5
 
 Prioridade:
 
@@ -380,21 +426,74 @@ Aceite:
 - o CTA principal fica sempre facil de alcancar
 - o mobile deixa de ser summary-first e vira checkout-first
 
+Implementado:
+
+- `MobileCheckoutFooter.tsx`
+  - ganhou CTA principal contextual por etapa
+  - `Resumo` ficou como acao secundaria
+- `PublicCheckoutPageV2.tsx`
+  - passou a orquestrar label e handler do CTA fixo no mobile
+- `PublicCheckoutMobileLayout.test.tsx`
+  - cobre CTA fixo em `details`
+  - cobre CTA fixo em `payment`
+  - cobre preservacao de dados ao voltar
+- `apps/web/e2e/public-checkout-mobile.spec.ts`
+  - cobre o fluxo mobile usando o CTA fixo
+
+Bateria executada nesta fase:
+
+- `npm run test -- src/modules/billing/public-checkout/PublicCheckoutMobileLayout.test.tsx`
+- `npx playwright test e2e/public-checkout-mobile.spec.ts`
+- `npm run type-check`
+
 ## Fase 5 - Polish de UX apos os fixes estruturais
+
+Status:
+
+- concluida e validada localmente nesta rodada de polish mobile/copy
 
 Prioridade:
 
 - P2
 
-Possiveis refinamentos:
+Refinamentos implementados:
 
 - reduzir altura do hero no mobile
-- mostrar `Trocar pacote` de forma mais visivel depois da selecao
+- trocar a copy do hero para `Contrate seu evento em poucos minutos`
+- ocultar a trust row na primeira dobra mobile, mantendo os selos a partir de `sm`
+- mostrar resumo compacto do pacote escolhido acima do step ativo no mobile
 - ajustar rotulos para maior clareza:
   - `Seu nome completo`
   - `WhatsApp com DDD`
   - `Quando seu evento acontece?`
+
+Ainda opcional:
+
+- mostrar `Trocar pacote` de forma mais visivel depois da selecao
 - prefill mais explicito do telefone do pagador quando cartao for escolhido
+
+Implementado:
+
+- `CheckoutHeroSimple.tsx`
+  - hero mais baixo no mobile
+  - heading menor na primeira dobra
+  - trust row escondida no mobile para reduzir ruído
+- `PublicCheckoutShell.tsx`
+  - padding/gap mobile reduzidos sem afetar desktop
+- `MobileSelectedPackageSummary.tsx`
+  - resumo compacto do pacote escolhido somente em mobile e somente apos a etapa de pacote
+- `BuyerIdentityFields.tsx`
+  - labels mais explicitos para nome e WhatsApp
+- `BuyerEventStep.tsx`
+  - label do campo opcional de agenda orientado a usuario final
+
+Bateria executada nesta fase:
+
+- `npm run test -- src/modules/billing/public-checkout/components/CheckoutHeroSimple.test.tsx src/modules/billing/public-checkout/components/BuyerIdentityFields.test.tsx src/modules/billing/public-checkout/components/BuyerEventStep.test.tsx src/modules/billing/public-checkout/PublicCheckoutMobileLayout.test.tsx`
+- `npm run test -- src/modules/billing/public-checkout/PublicCheckoutPageV2.test.tsx src/modules/billing/public-checkout/PublicCheckoutFrictionCharacterization.test.tsx src/modules/billing/PublicEventCheckoutEntryPage.test.tsx src/modules/billing/public-checkout/mappers/checkoutResponseAdapters.test.ts`
+- `npx playwright test e2e/public-checkout-mobile.spec.ts e2e/public-checkout-pix.spec.ts e2e/public-checkout-manual-login.spec.ts e2e/public-checkout-card.spec.ts`
+- `npm run type-check`
+- `php artisan test --filter=PublicEventCheckoutTest`
 
 ## Backend: O Que Realmente Precisa Mudar
 
@@ -453,18 +552,28 @@ Possiveis refinamentos:
 
 - mascara e teclado do WhatsApp
 - testes do campo e regressao do pre-check
+- status: concluido
 
 ### PR 3
 
-- `Data e hora do evento`
+- data e hora do evento
 - ajuste de copy e payload
 - confirmacao final do contrato backend
+- status: concluido
 
 ### PR 4
 
 - mobile CTA-first
 - compactacao visual mobile
 - regressao E2E
+- status: concluido
+
+### PR 5
+
+- polish visual mobile da primeira dobra
+- resumo compacto do pacote escolhido
+- ajustes finos de copy dos campos
+- status: concluido
 
 ## Criterios De Aceite
 
@@ -473,6 +582,8 @@ Possiveis refinamentos:
 - o WhatsApp e guiado visualmente como telefone
 - `event_date` passa a carregar horario sem perder compatibilidade
 - o sticky mobile exibe a acao principal da etapa
+- a primeira dobra mobile fica mais curta e direta
+- o pacote escolhido fica visivel em resumo compacto apos a selecao
 - backend continua verde sem necessidade de refatoracao do contrato
 
 ## Decisao Recomendada

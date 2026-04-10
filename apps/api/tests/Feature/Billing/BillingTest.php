@@ -614,6 +614,103 @@ it('returns billing history from real invoices instead of event purchases', func
     $response->assertJsonPath('meta.total', 1);
 });
 
+it('returns recurring billing history even when the payment is still linked by order and gateway invoice id', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $plan = Plan::create([
+        'code' => 'starter-parceiro',
+        'name' => 'Starter Parceiro',
+        'audience' => 'b2b',
+        'status' => 'active',
+    ]);
+
+    $planPrice = $plan->prices()->create([
+        'billing_cycle' => 'monthly',
+        'currency' => 'BRL',
+        'amount_cents' => 9900,
+        'is_default' => true,
+    ]);
+
+    $subscription = Subscription::create([
+        'organization_id' => $organization->id,
+        'plan_id' => $plan->id,
+        'plan_price_id' => $planPrice->id,
+        'status' => 'active',
+        'billing_cycle' => 'monthly',
+        'payment_method' => 'credit_card',
+        'starts_at' => now()->subMonth(),
+        'renews_at' => now()->addMonth(),
+        'gateway_provider' => 'pagarme',
+        'gateway_subscription_id' => 'sub_invoice_history_123',
+        'contract_status' => 'active',
+        'billing_status' => 'paid',
+        'access_status' => 'enabled',
+    ]);
+
+    $order = BillingOrder::create([
+        'organization_id' => $organization->id,
+        'buyer_user_id' => $user->id,
+        'mode' => 'subscription',
+        'status' => 'paid',
+        'currency' => 'BRL',
+        'total_cents' => 9900,
+        'gateway_provider' => 'pagarme',
+        'confirmed_at' => now(),
+        'metadata_json' => [
+            'journey' => 'recurring_invoice_history',
+        ],
+    ]);
+
+    Payment::create([
+        'billing_order_id' => $order->id,
+        'subscription_id' => $subscription->id,
+        'status' => PaymentStatus::Paid->value,
+        'amount_cents' => 9900,
+        'currency' => 'BRL',
+        'payment_method' => 'credit_card',
+        'gateway_provider' => 'pagarme',
+        'gateway_payment_id' => 'pay_invoice_history_123',
+        'gateway_invoice_id' => 'inv_gateway_history_123',
+        'gateway_charge_id' => 'ch_invoice_history_123',
+        'gateway_status' => 'paid',
+        'gateway_charge_status' => 'paid',
+        'paid_at' => now(),
+        'raw_payload_json' => ['source' => 'test_recurring_invoice_history'],
+    ]);
+
+    Invoice::create([
+        'organization_id' => $organization->id,
+        'billing_order_id' => $order->id,
+        'subscription_id' => $subscription->id,
+        'gateway_invoice_id' => 'inv_gateway_history_123',
+        'gateway_charge_id' => 'ch_invoice_history_123',
+        'invoice_number' => 'EVV-REC-000001',
+        'status' => InvoiceStatus::Paid->value,
+        'amount_cents' => 9900,
+        'currency' => 'BRL',
+        'issued_at' => now(),
+        'due_at' => now(),
+        'paid_at' => now(),
+        'snapshot_json' => [
+            'plan' => [
+                'id' => $plan->id,
+                'code' => $plan->code,
+                'name' => $plan->name,
+            ],
+        ],
+    ]);
+
+    $response = $this->apiGet('/billing/invoices');
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.0.invoice_number', 'EVV-REC-000001');
+    $response->assertJsonPath('data.0.plan.code', 'starter-parceiro');
+    $response->assertJsonPath('data.0.order.mode', 'subscription');
+    $response->assertJsonPath('data.0.payment.status', 'paid');
+    $response->assertJsonPath('data.0.payment.gateway_invoice_id', 'inv_gateway_history_123');
+    $response->assertJsonPath('meta.total', 1);
+});
+
 it('cancels a pending event-package billing order through the configured gateway', function () {
     [$user, $organization] = $this->actingAsOwner();
 

@@ -119,10 +119,13 @@ class EventMediaController extends BaseController
             eventId: $validated['event_id'] ?? null,
             search: $validated['search'] ?? null,
             status: $validated['status'] ?? null,
+            mediaType: $validated['media_type'] ?? null,
             featured: array_key_exists('featured', $validated) ? (bool) $validated['featured'] : null,
             pinned: array_key_exists('pinned', $validated) ? (bool) $validated['pinned'] : null,
             senderBlocked: array_key_exists('sender_blocked', $validated) ? (bool) $validated['sender_blocked'] : null,
             orientation: $validated['orientation'] ?? null,
+            duplicates: array_key_exists('duplicates', $validated) ? (bool) $validated['duplicates'] : null,
+            aiReview: array_key_exists('ai_review', $validated) ? (bool) $validated['ai_review'] : null,
         );
 
         $perPage = (int) ($validated['per_page'] ?? 24);
@@ -160,10 +163,13 @@ class EventMediaController extends BaseController
             eventId: $validated['event_id'] ?? null,
             search: $validated['search'] ?? null,
             status: $validated['status'] ?? null,
+            mediaType: $validated['media_type'] ?? null,
             featured: array_key_exists('featured', $validated) ? (bool) $validated['featured'] : null,
             pinned: array_key_exists('pinned', $validated) ? (bool) $validated['pinned'] : null,
             senderBlocked: array_key_exists('sender_blocked', $validated) ? (bool) $validated['sender_blocked'] : null,
             orientation: $validated['orientation'] ?? null,
+            duplicates: array_key_exists('duplicates', $validated) ? (bool) $validated['duplicates'] : null,
+            aiReview: array_key_exists('ai_review', $validated) ? (bool) $validated['ai_review'] : null,
         );
 
         return $this->success(
@@ -779,6 +785,9 @@ class EventMediaController extends BaseController
             'pinned' => array_key_exists('pinned', $filters) ? (bool) $filters['pinned'] : null,
             'sender_blocked' => array_key_exists('sender_blocked', $filters) ? (bool) $filters['sender_blocked'] : null,
             'orientation' => $filters['orientation'] ?? null,
+            'media_type' => $filters['media_type'] ?? null,
+            'duplicates' => array_key_exists('duplicates', $filters) ? (bool) $filters['duplicates'] : null,
+            'ai_review' => array_key_exists('ai_review', $filters) ? (bool) $filters['ai_review'] : null,
         ]));
 
         return Cache::remember(

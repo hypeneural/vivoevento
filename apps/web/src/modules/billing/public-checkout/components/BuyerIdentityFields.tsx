@@ -21,9 +21,9 @@ export function BuyerIdentityFields() {
         name="responsible_name"
         render={({ field }) => (
           <FormItem className="md:col-span-2">
-            <FormLabel>Seu nome</FormLabel>
+            <FormLabel>Seu nome completo</FormLabel>
             <FormControl>
-              <Input placeholder="Nome do responsavel" {...field} />
+              <Input placeholder="Ex.: Camila Rocha" autoComplete="name" {...field} />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -34,7 +34,7 @@ export function BuyerIdentityFields() {
         name="whatsapp"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>WhatsApp</FormLabel>
+            <FormLabel>WhatsApp com DDD</FormLabel>
             <FormControl>
               <Input
                 placeholder="(48) 99999-9999"

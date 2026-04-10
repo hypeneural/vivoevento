@@ -14,6 +14,7 @@ import type { ModerationMediaAction } from './ModerationMediaCard';
 import { MediaActionButton } from './ModerationMediaCard';
 import { ModerationMediaSurface, resolveModerationSurfaceAsset } from './ModerationMediaSurface';
 import { formatDateTime, getAspectRatio, getOrientationLabel } from '../utils';
+import type { ModerationQueueProgress } from '../feed-utils';
 
 interface ModerationReviewPanelProps {
   media: ApiEventMediaItem | ApiEventMediaDetail | null;
@@ -36,6 +37,7 @@ interface ModerationReviewPanelProps {
   duplicateClusterBusy?: boolean;
   onOpenDuplicateItem?: (mediaId: number) => void;
   onRejectDuplicateCluster?: () => void;
+  queueProgress?: ModerationQueueProgress;
 }
 
 function hasAiEvaluations(media: ApiEventMediaItem | ApiEventMediaDetail): media is ApiEventMediaDetail {
@@ -67,6 +69,7 @@ export function ModerationReviewPanel({
   duplicateClusterBusy = false,
   onOpenDuplicateItem,
   onRejectDuplicateCluster,
+  queueProgress,
 }: ModerationReviewPanelProps) {
   if (!media) {
     return (
@@ -104,6 +107,14 @@ export function ModerationReviewPanel({
       : 'Bloqueio sem prazo definido'
     : 'Remetente liberado para novas midias';
   const decisionReason = media.decision_override_reason ?? null;
+  const queuePositionLabel = queueProgress?.pendingPosition
+    ? `Pendente ${queueProgress.pendingPosition} de ${queueProgress.pendingTotal}`
+    : queueProgress?.currentPosition
+      ? `Item ${queueProgress.currentPosition} de ${queueProgress.total}`
+      : 'Sem posicao ativa';
+  const queueRemainingLabel = queueProgress?.pendingRemainingAfterCurrent !== null && queueProgress?.pendingRemainingAfterCurrent !== undefined
+    ? `${queueProgress.pendingRemainingAfterCurrent} pendentes depois desta`
+    : `${queueProgress?.pendingTotal ?? 0} pendentes no recorte`;
 
   return (
     <div className="overflow-hidden rounded-[28px] border border-border/60 bg-background/90 shadow-sm">
@@ -146,6 +157,22 @@ export function ModerationReviewPanel({
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-3 rounded-3xl border border-border/60 bg-muted/20 p-4 sm:grid-cols-2">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Posicao na fila</p>
+            <p className="mt-1 text-lg font-semibold tabular-nums">{queuePositionLabel}</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Fila restante</p>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">{queueRemainingLabel}</p>
+            {queueProgress ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {queueProgress.loadedPendingTotal} pendentes carregadas de {queueProgress.loadedTotal} midias visiveis.
+              </p>
+            ) : null}
           </div>
         </div>
 

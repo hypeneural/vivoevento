@@ -2,6 +2,7 @@ import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { LayoutRenderer } from './LayoutRenderer';
+import type { MediaSurfaceVideoControlProps } from './MediaSurface';
 import type { WallRuntimeItem, WallSettings } from '../types';
 
 function makeVideo(id: string): WallRuntimeItem {
@@ -77,6 +78,24 @@ function makeSettings(): WallSettings {
   };
 }
 
+function makeVideoControl(): MediaSurfaceVideoControlProps {
+  return {
+    playerStatus: 'booting',
+    startupDeadlineMs: 1200,
+    stallBudgetMs: 3000,
+    resumeMode: 'resume_if_same_item_else_restart',
+    onStarting: () => undefined,
+    onFirstFrame: () => undefined,
+    onPlaybackReady: () => undefined,
+    onPlaying: () => undefined,
+    onProgress: () => undefined,
+    onWaiting: () => undefined,
+    onStalled: () => undefined,
+    onEnded: () => undefined,
+    onFailure: () => undefined,
+  };
+}
+
 describe('LayoutRenderer video multi-layout characterization', () => {
   it('mounts multiple autoplay videos in grid mode when multi-layout video policy is all', () => {
     const items = [makeVideo('video-1'), makeVideo('video-2'), makeVideo('video-3')];
@@ -95,5 +114,29 @@ describe('LayoutRenderer video multi-layout characterization', () => {
     expect(videos).toHaveLength(3);
     expect(Array.from(videos).every((video) => video.autoplay && video.muted)).toBe(true);
     expect(posterImages).toHaveLength(0);
+  });
+
+  it('falls back to a single controlled video surface when multi-layout video policy is disallow', () => {
+    const items = [makeVideo('video-1'), makeVideo('video-2'), makeVideo('video-3')];
+    const settings = {
+      ...makeSettings(),
+      video_multi_layout_policy: 'disallow' as const,
+    };
+
+    const { container } = render(
+      <LayoutRenderer
+        media={items[0]}
+        settings={settings}
+        allItems={items}
+        videoControl={makeVideoControl()}
+      />,
+    );
+
+    const videos = container.querySelectorAll('video');
+    const posterImages = container.querySelectorAll('img');
+
+    expect(videos).toHaveLength(1);
+    expect(videos[0].getAttribute('poster')).toBe(items[0].preview_url);
+    expect(posterImages.length).toBeGreaterThanOrEqual(1);
   });
 });

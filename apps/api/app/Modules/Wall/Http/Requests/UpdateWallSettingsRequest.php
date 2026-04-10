@@ -19,8 +19,13 @@ class UpdateWallSettingsRequest extends FormRequest
 
     public function rules(): array
     {
+        $enabledLayouts = array_map(
+            fn (WallLayout $layout): string => $layout->value,
+            WallLayout::enabledCases(),
+        );
+
         return [
-            'layout' => ['sometimes', Rule::enum(WallLayout::class)],
+            'layout' => ['sometimes', Rule::in($enabledLayouts)],
             'transition_effect' => ['sometimes', Rule::enum(WallTransition::class)],
             'interval_ms' => ['sometimes', 'integer', 'min:2000', 'max:60000'],
             'queue_limit' => ['sometimes', 'integer', 'min:5', 'max:500'],
@@ -39,6 +44,12 @@ class UpdateWallSettingsRequest extends FormRequest
             'selection_policy.sender_window_minutes' => ['sometimes', 'integer', 'min:1', 'max:30'],
             'selection_policy.avoid_same_sender_if_alternative_exists' => ['sometimes', 'boolean'],
             'selection_policy.avoid_same_duplicate_cluster_if_alternative_exists' => ['sometimes', 'boolean'],
+            'theme_config' => ['sometimes', 'nullable', 'array'],
+            'theme_config.preset' => ['sometimes', 'string', Rule::in(['compact', 'standard'])],
+            'theme_config.anchor_mode' => ['sometimes', 'string', Rule::in(['event_brand', 'qr_prompt', 'none'])],
+            'theme_config.burst_intensity' => ['sometimes', 'string', Rule::in(['gentle', 'normal'])],
+            'theme_config.hero_enabled' => ['sometimes', 'boolean'],
+            'theme_config.video_behavior' => ['sometimes', 'string', Rule::in(['fallback_single_item'])],
             'show_qr' => ['sometimes', 'boolean'],
             'show_branding' => ['sometimes', 'boolean'],
             'show_neon' => ['sometimes', 'boolean'],

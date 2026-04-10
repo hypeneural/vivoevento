@@ -67,4 +67,20 @@ describe('moderation architecture', () => {
       .toContain('setDuplicatesOnly(true)')
       .toContain('setAiReviewOnly(true)');
   });
+
+  it('wires queue progress into the moderation page and review panel', () => {
+    const currentDirectory = dirname(fileURLToPath(import.meta.url));
+    const pageSource = readFileSync(resolve(currentDirectory, 'ModerationPage.tsx'), 'utf8');
+    const feedUtilsSource = readFileSync(resolve(currentDirectory, 'feed-utils.ts'), 'utf8');
+
+    expect(feedUtilsSource)
+      .toContain('resolveModerationQueueProgress')
+      .toContain('pendingRemainingAfterCurrent');
+
+    expect(pageSource)
+      .toContain('queueProgress')
+      .toContain('resolveModerationQueueProgress(media, focusedMediaId')
+      .toContain('Pendentes restantes')
+      .toContain('Posicao atual');
+  });
 });

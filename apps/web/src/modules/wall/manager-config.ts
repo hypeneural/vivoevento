@@ -1,5 +1,6 @@
 import type {
   ApiWallEventPhaseOption,
+  ApiWallLayoutOption,
   ApiWallOptionsResponse,
   ApiWallSelectionModeOption,
   ApiWallSettings,
@@ -10,19 +11,51 @@ import type {
   ApiWallVideoResumeMode,
 } from '@/lib/api-types';
 
+const singleLayoutMetadata = {
+  capabilities: {
+    supports_video_playback: true,
+    supports_video_poster_only: false,
+    supports_multi_video: false,
+    max_simultaneous_videos: 1,
+    fallback_video_layout: null,
+    supports_side_thumbnails: true,
+    supports_floating_caption: true,
+    supports_theme_config: false,
+  },
+  defaults: {
+    theme_config: {},
+  },
+} satisfies Pick<ApiWallLayoutOption, 'capabilities' | 'defaults'>;
+
+const multiLayoutMetadata = {
+  capabilities: {
+    supports_video_playback: false,
+    supports_video_poster_only: true,
+    supports_multi_video: false,
+    max_simultaneous_videos: 0,
+    fallback_video_layout: 'fullscreen',
+    supports_side_thumbnails: false,
+    supports_floating_caption: false,
+    supports_theme_config: false,
+  },
+  defaults: {
+    theme_config: {},
+  },
+} satisfies Pick<ApiWallLayoutOption, 'capabilities' | 'defaults'>;
+
 export const fallbackOptions: ApiWallOptionsResponse = {
   layouts: [
-    { value: 'auto', label: 'Automatico' },
-    { value: 'fullscreen', label: 'Tela cheia' },
-    { value: 'polaroid', label: 'Polaroid' },
-    { value: 'split', label: 'Tela dividida' },
-    { value: 'cinematic', label: 'Cinematografico' },
-    { value: 'kenburns', label: 'Ken Burns' },
-    { value: 'spotlight', label: 'Holofote' },
-    { value: 'gallery', label: 'Galeria de arte' },
-    { value: 'carousel', label: 'Carrossel' },
-    { value: 'mosaic', label: 'Mosaico' },
-    { value: 'grid', label: 'Grade' },
+    { value: 'auto', label: 'Automatico', ...singleLayoutMetadata },
+    { value: 'fullscreen', label: 'Tela cheia', ...singleLayoutMetadata },
+    { value: 'polaroid', label: 'Polaroid', ...singleLayoutMetadata },
+    { value: 'split', label: 'Tela dividida', ...singleLayoutMetadata },
+    { value: 'cinematic', label: 'Cinematografico', ...singleLayoutMetadata },
+    { value: 'kenburns', label: 'Ken Burns', ...singleLayoutMetadata },
+    { value: 'spotlight', label: 'Holofote', ...singleLayoutMetadata },
+    { value: 'gallery', label: 'Galeria de arte', ...singleLayoutMetadata },
+    { value: 'carousel', label: 'Carrossel', ...multiLayoutMetadata },
+    { value: 'mosaic', label: 'Mosaico', ...multiLayoutMetadata },
+    { value: 'grid', label: 'Grade', ...multiLayoutMetadata },
   ],
   transitions: [
     { value: 'fade', label: 'Suave' },

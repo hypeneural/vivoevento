@@ -12,11 +12,14 @@
  * Also renders overlays: branding, connection status, floating caption.
  */
 
+import { MotionConfig } from 'framer-motion';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { useWallPlayer } from '../hooks/useWallPlayer';
 import { usePerformanceMode } from '../hooks/usePerformanceMode';
 import { resolveRenderableLayout, shouldRenderFloatingCaption } from '../engine/layoutStrategy';
 import { WALL_CAPTION_PANEL, WALL_TEXT_PRIMARY } from '../design/tokens';
+import { resolveWallMotionConfig } from '../themes/motion';
+import { getWallLayoutDefinition } from '../themes/registry';
 import AdOverlay from './AdOverlay';
 import BrandingOverlay from './BrandingOverlay';
 import ConnectionOverlay from './ConnectionOverlay';
@@ -81,7 +84,11 @@ export function WallPlayerRoot({ code }: { code: string }) {
     )
     : null;
 
-  const isMultiItemLayout = activeLayout === 'carousel' || activeLayout === 'mosaic' || activeLayout === 'grid';
+  const activeLayoutDefinition = getWallLayoutDefinition(
+    activeLayout ?? state.settings?.layout ?? 'fullscreen',
+  );
+  const motionConfig = resolveWallMotionConfig(activeLayoutDefinition.motion, reducedEffects);
+  const isBoardLayout = activeLayoutDefinition.kind === 'board';
 
   const sideThumbs = useSideThumbnails(
     state.items,
@@ -90,7 +97,7 @@ export function WallPlayerRoot({ code }: { code: string }) {
       enabled:
         state.status === 'playing'
         && (state.settings?.show_side_thumbnails ?? false)
-        && !isMultiItemLayout
+        && !isBoardLayout
         && !isAdShowing,
     },
   );
@@ -114,7 +121,11 @@ export function WallPlayerRoot({ code }: { code: string }) {
     : null;
 
   return (
-    <PlayerShell backgroundUrl={state.settings?.background_url}>
+    <MotionConfig
+      reducedMotion={motionConfig.reducedMotion}
+      transition={motionConfig.transition}
+    >
+      <PlayerShell backgroundUrl={state.settings?.background_url}>
       <BrandingOverlay
         showBranding={state.settings?.show_branding ?? true}
         showQr={
@@ -227,7 +238,8 @@ export function WallPlayerRoot({ code }: { code: string }) {
           instructions={state.settings?.instructions_text}
         />
       )}
-    </PlayerShell>
+      </PlayerShell>
+    </MotionConfig>
   );
 }
 

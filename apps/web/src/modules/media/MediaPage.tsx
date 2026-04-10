@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   CalendarRange,
@@ -22,10 +22,13 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { ApiEventMediaDetail, ApiEventMediaItem } from '@/lib/api-types';
+import type { ApiEventMediaDetail, ApiEventMediaItem, ApiFaceSearchResponse } from '@/lib/api-types';
+import { ApiError } from '@/lib/api';
 import { queryKeys } from '@/lib/query-client';
 import { eventsService } from '@/modules/events/services/events.service';
 import type { EventListItem } from '@/modules/events/types';
+import { searchEventFaces } from '@/modules/face-search/api';
+import { FaceSearchSearchPanel } from '@/modules/face-search/components/FaceSearchSearchPanel';
 import { EmptyState } from '@/shared/components/EmptyState';
 import { PageHeader } from '@/shared/components/PageHeader';
 import { ChannelBadge, MediaStatusBadge } from '@/shared/components/StatusBadges';
@@ -187,6 +190,11 @@ export default function MediaPage() {
   const [duplicatesOnly, setDuplicatesOnly] = useState(false);
   const [featuredOnly, setFeaturedOnly] = useState(false);
   const [recognitionReadyOnly, setRecognitionReadyOnly] = useState(false);
+  const [faceSearchDialogOpen, setFaceSearchDialogOpen] = useState(false);
+  const [faceSearchEventId, setFaceSearchEventId] = useState('');
+  const [faceSearchIncludePending, setFaceSearchIncludePending] = useState(true);
+  const [faceSearchErrorMessage, setFaceSearchErrorMessage] = useState<string | null>(null);
+  const [faceSearchResponse, setFaceSearchResponse] = useState<ApiFaceSearchResponse | null>(null);
   const [selectedMediaId, setSelectedMediaId] = useState<number | null>(null);
 
   const deferredSearch = useDeferredValue(search);
@@ -243,12 +251,31 @@ export default function MediaPage() {
     enabled: selectedMediaId !== null,
   });
 
+  const faceSearchMutation = useMutation({
+    mutationFn: ({ eventId, file, includePending }: { eventId: string; file: File; includePending: boolean }) =>
+      searchEventFaces(eventId, file, includePending),
+    onMutate: () => {
+      setFaceSearchErrorMessage(null);
+    },
+    onSuccess: (response) => {
+      setFaceSearchResponse(response);
+    },
+    onError: (error) => {
+      const message = error instanceof ApiError
+        ? error.message
+        : 'Nao foi possivel buscar essa pessoa agora.';
+
+      setFaceSearchErrorMessage(message);
+    },
+  });
+
   const events = (eventsQuery.data?.data ?? []) as EventListItem[];
   const pages = mediaQuery.data?.pages ?? [];
   const items = useMemo(() => pages.flatMap((page) => page.data), [pages]);
   const total = pages[0]?.meta.total ?? 0;
   const stats = pages[0]?.meta.stats ?? EMPTY_STATS;
   const selectedMediaPreview = detailQuery.data ?? items.find((item) => item.id === selectedMediaId) ?? null;
+  const selectedFaceSearchEvent = events.find((eventItem) => String(eventItem.id) === faceSearchEventId);
 
   useEffect(() => {
     const node = loadMoreRef.current;
@@ -261,6 +288,12 @@ export default function MediaPage() {
     observer.observe(node);
     return () => observer.disconnect();
   }, [items.length, mediaQuery.fetchNextPage, mediaQuery.hasNextPage, mediaQuery.isFetchNextPageError, mediaQuery.isFetchingNextPage]);
+
+  useEffect(() => {
+    if (!faceSearchDialogOpen || faceSearchEventId || events.length === 0) return;
+
+    setFaceSearchEventId(eventFilter !== 'all' ? eventFilter : String(events[0].id));
+  }, [eventFilter, events, faceSearchDialogOpen, faceSearchEventId]);
 
   function clearFilters() {
     setSearch('');
@@ -275,6 +308,21 @@ export default function MediaPage() {
     setDuplicatesOnly(false);
     setFeaturedOnly(false);
     setRecognitionReadyOnly(false);
+  }
+
+  function openFaceSearchDialog() {
+    setFaceSearchDialogOpen(true);
+    setFaceSearchErrorMessage(null);
+    setFaceSearchResponse(null);
+
+    if (eventFilter !== 'all') {
+      setFaceSearchEventId(eventFilter);
+      return;
+    }
+
+    if (!faceSearchEventId && events.length > 0) {
+      setFaceSearchEventId(String(events[0].id));
+    }
   }
 
   return (
@@ -297,6 +345,10 @@ export default function MediaPage() {
               <p className="text-sm text-muted-foreground">Periodo com hora, carregamento progressivo e viewport virtualizado para centenas de fotos.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" onClick={openFaceSearchDialog}>
+                <ScanFace className="h-4 w-4" />
+                Buscar pessoa por foto
+              </Button>
               <Button type="button" variant={filtersOpen || activeFiltersCount > 0 ? 'secondary' : 'outline'} onClick={() => setFiltersOpen((current) => !current)}>
                 <SlidersHorizontal className="h-4 w-4" />
                 {filtersOpen ? 'Fechar filtros' : 'Abrir filtros'}
@@ -468,6 +520,75 @@ export default function MediaPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={faceSearchDialogOpen} onOpenChange={setFaceSearchDialogOpen}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Buscar pessoa por foto</DialogTitle>
+            <DialogDescription>
+              Escolha o evento e envie uma selfie. A busca mostra fotos da galeria que ja estao preparadas para reconhecimento facial.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Evento da busca</p>
+              <Select
+                value={faceSearchEventId}
+                onValueChange={(value) => {
+                  setFaceSearchEventId(value);
+                  setFaceSearchResponse(null);
+                  setFaceSearchErrorMessage(null);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um evento" />
+                </SelectTrigger>
+                <SelectContent>
+                  {events.map((eventItem) => (
+                    <SelectItem key={eventItem.id} value={String(eventItem.id)}>
+                      {eventItem.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedFaceSearchEvent ? (
+                <p className="text-xs text-muted-foreground">
+                  Buscando dentro de: {selectedFaceSearchEvent.title}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Selecione um evento para liberar o envio da selfie.
+                </p>
+              )}
+            </div>
+
+            <FaceSearchSearchPanel
+              title="Encontrar fotos de uma pessoa"
+              description="Envie uma selfie nitida para localizar fotos parecidas dentro do evento escolhido."
+              submitLabel="Buscar fotos"
+              isPending={faceSearchMutation.isPending}
+              includePendingEnabled
+              includePending={faceSearchIncludePending}
+              onIncludePendingChange={setFaceSearchIncludePending}
+              disabled={!faceSearchEventId}
+              disabledMessage={!faceSearchEventId ? 'Selecione um evento antes de enviar a selfie.' : null}
+              requestMeta={faceSearchResponse?.request ?? null}
+              results={faceSearchResponse?.results ?? []}
+              errorMessage={faceSearchErrorMessage}
+              onSubmit={({ file, includePending }) => {
+                if (!faceSearchEventId) return;
+
+                faceSearchMutation.mutate({
+                  eventId: faceSearchEventId,
+                  file,
+                  includePending,
+                });
+              }}
+            />
+          </div>
         </DialogContent>
       </Dialog>
     </>

@@ -267,9 +267,11 @@ class EventWallController extends BaseController
         abort_unless($request->user()?->can('wall.view'), 403);
 
         return $this->success([
-            'layouts' => collect(WallLayout::cases())->map(fn ($layout) => [
+            'layouts' => collect(WallLayout::enabledCases())->map(fn ($layout) => [
                 'value' => $layout->value,
                 'label' => $layout->label(),
+                'capabilities' => $layout->capabilities(),
+                'defaults' => $layout->defaults(),
             ]),
             'transitions' => collect(WallTransition::cases())->map(fn ($transition) => [
                 'value' => $transition->value,

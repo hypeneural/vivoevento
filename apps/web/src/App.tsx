@@ -259,7 +259,11 @@ const App = () => (
         <Sonner />
         <AuthProvider>
           <BrandingProvider>
-            <RouterProvider router={router} fallbackElement={<FullScreenLoader />} />
+            <RouterProvider
+              router={router}
+              fallbackElement={<FullScreenLoader />}
+              future={{ v7_startTransition: true }}
+            />
           </BrandingProvider>
         </AuthProvider>
       </TooltipProvider>

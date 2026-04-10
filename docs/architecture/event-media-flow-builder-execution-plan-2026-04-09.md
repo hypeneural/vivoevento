@@ -194,6 +194,22 @@ Leitura pratica:
 - a execucao deve comecar por uma fase curta de estabilizacao de baseline, nao direto pela tela nova;
 - o bloqueio confirmado e unico, hoje, esta no backend de assets.
 
+## Status da execucao em `2026-04-10`
+
+Revalidacao concluida no estado atual do workspace:
+
+- a blindagem de assets ausentes foi aplicada em `EventMediaResource`;
+- o cenario `data_url fallback` voltou a passar;
+- a bateria backend relevante fechou com `87` testes passando e `670` assertions;
+- a trilha frontend de duplicate cluster e a caracterizacao de moderacao passaram juntas;
+- `npm run type-check` passou;
+- a bateria frontend relevante fechou com `31` testes passando e `1` arquivo com cenarios skipped.
+
+Leitura pratica:
+
+- a Fase `0B` pode ser considerada concluida;
+- o proximo passo de implementacao agora e a `Fase 1 - Backend projection`.
+
 ---
 
 ## Decisoes tiradas da documentacao oficial do React Flow
@@ -877,6 +893,10 @@ npm run test -- src/modules/events/intake.test.ts
 
 ## Fase 0B - Estabilizacao da baseline
 
+Status:
+
+- revalidada com sucesso em `2026-04-10` no estado atual do workspace.
+
 ### Tarefa 0.3 - Blindar assets ausentes em `EventMediaResource`
 
 Subtarefas:
@@ -975,6 +995,17 @@ cd apps/api
 php artisan test --filter=EventJourneyProjectionDataTest
 ```
 
+Status em `2026-04-10`:
+
+- [x] `EventJourneyProjectionData` criado;
+- [x] `EventJourneyStageData` criado;
+- [x] `EventJourneyNodeData` criado;
+- [x] `EventJourneyBranchData` criado;
+- [x] `EventJourneyCapabilityData` criado;
+- [x] `EventJourneyScenarioData` criado;
+- [x] contrato serializavel validado por teste unitario;
+- [x] campos operacionais padronizados como projection read-only, sem DSL de execucao.
+
 ### Tarefa 1.2 - Criar `BuildEventJourneyProjectionAction`
 
 Subtarefas:
@@ -1010,19 +1041,46 @@ php artisan test --filter=BuildEventJourneyProjectionActionTest
 
 Casos obrigatorios:
 
-- evento manual sem IA;
-- evento `none`;
-- evento `ai` com Safety desligado;
-- evento `ai` com Safety enforced;
-- evento `ai` com Safety observe_only;
-- evento `ai` com VLM enrich_only;
-- evento `ai` com VLM gate;
-- evento com WhatsApp direto;
-- evento com grupos;
-- evento com Telegram;
-- evento com upload publico;
-- evento sem entitlement de canal;
-- budget de query protegido com `expectsDatabaseQueryCount`.
+- [x] evento manual sem IA;
+- [x] evento `none`;
+- [x] evento `ai` com Safety desligado;
+- [x] evento `ai` com Safety enforced;
+- [x] evento `ai` com Safety observe_only;
+- [x] evento `ai` com VLM enrich_only;
+- [x] evento `ai` com VLM gate;
+- [x] evento com WhatsApp direto;
+- [x] evento com grupos;
+- [x] evento com Telegram;
+- [x] evento com upload publico;
+- [x] evento sem entitlement de canal;
+- [x] budget de query protegido com `expectsDatabaseQueryCount`.
+
+Status em `2026-04-10`:
+
+- [x] `BuildEventJourneyProjectionAction` implementada no modulo `Events`;
+- [x] a action carrega `modules`, `channels`, `defaultWhatsAppInstance`, `whatsappGroupBindings`, `mediaSenderBlacklists`, `contentModerationSettings`, `mediaIntelligenceSettings` e `wallSettings`;
+- [x] a action reaproveita `EventIntakeChannelsStateBuilder`, `ContentModerationSettingsResolver` e `ContextualModerationPolicyResolver`;
+- [x] a projection retorna as faixas `Entrada`, `Processamento`, `Decisao` e `Saida`;
+- [x] a projection retorna nodes estaveis para canais, Safety, VLM, decisoes, galeria, wall, print e silencio/arquivo;
+- [x] `print` fica `unavailable` na V1;
+- [x] canais ativos sem entitlement aparecem como `locked` e geram `warnings`;
+- [x] o teste de budget da action ficou em `8` queries para o cenario completo com settings persistidos;
+- [x] o endpoint ainda nao existe; a protecao de budget do endpoint deve ser repetida na `Tarefa 1.4`.
+
+Bateria validada em `2026-04-10`:
+
+```bash
+cd apps/api
+php artisan test tests/Unit/Events/EventJourneyProjectionDataTest.php tests/Unit/Events/BuildEventJourneyProjectionActionTest.php
+php artisan test tests/Unit/Events/EventJourneyProjectionDataTest.php tests/Unit/Events/BuildEventJourneyProjectionActionTest.php tests/Feature/Events/EventJourneyArchitectureCharacterizationTest.php tests/Feature/Events/EventIntakeChannelsTest.php tests/Feature/Events/EventIntakeChannelsTelegramPrivateTest.php tests/Feature/ContentModeration/ContentModerationSettingsTest.php tests/Feature/MediaIntelligence/MediaIntelligenceSettingsTest.php
+```
+
+Resultado:
+
+- `14` testes novos passaram;
+- `83` assertions novas passaram;
+- bateria de regressao direcionada passou com `36` testes;
+- bateria de regressao direcionada passou com `297` assertions.
 
 ### Tarefa 1.3 - Criar resumo humano automatico
 
@@ -1045,6 +1103,30 @@ Testes:
 cd apps/api
 php artisan test --filter=BuildEventJourneySummaryActionTest
 ```
+
+Status em `2026-04-10`:
+
+- [x] `BuildEventJourneySummaryAction` criada;
+- [x] o resumo foi extraido da projection para action dedicada;
+- [x] `BuildEventJourneyProjectionAction` agora consome a action dedicada em vez de manter string inline;
+- [x] o resumo considera canais ativos, modo de moderacao, Safety, VLM, resposta automatica e destinos visiveis;
+- [x] o resumo evita linguagem tecnica pesada no texto final;
+- [x] o resumo faz fallback quando nao ha canais ativos;
+- [x] o resumo ignora `print` mesmo se esse destino aparecer tecnicamente no contexto;
+- [x] a projection continua com o mesmo contrato `summary.human_text`.
+
+Bateria validada em `2026-04-10`:
+
+```bash
+cd apps/api
+php artisan test tests/Unit/Events/BuildEventJourneySummaryActionTest.php tests/Unit/Events/BuildEventJourneyProjectionActionTest.php
+php artisan test tests/Unit/Events/EventJourneyProjectionDataTest.php tests/Unit/Events/BuildEventJourneySummaryActionTest.php tests/Unit/Events/BuildEventJourneyProjectionActionTest.php tests/Feature/Events/EventJourneyArchitectureCharacterizationTest.php tests/Feature/Events/EventIntakeChannelsTest.php tests/Feature/Events/EventIntakeChannelsTelegramPrivateTest.php tests/Feature/ContentModeration/ContentModerationSettingsTest.php tests/Feature/MediaIntelligence/MediaIntelligenceSettingsTest.php
+```
+
+Resultado:
+
+- bateria unitária da extração passou com `18` testes e `76` assertions;
+- bateria de regressão direcionada passou com `41` testes e `304` assertions.
 
 ### Tarefa 1.4 - Criar controller e rotas
 
@@ -1080,6 +1162,42 @@ Casos obrigatorios:
 - `PATCH` sem permissao;
 - `PATCH` invalido retorna `422`;
 - payload final preserva shape.
+
+Status em `2026-04-10`:
+
+- [x] `EventJourneyController` criado;
+- [x] `EventJourneyResource` criado;
+- [x] rota `GET /api/v1/events/{event}/journey-builder` registrada no modulo `Events`;
+- [x] leitura usa `authorize('view', $event)` e envelope padrao do `BaseController`;
+- [x] o endpoint retorna a projection read-only completa com `meta.request_id`;
+- [x] `GET` autorizado validado;
+- [x] `GET` cross-organization validado com `403`;
+- [x] budget do endpoint protegido com `expectsDatabaseQueryCount(14)` no cenario read-only completo;
+- [ ] `PATCH /events/{event}/journey-builder` continua pendente e depende das `Tarefas 1.5` e `1.6`.
+
+Bateria validada em `2026-04-10`:
+
+```bash
+cd apps/api
+php artisan test tests/Feature/Events/EventJourneyControllerTest.php tests/Unit/Events/EventJourneyProjectionDataTest.php tests/Unit/Events/BuildEventJourneySummaryActionTest.php tests/Unit/Events/BuildEventJourneyProjectionActionTest.php
+```
+
+Resultado:
+
+- `22` testes passaram;
+- `135` assertions passaram.
+
+Regressao ampliada em `2026-04-10`:
+
+```bash
+cd apps/api
+php artisan test tests/Feature/Events/EventJourneyControllerTest.php tests/Unit/Events/EventJourneyProjectionDataTest.php tests/Unit/Events/BuildEventJourneySummaryActionTest.php tests/Unit/Events/BuildEventJourneyProjectionActionTest.php tests/Feature/Events/EventJourneyArchitectureCharacterizationTest.php tests/Feature/Events/EventIntakeChannelsTest.php tests/Feature/Events/EventIntakeChannelsTelegramPrivateTest.php tests/Feature/ContentModeration/ContentModerationSettingsTest.php tests/Feature/MediaIntelligence/MediaIntelligenceSettingsTest.php
+```
+
+Resultado:
+
+- `44` testes passaram;
+- `349` assertions passaram.
 
 ### Tarefa 1.5 - Criar `UpdateEventJourneyRequest`
 
@@ -1732,7 +1850,7 @@ npm run test:e2e
 
 A V1 so esta pronta quando:
 
-- a Fase 0 deixou a baseline relevante verde de novo;
+- a Fase 0B deixou a baseline relevante verde de novo;
 - endpoint `GET journey-builder` retorna projection completa;
 - endpoint `PATCH journey-builder` salva configuracoes reais do evento;
 - a pagina renderiza quatro faixas fixas;
@@ -1803,9 +1921,9 @@ Mitigacao:
 
 ## Ordem recomendada de implementacao
 
-1. Estabilizar baseline backend de assets e revalidar a trilha frontend de duplicate cluster.
-2. Rerodar a bateria base.
-3. Criar backend read-only projection.
+1. Concluido: estabilizar baseline backend de assets e revalidar a trilha frontend de duplicate cluster.
+2. Concluido: rerodar a bateria base.
+3. Proximo passo: criar backend read-only projection.
 4. Criar graph adapter frontend com dados mockados.
 5. Criar pagina com canvas travado read-only.
 6. Criar inspector read-only.

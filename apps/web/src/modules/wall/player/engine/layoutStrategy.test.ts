@@ -41,6 +41,10 @@ describe('resolveRenderableLayout', () => {
     expect(resolveRenderableLayout('carousel', makeMedia({ type: 'video' }), 'one')).toBe('carousel');
   });
 
+  it('treats puzzle as a board layout and falls back to cinematic for video when multi-slot playback is disallowed', () => {
+    expect(resolveRenderableLayout('puzzle', makeMedia({ type: 'video' }))).toBe('cinematic');
+  });
+
   // ─── Horizontal ──────────────────────────────
   it('auto + horizontal + featured + no caption = kenburns', () => {
     const media = makeMedia({ orientation: 'horizontal', is_featured: true });
@@ -131,6 +135,10 @@ describe('isMultiItemLayout', () => {
 
   it('returns true for grid', () => {
     expect(isMultiItemLayout('grid')).toBe(true);
+  });
+
+  it('returns true for puzzle', () => {
+    expect(isMultiItemLayout('puzzle')).toBe(true);
   });
 
   it('returns false for single-item layouts', () => {

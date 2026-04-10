@@ -17,7 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { createPagarmeCardToken, PagarmeTokenizationError } from '@/lib/pagarme-tokenization';
-import type { ApiPlan, ApiPlanPrice } from '@/lib/api-types';
+import type { ApiBillingSubscription, ApiPlan, ApiPlanPrice } from '@/lib/api-types';
 import {
   digitsOnly,
   formatCardExpiryPart,
@@ -181,6 +181,7 @@ export interface RecurringPlanCheckoutDialogProps {
   organizationName?: string | null;
   userName?: string | null;
   userEmail?: string | null;
+  currentSubscription?: ApiBillingSubscription | null;
   isSubmitting?: boolean;
   onSubmit: (payload: BillingCheckoutPayload) => Promise<unknown>;
 }
@@ -193,6 +194,7 @@ export function RecurringPlanCheckoutDialog({
   organizationName,
   userName,
   userEmail,
+  currentSubscription,
   isSubmitting = false,
   onSubmit,
 }: RecurringPlanCheckoutDialogProps) {
@@ -219,6 +221,15 @@ export function RecurringPlanCheckoutDialog({
   }, [defaultValues, form, open, plan?.id, price?.id]);
 
   const isBusy = isSubmitting || isTokenizing;
+  const targetBillingCycle = price?.billing_cycle === 'yearly' ? 'yearly' : 'monthly';
+  const isPlanSwitch = Boolean(
+    plan
+      && currentSubscription
+      && (
+        currentSubscription.plan_key !== plan.code
+        || currentSubscription.billing_cycle !== targetBillingCycle
+      ),
+  );
 
   const handleSubmit = form.handleSubmit(async (values) => {
     if (!plan || !price) {
@@ -282,12 +293,12 @@ export function RecurringPlanCheckoutDialog({
         <DialogHeader>
           <DialogTitle>Contratar plano recorrente</DialogTitle>
           <DialogDescription>
-            O checkout da conta usa tokenizacao no navegador e envia apenas <code>card_token</code> ao backend.
+            Revise os dados da cobranca da conta e confirme. O cartao so e validado no momento final da contratacao.
           </DialogDescription>
         </DialogHeader>
 
         {plan && price ? (
-          <div className="grid gap-4 rounded-2xl border border-border/60 bg-muted/20 p-4 md:grid-cols-[1.2fr_0.8fr]">
+          <div className="grid gap-4 rounded-3xl border border-border/60 bg-muted/20 p-5 md:grid-cols-[1.2fr_0.8fr]">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
@@ -313,6 +324,16 @@ export function RecurringPlanCheckoutDialog({
                 cobranca {formatCycle(price.billing_cycle)}
               </p>
             </div>
+          </div>
+        ) : null}
+
+        {isPlanSwitch && plan ? (
+          <div className="rounded-3xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">Troca de plano da conta</p>
+            <p className="mt-1">
+              A conta esta em <strong>{currentSubscription?.plan_name || 'um plano ativo'}</strong>. Ao confirmar,
+              encerramos a renovacao do plano atual e passamos a usar <strong>{plan.name}</strong> na conta.
+            </p>
           </div>
         ) : null}
 
@@ -603,9 +624,9 @@ export function RecurringPlanCheckoutDialog({
               <div className="flex items-start gap-3">
                 <ShieldCheck className="mt-0.5 h-4 w-4 text-emerald-300" />
                 <div className="space-y-1">
-                  <p className="font-medium text-foreground">Tokenizacao no submit final</p>
+                  <p className="font-medium text-foreground">Pagamento protegido</p>
                   <p>
-                    O backend recebe apenas <code>card_token</code>. PAN e CVV ficam no navegador e o token e gerado apenas quando voce confirma o checkout.
+                    Os dados do cartao ficam protegidos e a validacao acontece somente quando voce confirma a contratacao.
                   </p>
                 </div>
               </div>
@@ -623,7 +644,7 @@ export function RecurringPlanCheckoutDialog({
               </Button>
               <Button type="submit" disabled={isBusy || !plan || !price}>
                 {isBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Confirmar assinatura
+                Confirmar contratacao
               </Button>
             </div>
           </form>

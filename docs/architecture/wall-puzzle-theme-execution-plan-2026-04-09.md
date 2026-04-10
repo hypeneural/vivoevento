@@ -26,6 +26,8 @@ Este plano responde 10 perguntas:
 ## Referencias primarias
 
 - `docs/architecture/wall-puzzle-theme-analysis-2026-04-09.md`
+- `docs/architecture/wall-puzzle-video-and-theme-extensibility-analysis-2026-04-09.md`
+- `docs/architecture/wall-puzzle-video-policy-and-theme-capabilities-2026-04-10.md`
 - `docs/architecture/wall-video-playback-execution-plan-2026-04-08.md`
 - `apps/web/src/modules/wall/player/wall-theme-architecture-characterization.test.ts`
 - `apps/web/src/modules/wall/player/components/LayoutRenderer.tsx`
@@ -51,6 +53,7 @@ Este plano responde 10 perguntas:
 - `apps/api/tests/Feature/Wall/WallLiveSnapshotTest.php`
 - `apps/api/tests/Feature/Wall/WallInsightsTest.php`
 - `apps/api/tests/Feature/Wall/WallDiagnosticsTest.php`
+- `apps/api/tests/Feature/Wall/WallOptionsCharacterizationTest.php`
 - `apps/api/tests/Unit/Modules/Wall/WallEligibilityServiceTest.php`
 
 ## Validacao executada nesta rodada
@@ -72,6 +75,97 @@ Este plano responde 10 perguntas:
   - `45 testes`
   - `331 assertions`
   - `PASS`
+
+### Validacao final antes da execucao do PR 1 - 2026-04-10
+
+Frontend:
+
+- `cd apps/web && npm run test -- src/modules/wall/player/wall-theme-architecture-characterization.test.ts src/modules/wall/player/components/LayoutRenderer.video-multi-layout.test.tsx src/modules/wall/player/components/WallVideoSurface.test.tsx src/modules/wall/player/components/MediaSurface.test.tsx src/modules/wall/player/engine/layoutStrategy.test.ts src/modules/wall/player/engine/preload.test.ts src/modules/wall/components/manager/stage/WallPreviewCanvas.test.tsx src/modules/wall/pages/EventWallManagerPage.test.tsx`
+  - `8 arquivos`
+  - `63 testes`
+  - `PASS`
+- `cd apps/web && npm run test -- src/modules/wall/player/components/LayoutRenderer.video-multi-layout.test.tsx src/modules/wall/player/wall-theme-architecture-characterization.test.ts`
+  - `2 arquivos`
+  - `9 testes`
+  - `PASS`
+
+Backend:
+
+- `cd apps/api && php artisan test tests/Feature/Wall/WallOptionsCharacterizationTest.php tests/Feature/Wall/PublicWallBootTest.php tests/Unit/Modules/Wall/WallVideoAdmissionServiceTest.php tests/Feature/Wall/WallLiveSnapshotTest.php tests/Feature/Wall/WallDiagnosticsTest.php`
+  - `24 testes`
+  - `274 assertions`
+  - `PASS`
+
+O que esta bateria pre-PR1 travou:
+
+- `video_multi_layout_policy = all` ainda monta `3` `<video>` simultaneos crus em `grid`;
+- `video_multi_layout_policy = disallow` cai para uma unica surface controlada por `WallVideoSurface`;
+- `/wall/options` ainda nao expoe `puzzle` nem capability metadata por layout;
+- `PublicWallBoot` continua entregando admission metadata para video;
+- diagnostics e live snapshot continuam verdes;
+- o execution plan agora referencia a policy de video e assume `video no puzzle = fallback single-item`.
+
+### Validacao do PR 1 - contrato e gate - 2026-04-10
+
+Backend:
+
+- `cd apps/api && php artisan test tests/Feature/Wall/WallOptionsPuzzleLayoutTest.php tests/Feature/Wall/WallSettingsThemeConfigTest.php tests/Feature/Wall/WallSettingsFeatureFlagTest.php tests/Feature/Wall/WallOptionsCharacterizationTest.php`
+  - `7 testes`
+  - `72 assertions`
+  - `PASS`
+- `cd apps/api && php artisan test tests/Feature/Wall tests/Unit/Modules/Wall`
+  - `87 testes`
+  - `561 assertions`
+  - `PASS`
+
+Frontend:
+
+- `cd apps/web && npm run test -- src/modules/wall/wall-settings.test.ts src/modules/wall/player/wall-theme-architecture-characterization.test.ts`
+  - `2 arquivos`
+  - `10 testes`
+  - `PASS`
+- `cd apps/web && npm run test -- src/modules/wall`
+  - `45 arquivos`
+  - `242 testes`
+  - `PASS`
+- `cd apps/web && npm run type-check`
+  - `PASS`
+
+O que esta bateria do PR 1 travou:
+
+- `/wall/options` devolve `capabilities` e `defaults` para todos os layouts;
+- `puzzle` fica escondido quando `wall.layouts.puzzle.enabled=false`;
+- `puzzle` aparece quando o gate permite, com `max_simultaneous_videos=0` e `fallback_video_layout=cinematic`;
+- `layout=puzzle` e rejeitado no update quando o gate esta fechado;
+- `theme_config` e salvo, normalizado e devolvido no payload de settings;
+- `theme_config` invalido falha com erro de validacao;
+- o frontend preserva `theme_config` em clone/payload e evita dirty state por ordem diferente de chaves;
+- o fallback estatico do manager fica capability-aware sem expor `puzzle` fora do gate;
+- o teste legado `WallAdsTest` foi atualizado para reconhecer `12` layouts no enum, incluindo `puzzle`.
+
+### Validacao do PR 2 - registry e motion foundation - 2026-04-10
+
+Frontend:
+
+- `cd apps/web && npm run test -- src/modules/wall/player/themes/registry.test.ts src/modules/wall/player/themes/motion.test.ts src/modules/wall/player/components/WallPlayerRoot.test.tsx src/modules/wall/player/engine/motion.test.ts src/modules/wall/player/engine/layoutStrategy.test.ts src/modules/wall/player/wall-theme-architecture-characterization.test.ts`
+  - `6 arquivos`
+  - `49 testes`
+  - `PASS`
+- `cd apps/web && npm run test -- src/modules/wall`
+  - `47 arquivos`
+  - `253 testes`
+  - `PASS`
+- `cd apps/web && npm run type-check`
+  - `PASS`
+
+O que esta bateria do PR 2 travou:
+
+- o player agora usa `MotionConfig` no topo com policy global de `reducedMotion`;
+- os layouts passam a ser resolvidos por `registry`, nao por `switch` espalhado;
+- `puzzle` entra no registry como layout `board`, com capability e fallback coerentes com a policy de video;
+- `resolveLayoutTransition()` passa a consumir motion tokens por tema, em vez de depender de transicao hardcoded por renderer;
+- `WallPlayerRoot` deixa de hardcode de side thumbnails por nome de layout e passa a respeitar `kind`/capability do registry;
+- `layoutStrategy` passa a tratar `puzzle` como multi-layout com fallback de video para `cinematic`.
 
 ### Leituras oficiais validadas
 
@@ -115,9 +209,26 @@ MDN:
 - `https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Attribute/clipPathUnits`
   - `objectBoundingBox` e a base certa para shape responsivo e reutilizavel.
 
-## O que ficou validado no codigo atual
+Chrome e MDN para video:
 
-### 1. `puzzle` ainda nao existe no contrato
+- `https://developer.chrome.com/blog/autoplay/`
+  - autoplay mudo continua sendo a rota segura para playback sem gesto do usuario.
+- `https://developer.chrome.com/docs/workbox/serving-cached-audio-and-video`
+  - cache de audio/video com Service Worker exige atencao explicita a Range Requests.
+- `https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Autoplay`
+  - `play()` pode falhar e precisa ser tratado como recuperavel.
+- `https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement/preload`
+  - `preload` e hint, nao garantia de download, decode ou readiness.
+- `https://developer.mozilla.org/en-US/docs/Web/API/MediaCapabilities/decodingInfo`
+  - smoothness e eficiencia de playback dependem do perfil de midia e do device.
+- `https://developer.mozilla.org/en-US/docs/Web/API/HTMLVideoElement/getVideoPlaybackQuality`
+  - dropped frames precisam ser medidos se algum dia houver video premium por slot.
+- `https://developer.mozilla.org/en-US/docs/Web/API/HTMLVideoElement/requestVideoFrameCallback`
+  - existe trilha oficial para observabilidade frame-level.
+
+## Estado inicial validado antes do PR 1
+
+### 1. Antes do PR 1, `puzzle` ainda nao existia no contrato
 
 O teste de caracterizacao agora trava explicitamente:
 
@@ -201,6 +312,33 @@ Conclusao:
 - o plano precisa preservar o realtime atual;
 - o foco deve ser melhorar scheduler, cache e render, nao refatorar tudo cedo demais.
 
+### 8. Video robusto existe apenas na trilha single-item
+
+Hoje:
+
+- `WallVideoSurface` faz poster-first, startup deadline e stall budget;
+- essa trilha entra quando o layout resolvido e single-item;
+- layouts multi-slot ainda usam `MediaSurface` sem `videoControl`, caindo em `<video autoPlay muted playsInline preload="auto">`.
+
+Conclusao:
+
+- o `puzzle` v1 nao pode usar multi-video como comportamento default;
+- o fallback de video precisa cair para layout single-item e reaproveitar `WallVideoSurface`.
+
+### 9. Antes do PR 1, capabilities ainda nao existiam como contrato formal
+
+Hoje:
+
+- `/wall/options` devolve `value` e `label` por layout;
+- `manager-config.ts` lista opcoes separadas;
+- `WallAppearanceTab.tsx` expoe `video_multi_layout_policy` como select independente;
+- nao existe `capabilities`, `maxSimultaneousVideos`, `posterOnlyMode`, `fallbackVideoLayout` ou `theme_config`.
+
+Conclusao:
+
+- `layout registry + capabilities + theme_config` deixam de ser melhoria opcional;
+- eles entram como fundacao obrigatoria antes de liberar o `puzzle` para evento real.
+
 ## Principios de execucao
 
 - nao misturar a entrega do `puzzle` com migracao de pacote `framer-motion -> motion/react`;
@@ -210,6 +348,28 @@ Conclusao:
 - manter player e preview no mesmo renderer;
 - bloquear capabilities incompativeis no manager, nao so avisar;
 - entrar em producao por feature flag e rollout progressivo.
+
+## Policy unificada que este plano passa a assumir
+
+Esta secao consolida as quatro docs do projeto em regras executaveis:
+
+1. `puzzle` v1 e `image-first`.
+2. `puzzle` v1 nao monta `<video>` dentro de peca.
+3. `multi-video no puzzle` fica fora da v1.
+4. `maxSimultaneousVideos` default do produto continua `1`.
+5. Capability oficial do `puzzle` v1:
+   - `supportsVideoPlayback = false`
+   - `supportsVideoPosterOnly = false`
+   - `supportsMultiVideo = false`
+   - `maxSimultaneousVideos = 0`
+   - `fallbackVideoLayout = cinematic`
+6. Se `layout=puzzle` e o item atual for video elegivel:
+   - o board nao tenta tocar o video;
+   - o player cai para fallback single-item;
+   - a trilha usada precisa ser `WallVideoSurface`;
+   - ao terminar, falhar ou bater cap, o runtime volta ao board.
+7. `poster-only` e modo futuro formal, nao gambiarra local da v1.
+8. O manager deve bloquear combinacoes invalidas por capability, nao apenas exibir ajuda textual.
 
 ## Organizacao recomendada do codigo
 
@@ -289,20 +449,27 @@ Arquivos-alvo:
 - `apps/web/src/modules/wall/manager-config.ts`
 - `apps/web/src/modules/wall/wall-settings.ts`
 - `apps/web/src/modules/wall/api.ts`
-- `apps/api/database/migrations/<timestamp>_add_theme_config_to_event_wall_settings_table.php`
-- opcional: `apps/api/config/wall.php`
+- `apps/api/database/migrations/2026_04_10_020000_add_theme_config_to_event_wall_settings.php`
+- `apps/api/config/wall.php`
 
 Subtarefas:
 
-- [ ] adicionar `puzzle` a `WallLayout` no shared type e no enum backend;
-- [ ] adicionar coluna JSON `theme_config` em `event_wall_settings`;
-- [ ] adicionar cast e `fillable` em `EventWallSetting`;
-- [ ] validar `theme_config` no request de update;
-- [ ] expor `theme_config` em `WallPayloadFactory::settings()`;
-- [ ] expor `puzzle` nas `options()` do backend;
-- [ ] introduzir gate de rollout:
-  - `puzzle_enabled` global;
-  - `puzzle_preview_enabled` se quiser preview antes do player vivo.
+- [x] adicionar `puzzle` a `WallLayout` no shared type e no enum backend;
+- [x] adicionar coluna JSON `theme_config` em `event_wall_settings`;
+- [x] adicionar cast e `fillable` em `EventWallSetting`;
+- [x] validar `theme_config` no request de update;
+- [x] expor `theme_config` em `WallPayloadFactory::settings()`;
+- [x] expor `puzzle` nas `options()` do backend quando o gate permitir;
+- [x] evoluir `options()` para devolver capability metadata por layout;
+- [x] definir capability backend do `puzzle`:
+  - `supports_video_playback=false`;
+  - `supports_video_poster_only=false`;
+  - `supports_multi_video=false`;
+  - `max_simultaneous_videos=0`;
+  - `fallback_video_layout=cinematic`.
+- [x] introduzir gate de rollout:
+  - `WALL_PUZZLE_ENABLED`;
+  - `WALL_PUZZLE_PREVIEW_ENABLED`.
 
 Contrato recomendado de `theme_config` na v1:
 
@@ -312,6 +479,7 @@ type WallThemeConfig = {
   anchor_mode?: 'event_brand' | 'qr_prompt' | 'none';
   burst_intensity?: 'gentle' | 'normal';
   hero_enabled?: boolean;
+  video_behavior?: 'fallback_single_item';
 };
 ```
 
@@ -325,21 +493,24 @@ Regras:
 
 Backend:
 
-- [ ] criar `apps/api/tests/Feature/Wall/WallOptionsPuzzleLayoutTest.php`
-- [ ] criar `apps/api/tests/Feature/Wall/WallSettingsThemeConfigTest.php`
-- [ ] criar `apps/api/tests/Feature/Wall/WallSettingsFeatureFlagTest.php`
+- [x] criar `apps/api/tests/Feature/Wall/WallOptionsPuzzleLayoutTest.php`
+- [x] criar `apps/api/tests/Feature/Wall/WallSettingsThemeConfigTest.php`
+- [x] criar `apps/api/tests/Feature/Wall/WallSettingsFeatureFlagTest.php`
 
 Frontend:
 
-- [ ] ampliar `apps/web/src/modules/wall/player/wall-theme-architecture-characterization.test.ts`
-- [ ] criar `apps/web/src/modules/wall/wall-settings.test.ts`
+- [x] ampliar `apps/web/src/modules/wall/player/wall-theme-architecture-characterization.test.ts`
+- [x] criar `apps/web/src/modules/wall/wall-settings.test.ts`
 
 Cenarios obrigatorios:
 
-- [ ] `options()` retorna `puzzle` apenas quando o gate permitir;
-- [ ] `theme_config` vazio nao quebra contrato antigo;
-- [ ] `theme_config` invalido falha com erro claro;
-- [ ] manager serializa e compara `theme_config` sem falso positivo de dirty state.
+- [x] `options()` retorna `puzzle` apenas quando o gate permitir;
+- [x] `options()` retorna `capabilities` para todos os layouts;
+- [x] `puzzle.capabilities.max_simultaneous_videos` e `0`;
+- [x] `puzzle.capabilities.fallback_video_layout` e `cinematic`;
+- [x] `theme_config` vazio nao quebra contrato antigo;
+- [x] `theme_config` invalido falha com erro claro;
+- [x] manager serializa e compara `theme_config` sem falso positivo de dirty state.
 
 ## Fase 2 - Layout registry e contrato global de motion
 
@@ -359,13 +530,13 @@ Arquivos-alvo:
 
 Subtarefas:
 
-- [ ] criar `WallLayoutDefinition`;
-- [ ] registrar layouts existentes no registry antes de adicionar `puzzle`;
-- [ ] mover `switch` de `LayoutRenderer` para resolucao por registry;
-- [ ] criar `WallMotionTokens` por tema;
-- [ ] subir `MotionConfig` para `WallPlayerRoot`;
-- [ ] formalizar politica de `reducedMotion` por tema;
-- [ ] manter `framer-motion` na primeira entrega para nao misturar risco de API e de tema.
+- [x] criar `WallLayoutDefinition`;
+- [x] registrar layouts existentes no registry antes de adicionar `puzzle`;
+- [x] mover `switch` de `LayoutRenderer` para resolucao por registry;
+- [x] criar `WallMotionTokens` por tema;
+- [x] subir `MotionConfig` para `WallPlayerRoot`;
+- [x] formalizar politica de `reducedMotion` por tema;
+- [x] manter `framer-motion` na primeira entrega para nao misturar risco de API e de tema.
 
 Contrato recomendado:
 
@@ -375,10 +546,17 @@ interface WallLayoutDefinition {
   label: string;
   kind: 'single' | 'board';
   renderer: React.ComponentType<WallLayoutProps>;
-  supportsVideo: boolean;
-  supportsSideThumbnails: boolean;
-  supportsFloatingCaption: boolean;
-  supportsRealtimeBurst: boolean;
+  capabilities: {
+    supportsVideoPlayback: boolean;
+    supportsVideoPosterOnly: boolean;
+    supportsMultiVideo: boolean;
+    maxSimultaneousVideos: number;
+    fallbackVideoLayout?: Exclude<WallLayout, 'auto'>;
+    supportsSideThumbnails: boolean;
+    supportsFloatingCaption: boolean;
+    supportsRealtimeBurst: boolean;
+    supportsThemeConfig: boolean;
+  };
   motion: WallMotionTokens;
   version: string;
 }
@@ -386,17 +564,18 @@ interface WallLayoutDefinition {
 
 ### Bateria TDD da fase 2
 
-- [ ] criar `apps/web/src/modules/wall/player/themes/registry.test.ts`
-- [ ] criar `apps/web/src/modules/wall/player/themes/motion.test.ts`
-- [ ] ampliar `apps/web/src/modules/wall/player/components/WallPlayerRoot.test.tsx`
-- [ ] ampliar `apps/web/src/modules/wall/player/engine/motion.test.ts`
+- [x] criar `apps/web/src/modules/wall/player/themes/registry.test.ts`
+- [x] criar `apps/web/src/modules/wall/player/themes/motion.test.ts`
+- [x] ampliar `apps/web/src/modules/wall/player/components/WallPlayerRoot.test.tsx`
+- [x] ampliar `apps/web/src/modules/wall/player/engine/motion.test.ts`
 
 Cenarios obrigatorios:
 
-- [ ] `MotionConfig` envolve o player inteiro;
-- [ ] `reducedMotion` desliga transform/layout animation agressiva;
-- [ ] cada layout resolve motion tokens do registry, nao via condicao espalhada;
-- [ ] `puzzle` e tratado como `board`.
+- [x] `MotionConfig` envolve o player inteiro;
+- [x] `reducedMotion` desliga transform/layout animation agressiva;
+- [x] cada layout resolve motion tokens do registry, nao via condicao espalhada;
+- [x] `puzzle` e tratado como `board`.
+- [x] `puzzle` declara `maxSimultaneousVideos=0` e fallback para `cinematic`.
 
 ## Fase 3 - Subsistema de board layouts
 
@@ -530,7 +709,9 @@ Subtarefas:
 - [ ] deduplicar `defs` por variante de shape;
 - [ ] limitar catalogo inicial a poucas variantes de shape;
 - [ ] implementar drift e micro-burst via `MotionValue + useSpring + useAnimationFrame/useAnimate`;
-- [ ] bloquear video dentro do tema e cair para `fullscreen` ou `cinematic`;
+- [ ] bloquear video dentro do tema e cair para `cinematic` via capability `fallbackVideoLayout`;
+- [ ] garantir que fallback de video use `WallVideoSurface`, nao `<video>` cru;
+- [ ] garantir `maxSimultaneousVideos=0` dentro do board;
 - [ ] bloquear side thumbnails enquanto `layout=puzzle`;
 - [ ] bloquear floating caption por peca;
 - [ ] manter sender/caption apenas em ancora ou barra externa, se necessario.
@@ -554,6 +735,9 @@ Regras da v1:
 Cenarios obrigatorios:
 
 - [ ] `layout=puzzle` cai para fallback single-item quando a midia atual for video;
+- [ ] fallback de video no `puzzle` monta somente `1` `<video>`;
+- [ ] fallback de video no `puzzle` usa poster-first/control path da `WallVideoSurface`;
+- [ ] board `puzzle` nunca monta `<video>` em slot;
 - [ ] preset `standard` usa `9` slots e `compact` usa `6`;
 - [ ] troca incremental nao remonta o board inteiro;
 - [ ] drift nao depende de `setState` por frame;
@@ -587,6 +771,9 @@ Subtarefas:
   - floating caption por peca
   - blur pesado por slot
   - face overlay client-side
+- [ ] esconder/desabilitar `video_multi_layout_policy` quando `layout=puzzle`;
+- [ ] mostrar copy operacional:
+  - `Puzzle exibe imagens. Videos entram em layout individual de fallback.`
 - [ ] reaproveitar o mesmo registry/layout renderer no preview;
 - [ ] manter preview previsivel mesmo com configuracao incompleta ou invalida.
 
@@ -600,6 +787,7 @@ Cenarios obrigatorios:
 
 - [ ] manager mostra controles minimos do `puzzle`;
 - [ ] controles incompativeis ficam bloqueados ou desligados automaticamente;
+- [ ] manager nao permite `one` nem `all` para video multi-layout quando `layout=puzzle`;
 - [ ] preview do manager bate com o renderer do player;
 - [ ] salvar `theme_config` nao gera dirty state infinito.
 
@@ -723,6 +911,7 @@ Subtarefas:
 
 ### Backend - manter
 
+- `apps/api/tests/Feature/Wall/WallOptionsCharacterizationTest.php`
 - `apps/api/tests/Feature/Wall/PublicWallBootTest.php`
 - `apps/api/tests/Feature/Wall/WallLiveSnapshotTest.php`
 - `apps/api/tests/Feature/Wall/WallInsightsTest.php`
@@ -739,6 +928,9 @@ Subtarefas:
 ### Frontend - manter
 
 - `apps/web/src/modules/wall/player/wall-theme-architecture-characterization.test.ts`
+- `apps/web/src/modules/wall/player/components/LayoutRenderer.video-multi-layout.test.tsx`
+- `apps/web/src/modules/wall/player/components/WallVideoSurface.test.tsx`
+- `apps/web/src/modules/wall/player/components/MediaSurface.test.tsx`
 - `apps/web/src/modules/wall/player/engine/layoutStrategy.test.ts`
 - `apps/web/src/modules/wall/player/engine/motion.test.ts`
 - `apps/web/src/modules/wall/player/engine/preload.test.ts`
@@ -776,6 +968,8 @@ Saida esperada:
 
 - `puzzle` existe no contrato;
 - `theme_config` existe no backend e frontend;
+- `options()` ja devolve capabilities por layout;
+- `puzzle` declara `maxSimultaneousVideos=0` e fallback `cinematic`;
 - manager consegue receber `puzzle`, mas ainda nao renderiza o tema;
 - rollout gate impede exposicao prematura.
 
@@ -807,7 +1001,8 @@ Saida esperada:
 Saida esperada:
 
 - player ja exibe `puzzle` image-only;
-- fallback para video existe;
+- fallback para video existe e usa `WallVideoSurface`;
+- board `puzzle` nunca monta `<video>` em slot;
 - board preserva estado e reage a realtime sem reset bruto.
 
 ## PR 5 - Manager e preview parity
@@ -890,15 +1085,21 @@ Saida esperada:
 
 O `Quebra Cabeca` so deve ser considerado pronto quando:
 
-- [ ] contrato compartilhado, enum backend e manager conhecem `puzzle`;
-- [ ] `theme_config` existe e e salvo com seguranca;
-- [ ] player tem `MotionConfig` e contrato global de motion;
+- [x] contrato compartilhado, enum backend e manager conhecem `puzzle`;
+- [x] `theme_config` existe e e salvo com seguranca;
+- [x] `options()` expoe capabilities por layout;
+- [x] `puzzle.capabilities.maxSimultaneousVideos = 0`;
+- [x] `puzzle.capabilities.fallbackVideoLayout = cinematic`;
+- [x] player tem `MotionConfig` e contrato global de motion;
 - [ ] `puzzle` usa fundacao de board, nao `useMultiSlot` remendado;
 - [ ] readiness de imagem depende de `decode()`, nao so de `load`;
 - [ ] cache aquece apenas a janela quente do board;
 - [ ] realtime continua atualizando a fila sem refetch completo;
 - [ ] preview e player batem no mesmo preset;
 - [ ] manager bloqueia video e outras capabilities incompativeis;
+- [ ] `puzzle` nao monta `<video>` dentro do board;
+- [ ] video elegivel em `puzzle` cai para fallback single-item com `WallVideoSurface`;
+- [ ] `maxSimultaneousVideos` default do produto continua `1`;
 - [ ] board so reseta quando a identidade oficial muda;
 - [ ] em FHD padrao com `9` pecas o layout se mantem fluido e sem loading visivel reentrante;
 - [ ] rollout interno passou por pelo menos um evento controlado.

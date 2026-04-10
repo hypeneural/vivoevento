@@ -4,7 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('wall theme architecture characterization', () => {
-  it('does not yet expose puzzle or theme_config in the shared contract, backend enum, or manager options', () => {
+  it('exposes the puzzle contract while keeping the static manager fallback gated', () => {
     const sharedTypesSource = fs.readFileSync(
       path.resolve(__dirname, '../../../../../../packages/shared-types/src/wall.ts'),
       'utf8',
@@ -22,14 +22,15 @@ describe('wall theme architecture characterization', () => {
       'utf8',
     );
 
-    expect(sharedTypesSource).not.toContain("'puzzle'");
-    expect(sharedTypesSource).not.toContain('theme_config');
-    expect(backendEnumSource).not.toContain("case Puzzle = 'puzzle'");
+    expect(sharedTypesSource).toContain("'puzzle'");
+    expect(sharedTypesSource).toContain('theme_config');
+    expect(backendEnumSource).toContain("case Puzzle = 'puzzle'");
+    expect(backendEnumSource).toContain('supports_theme_config');
     expect(managerConfigSource).not.toContain("value: 'puzzle'");
-    expect(settingsRequestSource).not.toContain('theme_config');
+    expect(settingsRequestSource).toContain('theme_config');
   });
 
-  it('still hardcodes 3 slots for multi-item layouts, imports framer-motion, and does not expose a formal theme-level motion system', () => {
+  it('still hardcodes 3 slots for board layouts, but now uses a formal registry and theme-level motion contract', () => {
     const layoutRendererSource = fs.readFileSync(
       path.resolve(__dirname, 'components/LayoutRenderer.tsx'),
       'utf8',
@@ -38,18 +39,35 @@ describe('wall theme architecture characterization', () => {
       path.resolve(__dirname, 'components/WallPlayerRoot.tsx'),
       'utf8',
     );
+    const registrySource = fs.readFileSync(
+      path.resolve(__dirname, 'themes/registry.ts'),
+      'utf8',
+    );
+    const motionSource = fs.readFileSync(
+      path.resolve(__dirname, 'themes/motion.ts'),
+      'utf8',
+    );
 
     expect(layoutRendererSource).toContain('const MULTI_ITEM_SLOT_COUNT = 3');
     expect(layoutRendererSource).toContain('AnimatePresence');
     expect(layoutRendererSource).toContain("from 'framer-motion'");
-    expect(layoutRendererSource).not.toContain("from 'motion/react'");
-    expect(layoutRendererSource).not.toContain('MotionConfig');
-    expect(layoutRendererSource).not.toContain('LayoutGroup');
-    expect(layoutRendererSource).not.toContain('layoutId');
+    expect(layoutRendererSource).toContain('getWallLayoutDefinition');
+    expect(layoutRendererSource).toContain('resolveLayoutTransition');
+    expect(layoutRendererSource).not.toContain('function renderSingleLayout');
+    expect(layoutRendererSource).not.toContain('function renderMultiLayout');
 
-    expect(playerRootSource).not.toContain('MotionConfig');
-    expect(playerRootSource).not.toContain('useReducedMotion');
-    expect(playerRootSource).not.toContain('LayoutGroup');
+    expect(playerRootSource).toContain('MotionConfig');
+    expect(playerRootSource).toContain('resolveWallMotionConfig');
+    expect(playerRootSource).not.toContain("from 'motion/react'");
+
+    expect(registrySource).toContain('interface WallLayoutDefinition');
+    expect(registrySource).toContain("puzzle: defineLayout(");
+    expect(registrySource).toContain("'board',");
+    expect(registrySource).toContain('supportsThemeConfig: true');
+
+    expect(motionSource).toContain('interface WallMotionTokens');
+    expect(motionSource).toContain('visualDuration');
+    expect(motionSource).toContain('reducedMotion');
   });
 
   it('still handles realtime through React hook state rather than a useSyncExternalStore bridge', () => {
@@ -103,5 +121,54 @@ describe('wall theme architecture characterization', () => {
     expect(preloadSource).toContain('img.decode()');
     expect(cacheSource).not.toContain('.decode(');
     expect(cacheSource).toContain('image.onload');
+  });
+
+  it('exposes capability metadata, but manager controls are not capability-gated yet', () => {
+    const managerConfigSource = fs.readFileSync(
+      path.resolve(__dirname, '../manager-config.ts'),
+      'utf8',
+    );
+    const appearanceTabSource = fs.readFileSync(
+      path.resolve(__dirname, '../components/manager/inspector/WallAppearanceTab.tsx'),
+      'utf8',
+    );
+    const optionsControllerSource = fs.readFileSync(
+      path.resolve(__dirname, '../../../../../../apps/api/app/Modules/Wall/Http/Controllers/EventWallController.php'),
+      'utf8',
+    );
+
+    expect(managerConfigSource).toContain('WALL_VIDEO_MULTI_LAYOUT_OPTIONS');
+    expect(managerConfigSource).toContain('supports_multi_video');
+    expect(managerConfigSource).toContain('max_simultaneous_videos');
+    expect(managerConfigSource).not.toContain('posterOnlyMode');
+
+    expect(appearanceTabSource).toContain('value={wallSettings.video_multi_layout_policy}');
+    expect(appearanceTabSource).toContain('WALL_VIDEO_MULTI_LAYOUT_OPTIONS');
+    expect(appearanceTabSource).not.toContain('capabilities');
+    expect(appearanceTabSource).not.toContain('maxSimultaneousVideos');
+
+    expect(optionsControllerSource).toContain("'layouts' => collect(WallLayout::enabledCases())->map");
+    expect(optionsControllerSource).toContain('capabilities');
+    expect(optionsControllerSource).toContain('defaults');
+  });
+
+  it('keeps the puzzle execution plan aligned with the final video policy before implementation starts', () => {
+    const executionPlanSource = fs.readFileSync(
+      path.resolve(__dirname, '../../../../../../docs/architecture/wall-puzzle-theme-execution-plan-2026-04-09.md'),
+      'utf8',
+    );
+    const videoPolicySource = fs.readFileSync(
+      path.resolve(__dirname, '../../../../../../docs/architecture/wall-puzzle-video-policy-and-theme-capabilities-2026-04-10.md'),
+      'utf8',
+    );
+
+    expect(executionPlanSource).toContain('docs/architecture/wall-puzzle-video-policy-and-theme-capabilities-2026-04-10.md');
+    expect(executionPlanSource).toContain('fallback para video existe');
+    expect(executionPlanSource).toContain('video dentro do `puzzle`');
+    expect(executionPlanSource).toContain('capabilities incompativeis ficam bloqueadas');
+
+    expect(videoPolicySource).toContain('`video no puzzle = fallback single-item`');
+    expect(videoPolicySource).toContain('`maxSimultaneousVideos default = 1`');
+    expect(videoPolicySource).toContain('`multi-video no puzzle = fora da v1`');
   });
 });

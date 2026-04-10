@@ -19,10 +19,13 @@ class ListModerationMediaQuery
         private readonly ?int $eventId = null,
         private readonly ?string $search = null,
         private readonly ?string $status = null,
+        private readonly ?string $mediaType = null,
         private readonly ?bool $featured = null,
         private readonly ?bool $pinned = null,
         private readonly ?bool $senderBlocked = null,
         private readonly ?string $orientation = null,
+        private readonly ?bool $duplicates = null,
+        private readonly ?bool $aiReview = null,
         private readonly ?ModerationFeedStateProjection $projection = null,
     ) {}
 
@@ -56,6 +59,7 @@ class ListModerationMediaQuery
             ])
             ->when($this->eventId, fn (Builder $builder) => $builder->where('event_media.event_id', $this->eventId))
             ->when($this->search !== null && trim($this->search) !== '', fn (Builder $builder) => $this->applySearch($builder))
+            ->when($this->mediaType !== null, fn (Builder $builder) => $builder->where('event_media.media_type', $this->mediaType))
             ->when($this->featured !== null, fn (Builder $builder) => $builder->where('event_media.is_featured', $this->featured))
             ->when($this->pinned !== null, function (Builder $builder) {
                 $operator = $this->pinned ? '>' : '=';
@@ -106,6 +110,18 @@ class ListModerationMediaQuery
                     'square' => $builder->whereColumn('event_media.width', '=', 'event_media.height'),
                     default => null,
                 };
+            })
+            ->when($this->duplicates !== null, function (Builder $builder) {
+                $method = $this->duplicates ? 'whereNotNull' : 'whereNull';
+                $builder->{$method}('event_media.duplicate_group_key');
+            })
+            ->when($this->aiReview !== null, function (Builder $builder) use ($projection) {
+                $aiReviewSql = $projection->aiReviewExpression();
+
+                $builder->whereRaw(
+                    '(' . $aiReviewSql . ') = ?',
+                    [$this->aiReview],
+                );
             });
 
         if ($withStatusFilter && $this->status) {

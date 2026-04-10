@@ -362,7 +362,7 @@ export async function mockAuthLogin(page: Page) {
 
 export async function fillBuyerDetails(page: Page) {
   await page.getByLabel(/seu nome/i).fill('Camila Rocha');
-  await page.getByLabel(/^WhatsApp$/i).fill('(48) 99977-1111');
+  await page.getByLabel(/whatsapp com ddd/i).fill('(48) 99977-1111');
   await page.getByLabel(/nome do evento/i).fill('Casamento Camila e Bruno');
 }
 

@@ -36,15 +36,16 @@ beforeEach(function () {
 
 // ─── WallLayout enum ──────────────────────────────────────────
 
-it('WallLayout enum has 11 cases (auto + 10 layouts)', function () {
+it('WallLayout enum has 12 cases (auto + 11 layouts)', function () {
     $cases = WallLayout::cases();
-    expect(count($cases))->toBe(11);
+    expect(count($cases))->toBe(12);
 });
 
-it('WallLayout enum includes carousel mosaic and grid', function () {
+it('WallLayout enum includes carousel mosaic grid and puzzle', function () {
     expect(WallLayout::Carousel->value)->toBe('carousel');
     expect(WallLayout::Mosaic->value)->toBe('mosaic');
     expect(WallLayout::Grid->value)->toBe('grid');
+    expect(WallLayout::Puzzle->value)->toBe('puzzle');
 });
 
 // ─── Ad CRUD ──────────────────────────────────────────────────

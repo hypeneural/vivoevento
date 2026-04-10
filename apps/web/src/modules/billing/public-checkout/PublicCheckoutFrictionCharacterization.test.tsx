@@ -171,7 +171,7 @@ describe('Public checkout friction characterization', () => {
     window.sessionStorage.clear();
   });
 
-  it('currently keeps raw whatsapp typing instead of formatting the buyer field as the user types', async () => {
+  it('now formats the buyer WhatsApp field while the user types', async () => {
     renderPage();
 
     await openDetailsStep();
@@ -182,19 +182,19 @@ describe('Public checkout friction characterization', () => {
       target: { value: 'abc48999771111' },
     });
 
-    expect(whatsappInput).toHaveValue('abc48999771111');
+    expect(whatsappInput).toHaveValue('(48) 99977-1111');
   });
 
-  it('currently renders the optional event schedule field as date-only inside more details', async () => {
+  it('now renders the optional event schedule field with date and time inside more details', async () => {
     renderPage();
 
     await openDetailsStep();
 
     fireEvent.click(screen.getByRole('button', { name: /adicionar mais detalhes/i }));
 
-    const eventDateInput = screen.getByLabelText(/data do evento/i);
+    const eventDateInput = screen.getByLabelText(/quando seu evento acontece/i);
 
-    expect(eventDateInput).toHaveAttribute('type', 'date');
+    expect(eventDateInput).toHaveAttribute('type', 'datetime-local');
   });
 
   it('persists a safe manual resume draft when "Ja tenho conta" is used before payment', async () => {
@@ -224,12 +224,15 @@ describe('Public checkout friction characterization', () => {
     );
   });
 
-  it('currently uses a mobile sticky footer that prioritizes the summary drawer entrypoint over the step CTA', async () => {
+  it('now uses the mobile footer as a sticky step CTA while keeping the summary as a secondary action', async () => {
     useIsMobileMock.mockReturnValue(true);
     renderPage();
 
+    await openDetailsStep();
+    fillBasicDetails();
+
     expect(await screen.findByTestId('public-checkout-mobile-footer')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /ver resumo/i })).toBeInTheDocument();
-    expect(screen.queryByTestId('public-checkout-mobile-primary-cta')).not.toBeInTheDocument();
+    expect(screen.getByTestId('public-checkout-mobile-primary-cta')).toHaveTextContent(/continuar para pagamento/i);
   });
 });

@@ -58,6 +58,7 @@ import {
   resolveDuplicateClusterSelection,
   resolveNextModerationDetailPrefetchItem,
   resolveNextPendingModerationItem,
+  resolveModerationQueueProgress,
   upsertModerationItems,
 } from './feed-utils';
 import { useModerationRealtime } from './hooks/useModerationRealtime';
@@ -67,9 +68,11 @@ import {
   MODERATION_PAGE_SIZE_OPTIONS,
   MODERATION_QUICK_FILTERS,
   MODERATION_REJECT_REASON_PRESETS,
+  MODERATION_MEDIA_TYPE_OPTIONS,
   MODERATION_STATUS_OPTIONS,
   type ModerationFeedPage,
   type ModerationListFilters,
+  type ModerationMediaTypeFilter,
   type ModerationOrientationFilter,
   type ModerationStatusFilter,
 } from './types';
@@ -193,9 +196,12 @@ export default function ModerationPage() {
   const [eventFilter, setEventFilter] = useState(prefilledScope.eventId);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [orientationFilter, setOrientationFilter] = useState<string>('all');
+  const [mediaTypeFilter, setMediaTypeFilter] = useState<string>('all');
   const [featuredOnly, setFeaturedOnly] = useState(false);
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [blockedSenderOnly, setBlockedSenderOnly] = useState(false);
+  const [duplicatesOnly, setDuplicatesOnly] = useState(false);
+  const [aiReviewOnly, setAiReviewOnly] = useState(false);
   const [focusedMediaId, setFocusedMediaId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [selectionAnchorId, setSelectionAnchorId] = useState<number | null>(null);
@@ -221,11 +227,14 @@ export default function ModerationPage() {
     search: deferredSearch || undefined,
     event_id: eventFilter === 'all' ? undefined : Number(eventFilter),
     status: statusFilter === 'all' ? undefined : statusFilter as ModerationStatusFilter,
+    media_type: mediaTypeFilter === 'all' ? undefined : mediaTypeFilter as ModerationMediaTypeFilter,
     featured: featuredOnly ? true : undefined,
     pinned: pinnedOnly ? true : undefined,
     sender_blocked: blockedSenderOnly ? true : undefined,
     orientation: orientationFilter === 'all' ? undefined : orientationFilter as ModerationOrientationFilter,
-  }), [blockedSenderOnly, deferredSearch, eventFilter, featuredOnly, orientationFilter, pinnedOnly, statusFilter]);
+    duplicates: duplicatesOnly ? true : undefined,
+    ai_review: aiReviewOnly ? true : undefined,
+  }), [aiReviewOnly, blockedSenderOnly, deferredSearch, duplicatesOnly, eventFilter, featuredOnly, mediaTypeFilter, orientationFilter, pinnedOnly, statusFilter]);
 
   const feedFilters = useMemo<ModerationListFilters>(() => ({
     ...sharedFilters,
@@ -271,7 +280,15 @@ export default function ModerationPage() {
   const focusedMedia = useMemo(() => media.find((item) => item.id === focusedMediaId) ?? null, [focusedMediaId, media]);
   const focusedMediaIndex = useMemo(() => media.findIndex((item) => item.id === focusedMediaId), [focusedMediaId, media]);
   const stats = statsQuery.data ?? EMPTY_STATS;
-  const activeQuickFilter = resolveQuickFilter(statusFilter, featuredOnly, pinnedOnly, blockedSenderOnly);
+  const activeQuickFilter = resolveQuickFilter(
+    statusFilter,
+    featuredOnly,
+    pinnedOnly,
+    blockedSenderOnly,
+    mediaTypeFilter,
+    duplicatesOnly,
+    aiReviewOnly,
+  );
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const virtualGridRef = useRef<ModerationVirtualGridHandle | null>(null);
   const nextDetailPrefetchItem = useMemo(
@@ -294,6 +311,10 @@ export default function ModerationPage() {
   });
 
   const reviewMedia = (focusedMediaDetailQuery.data ?? focusedMedia) as ApiEventMediaDetail | ApiEventMediaItem | null;
+  const queueProgress = useMemo(
+    () => resolveModerationQueueProgress(media, focusedMediaId, stats),
+    [focusedMediaId, media, stats],
+  );
   const duplicateClusterItems = useMemo(
     () => resolveDuplicateClusterSelection(duplicateClusterQuery.data ?? [], focusedMediaId),
     [duplicateClusterQuery.data, focusedMediaId],
@@ -360,9 +381,12 @@ export default function ModerationPage() {
     setEventFilter('all');
     setStatusFilter('all');
     setOrientationFilter('all');
+    setMediaTypeFilter('all');
     setFeaturedOnly(false);
     setPinnedOnly(false);
     setBlockedSenderOnly(false);
+    setDuplicatesOnly(false);
+    setAiReviewOnly(false);
     setIncomingItems([]);
     setMobileFiltersOpen(false);
   }, []);
@@ -673,50 +697,123 @@ export default function ModerationPage() {
     if (eventFilter !== 'all') tags.push(events.find((item) => String(item.id) === eventFilter)?.title ?? '');
     if (statusFilter !== 'all') tags.push(MODERATION_STATUS_OPTIONS.find((item) => item.value === statusFilter)?.label ?? '');
     if (orientationFilter !== 'all') tags.push(MODERATION_ORIENTATION_OPTIONS.find((item) => item.value === orientationFilter)?.label ?? '');
+    if (mediaTypeFilter !== 'all') tags.push(MODERATION_MEDIA_TYPE_OPTIONS.find((item) => item.value === mediaTypeFilter)?.label ?? '');
     if (featuredOnly) tags.push('Somente favoritas');
     if (pinnedOnly) tags.push('Somente fixadas');
     if (blockedSenderOnly) tags.push('Somente remetentes bloqueados');
+    if (duplicatesOnly) tags.push('Somente duplicatas');
+    if (aiReviewOnly) tags.push('Somente IA em review');
 
     return tags.filter(Boolean);
-  }, [blockedSenderOnly, deferredSearch, eventFilter, events, featuredOnly, orientationFilter, pinnedOnly, statusFilter]);
+  }, [aiReviewOnly, blockedSenderOnly, deferredSearch, duplicatesOnly, eventFilter, events, featuredOnly, mediaTypeFilter, orientationFilter, pinnedOnly, statusFilter]);
 
   const applyQuickFilter = (key: typeof MODERATION_QUICK_FILTERS[number]['key']) => {
     if (key === 'all') {
       setStatusFilter('all');
+      setMediaTypeFilter('all');
       setFeaturedOnly(false);
       setPinnedOnly(false);
       setBlockedSenderOnly(false);
+      setDuplicatesOnly(false);
+      setAiReviewOnly(false);
       return;
     }
 
     if (key === 'featured') {
       setStatusFilter('all');
+      setMediaTypeFilter('all');
       setFeaturedOnly(true);
       setPinnedOnly(false);
       setBlockedSenderOnly(false);
+      setDuplicatesOnly(false);
+      setAiReviewOnly(false);
       return;
     }
 
     if (key === 'pinned') {
       setStatusFilter('all');
+      setMediaTypeFilter('all');
       setFeaturedOnly(false);
       setPinnedOnly(true);
       setBlockedSenderOnly(false);
+      setDuplicatesOnly(false);
+      setAiReviewOnly(false);
       return;
     }
 
     if (key === 'blocked_sender') {
       setStatusFilter('all');
+      setMediaTypeFilter('all');
       setFeaturedOnly(false);
       setPinnedOnly(false);
       setBlockedSenderOnly(true);
+      setDuplicatesOnly(false);
+      setAiReviewOnly(false);
+      return;
+    }
+
+    if (key === 'images') {
+      setStatusFilter('all');
+      setMediaTypeFilter('image');
+      setFeaturedOnly(false);
+      setPinnedOnly(false);
+      setBlockedSenderOnly(false);
+      setDuplicatesOnly(false);
+      setAiReviewOnly(false);
+      return;
+    }
+
+    if (key === 'videos') {
+      setStatusFilter('all');
+      setMediaTypeFilter('video');
+      setFeaturedOnly(false);
+      setPinnedOnly(false);
+      setBlockedSenderOnly(false);
+      setDuplicatesOnly(false);
+      setAiReviewOnly(false);
+      return;
+    }
+
+    if (key === 'duplicates') {
+      setStatusFilter('all');
+      setMediaTypeFilter('all');
+      setFeaturedOnly(false);
+      setPinnedOnly(false);
+      setBlockedSenderOnly(false);
+      setDuplicatesOnly(true);
+      setAiReviewOnly(false);
+      return;
+    }
+
+    if (key === 'ai_review') {
+      setStatusFilter('all');
+      setMediaTypeFilter('all');
+      setFeaturedOnly(false);
+      setPinnedOnly(false);
+      setBlockedSenderOnly(false);
+      setDuplicatesOnly(false);
+      setAiReviewOnly(true);
+      return;
+    }
+
+    if (key === 'error') {
+      setStatusFilter('error');
+      setMediaTypeFilter('all');
+      setFeaturedOnly(false);
+      setPinnedOnly(false);
+      setBlockedSenderOnly(false);
+      setDuplicatesOnly(false);
+      setAiReviewOnly(false);
       return;
     }
 
     setStatusFilter(key);
+    setMediaTypeFilter('all');
     setFeaturedOnly(false);
     setPinnedOnly(false);
     setBlockedSenderOnly(false);
+    setDuplicatesOnly(false);
+    setAiReviewOnly(false);
   };
 
   const handleToggleSelection = useCallback((itemId: number, shiftKey: boolean) => {
@@ -1086,14 +1183,17 @@ export default function ModerationPage() {
                 <Select value={eventFilter} onValueChange={setEventFilter}><SelectTrigger className="xl:col-span-3"><SelectValue placeholder="Evento" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os eventos</SelectItem>{events.map((eventItem) => <SelectItem key={eventItem.id} value={String(eventItem.id)}>{eventItem.title}</SelectItem>)}</SelectContent></Select>
                 <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="xl:col-span-2"><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem>{MODERATION_STATUS_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select>
                 <Select value={orientationFilter} onValueChange={setOrientationFilter}><SelectTrigger className="xl:col-span-2"><SelectValue placeholder="Formato" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os formatos</SelectItem>{MODERATION_ORIENTATION_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select>
-                <Button type="button" variant={featuredOnly ? 'default' : 'outline'} className="xl:col-span-1" onClick={() => { setFeaturedOnly((current) => !current); setPinnedOnly(false); setBlockedSenderOnly(false); }}><Star className={cn('h-4 w-4', featuredOnly && 'fill-current')} />Favoritas</Button>
-                <Button type="button" variant={pinnedOnly ? 'default' : 'outline'} className="md:col-span-2 xl:col-span-1" onClick={() => { setPinnedOnly((current) => !current); setFeaturedOnly(false); setBlockedSenderOnly(false); }}><Pin className="h-4 w-4" />Fixadas</Button>
-                <Button type="button" variant={blockedSenderOnly ? 'default' : 'outline'} className="md:col-span-2 xl:col-span-2" onClick={() => { setBlockedSenderOnly((current) => !current); setFeaturedOnly(false); setPinnedOnly(false); setStatusFilter('all'); }}><ShieldBan className="h-4 w-4" />Bloqueados</Button>
+                <Select value={mediaTypeFilter} onValueChange={setMediaTypeFilter}><SelectTrigger className="xl:col-span-2"><SelectValue placeholder="Midia" /></SelectTrigger><SelectContent><SelectItem value="all">Imagens e videos</SelectItem>{MODERATION_MEDIA_TYPE_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select>
+                <Button type="button" variant={featuredOnly ? 'default' : 'outline'} className="xl:col-span-2" onClick={() => { setFeaturedOnly((current) => !current); setPinnedOnly(false); setBlockedSenderOnly(false); }}><Star className={cn('h-4 w-4', featuredOnly && 'fill-current')} />Favoritas</Button>
+                <Button type="button" variant={pinnedOnly ? 'default' : 'outline'} className="xl:col-span-2" onClick={() => { setPinnedOnly((current) => !current); setFeaturedOnly(false); setBlockedSenderOnly(false); }}><Pin className="h-4 w-4" />Fixadas</Button>
+                <Button type="button" variant={blockedSenderOnly ? 'default' : 'outline'} className="xl:col-span-2" onClick={() => { setBlockedSenderOnly((current) => !current); setFeaturedOnly(false); setPinnedOnly(false); setStatusFilter('all'); }}><ShieldBan className="h-4 w-4" />Bloqueados</Button>
+                <Button type="button" variant={duplicatesOnly ? 'default' : 'outline'} className="xl:col-span-2" onClick={() => setDuplicatesOnly((current) => !current)}>Duplicatas</Button>
+                <Button type="button" variant={aiReviewOnly ? 'default' : 'outline'} className="xl:col-span-2" onClick={() => setAiReviewOnly((current) => !current)}>IA em review</Button>
               </div>
             </>
           ) : null}
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-            <div className="flex flex-wrap items-center gap-2"><span>{stats.total} itens no recorte atual</span><Badge variant="outline">{media.length} carregadas</Badge>{!isMobile ? <Badge variant="outline">J/K navega - A/R/F/P age - Shift+A aprova e avanca - X marca</Badge> : null}</div>
+            <div className="flex flex-wrap items-center gap-2"><span>{stats.total} itens no recorte atual</span><Badge variant="outline">{media.length} carregadas</Badge><Badge variant="outline">Pendentes restantes: {queueProgress.pendingTotal}</Badge>{queueProgress.pendingPosition ? <Badge variant="secondary">Posicao atual: pendente {queueProgress.pendingPosition}/{queueProgress.pendingTotal}</Badge> : queueProgress.currentPosition ? <Badge variant="secondary">Posicao atual: item {queueProgress.currentPosition}/{queueProgress.total}</Badge> : null}{!isMobile ? <Badge variant="outline">J/K navega - A/R/F/P age - Shift+A aprova e avanca - X marca</Badge> : null}</div>
             <div className="flex flex-wrap items-center gap-2">
               {isMobile ? (
                 <>
@@ -1137,16 +1237,16 @@ export default function ModerationPage() {
               />
               {feedQuery.isFetchingNextPage ? <div className="border-t border-border/60 px-4 py-4 text-center text-sm text-muted-foreground"><Loader2 className="mx-auto mb-2 h-4 w-4 animate-spin" />Buscando mais fotos...</div> : feedQuery.isFetchNextPageError ? <div className="border-t border-border/60 px-4 py-4 text-center text-sm text-destructive"><p>Falha ao carregar o proximo bloco da fila.</p><Button type="button" size="sm" variant="outline" className="mt-3 rounded-full" onClick={() => feedQuery.fetchNextPage()}>Tentar novamente</Button></div> : !feedQuery.hasNextPage ? <div className="border-t border-border/60 px-4 py-4 text-center text-sm text-muted-foreground">Voce chegou ao fim do que foi carregado ate agora.</div> : null}
             </section>
-            <aside className="hidden xl:block"><div className="sticky top-20"><ModerationReviewPanel media={reviewMedia} canModerate={canModerate} isBusy={(action) => mutation.isPending && !!focusedMedia && mutation.variables?.items.some((item) => item.id === focusedMedia.id) && (!action || mutation.variables?.action === action)} onAction={handleFocusedAction} onApproveAndNext={handleFocusedApproveAndNext} onOpenPreview={() => setPreviewOpen(true)} canGoPrevious={focusedMediaIndex > 0} canGoNext={focusedMediaIndex >= 0 && focusedMediaIndex < media.length - 1} onPrevious={() => focusMediaByOffset(-1)} onNext={() => focusMediaByOffset(1)} autoAdvanceEnabled={autoAdvanceEnabled} onAutoAdvanceChange={setAutoAdvanceEnabled} senderBlockBusy={senderBlockMutation.isPending && !!focusedMedia && senderBlockMutation.variables?.item.id === focusedMedia.id} senderBlockDuration={senderBlockDuration} onSenderBlockDurationChange={setSenderBlockDuration} onSenderBlockToggle={runSenderBlockToggle} duplicateClusterItems={duplicateClusterItems} duplicateClusterBusy={duplicateClusterQuery.isFetching || (mutation.isPending && duplicateClusterItems.some((item) => mutation.variables?.items.some((selected) => selected.id === item.id)))} onOpenDuplicateItem={handleOpenDuplicateItem} onRejectDuplicateCluster={handleRejectDuplicateCluster} /></div></aside>
+            <aside className="hidden xl:block"><div className="sticky top-20"><ModerationReviewPanel media={reviewMedia} canModerate={canModerate} isBusy={(action) => mutation.isPending && !!focusedMedia && mutation.variables?.items.some((item) => item.id === focusedMedia.id) && (!action || mutation.variables?.action === action)} onAction={handleFocusedAction} onApproveAndNext={handleFocusedApproveAndNext} onOpenPreview={() => setPreviewOpen(true)} canGoPrevious={focusedMediaIndex > 0} canGoNext={focusedMediaIndex >= 0 && focusedMediaIndex < media.length - 1} onPrevious={() => focusMediaByOffset(-1)} onNext={() => focusMediaByOffset(1)} autoAdvanceEnabled={autoAdvanceEnabled} onAutoAdvanceChange={setAutoAdvanceEnabled} senderBlockBusy={senderBlockMutation.isPending && !!focusedMedia && senderBlockMutation.variables?.item.id === focusedMedia.id} senderBlockDuration={senderBlockDuration} onSenderBlockDurationChange={setSenderBlockDuration} onSenderBlockToggle={runSenderBlockToggle} duplicateClusterItems={duplicateClusterItems} duplicateClusterBusy={duplicateClusterQuery.isFetching || (mutation.isPending && duplicateClusterItems.some((item) => mutation.variables?.items.some((selected) => selected.id === item.id)))} onOpenDuplicateItem={handleOpenDuplicateItem} onRejectDuplicateCluster={handleRejectDuplicateCluster} queueProgress={queueProgress} /></div></aside>
           </div>
         ) : null}
       </motion.div>
 
       <ModerationBulkActionBar selectedCount={selectedItems.length} canModerate={canModerate} isBusy={mutation.isPending} favoriteLabel={allSelectedFeatured ? 'Desfavoritar' : 'Favoritar'} pinLabel={allSelectedPinned ? 'Desafixar' : 'Fixar'} onClear={() => { setSelectedIds([]); setSelectionAnchorId(null); }} onAction={(action) => runActionForCurrentTarget(action)} />
 
-      <Drawer open={mobileReviewOpen} onOpenChange={setMobileReviewOpen}><DrawerContent className="max-h-[92vh] rounded-t-[28px]"><DrawerHeader className="border-b border-border/60 px-5 pb-4 text-left"><DrawerTitle>Revisao rapida</DrawerTitle><DrawerDescription>Confira a midia atual e decida sem sair do feed.</DrawerDescription></DrawerHeader><div className="overflow-y-auto px-4 py-4"><ModerationReviewPanel media={reviewMedia} canModerate={canModerate} isBusy={(action) => mutation.isPending && !!focusedMedia && mutation.variables?.items.some((item) => item.id === focusedMedia.id) && (!action || mutation.variables?.action === action)} onAction={handleFocusedAction} onApproveAndNext={handleFocusedApproveAndNext} onOpenPreview={() => setPreviewOpen(true)} canGoPrevious={focusedMediaIndex > 0} canGoNext={focusedMediaIndex >= 0 && focusedMediaIndex < media.length - 1} onPrevious={() => focusMediaByOffset(-1)} onNext={() => focusMediaByOffset(1)} autoAdvanceEnabled={autoAdvanceEnabled} onAutoAdvanceChange={setAutoAdvanceEnabled} senderBlockBusy={senderBlockMutation.isPending && !!focusedMedia && senderBlockMutation.variables?.item.id === focusedMedia.id} senderBlockDuration={senderBlockDuration} onSenderBlockDurationChange={setSenderBlockDuration} onSenderBlockToggle={runSenderBlockToggle} duplicateClusterItems={duplicateClusterItems} duplicateClusterBusy={duplicateClusterQuery.isFetching || (mutation.isPending && duplicateClusterItems.some((item) => mutation.variables?.items.some((selected) => selected.id === item.id)))} onOpenDuplicateItem={handleOpenDuplicateItem} onRejectDuplicateCluster={handleRejectDuplicateCluster} /></div></DrawerContent></Drawer>
+      <Drawer open={mobileReviewOpen} onOpenChange={setMobileReviewOpen}><DrawerContent className="max-h-[92vh] rounded-t-[28px]"><DrawerHeader className="border-b border-border/60 px-5 pb-4 text-left"><DrawerTitle>Revisao rapida</DrawerTitle><DrawerDescription>Confira a midia atual e decida sem sair do feed.</DrawerDescription></DrawerHeader><div className="overflow-y-auto px-4 py-4"><ModerationReviewPanel media={reviewMedia} canModerate={canModerate} isBusy={(action) => mutation.isPending && !!focusedMedia && mutation.variables?.items.some((item) => item.id === focusedMedia.id) && (!action || mutation.variables?.action === action)} onAction={handleFocusedAction} onApproveAndNext={handleFocusedApproveAndNext} onOpenPreview={() => setPreviewOpen(true)} canGoPrevious={focusedMediaIndex > 0} canGoNext={focusedMediaIndex >= 0 && focusedMediaIndex < media.length - 1} onPrevious={() => focusMediaByOffset(-1)} onNext={() => focusMediaByOffset(1)} autoAdvanceEnabled={autoAdvanceEnabled} onAutoAdvanceChange={setAutoAdvanceEnabled} senderBlockBusy={senderBlockMutation.isPending && !!focusedMedia && senderBlockMutation.variables?.item.id === focusedMedia.id} senderBlockDuration={senderBlockDuration} onSenderBlockDurationChange={setSenderBlockDuration} onSenderBlockToggle={runSenderBlockToggle} duplicateClusterItems={duplicateClusterItems} duplicateClusterBusy={duplicateClusterQuery.isFetching || (mutation.isPending && duplicateClusterItems.some((item) => mutation.variables?.items.some((selected) => selected.id === item.id)))} onOpenDuplicateItem={handleOpenDuplicateItem} onRejectDuplicateCluster={handleRejectDuplicateCluster} queueProgress={queueProgress} /></div></DrawerContent></Drawer>
 
-      <Drawer open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}><DrawerContent className="max-h-[92vh] rounded-t-[28px]"><DrawerHeader className="border-b border-border/60 px-5 pb-4 text-left"><DrawerTitle>Filtros avancados</DrawerTitle><DrawerDescription>Ajuste o recorte da fila sem perder o contexto da moderacao.</DrawerDescription></DrawerHeader><div className="grid gap-3 overflow-y-auto px-4 py-4"><Select value={eventFilter} onValueChange={setEventFilter}><SelectTrigger><SelectValue placeholder="Evento" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os eventos</SelectItem>{events.map((eventItem) => <SelectItem key={eventItem.id} value={String(eventItem.id)}>{eventItem.title}</SelectItem>)}</SelectContent></Select><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem>{MODERATION_STATUS_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Select value={orientationFilter} onValueChange={setOrientationFilter}><SelectTrigger><SelectValue placeholder="Formato" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os formatos</SelectItem>{MODERATION_ORIENTATION_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Select value={String(perPage)} onValueChange={(value) => setPerPage(Number(value))}><SelectTrigger><SelectValue placeholder="Densidade" /></SelectTrigger><SelectContent>{MODERATION_PAGE_SIZE_OPTIONS.map((option) => <SelectItem key={option} value={String(option)}>{option} por bloco</SelectItem>)}</SelectContent></Select><div className="grid grid-cols-2 gap-2"><Button type="button" variant={featuredOnly ? 'default' : 'outline'} className="rounded-2xl" onClick={() => { setFeaturedOnly((current) => !current); setPinnedOnly(false); setBlockedSenderOnly(false); }}><Star className={cn('h-4 w-4', featuredOnly && 'fill-current')} />Favoritas</Button><Button type="button" variant={pinnedOnly ? 'default' : 'outline'} className="rounded-2xl" onClick={() => { setPinnedOnly((current) => !current); setFeaturedOnly(false); setBlockedSenderOnly(false); }}><Pin className="h-4 w-4" />Fixadas</Button><Button type="button" variant={blockedSenderOnly ? 'default' : 'outline'} className="col-span-2 rounded-2xl" onClick={() => { setBlockedSenderOnly((current) => !current); setFeaturedOnly(false); setPinnedOnly(false); setStatusFilter('all'); }}><ShieldBan className="h-4 w-4" />Remetentes bloqueados</Button></div><div className="flex flex-wrap gap-2 pt-2"><Button type="button" className="rounded-full" onClick={() => setMobileFiltersOpen(false)}>Aplicar</Button><Button type="button" variant="outline" className="rounded-full" onClick={clearFilters}>Limpar filtros</Button></div></div></DrawerContent></Drawer>
+      <Drawer open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}><DrawerContent className="max-h-[92vh] rounded-t-[28px]"><DrawerHeader className="border-b border-border/60 px-5 pb-4 text-left"><DrawerTitle>Filtros avancados</DrawerTitle><DrawerDescription>Ajuste o recorte da fila sem perder o contexto da moderacao.</DrawerDescription></DrawerHeader><div className="grid gap-3 overflow-y-auto px-4 py-4"><Select value={eventFilter} onValueChange={setEventFilter}><SelectTrigger><SelectValue placeholder="Evento" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os eventos</SelectItem>{events.map((eventItem) => <SelectItem key={eventItem.id} value={String(eventItem.id)}>{eventItem.title}</SelectItem>)}</SelectContent></Select><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os status</SelectItem>{MODERATION_STATUS_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Select value={orientationFilter} onValueChange={setOrientationFilter}><SelectTrigger><SelectValue placeholder="Formato" /></SelectTrigger><SelectContent><SelectItem value="all">Todos os formatos</SelectItem>{MODERATION_ORIENTATION_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Select value={mediaTypeFilter} onValueChange={setMediaTypeFilter}><SelectTrigger><SelectValue placeholder="Midia" /></SelectTrigger><SelectContent><SelectItem value="all">Imagens e videos</SelectItem>{MODERATION_MEDIA_TYPE_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select><Select value={String(perPage)} onValueChange={(value) => setPerPage(Number(value))}><SelectTrigger><SelectValue placeholder="Densidade" /></SelectTrigger><SelectContent>{MODERATION_PAGE_SIZE_OPTIONS.map((option) => <SelectItem key={option} value={String(option)}>{option} por bloco</SelectItem>)}</SelectContent></Select><div className="grid grid-cols-2 gap-2"><Button type="button" variant={featuredOnly ? 'default' : 'outline'} className="rounded-2xl" onClick={() => { setFeaturedOnly((current) => !current); setPinnedOnly(false); setBlockedSenderOnly(false); }}><Star className={cn('h-4 w-4', featuredOnly && 'fill-current')} />Favoritas</Button><Button type="button" variant={pinnedOnly ? 'default' : 'outline'} className="rounded-2xl" onClick={() => { setPinnedOnly((current) => !current); setFeaturedOnly(false); setBlockedSenderOnly(false); }}><Pin className="h-4 w-4" />Fixadas</Button><Button type="button" variant={duplicatesOnly ? 'default' : 'outline'} className="rounded-2xl" onClick={() => setDuplicatesOnly((current) => !current)}>Duplicatas</Button><Button type="button" variant={aiReviewOnly ? 'default' : 'outline'} className="rounded-2xl" onClick={() => setAiReviewOnly((current) => !current)}>IA em review</Button><Button type="button" variant={blockedSenderOnly ? 'default' : 'outline'} className="col-span-2 rounded-2xl" onClick={() => { setBlockedSenderOnly((current) => !current); setFeaturedOnly(false); setPinnedOnly(false); setStatusFilter('all'); }}><ShieldBan className="h-4 w-4" />Remetentes bloqueados</Button></div><div className="flex flex-wrap gap-2 pt-2"><Button type="button" className="rounded-full" onClick={() => setMobileFiltersOpen(false)}>Aplicar</Button><Button type="button" variant="outline" className="rounded-full" onClick={clearFilters}>Limpar filtros</Button></div></div></DrawerContent></Drawer>
 
       <Dialog open={!!pendingRejectPayload} onOpenChange={(open) => { if (!open) closeRejectDialog(); }}>
         <DialogContent className="sm:max-w-xl">

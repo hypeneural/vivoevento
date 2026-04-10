@@ -80,6 +80,7 @@ class WallPayloadFactory
             'selection_mode' => $settings->selection_mode?->value ?? 'balanced',
             'event_phase' => $settings->event_phase?->value ?? 'flow',
             'selection_policy' => $effectivePolicy,
+            'theme_config' => $this->themeConfig($settings),
             'layout' => $settings->layout->value,
             'transition_effect' => $settings->transition_effect->value,
             'background_url' => $this->assets->toPublicUrl($settings->background_image_path),
@@ -136,6 +137,39 @@ class WallPayloadFactory
     private function mediaIdentifier(EventMedia $media): string
     {
         return 'media_'.$media->id;
+    }
+
+    private function themeConfig(EventWallSetting $settings): array
+    {
+        $config = $settings->theme_config;
+
+        if (! is_array($config)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        if (isset($config['preset']) && in_array($config['preset'], ['compact', 'standard'], true)) {
+            $normalized['preset'] = $config['preset'];
+        }
+
+        if (isset($config['anchor_mode']) && in_array($config['anchor_mode'], ['event_brand', 'qr_prompt', 'none'], true)) {
+            $normalized['anchor_mode'] = $config['anchor_mode'];
+        }
+
+        if (isset($config['burst_intensity']) && in_array($config['burst_intensity'], ['gentle', 'normal'], true)) {
+            $normalized['burst_intensity'] = $config['burst_intensity'];
+        }
+
+        if (array_key_exists('hero_enabled', $config)) {
+            $normalized['hero_enabled'] = (bool) $config['hero_enabled'];
+        }
+
+        if (isset($config['video_behavior']) && $config['video_behavior'] === 'fallback_single_item') {
+            $normalized['video_behavior'] = $config['video_behavior'];
+        }
+
+        return $normalized;
     }
 
     private function resolveSenderName(EventMedia $media): ?string

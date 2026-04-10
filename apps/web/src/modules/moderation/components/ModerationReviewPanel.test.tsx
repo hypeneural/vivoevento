@@ -218,6 +218,33 @@ describe('ModerationReviewPanel', () => {
     expect(onAutoAdvanceChange).toHaveBeenCalledWith(false);
   });
 
+  it('shows the current queue position and remaining pending count', () => {
+    render(
+      <MemoryRouter>
+        <ModerationReviewPanel
+          media={media}
+          canModerate
+          isBusy={() => false}
+          onAction={vi.fn()}
+          onOpenPreview={vi.fn()}
+          queueProgress={{
+            currentPosition: 4,
+            total: 18,
+            loadedTotal: 9,
+            pendingPosition: 2,
+            pendingTotal: 7,
+            loadedPendingTotal: 3,
+            pendingRemainingAfterCurrent: 5,
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText(/posicao na fila/i)).toBeInTheDocument();
+    expect(screen.getByText('Pendente 2 de 7')).toBeInTheDocument();
+    expect(screen.getByText(/5 pendentes depois desta/i)).toBeInTheDocument();
+  });
+
   it('renders the duplicate cluster and exposes review actions for the remaining items', () => {
     const onOpenDuplicateItem = vi.fn();
     const onRejectDuplicateCluster = vi.fn();

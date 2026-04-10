@@ -9,6 +9,7 @@ import {
   resolveDuplicateClusterSelection,
   resolveNextPendingModerationItem,
   resolveNextModerationDetailPrefetchItem,
+  resolveModerationQueueProgress,
   upsertModerationItems,
 } from './feed-utils';
 import type { ModerationFeedPage } from './types';
@@ -222,5 +223,47 @@ describe('moderation feed local helpers', () => {
 
     expect(resolveDuplicateClusterSelection(items, 702).map((item) => item.id)).toEqual([701, 703]);
     expect(resolveDuplicateClusterSelection(items, null)).toEqual([]);
+  });
+
+  it('resolves the current queue position and remaining pending count from loaded order and stats', () => {
+    const items = [
+      makeMedia({ id: 801, status: 'pending_moderation' }),
+      makeMedia({ id: 802, status: 'approved' }),
+      makeMedia({ id: 803, status: 'pending_moderation' }),
+      makeMedia({ id: 804, status: 'rejected' }),
+      makeMedia({ id: 805, status: 'pending_moderation' }),
+    ];
+
+    const progress = resolveModerationQueueProgress(items, 803, {
+      total: 12,
+      pending: 7,
+    });
+
+    expect(progress).toMatchObject({
+      currentPosition: 3,
+      total: 12,
+      loadedTotal: 5,
+      pendingPosition: 2,
+      pendingTotal: 7,
+      loadedPendingTotal: 3,
+      pendingRemainingAfterCurrent: 5,
+    });
+  });
+
+  it('falls back to the overall position when the focused item is not pending', () => {
+    const items = [
+      makeMedia({ id: 901, status: 'pending_moderation' }),
+      makeMedia({ id: 902, status: 'approved' }),
+    ];
+
+    const progress = resolveModerationQueueProgress(items, 902, {
+      total: 4,
+      pending: 2,
+    });
+
+    expect(progress.currentPosition).toBe(2);
+    expect(progress.pendingPosition).toBeNull();
+    expect(progress.pendingRemainingAfterCurrent).toBeNull();
+    expect(progress.pendingTotal).toBe(2);
   });
 });

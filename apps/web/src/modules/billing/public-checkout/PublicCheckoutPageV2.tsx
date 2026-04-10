@@ -16,6 +16,7 @@ import { CheckoutHeroSimple } from './components/CheckoutHeroSimple';
 import { CheckoutSidebar } from './components/CheckoutSidebar';
 import { CheckoutStepper } from './components/CheckoutStepper';
 import { MobileCheckoutFooter } from './components/MobileCheckoutFooter';
+import { MobileSelectedPackageSummary } from './components/MobileSelectedPackageSummary';
 import { PackageSelectionStep } from './components/PackageSelectionStep';
 import { PaymentStatusCard } from './components/PaymentStatusCard';
 import { PaymentStep } from './components/PaymentStep';
@@ -500,13 +501,19 @@ export function PublicCheckoutPageV2() {
       <PublicCheckoutShell
         hero={<CheckoutHeroSimple />}
         main={(
-          <CheckoutStepper
-            currentStep={wizard.currentStep}
-            progressValue={wizard.progressValue}
-            completedSteps={wizard.completedSteps}
-            steps={wizard.stepMeta}
-            childrenByStep={stepChildren}
-          />
+          <>
+            <MobileSelectedPackageSummary
+              currentStep={wizard.currentStep}
+              selectedPackage={selectedPackage}
+            />
+            <CheckoutStepper
+              currentStep={wizard.currentStep}
+              progressValue={wizard.progressValue}
+              completedSteps={wizard.completedSteps}
+              steps={wizard.stepMeta}
+              childrenByStep={stepChildren}
+            />
+          </>
         )}
         sidebar={(
           <CheckoutSidebar

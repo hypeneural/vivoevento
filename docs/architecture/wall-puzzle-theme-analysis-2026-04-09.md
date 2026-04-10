@@ -21,6 +21,10 @@ Analise complementar desta rodada:
 
 - `docs/architecture/wall-puzzle-video-and-theme-extensibility-analysis-2026-04-09.md`
 
+Policy derivada desta analise:
+
+- `docs/architecture/wall-puzzle-video-policy-and-theme-capabilities-2026-04-10.md`
+
 ---
 
 ## Veredito executivo

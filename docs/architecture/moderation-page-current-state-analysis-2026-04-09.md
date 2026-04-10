@@ -187,10 +187,13 @@ Estados principais no frontend:
 - `search`
 - `eventFilter`
 - `statusFilter`
+- `mediaTypeFilter`
 - `orientationFilter`
 - `featuredOnly`
 - `pinnedOnly`
 - `blockedSenderOnly`
+- `duplicatesOnly`
+- `aiReviewOnly`
 - `focusedMediaId`
 - `selectedIds`
 - `incomingItems`
@@ -219,10 +222,13 @@ Parametros atuais enviados ao backend:
 - `event_id`
 - `search`
 - `status`
+- `media_type`
 - `featured`
 - `pinned`
 - `sender_blocked`
 - `orientation`
+- `duplicates`
+- `ai_review`
 
 Comportamento:
 
@@ -316,7 +322,10 @@ Filtros expostos na UI:
 - busca textual;
 - evento;
 - status;
+- tipo de midia;
 - orientacao;
+- IA em review;
+- duplicatas;
 - favoritas;
 - fixadas;
 - remetentes bloqueados;
@@ -328,6 +337,11 @@ Quick filters:
 - nao moderadas;
 - aprovadas;
 - reprovadas;
+- com erro;
+- imagens;
+- videos;
+- IA em review;
+- duplicatas;
 - favoritas;
 - fixadas;
 - remetente bloqueado.
@@ -1128,7 +1142,7 @@ Mesmo que isso nao seja a causa principal do flicker, websocket instavel piora a
 Para reduzir duvidas na documentacao, esta rodada adicionou cobertura especifica em:
 
 - `apps/web/src/modules/moderation/components/ModerationReviewPanel.test.tsx`
-  - valida nome do remetente, badge de canal, renderer de video, toggle de `auto-advance` e acao `Aprovar e proxima` no painel de revisao;
+  - valida nome do remetente, badge de canal, renderer de video, toggle de `auto-advance`, acao `Aprovar e proxima` e exposicao da posicao/restante da fila no painel de revisao;
 - `apps/web/src/modules/moderation/components/ModerationMediaSurface.test.tsx`
   - valida `loading`, `error fallback` e escolha correta de `preview_url` + `thumbnail_url` para video;
 - `apps/web/src/modules/moderation/services/moderation.service.test.ts`
@@ -1140,7 +1154,11 @@ Para reduzir duvidas na documentacao, esta rodada adicionou cobertura especifica
 - `apps/web/src/app/routing/scroll-restoration.test.ts`
   - valida a chave estavel de restauracao de scroll para `/moderation`;
 - `apps/web/src/modules/moderation/moderation-architecture.test.ts`
-  - valida `prefetch` do proximo detalhe, ausencia da paginacao legada e o wiring de `approve-and-next` + motivos rapidos no `ModerationPage`;
+  - valida `prefetch` do proximo detalhe, ausencia da paginacao legada, wiring de `approve-and-next` + motivos rapidos e exposicao do progresso da fila no `ModerationPage`;
+- `apps/web/src/modules/moderation/feed-utils.test.ts`
+  - valida filtros operacionais locais para `media_type`, `duplicates`, `ai_review` e calculo de posicao/restante da fila;
+- `apps/web/src/modules/moderation/services/moderation.service.test.ts`
+  - valida forwarding de `media_type`, `duplicates` e `ai_review` para feed e `stats`;
 - `apps/web/src/modules/wall/player/engine/selectors.test.ts`
   - valida que `is_featured` influencia a escolha do proximo item do telao;
 - `apps/api/tests/Feature/Gallery/PublicGalleryAvailabilityTest.php`
@@ -1149,6 +1167,10 @@ Para reduzir duvidas na documentacao, esta rodada adicionou cobertura especifica
   - valida o endpoint dedicado de `stats`, a supressao de eco da moderacao com `broadcast(...)->toOthers()`, a presenca da migration de indices do feed e o registro do comando de benchmark da moderacao;
 - `apps/api/tests/Unit/Modules/MediaProcessing/ModerationFeedExplainAnalyzeServiceTest.php`
   - valida a leitura do plano JSON do PostgreSQL, a decisao de promover ou nao `search document` por budget e o estado de follow-up quando o documento ja existe mas algum cenario passa de `500ms`;
+- `apps/api/tests/Unit/MediaProcessing/MediaEffectiveStateResolverTest.php`
+  - valida a semantica de estado efetivo para cenarios AI bloqueantes e nao bloqueantes;
+- `apps/api/tests/Feature/MediaProcessing/ModerationMediaTest.php`
+  - valida filtros operacionais do feed e das `stats` para `media_type`, `duplicates`, `ai_review`, `error` e totais pendentes usados pelo contador de fila;
 - `apps/api/tests/Unit/Modules/MediaProcessing/ModerationSearchDocumentBuilderTest.php`
   - valida normalizacao do documento denormalizado de busca da moderacao;
 - `apps/api/tests/Feature/MediaProcessing/RunModerationFeedExplainCommandTest.php`
@@ -1341,13 +1363,19 @@ O fluxo atual tambem permite:
 - escrever motivo customizado com ate `500` caracteres;
 - reaproveitar o mesmo dialog para selecao em lote.
 
-### 4. Modo "somente pendentes"
+### 4. Parcialmente entregue nesta entrega: modo "somente pendentes"
 
-Deixar isso mais forte no produto:
+Estado atual:
 
-- quick filter default;
-- contador de fila restante;
-- posicao do item atual na fila.
+- o topo do bloco de filtros mostra `Pendentes restantes` com base em `stats.pending` da query dedicada;
+- quando a midia focada esta pendente, a UI mostra `Posicao atual: pendente X/Y`;
+- quando a midia focada nao esta pendente, a UI mostra `Posicao atual: item X/Y`;
+- o painel lateral repete a posicao e mostra quantas pendentes existem depois da midia atual;
+- a posicao e calculada pela ordem carregada do feed, enquanto o total de pendentes vem de `stats.pending`.
+
+Pendente:
+
+- decidir se o quick filter `Nao moderadas` deve virar default do produto para todos os operadores ou ficar como preferencia configuravel.
 
 ### 5. Resolvido nesta entrega: revisao por cluster de duplicata
 
@@ -1389,17 +1417,21 @@ Impacto:
 - o undo fica tecnicamente correto, sem transformar desfazer em uma nova rejeicao;
 - a fila ganha seguranca operacional sem aumentar churn estrutural do feed.
 
-### 8. Filtros mais operacionais
+### 8. Entregue nesta entrega: filtros operacionais mais fortes
 
-Faz sentido considerar:
+Estado atual:
 
-- somente imagens;
-- somente videos;
-- somente IA em review;
-- somente com erro;
-- somente duplicatas;
-- somente com bloqueio de remetente;
-- somente evento atual.
+- a rota `/moderation` agora aceita `media_type=image|video`, `duplicates=1` e `ai_review=1` no mesmo contrato usado por feed e `stats`;
+- a UI passou a expor quick filters para `Com erro`, `Imagens`, `Videos`, `IA em review` e `Duplicatas`;
+- os filtros avancados agora combinam busca, evento, status, tipo de midia, orientacao, IA em review, duplicatas, favoritas, fixadas e remetente bloqueado;
+- o matcher local de realtime e patches otimistas passou a respeitar o mesmo recorte operacional.
+
+Semantica entregue:
+
+- `Com erro` usa a semantica operacional do feed e agora considera `processing_status = failed` como `error` antes de cair em `pending_moderation`;
+- `IA em review` cobre apenas pendencias bloqueantes vindas de safety/VLM (`queued`, `review` ou `failed`), sem misturar pendencia manual pura;
+- `Duplicatas` usa `duplicate_group_key` / `is_duplicate_candidate`;
+- `Imagens` e `Videos` filtram por `media_type`.
 
 ## Roadmap recomendado
 
@@ -1465,6 +1497,8 @@ Status consolidado ate esta entrega:
 - [x] adicionar auto-advance e razoes de reprova;
 - [x] adicionar revisao por cluster de duplicata;
 - [x] adicionar undo curto apos acoes unitarias;
+- [x] adicionar filtros operacionais fortes para imagens, videos, IA em review, duplicatas e erro;
+- [x] adicionar contador de fila restante e posicao do item atual;
 - [x] remover codigo morto de paginacao nao usada.
 
 ## Conclusao

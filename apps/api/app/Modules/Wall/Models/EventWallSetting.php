@@ -38,6 +38,7 @@ class EventWallSetting extends Model
         'selection_mode',
         'event_phase',
         'selection_policy',
+        'theme_config',
         'accepted_orientation',
         'video_enabled',
         'public_upload_video_enabled',
@@ -74,6 +75,7 @@ class EventWallSetting extends Model
         'selection_mode' => WallSelectionMode::class,
         'event_phase' => WallEventPhase::class,
         'selection_policy' => 'array',
+        'theme_config' => 'array',
         'accepted_orientation' => WallAcceptedOrientation::class,
         'video_enabled' => 'boolean',
         'public_upload_video_enabled' => 'boolean',
@@ -118,6 +120,10 @@ class EventWallSetting extends Model
 
             if (empty($setting->selection_policy)) {
                 $setting->selection_policy = WallSelectionPreset::defaultsFor($setting->selection_mode);
+            }
+
+            if ($setting->theme_config === null) {
+                $setting->theme_config = [];
             }
 
             if ($setting->video_enabled === null) {

@@ -64,7 +64,7 @@ describe('BuyerEventStep', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /adicionar mais detalhes/i }));
 
-    const eventDateInput = screen.getByLabelText(/data e hora do evento/i);
+    const eventDateInput = screen.getByLabelText(/quando seu evento acontece/i);
 
     expect(eventDateInput).toHaveAttribute('type', 'datetime-local');
   });

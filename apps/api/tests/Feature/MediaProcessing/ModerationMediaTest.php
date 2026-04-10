@@ -92,7 +92,7 @@ it('lists media catalog with organization scoped stats and smart filters', funct
         ->assertJsonPath('meta.stats.duplicates', 1)
         ->assertJsonPath('meta.stats.face_indexed', 1);
 
-    $filteredResponse = $this->apiGet("/media?event_id={$faceSearchEvent->id}&status=pending_moderation&channel=upload&media_type=image&duplicates=1&face_search_enabled=1&face_index_status=indexed&orientation=portrait&search=SELFIE");
+    $filteredResponse = $this->apiGet("/media?event_id={$faceSearchEvent->id}&status=pending_moderation&channel=upload&media_type=image&duplicates=1&face_search_enabled=true&face_index_status=indexed&orientation=portrait&search=SELFIE");
 
     $this->assertApiPaginated($filteredResponse);
     $filteredResponse->assertJsonCount(1, 'data')
@@ -282,8 +282,6 @@ it('filters the moderation feed and stats by media type, duplicate cluster, ai r
         'event_id' => $event->id,
         'media_type' => 'image',
         'processing_status' => 'failed',
-        'moderation_status' => null,
-        'publication_status' => null,
         'safety_status' => 'skipped',
         'vlm_status' => 'skipped',
     ]);
@@ -327,6 +325,53 @@ it('filters the moderation feed and stats by media type, duplicate cluster, ai r
     $this->assertApiSuccess($videoStats);
     $videoStats->assertJsonPath('data.total', 1)
         ->assertJsonPath('data.approved', 1);
+});
+
+it('returns pending queue totals aligned to the active moderation stats filter', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+    ]);
+
+    EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'media_type' => 'image',
+        'created_at' => now()->subMinutes(4),
+    ]);
+
+    EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'media_type' => 'image',
+        'created_at' => now()->subMinutes(3),
+    ]);
+
+    EventMedia::factory()->approved()->create([
+        'event_id' => $event->id,
+        'media_type' => 'image',
+        'created_at' => now()->subMinutes(2),
+    ]);
+
+    EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'media_type' => 'video',
+        'mime_type' => 'video/mp4',
+        'created_at' => now()->subMinute(),
+    ]);
+
+    $imageStats = $this->apiGet('/media/feed/stats?media_type=image');
+
+    $this->assertApiSuccess($imageStats);
+    $imageStats->assertJsonPath('data.total', 3)
+        ->assertJsonPath('data.pending', 2)
+        ->assertJsonPath('data.approved', 1);
+
+    $pendingStats = $this->apiGet('/media/feed/stats?status=pending_moderation');
+
+    $this->assertApiSuccess($pendingStats);
+    $pendingStats->assertJsonPath('data.total', 3)
+        ->assertJsonPath('data.pending', 3)
+        ->assertJsonPath('data.approved', 0);
 });
 
 it('searches the moderation feed across event title and sender identity fields', function () {

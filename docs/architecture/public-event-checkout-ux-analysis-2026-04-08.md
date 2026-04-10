@@ -612,6 +612,11 @@ Status real apos a V2 + PR1 de friction hardening:
 - o pacote deep-linked continua preservado no `returnTo`
 - se o comprador ja estiver autenticado, a jornada nao passa por `/login`; ela retoma direto em `payment`
 - a retomada manual nao auto-submete Pix; ela devolve o comprador para o pagamento com os dados restaurados
+- o campo `WhatsApp` agora mascara a digitacao e abre teclado de telefone no mobile
+- o campo opcional de agenda passou a coletar data e hora com label `Quando seu evento acontece?`
+- o rodape mobile deixou de ser apenas resumo e passou a expor a acao principal da etapa
+- a primeira dobra mobile ficou mais curta e direta, com selos de confianca fora do viewport inicial pequeno
+- o pacote escolhido aparece em resumo compacto no mobile depois da selecao
 
 Mas a estrategia principal deve ser:
 

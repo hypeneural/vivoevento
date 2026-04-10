@@ -229,7 +229,7 @@ function makeCheckoutResponse(): ApiBillingCheckoutResponse {
 }
 
 async function openAndFillRecurringCheckoutDialog() {
-  fireEvent.click(await screen.findByRole('button', { name: /ativar plano/i }));
+  fireEvent.click(await screen.findByRole('button', { name: /contratar plano/i }));
 
   const dialog = await screen.findByRole('dialog');
   const scoped = within(dialog);
@@ -377,7 +377,7 @@ describe('PlansPage', () => {
     expect(createPagarmeCardTokenMock).not.toHaveBeenCalled();
     expect(checkoutMock).not.toHaveBeenCalled();
 
-    fireEvent.click(dialog.getByRole('button', { name: /confirmar assinatura/i }));
+    fireEvent.click(dialog.getByRole('button', { name: /confirmar contratacao/i }));
 
     await waitFor(() => {
       expect(createPagarmeCardTokenMock).toHaveBeenCalledTimes(1);
@@ -396,12 +396,12 @@ describe('PlansPage', () => {
     }));
 
     expect((await screen.findAllByText(/pagamento pendente/i)).length).toBeGreaterThan(0);
-    const checkoutLinks = screen.getAllByRole('link', { name: /abrir checkout/i });
+    const checkoutLinks = screen.getAllByRole('link', { name: /continuar pagamento/i });
 
     expect(
       checkoutLinks.some((link) => link.getAttribute('href') === 'https://checkout.example.com/pay/starter'),
     ).toBe(true);
-    expect(screen.getByText(/gateway_order_id/i)).toBeInTheDocument();
+    expect(screen.queryByText(/gateway_order_id/i)).not.toBeInTheDocument();
   });
 
   it('blocks the backend checkout when card tokenization fails', async () => {
@@ -411,7 +411,7 @@ describe('PlansPage', () => {
 
     const dialog = await openAndFillRecurringCheckoutDialog();
 
-    fireEvent.click(dialog.getByRole('button', { name: /confirmar assinatura/i }));
+    fireEvent.click(dialog.getByRole('button', { name: /confirmar contratacao/i }));
 
     expect(await screen.findByText(/falha ao tokenizar cartao/i)).toBeInTheDocument();
     expect(checkoutMock).not.toHaveBeenCalled();
@@ -509,7 +509,7 @@ describe('PlansPage', () => {
     renderPage();
 
     fireEvent.click(await screen.findByRole('button', { name: /ver assinatura/i }));
-    fireEvent.click(await screen.findByRole('button', { name: /sincronizar provider/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /sincronizar dados/i }));
 
     await waitFor(() => {
       expect(reconcileSubscriptionMock).toHaveBeenCalled();
@@ -519,6 +519,18 @@ describe('PlansPage', () => {
       size: 20,
       with_charge_details: true,
     });
+  });
+
+  it('allows changing the billing cycle of the current plan', async () => {
+    getCurrentSubscriptionMock.mockResolvedValue(makeSubscription({
+      billing_cycle: 'monthly',
+    }));
+
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: /anual/i }));
+
+    expect(await screen.findByRole('button', { name: /alterar ciclo/i })).toBeInTheDocument();
   });
 
   it('shows the catalog error state when the plans payload is malformed', async () => {

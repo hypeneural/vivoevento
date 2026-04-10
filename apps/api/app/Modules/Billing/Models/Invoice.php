@@ -9,10 +9,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Schema;
 
 class Invoice extends Model
 {
     use HasFactory, HasOrganization;
+
+    private static array $schemaColumnCache = [];
 
     protected static function newFactory(): \Database\Factories\InvoiceFactory
     {
@@ -70,11 +73,42 @@ class Invoice extends Model
 
     public function payments(): HasMany
     {
-        return $this->hasMany(Payment::class);
+        [$foreignKey, $localKey] = $this->paymentRelationKeys();
+
+        return $this->hasMany(Payment::class, $foreignKey, $localKey);
     }
 
     public function latestPayment(): HasOne
     {
-        return $this->hasOne(Payment::class)->latestOfMany();
+        [$foreignKey, $localKey] = $this->paymentRelationKeys();
+
+        return $this->hasOne(Payment::class, $foreignKey, $localKey)->latestOfMany();
+    }
+
+    private function paymentRelationKeys(): array
+    {
+        if ($this->tableHasColumn('payments', 'invoice_id')) {
+            return ['invoice_id', $this->getKeyName()];
+        }
+
+        if (
+            $this->tableHasColumn('payments', 'gateway_invoice_id')
+            && $this->tableHasColumn($this->getTable(), 'gateway_invoice_id')
+        ) {
+            return ['gateway_invoice_id', 'gateway_invoice_id'];
+        }
+
+        return ['billing_order_id', 'billing_order_id'];
+    }
+
+    private function tableHasColumn(string $table, string $column): bool
+    {
+        $cacheKey = "{$table}.{$column}";
+
+        if (! array_key_exists($cacheKey, self::$schemaColumnCache)) {
+            self::$schemaColumnCache[$cacheKey] = Schema::hasColumn($table, $column);
+        }
+
+        return self::$schemaColumnCache[$cacheKey];
     }
 }

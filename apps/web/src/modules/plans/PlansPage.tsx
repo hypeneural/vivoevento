@@ -358,10 +358,10 @@ function BillingStateHero({
   let badgeLabel = 'Pronto para contratar';
 
   if (hasPendingCheckout) {
-    title = 'Pagamento pendente';
-    description = 'O checkout ja foi iniciado. Abra o link do provider para concluir o pagamento e depois acompanhe o status nesta mesma pagina.';
+    title = 'Pagamento aguardando confirmacao';
+    description = 'A contratacao ja foi iniciada. Continue o pagamento para ativar o plano escolhido e acompanhe a atualizacao por aqui.';
     accentClass = 'border-amber-500/30 bg-amber-500/10 text-amber-100';
-    badgeLabel = 'Checkout aberto';
+    badgeLabel = 'Pagamento pendente';
   } else if (subscription?.cancel_at_period_end) {
     title = 'Cancelamento agendado';
     description = `A conta segue coberta ate ${formatDate(subscription.cancellation_effective_at || subscription.ends_at)}.`;
@@ -404,10 +404,10 @@ function BillingStateHero({
             <div className="rounded-2xl border border-border/60 bg-background/40 p-4">
               <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Ultima cobranca</p>
               <p className="mt-2 text-sm font-medium text-foreground">
-                {latestInvoice ? formatMoney(latestInvoice.amount_cents, latestInvoice.currency) : 'Sem invoices'}
+                {latestInvoice ? formatMoney(latestInvoice.amount_cents, latestInvoice.currency) : 'Sem cobrancas'}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {latestInvoice?.invoice_number || 'Nenhuma invoice emitida'}
+                {latestInvoice?.invoice_number || 'Nenhuma cobranca emitida'}
               </p>
             </div>
           </div>
@@ -418,7 +418,7 @@ function BillingStateHero({
             <Button asChild size="lg">
               <a href={pendingCheckout?.checkout.checkout_url ?? '#'} target="_blank" rel="noreferrer">
                 <ExternalLink className="mr-2 h-4 w-4" />
-                Abrir checkout
+                Continuar pagamento
               </a>
             </Button>
           ) : null}
@@ -464,7 +464,7 @@ function PendingCheckoutCard({
           <p className="text-[11px] uppercase tracking-[0.18em] text-amber-200">Pagamento pendente</p>
           <h3 className="mt-2 text-xl font-semibold text-foreground">{checkout.plan_name}</h3>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            O checkout do provider ja foi criado. Use o link abaixo para concluir o pagamento e volte aqui para acompanhar a ativacao da conta.
+            A contratacao do novo plano ja foi iniciada. Finalize o pagamento para concluir a troca ou ativacao da conta.
           </p>
         </div>
 
@@ -473,7 +473,7 @@ function PendingCheckoutCard({
             <Button asChild>
               <a href={checkout.checkout.checkout_url} target="_blank" rel="noreferrer">
                 <ExternalLink className="mr-2 h-4 w-4" />
-                Abrir checkout
+                Continuar pagamento
               </a>
             </Button>
           ) : null}
@@ -483,22 +483,18 @@ function PendingCheckoutCard({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
         <div className="rounded-2xl border border-border/60 bg-background/30 p-4">
           <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Status</p>
           <p className="mt-2 text-sm font-medium text-foreground">{formatSubscriptionStatus(checkout.checkout.status)}</p>
         </div>
         <div className="rounded-2xl border border-border/60 bg-background/30 p-4">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">gateway_order_id</p>
-          <p className="mt-2 break-all text-sm font-medium text-foreground">{checkout.checkout.gateway_order_id || 'Nao informado'}</p>
-        </div>
-        <div className="rounded-2xl border border-border/60 bg-background/30 p-4">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Expira em</p>
+          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Validade do link</p>
           <p className="mt-2 text-sm font-medium text-foreground">{formatDateTime(checkout.checkout.expires_at)}</p>
         </div>
         <div className="rounded-2xl border border-border/60 bg-background/30 p-4">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Pedido local</p>
-          <p className="mt-2 text-sm font-medium text-foreground">#{checkout.billing_order_id}</p>
+          <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Proxima etapa</p>
+          <p className="mt-2 text-sm font-medium text-foreground">Concluir o pagamento e aguardar a ativacao</p>
         </div>
       </div>
     </div>
@@ -514,7 +510,7 @@ function InvoicesMobileList({ invoices }: { invoices: ApiBillingInvoice[] }) {
             <div>
               <p className="text-sm font-semibold text-foreground">{getInvoiceDescription(invoice)}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {invoice.invoice_number || `Invoice #${invoice.id}`}
+                {invoice.invoice_number || `Cobranca #${invoice.id}`}
               </p>
             </div>
             <Badge variant="outline" className={subscriptionStatusClasses(invoice.status)}>
@@ -607,7 +603,7 @@ function SubscriptionPanel({
               <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Conta atual</p>
               <h3 className="mt-2 text-xl font-semibold text-foreground">{organizationName}</h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                Billing recorrente da organizacao. O evento pode ter grant proprio, mas esta tela representa a conta.
+                Este e o plano mensal da organizacao. Recursos e limites da conta partem daqui.
               </p>
             </div>
             <Badge variant="outline" className={subscriptionBadgeClasses(subscription)}>
@@ -643,7 +639,7 @@ function SubscriptionPanel({
               onClick={onReconcile}
             >
               {isReconciling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-              Sincronizar provider
+              Sincronizar dados
             </Button>
 
             {canCancelSubscription ? (
@@ -705,13 +701,13 @@ function SubscriptionPanel({
             <div className="mt-4 space-y-3">
               {isWalletLoading ? (
                 <div className="rounded-2xl border border-border/60 bg-background/30 p-4 text-sm text-muted-foreground">
-                  Carregando wallet...
+                  Carregando cartoes salvos...
                 </div>
               ) : null}
 
               {!isWalletLoading && walletCards.length === 0 ? (
                 <div className="rounded-2xl border border-border/60 bg-background/30 p-4 text-sm text-muted-foreground">
-                  Nenhum cartao salvo retornado pelo provider.
+                  Nenhum cartao salvo encontrado para esta conta.
                 </div>
               ) : null}
 
@@ -821,9 +817,11 @@ export default function PlansPage() {
       ]);
 
       toast({
-        title: 'Checkout de assinatura iniciado',
+        title: currentSubscription ? 'Mudanca de plano iniciada' : 'Contratacao iniciada',
         description: result.checkout.checkout_url
-          ? `Plano ${result.plan_name} pronto para pagamento.`
+          ? currentSubscription
+            ? `Finalize o pagamento para concluir a troca para ${result.plan_name}.`
+            : `Finalize o pagamento para ativar o plano ${result.plan_name}.`
           : `Plano ${result.plan_name} ativado com sucesso.`,
       });
     },
@@ -882,13 +880,13 @@ export default function PlansPage() {
       ]);
 
       toast({
-        title: 'Assinatura sincronizada',
-        description: 'Os ciclos, invoices e charges recorrentes foram reconciliados com o provider.',
+        title: 'Assinatura atualizada',
+        description: 'Os dados recorrentes da conta foram conferidos e atualizados.',
       });
     },
     onError: (error: Error) => {
       toast({
-        title: 'Falha ao sincronizar provider',
+        title: 'Falha ao atualizar a assinatura',
         description: error.message,
         variant: 'destructive',
       });
@@ -987,14 +985,14 @@ export default function PlansPage() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <PageHeader
         title="Planos e Cobranca"
-        description="Catalogo recorrente, assinatura da conta e historico financeiro da organizacao."
+        description="Planos da conta, assinatura atual e historico de cobrancas da organizacao."
         actions={(
           <>
             {visiblePendingCheckout?.checkout.checkout_url ? (
               <Button asChild>
                 <a href={visiblePendingCheckout.checkout.checkout_url} target="_blank" rel="noreferrer">
                   <ExternalLink className="mr-2 h-4 w-4" />
-                  Abrir checkout
+                  Continuar pagamento
                 </a>
               </Button>
             ) : null}
@@ -1011,7 +1009,7 @@ export default function PlansPage() {
           icon={Building2}
           label="Conta"
           title={organizationName}
-          description="Esta tela representa o billing da conta. Entitlements especificos de evento aparecem nas paginas de evento."
+          description="Este painel concentra o plano mensal, a forma de pagamento e o historico financeiro da organizacao."
         />
         <BillingSummaryCard
           icon={Sparkles}
@@ -1026,10 +1024,10 @@ export default function PlansPage() {
         <BillingSummaryCard
           icon={Receipt}
           label="Ultima cobranca"
-          title={latestInvoice ? formatMoney(latestInvoice.amount_cents, latestInvoice.currency) : 'Sem invoices'}
+          title={latestInvoice ? formatMoney(latestInvoice.amount_cents, latestInvoice.currency) : 'Sem cobrancas'}
           description={latestInvoice
             ? `${getInvoiceDescription(latestInvoice)} - ${formatDate(latestInvoice.paid_at || latestInvoice.issued_at)}`
-            : 'O historico financeiro aparece aqui assim que a conta gerar a primeira invoice.'}
+            : 'O historico financeiro aparece aqui assim que a conta gerar a primeira cobranca.'}
         />
       </div>
 
@@ -1063,6 +1061,7 @@ export default function PlansPage() {
         organizationName={organizationName}
         userName={meUser?.name ?? null}
         userEmail={meUser?.email ?? null}
+        currentSubscription={currentSubscription}
         isSubmitting={checkoutMutation.isPending}
         onSubmit={(payload) => checkoutMutation.mutateAsync(payload)}
       />
@@ -1116,15 +1115,20 @@ export default function PlansPage() {
           {!catalogQuery.isLoading && !catalogQuery.isError ? (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {plansWithPricing.map(({ plan, defaultPrice, prices, featureLabels, modules }) => {
-                const isCurrentPlan = Boolean(currentPlanKey && currentPlanKey === plan.code);
                 const selectedCycle = selectedCycles[plan.id] ?? defaultPrice?.billing_cycle ?? 'monthly';
                 const selectedPrice = getSelectedPrice(plan, selectedCycle);
+                const isPlanFamily = Boolean(currentPlanKey && currentPlanKey === plan.code);
+                const isCurrentSelection = Boolean(
+                  isPlanFamily
+                  && currentSubscription?.billing_cycle === selectedCycle
+                  && !currentSubscription?.cancel_at_period_end,
+                );
 
                 return (
                   <div
                     key={plan.id}
                     className={`glass rounded-2xl border p-5 transition-colors ${
-                      isCurrentPlan ? 'border-primary/60 shadow-[0_0_0_1px_rgba(255,255,255,0.06)]' : 'border-border/60'
+                      isCurrentSelection ? 'border-primary/60 shadow-[0_0_0_1px_rgba(255,255,255,0.06)]' : 'border-border/60'
                     }`}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1134,8 +1138,12 @@ export default function PlansPage() {
                           {plan.description || 'Plano recorrente para operacao da conta.'}
                         </p>
                       </div>
-                      {isCurrentPlan ? (
-                        <Badge className="border-0 bg-primary text-primary-foreground">Plano atual</Badge>
+                      {isPlanFamily ? (
+                        <Badge className="border-0 bg-primary text-primary-foreground">
+                          {isCurrentSelection
+                            ? 'Plano atual'
+                            : `Plano atual: ${currentSubscription?.billing_cycle === 'yearly' ? 'Anual' : 'Mensal'}`}
+                        </Badge>
                       ) : null}
                     </div>
 
@@ -1196,8 +1204,8 @@ export default function PlansPage() {
 
                     <Button
                       className="mt-6 w-full"
-                      variant={isCurrentPlan ? 'secondary' : 'default'}
-                      disabled={!selectedPrice || isCurrentPlan || checkoutMutation.isPending || !canPurchaseBilling}
+                      variant={isCurrentSelection ? 'secondary' : 'default'}
+                      disabled={!selectedPrice || isCurrentSelection || checkoutMutation.isPending || !canPurchaseBilling}
                       onClick={() => {
                         if (!selectedPrice) {
                           return;
@@ -1207,7 +1215,15 @@ export default function PlansPage() {
                       }}
                     >
                       {checkoutMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      {isCurrentPlan ? 'Plano atual' : canPurchaseBilling ? 'Ativar plano' : 'Sem permissao para contratar'}
+                      {isCurrentSelection
+                        ? 'Plano atual'
+                        : canPurchaseBilling
+                          ? currentSubscription
+                            ? isPlanFamily
+                              ? 'Alterar ciclo'
+                              : 'Trocar para este plano'
+                            : 'Contratar plano'
+                          : 'Sem permissao para contratar'}
                     </Button>
                   </div>
                 );
@@ -1277,7 +1293,7 @@ export default function PlansPage() {
               <EmptyState
                 icon={Receipt}
                 title="Nenhuma cobranca registrada"
-                description="As invoices reais da conta vao aparecer aqui assim que houver checkout ou renovacao."
+                description="As cobrancas reais da conta vao aparecer aqui assim que houver checkout ou renovacao."
                 action={(
                   <Button onClick={() => setActiveTab('plans')}>
                     <ArrowRight className="mr-2 h-4 w-4" />
@@ -1308,7 +1324,7 @@ export default function PlansPage() {
                     {invoices.map((invoice) => (
                       <TableRow key={invoice.id} className="border-border/30">
                         <TableCell className="font-medium text-sm text-foreground">
-                          {invoice.invoice_number || `Invoice #${invoice.id}`}
+                          {invoice.invoice_number || `Cobranca #${invoice.id}`}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {getInvoiceDescription(invoice)}
@@ -1334,7 +1350,7 @@ export default function PlansPage() {
               <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-background/30 px-4 py-3 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <CalendarClock className="h-4 w-4" />
-                  <span>Historico real de invoices da conta atual.</span>
+                  <span>Historico real de cobrancas da conta atual.</span>
                 </div>
                 <span>
                   {invoicesMeta?.total ? `${invoicesMeta.total} registro(s)` : `${invoices.length} registro(s)`}

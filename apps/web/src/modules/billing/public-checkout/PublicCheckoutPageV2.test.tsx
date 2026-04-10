@@ -257,7 +257,7 @@ describe('PublicCheckoutPageV2', () => {
   it('renders the new hero and loads the public packages commercially', async () => {
     renderPage();
 
-    expect(screen.getByRole('heading', { name: /reserve seu pacote em poucos minutos/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /contrate seu evento em poucos minutos/i })).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: /escolher este pacote/i })).toBeInTheDocument();
     expect(screen.getByText(/mais escolhido/i)).toBeInTheDocument();
     expect(screen.getByText(/telao ao vivo para os convidados/i)).toBeInTheDocument();
@@ -458,7 +458,7 @@ describe('PublicCheckoutPageV2', () => {
     fillDetailsStep();
 
     fireEvent.click(screen.getByRole('button', { name: /adicionar mais detalhes/i }));
-    fireEvent.change(screen.getByLabelText(/data e hora do evento/i), {
+    fireEvent.change(screen.getByLabelText(/quando seu evento acontece/i), {
       target: { value: '2026-11-15T18:30' },
     });
 

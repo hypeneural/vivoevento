@@ -304,6 +304,12 @@ Ja esta implementado:
 - estado `status/post_submit` ja separado do accordion
 - `PaymentStatusCard` com QR Code, copia e cola, expiracao, aviso de WhatsApp e CTA de refresh
 - adapters/view-model no frontend para a UI nao ler `gateway_status` diretamente nos componentes
+- `Ja tenho conta` com draft seguro manual e retomada direta em `payment`
+- `WhatsApp` com mascara visual, `inputMode="tel"` e `autoComplete="tel"`
+- campo opcional de agenda em `datetime-local` com label `Quando seu evento acontece?`
+- rodape mobile CTA-first com acao contextual por etapa e resumo como secundario
+- primeira dobra mobile mais compacta, com trust row apenas a partir de `sm`
+- resumo compacto do pacote escolhido acima do step ativo no mobile
 
 Ainda segue pendente:
 

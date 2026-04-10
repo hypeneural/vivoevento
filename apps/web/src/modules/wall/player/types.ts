@@ -67,6 +67,8 @@ export type WallPlayerStatus =
 export type MediaOrientation = 'vertical' | 'horizontal' | 'squareish';
 
 export type WallAssetStatus = 'idle' | 'loading' | 'ready' | 'stale' | 'error';
+export type WallLayoutKind = 'single' | 'board';
+export type WallReducedMotionSetting = 'always' | 'never' | 'user';
 
 export type WallVideoPlaybackPhase =
   | 'idle'

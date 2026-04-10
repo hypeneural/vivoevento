@@ -6,6 +6,21 @@ import type { ModerationFeedPage, ModerationListFilters } from './types';
 
 type ModerationFeedData = InfiniteData<ModerationFeedPage, string | null>;
 
+export interface ModerationQueueProgress {
+  currentPosition: number | null;
+  total: number;
+  loadedTotal: number;
+  pendingPosition: number | null;
+  pendingTotal: number;
+  loadedPendingTotal: number;
+  pendingRemainingAfterCurrent: number | null;
+}
+
+export interface ModerationQueueProgressStats {
+  total?: number | null;
+  pending?: number | null;
+}
+
 function mediaDateValue(media: ApiEventMediaItem) {
   return media.created_at ? new Date(media.created_at).getTime() : 0;
 }
@@ -136,6 +151,34 @@ export function resolveDuplicateClusterSelection(
   }
 
   return items.filter((item) => item.id !== focusedMediaId && item.duplicate_group_key === groupKey);
+}
+
+export function resolveModerationQueueProgress(
+  items: ApiEventMediaItem[],
+  focusedMediaId: number | null,
+  stats: ModerationQueueProgressStats,
+): ModerationQueueProgress {
+  const focusedIndex = focusedMediaId === null
+    ? -1
+    : items.findIndex((item) => item.id === focusedMediaId);
+  const pendingItems = items.filter((item) => item.status === 'pending_moderation');
+  const pendingIndex = focusedMediaId === null
+    ? -1
+    : pendingItems.findIndex((item) => item.id === focusedMediaId);
+  const pendingTotal = Math.max(Number(stats.pending ?? pendingItems.length), pendingItems.length);
+  const total = Math.max(Number(stats.total ?? items.length), items.length);
+
+  return {
+    currentPosition: focusedIndex >= 0 ? focusedIndex + 1 : null,
+    total,
+    loadedTotal: items.length,
+    pendingPosition: pendingIndex >= 0 ? pendingIndex + 1 : null,
+    pendingTotal,
+    loadedPendingTotal: pendingItems.length,
+    pendingRemainingAfterCurrent: pendingIndex >= 0
+      ? Math.max(pendingTotal - (pendingIndex + 1), 0)
+      : null,
+  };
 }
 
 export function moderationItemMatchesFilters(media: ApiEventMediaItem, filters: ModerationListFilters) {

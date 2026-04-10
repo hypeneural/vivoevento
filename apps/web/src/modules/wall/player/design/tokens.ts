@@ -33,3 +33,12 @@ export const WALL_ACCENT_BAR = 'h-1.5 w-16 rounded-full bg-orange-400 shadow-[0_
 export const WALL_BADGE = 'rounded-full bg-orange-500 px-4 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-white shadow-lg';
 export const WALL_LOGO_DOCK = 'rounded-2xl border border-white/10 bg-black/40 p-3 backdrop-blur-md shadow-[0_16px_50px_rgba(0,0,0,0.22)]';
 export const WALL_NEON_PANEL = 'rounded-full border border-white/15 bg-black/35 px-5 py-2 shadow-[0_0_40px_rgba(249,115,22,0.25)] backdrop-blur-md';
+
+// Motion foundation
+export const WALL_MOTION_VISUAL_DURATION_SINGLE = 0.42;
+export const WALL_MOTION_VISUAL_DURATION_BOARD = 0.38;
+export const WALL_MOTION_VISUAL_DURATION_PUZZLE = 0.46;
+export const WALL_MOTION_BURST_DURATION = 0.24;
+export const WALL_MOTION_PUZZLE_BURST_DURATION = 0.28;
+export const WALL_MOTION_DRIFT_DURATION_SECONDS = 18;
+export const WALL_MOTION_PUZZLE_DRIFT_DURATION_SECONDS = 22;

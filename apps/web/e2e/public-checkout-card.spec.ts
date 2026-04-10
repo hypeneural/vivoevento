@@ -44,7 +44,7 @@ test('card checkout restores only safe data after login and requires refilling s
   await page.goto(PUBLIC_CHECKOUT_V2_PATH, { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: /escolher este pacote/i }).click();
   await page.getByLabel(/seu nome/i).fill('Camila Rocha');
-  await page.getByLabel(/^WhatsApp$/i).fill('(48) 99977-1111');
+  await page.getByLabel(/whatsapp com ddd/i).fill('(48) 99977-1111');
   await page.getByLabel(/e-mail/i).fill('camila@example.com');
   await page.getByLabel(/nome do evento/i).fill('Casamento Camila e Bruno');
   await page.getByRole('button', { name: /continuar para pagamento/i }).click();

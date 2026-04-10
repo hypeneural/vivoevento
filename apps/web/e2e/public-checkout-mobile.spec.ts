@@ -8,7 +8,7 @@ test('mobile keeps data when moving forward to payment and back to details', asy
 
   await page.goto(PUBLIC_CHECKOUT_V2_PATH, { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByRole('heading', { name: /reserve seu pacote em poucos minutos/i })).toBeVisible({
+  await expect(page.getByRole('heading', { name: /contrate seu evento em poucos minutos/i })).toBeVisible({
     timeout: 15000,
   });
   await expect(page.getByRole('button', { name: /escolher este pacote/i })).toBeVisible({
@@ -23,17 +23,18 @@ test('mobile keeps data when moving forward to payment and back to details', asy
 
   await page.getByRole('button', { name: /escolher este pacote/i }).click();
   await page.getByLabel(/seu nome/i).fill('Camila Rocha');
-  await page.getByLabel(/^WhatsApp$/i).fill('(48) 99977-1111');
+  await page.getByLabel(/whatsapp com ddd/i).fill('(48) 99977-1111');
   await page.getByLabel(/nome do evento/i).fill('Casamento Camila e Bruno');
-  await page.getByRole('button', { name: /continuar para pagamento/i }).click();
+  await expect(page.getByTestId('public-checkout-mobile-primary-cta')).toHaveText(/continuar para pagamento/i);
+  await page.getByTestId('public-checkout-mobile-primary-cta').click();
 
   await expect(page).toHaveURL(/step=payment/);
-  await expect(page.getByRole('button', { name: /gerar meu pix/i })).toBeVisible();
+  await expect(page.getByTestId('public-checkout-mobile-primary-cta')).toHaveText(/gerar meu pix/i);
 
   await page.getByRole('button', { name: /voltar para seus dados/i }).click();
 
   await expect(page).toHaveURL(/step=details/);
   await expect(page.getByLabel(/seu nome/i)).toHaveValue('Camila Rocha');
-  await expect(page.getByLabel(/^WhatsApp$/i)).toHaveValue('(48) 99977-1111');
+  await expect(page.getByLabel(/whatsapp com ddd/i)).toHaveValue('(48) 99977-1111');
   await expect(page.getByLabel(/nome do evento/i)).toHaveValue('Casamento Camila e Bruno');
 });

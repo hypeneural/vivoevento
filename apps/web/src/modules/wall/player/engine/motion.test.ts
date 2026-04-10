@@ -4,10 +4,33 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  resolveLayoutTransition,
   resolveEffectiveTransition,
   resolveKenBurnsAnimationClass,
   shouldShowNeonPulse,
 } from '../engine/motion';
+import type { WallMotionTokens } from '../themes/motion';
+
+const tokens: WallMotionTokens = {
+  enter: {
+    duration: 0.42,
+    ease: 'easeOut',
+  },
+  exit: {
+    duration: 0.32,
+    ease: 'easeInOut',
+  },
+  burst: {
+    duration: 0.24,
+    ease: 'easeOut',
+  },
+  drift: {
+    duration: 18,
+    ease: 'linear',
+  },
+  visualDuration: 0.42,
+  reducedMotion: 'user',
+};
 
 describe('resolveEffectiveTransition', () => {
   it('returns "none" when reducedMotion is true, regardless of input', () => {
@@ -50,5 +73,26 @@ describe('shouldShowNeonPulse', () => {
 
   it('returns true when not reducedMotion', () => {
     expect(shouldShowNeonPulse(false)).toBe(true);
+  });
+});
+
+describe('resolveLayoutTransition', () => {
+  it('uses theme motion tokens to build a visible transition when reducedMotion is false', () => {
+    const resolved = resolveLayoutTransition('slide', tokens, false);
+
+    expect(resolved.effect).toBe('slide');
+    expect(resolved.transition).toMatchObject({
+      duration: tokens.visualDuration,
+      ease: tokens.enter.ease,
+    });
+    expect(resolved.variants.initial).toMatchObject({ opacity: 0, x: 60 });
+  });
+
+  it('forces transition effect none and zero duration when reducedMotion is true', () => {
+    const resolved = resolveLayoutTransition('zoom', tokens, true);
+
+    expect(resolved.effect).toBe('none');
+    expect(resolved.transition).toMatchObject({ duration: 0 });
+    expect(resolved.variants.initial).toMatchObject({ opacity: 1 });
   });
 });

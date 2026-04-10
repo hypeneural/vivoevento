@@ -78,7 +78,7 @@ class SubscriptionController extends BaseController
             ->with([
                 'order.event:id,title',
                 'order.payments',
-                'payments',
+                'latestPayment',
                 'subscription.plan:id,code,name,audience,description',
                 'subscriptionCycle',
             ])

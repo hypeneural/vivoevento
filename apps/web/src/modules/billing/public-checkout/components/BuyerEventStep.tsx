@@ -57,7 +57,7 @@ export function BuyerEventStep({
               name="event_date"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Data e hora do evento</FormLabel>
+                  <FormLabel>Quando seu evento acontece?</FormLabel>
                   <FormControl>
                     <Input type="datetime-local" {...field} />
                   </FormControl>

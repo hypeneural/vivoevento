@@ -1544,14 +1544,43 @@ export interface ApiHubPreset {
   updated_at: string | null;
 }
 
+export type ApiWallLayout =
+  | 'auto'
+  | 'polaroid'
+  | 'fullscreen'
+  | 'split'
+  | 'cinematic'
+  | 'kenburns'
+  | 'spotlight'
+  | 'gallery'
+  | 'carousel'
+  | 'mosaic'
+  | 'grid'
+  | 'puzzle';
+
+export type ApiWallTransition = 'fade' | 'slide' | 'zoom' | 'flip' | 'none';
+export type ApiWallThemePreset = 'compact' | 'standard';
+export type ApiWallThemeAnchorMode = 'event_brand' | 'qr_prompt' | 'none';
+export type ApiWallThemeBurstIntensity = 'gentle' | 'normal';
+export type ApiWallThemeVideoBehavior = 'fallback_single_item';
+
+export interface ApiWallThemeConfig {
+  preset?: ApiWallThemePreset;
+  anchor_mode?: ApiWallThemeAnchorMode;
+  burst_intensity?: ApiWallThemeBurstIntensity;
+  hero_enabled?: boolean;
+  video_behavior?: ApiWallThemeVideoBehavior;
+}
+
 export interface ApiWallSettings {
   interval_ms: number;
   queue_limit: number;
   selection_mode: ApiWallSelectionMode;
   event_phase: ApiWallEventPhase;
   selection_policy: ApiWallSelectionPolicy;
-  layout: string;
-  transition_effect: string;
+  theme_config: ApiWallThemeConfig;
+  layout: ApiWallLayout;
+  transition_effect: ApiWallTransition;
   background_url: string | null;
   partner_logo_url: string | null;
   show_qr: boolean;
@@ -1831,6 +1860,27 @@ export interface ApiWallOption {
   label: string;
 }
 
+export interface ApiWallLayoutCapabilities {
+  supports_video_playback: boolean;
+  supports_video_poster_only: boolean;
+  supports_multi_video: boolean;
+  max_simultaneous_videos: number;
+  fallback_video_layout: ApiWallLayout | null;
+  supports_side_thumbnails: boolean;
+  supports_floating_caption: boolean;
+  supports_theme_config: boolean;
+}
+
+export interface ApiWallLayoutDefaults {
+  theme_config: ApiWallThemeConfig;
+}
+
+export interface ApiWallLayoutOption extends ApiWallOption {
+  value: ApiWallLayout;
+  capabilities: ApiWallLayoutCapabilities;
+  defaults: ApiWallLayoutDefaults;
+}
+
 export interface ApiWallSelectionModeOption extends ApiWallOption {
   value: ApiWallSelectionMode;
   description: string;
@@ -1843,7 +1893,7 @@ export interface ApiWallEventPhaseOption extends ApiWallOption {
 }
 
 export interface ApiWallOptionsResponse {
-  layouts: ApiWallOption[];
+  layouts: ApiWallLayoutOption[];
   transitions: ApiWallOption[];
   statuses: ApiWallOption[];
   selection_modes: ApiWallSelectionModeOption[];
@@ -1924,7 +1974,8 @@ export type ApiWallResolvedLayout =
   | 'gallery'
   | 'carousel'
   | 'mosaic'
-  | 'grid';
+  | 'grid'
+  | 'puzzle';
 
 export interface ApiWallLiveSnapshotPlayer {
   playerInstanceId: string;

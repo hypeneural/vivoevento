@@ -37,6 +37,6 @@ test('manual "Ja tenho conta" keeps the package and resumes directly on payment 
 
   await expect(page).toHaveURL(/step=details/, { timeout: 15000 });
   await expect(page.getByLabel(/seu nome/i)).toHaveValue('Camila Rocha');
-  await expect(page.getByLabel(/^WhatsApp$/i)).toHaveValue('(48) 99977-1111');
+  await expect(page.getByLabel(/whatsapp com ddd/i)).toHaveValue('(48) 99977-1111');
   await expect(page.getByLabel(/nome do evento/i)).toHaveValue('Casamento Camila e Bruno');
 });

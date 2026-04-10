@@ -7,6 +7,7 @@ use App\Modules\Billing\Services\BillingSubscriptionGatewayInterface;
 use App\Modules\Organizations\Models\Organization;
 use App\Modules\Users\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class UpdateSubscriptionCardAction
@@ -21,6 +22,13 @@ class UpdateSubscriptionCardAction
         array $payload,
         ?User $actor = null,
     ): Subscription {
+        Log::info('billing.recurring.card_update.requested', [
+            'organization_id' => $organization->id,
+            'actor_user_id' => $actor?->id,
+            'uses_saved_card' => filled($payload['card_id'] ?? null),
+            'uses_new_token' => filled($payload['card_token'] ?? null),
+        ]);
+
         return DB::transaction(function () use ($organization, $payload, $actor) {
             /** @var Subscription|null $subscription */
             $subscription = Subscription::query()
@@ -73,6 +81,14 @@ class UpdateSubscriptionCardAction
                     'projection' => $projected,
                 ])
                 ->log('Cartao padrao da assinatura recorrente atualizado');
+
+            Log::info('billing.recurring.card_update.completed', [
+                'organization_id' => $organization->id,
+                'subscription_id' => $subscription->id,
+                'gateway_subscription_id' => $subscription->gateway_subscription_id,
+                'gateway_customer_id' => $gatewayUpdate['gateway_customer_id'] ?? $subscription->gateway_customer_id,
+                'gateway_card_id' => $gatewayUpdate['gateway_card_id'] ?? $subscription->gateway_card_id,
+            ]);
 
             return $subscription;
         });

@@ -19,6 +19,10 @@ export function resolveRenderableLayout(
   videoMultiLayoutPolicy: 'disallow' | 'one' | 'all' = 'disallow',
 ): RenderableLayout {
   if (media.type === 'video' && isMultiItemLayout(requested) && videoMultiLayoutPolicy === 'disallow') {
+    if (requested === 'puzzle') {
+      return 'cinematic';
+    }
+
     return 'fullscreen';
   }
 
@@ -57,7 +61,7 @@ export function shouldRenderFloatingCaption(layout: RenderableLayout): boolean {
   return layout === 'fullscreen' || layout === 'cinematic';
 }
 
-const MULTI_ITEM_LAYOUTS = new Set<string>(['carousel', 'mosaic', 'grid']);
+const MULTI_ITEM_LAYOUTS = new Set<string>(['carousel', 'mosaic', 'grid', 'puzzle']);
 
 /**
  * Returns true if the layout requires multiple items displayed simultaneously.

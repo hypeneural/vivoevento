@@ -13,6 +13,21 @@ class ListCatalogMediaRequest extends FormRequest
         return $this->user()?->can('media.view') || $this->user()?->can('media.moderate');
     }
 
+    protected function prepareForValidation(): void
+    {
+        $normalized = [];
+
+        foreach (['featured', 'pinned', 'duplicates', 'has_caption', 'face_search_enabled'] as $key) {
+            if ($this->has($key)) {
+                $normalized[$key] = $this->normalizeBooleanInput($key);
+            }
+        }
+
+        if ($normalized !== []) {
+            $this->merge($normalized);
+        }
+    }
+
     public function rules(): array
     {
         return [
@@ -81,5 +96,32 @@ class ListCatalogMediaRequest extends FormRequest
             'sort_by' => ['nullable', Rule::in(['created_at', 'published_at', 'sort_order'])],
             'sort_direction' => ['nullable', Rule::in(['asc', 'desc'])],
         ];
+    }
+
+    private function normalizeBooleanInput(string $key): mixed
+    {
+        if (! $this->has($key)) {
+            return null;
+        }
+
+        $value = $this->input($key);
+
+        if (is_bool($value) || $value === 0 || $value === 1 || $value === '0' || $value === '1') {
+            return $value;
+        }
+
+        if (is_string($value)) {
+            $normalized = strtolower($value);
+
+            if ($normalized === 'true') {
+                return '1';
+            }
+
+            if ($normalized === 'false') {
+                return '0';
+            }
+        }
+
+        return $value;
     }
 }
