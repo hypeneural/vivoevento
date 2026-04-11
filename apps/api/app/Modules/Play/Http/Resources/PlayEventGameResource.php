@@ -2,6 +2,7 @@
 
 namespace App\Modules\Play\Http\Resources;
 
+use App\Modules\Play\DTOs\GameLaunchReadinessDTO;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -9,6 +10,8 @@ class PlayEventGameResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $readiness = $this->resource->getAttribute('readiness');
+
         return [
             'id' => $this->id,
             'uuid' => $this->uuid,
@@ -21,6 +24,13 @@ class PlayEventGameResource extends JsonResource
             'sort_order' => $this->sort_order,
             'ranking_enabled' => (bool) $this->ranking_enabled,
             'settings' => $this->settings_json ?? [],
+            'readiness' => $this->when($readiness !== null, function () use ($readiness) {
+                if ($readiness instanceof GameLaunchReadinessDTO) {
+                    return $readiness->toArray();
+                }
+
+                return $readiness;
+            }),
             'assets' => $this->whenLoaded('assets', fn () => PlayGameAssetResource::collection($this->assets)),
             'assets_count' => $this->whenCounted('assets'),
             'sessions_count' => $this->whenCounted('sessions'),

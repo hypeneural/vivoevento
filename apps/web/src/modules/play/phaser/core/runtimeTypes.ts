@@ -24,6 +24,7 @@ export type CreateGameParams<TSettings = Record<string, unknown>> = {
   container: HTMLDivElement;
   payload: GameBootPayload<TSettings>;
   onReady?: () => void;
+  onError?: (error: Error | string) => void;
   onProgress?: (data: Record<string, unknown>) => void;
   onMove?: (move: GameRuntimeMove) => void;
   onFinish?: (result: NormalizedGameResult) => void;

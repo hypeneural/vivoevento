@@ -12,6 +12,7 @@ const persistSessionMock = vi.fn();
 const setTokenMock = vi.fn();
 const useAuthMock = vi.fn();
 const redirectToInvitationNextPathMock = vi.fn();
+const logoutMock = vi.fn();
 
 vi.mock('./api', () => ({
   eventInvitationsApi: {
@@ -68,6 +69,7 @@ describe('PublicEventInvitationPage', () => {
     vi.clearAllMocks();
     useAuthMock.mockReturnValue({
       isAuthenticated: false,
+      logout: logoutMock,
       meUser: null,
     });
   });
@@ -93,6 +95,9 @@ describe('PublicEventInvitationPage', () => {
         name: 'Cerimonial Aurora',
         slug: 'cerimonial-aurora',
       },
+      invited_by: {
+        name: 'Marina Aurora',
+      },
       access: {
         preset_key: 'event.operator',
         role_label: 'Operar evento',
@@ -107,10 +112,16 @@ describe('PublicEventInvitationPage', () => {
 
     expect(await screen.findByText('Casamento da Lara')).toBeInTheDocument();
     expect(screen.getAllByText(/cerimonial aurora/i)).toHaveLength(2);
-    expect(screen.getByRole('link', { name: /fazer login para continuar/i })).toHaveAttribute(
+    expect(screen.getByText(/marina aurora convidou você/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /entrar para aceitar convite/i })).toHaveAttribute(
       'href',
       '/login?returnTo=%2Fconvites%2Feventos%2Ftoken-123',
     );
+    expect(screen.getByRole('link', { name: /esqueci a senha/i })).toHaveAttribute(
+      'href',
+      '/login?returnTo=%2Fconvites%2Feventos%2Ftoken-123&flow=forgot',
+    );
+    expect(screen.getByText(/você voltará para este convite após entrar/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/senha/i)).not.toBeInTheDocument();
   });
 
@@ -134,6 +145,9 @@ describe('PublicEventInvitationPage', () => {
         id: 9,
         name: 'Bella Assessoria',
         slug: 'bella-assessoria',
+      },
+      invited_by: {
+        name: 'Clara Bella',
       },
       access: {
         preset_key: 'event.media-viewer',
@@ -165,7 +179,7 @@ describe('PublicEventInvitationPage', () => {
 
     fireEvent.change(screen.getByLabelText(/^senha$/i), { target: { value: 'SenhaForte123!' } });
     fireEvent.change(screen.getByLabelText(/confirmar senha/i), { target: { value: 'SenhaForte123!' } });
-    fireEvent.click(screen.getByRole('button', { name: /criar conta e entrar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /criar conta, aceitar convite e entrar/i }));
 
     await waitFor(() => {
       expect(acceptPublicInvitationMock).toHaveBeenCalledWith('token-123', expect.objectContaining({
@@ -177,5 +191,58 @@ describe('PublicEventInvitationPage', () => {
     expect(setTokenMock).toHaveBeenCalledWith('token-publico');
     expect(persistSessionMock).toHaveBeenCalled();
     expect(redirectToInvitationNextPathMock).toHaveBeenCalledWith('/my-events/88');
+  });
+
+  it('allows the authenticated user to switch account before accepting an event invitation', async () => {
+    getPublicInvitationMock.mockResolvedValue({
+      id: 3,
+      status: 'pending',
+      requires_existing_login: true,
+      invitee_name: 'DJ Bruno',
+      invitee_contact: {
+        email: 'dj-bruno@eventovivo.test',
+        phone_masked: '+55 (11) *****7665',
+      },
+      event: {
+        id: 55,
+        title: 'Casamento da Lara',
+        date: '2026-05-18',
+        status: 'active',
+      },
+      organization: {
+        id: 7,
+        name: 'Cerimonial Aurora',
+        slug: 'cerimonial-aurora',
+      },
+      invited_by: {
+        name: 'Marina Aurora',
+      },
+      access: {
+        preset_key: 'event.operator',
+        role_label: 'Operar evento',
+        description: 'Opera telao e jogos, alem de moderar midias.',
+        capabilities: ['overview', 'media', 'moderation', 'wall', 'play'],
+      },
+      next_path: '/my-events/55',
+      token_expires_at: '2026-05-10T12:00:00Z',
+    });
+
+    useAuthMock.mockReturnValue({
+      isAuthenticated: true,
+      logout: logoutMock,
+      meUser: { name: 'Conta errada' },
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('Casamento da Lara')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /usar outra conta/i }));
+
+    await waitFor(() => {
+      expect(logoutMock).toHaveBeenCalled();
+    });
+
+    expect(await screen.findByText('login-page')).toBeInTheDocument();
   });
 });

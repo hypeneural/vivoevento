@@ -28,6 +28,9 @@ class PublicOrganizationInvitationResource extends JsonResource
                 'email' => $this->invitee_email,
                 'phone_masked' => $this->maskPhone($this->invitee_phone),
             ],
+            'invited_by' => [
+                'name' => $this->inviter?->name,
+            ],
             'access' => [
                 'role_key' => $this->role_key,
                 'role_label' => $registry->labelForRoleKey((string) $this->role_key),

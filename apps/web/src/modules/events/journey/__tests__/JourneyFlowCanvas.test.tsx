@@ -17,7 +17,7 @@ vi.mock('@xyflow/react', () => {
     Handle: ({ id, type, position }: { id?: string; type: string; position: string }) => (
       <div data-testid={`journey-handle-${id ?? type}-${position}`} />
     ),
-    getBezierPath: () => ['M 0,0 C 0,0 0,0 0,0', 120, 180],
+    getSmoothStepPath: () => ['M 0,0 C 0,0 0,0 0,0', 120, 180],
     MarkerType: {
       ArrowClosed: 'arrow-closed',
     },
@@ -25,6 +25,7 @@ vi.mock('@xyflow/react', () => {
       Top: 'top',
       Bottom: 'bottom',
     },
+    useUpdateNodeInternals: () => vi.fn(),
     ReactFlow: (props: Record<string, unknown>) => {
       reactFlowPropsSpy(props);
 
@@ -343,7 +344,7 @@ describe('JourneyFlowCanvas', () => {
 
     expect(fitViewMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        padding: 0.1,
+        padding: 0.06,
         duration: 250,
       }),
     );
@@ -365,6 +366,6 @@ describe('JourneyFlowCanvas', () => {
       />,
     );
 
-    expect(screen.getByText('A jornada ainda nao tem etapas projetadas')).toBeInTheDocument();
+    expect(screen.getByText('Ainda nao foi possivel montar o mapa desta jornada')).toBeInTheDocument();
   });
 });

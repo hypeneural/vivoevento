@@ -7,6 +7,7 @@ use App\Modules\Events\Models\Event;
 use App\Modules\Events\Support\EventBrandingResolver;
 use App\Modules\Play\Http\Resources\PlayEventGameResource;
 use App\Modules\Play\Models\EventPlaySetting;
+use App\Modules\Play\Services\GameLaunchReadinessService;
 use App\Shared\Http\BaseController;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,7 +15,12 @@ use Illuminate\Support\Facades\Storage;
 
 class PublicPlayController extends BaseController
 {
-    public function manifest(string $event, Request $request, AnalyticsTracker $analytics): JsonResponse
+    public function manifest(
+        string $event,
+        Request $request,
+        AnalyticsTracker $analytics,
+        GameLaunchReadinessService $readiness,
+    ): JsonResponse
     {
         $eventModel = Event::with(['modules', 'playGames.gameType', 'organization'])
             ->where('slug', $event)
@@ -28,6 +34,7 @@ class PublicPlayController extends BaseController
 
         $games = $eventModel->playGames
             ->where('is_active', true)
+            ->map(fn ($game) => tap($game, fn ($item) => $item->setAttribute('readiness', $readiness->forGame($item)->toArray())))
             ->sortBy('sort_order')
             ->values();
 

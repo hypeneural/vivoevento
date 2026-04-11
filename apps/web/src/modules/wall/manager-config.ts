@@ -7,6 +7,7 @@ import type {
   ApiWallThemeAnchorMode,
   ApiWallThemeBurstIntensity,
   ApiWallThemePreset,
+  ApiWallTransitionMode,
   ApiWallVideoAudioPolicy,
   ApiWallVideoMultiLayoutPolicy,
   ApiWallVideoPlaybackMode,
@@ -89,8 +90,19 @@ export const fallbackOptions: ApiWallOptionsResponse = {
     { value: 'slide', label: 'Deslizar' },
     { value: 'zoom', label: 'Aproximar' },
     { value: 'flip', label: 'Virar' },
+    { value: 'lift-fade', label: 'Elevar com fade' },
+    { value: 'cross-zoom', label: 'Cross zoom' },
+    { value: 'swipe-up', label: 'Subir' },
     { value: 'none', label: 'Nenhuma' },
   ],
+  transition_modes: [
+    { value: 'fixed', label: 'Fixa' },
+    { value: 'random', label: 'Aleatoria' },
+  ],
+  transition_defaults: {
+    transition_effect: 'fade',
+    transition_mode: 'fixed',
+  },
   statuses: [],
   event_phases: [
     {
@@ -376,6 +388,11 @@ export const HELP_TEXTS = {
     description: 'E a animacao usada quando uma midia sai da tela e a proxima entra.',
     why: 'Animacoes suaves deixam o telao mais elegante. Animacoes fortes chamam mais atencao, mas podem cansar em exibicoes longas.',
   },
+  transitionMode: {
+    title: 'Modo da animacao',
+    description: 'Define se o wall usa sempre a mesma animacao ou alterna automaticamente entre efeitos seguros.',
+    why: 'O modo aleatorio so faz sentido no slideshow single-item. Em boards, a troca precisa ficar fixa para preservar previsibilidade e budget visual.',
+  },
   idleSection: {
     title: 'Mensagem quando nao ha fotos',
     description: 'Essa mensagem aparece quando o telao esta ligado, mas ainda nao ha midias para exibir.',
@@ -457,6 +474,22 @@ export const WALL_WINDOW_MINUTE_OPTIONS = [5, 10, 15];
 export const WALL_VOLUME_THRESHOLD_OPTIONS = [4, 6, 8, 10, 12, 16, 20, 24, 30, 40, 50];
 export const WALL_REPLAY_MINUTE_OPTIONS = [5, 8, 10, 12, 14, 16, 20, 25, 30];
 export const WALL_VIDEO_MAX_SECONDS_OPTIONS = [10, 12, 15, 20, 30, 45, 60];
+export const WALL_TRANSITION_MODE_OPTIONS: Array<{
+  value: ApiWallTransitionMode;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'fixed',
+    label: 'Fixa',
+    description: 'Mantem sempre a animacao escolhida em todas as trocas.',
+  },
+  {
+    value: 'random',
+    label: 'Aleatoria',
+    description: 'Alterna entre efeitos seguros do slideshow sem sortear nada no render.',
+  },
+];
 
 export const WALL_VIDEO_PLAYBACK_MODE_OPTIONS: Array<{
   value: ApiWallVideoPlaybackMode;

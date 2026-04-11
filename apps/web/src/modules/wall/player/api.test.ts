@@ -39,6 +39,7 @@ describe('wall player api', () => {
             },
             layout: 'auto',
             transition_effect: 'fade',
+            transition_mode: 'fixed',
             background_url: null,
             partner_logo_url: null,
             show_qr: true,

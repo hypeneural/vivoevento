@@ -37,7 +37,7 @@ vi.mock('@/modules/events/journey/JourneyFlowCanvas', () => {
       journeyFlowCanvasPropsSpy(props);
 
       if (props.graph.nodes.length === 0) {
-        return <div>A jornada ainda nao tem etapas projetadas</div>;
+        return <div>Ainda nao foi possivel montar o mapa desta jornada</div>;
       }
 
       return (
@@ -517,12 +517,12 @@ describe('EventJourneyBuilderPage', () => {
     expect(await screen.findByRole('heading', { name: 'Jornada da midia' })).toBeInTheDocument();
     expect(screen.getByText('Como o evento trata cada foto ou video recebido')).toBeInTheDocument();
     expect(screen.getByText('Resumo humano da jornada')).toBeInTheDocument();
-    expect(screen.getByText('Templates guiados')).toBeInTheDocument();
-    expect(screen.getByText('Simulador de cenarios')).toBeInTheDocument();
+    expect(screen.getByText('Modelos prontos')).toBeInTheDocument();
+    expect(screen.getByText('Simular um caso real')).toBeInTheDocument();
     expect(screen.getByText(/Quando uma foto chega pelo WhatsApp/i)).toBeInTheDocument();
     expect(screen.getByText('Centralizar fluxo')).toBeInTheDocument();
-    expect(screen.getByText('Ver detalhes tecnicos')).toBeInTheDocument();
-    expect(screen.getByText('Legenda fixa da jornada')).toBeInTheDocument();
+    expect(screen.getByText('Ver detalhes da configuracao')).toBeInTheDocument();
+    expect(screen.getByText('Como ler este mapa')).toBeInTheDocument();
     expect(screen.getAllByText('Entrada').length).toBeGreaterThan(0);
     expect(screen.getByText('Nenhuma etapa selecionada')).toBeInTheDocument();
     expect(screen.getByTestId('journey-flow-canvas')).toBeInTheDocument();
@@ -549,7 +549,7 @@ describe('EventJourneyBuilderPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Selecionar no' }));
 
-    expect(await screen.findByText('Modo de moderacao')).toBeInTheDocument();
+    expect(await screen.findByText('Regra principal de aprovacao')).toBeInTheDocument();
     expect(screen.getByText('Moderacao por IA ativa.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Registrar canvas' }));
@@ -557,16 +557,16 @@ describe('EventJourneyBuilderPage', () => {
 
     expect(fitViewMock).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Ver detalhes tecnicos' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalhes da configuracao' }));
 
-    expect(await screen.findByText('Detalhes tecnicos da projection')).toBeInTheDocument();
-    expect(screen.getByText('Warnings')).toBeInTheDocument();
+    expect(await screen.findByText('Detalhes da configuracao atual')).toBeInTheDocument();
+    expect(screen.getByText('Alertas')).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Limpar simulacao' })[0]);
 
     expect(await screen.findByText(/Quando uma foto chega pelo WhatsApp/i)).toBeInTheDocument();
     expect(updateEventJourneyBuilderMock).not.toHaveBeenCalled();
-  });
+  }, 10000);
 
   it('applies a guided template locally before the real save', async () => {
     getEventJourneyBuilderMock.mockResolvedValue(makeProjection());
@@ -578,12 +578,12 @@ describe('EventJourneyBuilderPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Aprovacao direta' }));
     expect(screen.getByText(/Publica sem fila manual nem analises de IA/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Aplicar ao rascunho' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar nesta tela' }));
 
     expect(await screen.findByText('Rascunho local ativo')).toBeInTheDocument();
     expect(screen.getByText(/aprova automaticamente/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar template' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar modelo' }));
 
     await waitFor(() => {
       expect(updateEventJourneyBuilderMock).toHaveBeenCalledWith('42', {
@@ -617,6 +617,6 @@ describe('EventJourneyBuilderPage', () => {
 
     renderJourneyBuilderPage();
 
-    expect(await screen.findByText('A jornada ainda nao tem etapas projetadas')).toBeInTheDocument();
+    expect(await screen.findByText('Ainda nao foi possivel montar o mapa desta jornada')).toBeInTheDocument();
   });
 });

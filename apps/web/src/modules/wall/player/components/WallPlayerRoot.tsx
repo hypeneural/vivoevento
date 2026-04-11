@@ -332,6 +332,7 @@ export function WallPlayerRoot({ code }: { code: string }) {
               videoControl={videoControl}
               eventId={state.event?.id ?? code}
               performanceTier={performanceTier}
+              activeTransitionEffect={state.activeTransitionEffect}
             />
           )}
           {!isAdShowing ? (

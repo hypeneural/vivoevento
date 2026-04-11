@@ -84,7 +84,38 @@ it('allows switching the active organization context without creating duplicate 
     expect(\App\Modules\Users\Models\User::query()->count())->toBe(1);
 });
 
-it('keeps event-only invitations attachable to an existing platform user identified by whatsapp or email')->todo();
+it('keeps event-only invitations attachable to an existing platform user identified by whatsapp or email', function () {
+    $this->seedPermissions();
+
+    [$owner, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->create([
+        'organization_id' => $organization->id,
+        'title' => 'Evento com DJ existente',
+    ]);
+
+    $existingUser = $this->createUser([
+        'name' => 'DJ Marcelo',
+        'email' => 'dj-marcelo@eventovivo.test',
+        'phone' => '5511988877009',
+    ]);
+    $existingUser->assignRole('viewer');
+
+    $response = $this->apiPost("/events/{$event->id}/access/invitations", [
+        'invitee' => [
+            'name' => 'DJ Marcelo',
+            'email' => 'dj-marcelo@eventovivo.test',
+            'phone' => '(11) 98887-7009',
+        ],
+        'preset_key' => 'event.operator',
+        'send_via_whatsapp' => false,
+    ]);
+
+    $this->assertApiSuccess($response, 201);
+
+    expect($response->json('data.existing_user_id'))->toBe($existingUser->id);
+    expect(\App\Modules\Users\Models\User::query()->count())->toBe(2);
+});
 
 it('returns four event workspaces for the same dj across different partner organizations with per-event capabilities', function () {
     $this->seedPermissions();
@@ -129,9 +160,104 @@ it('returns four event workspaces for the same dj across different partner organ
         ->toContain('event.operator', 'event.moderator', 'event.media-viewer');
 });
 
-it('groups event workspaces by partner organization without granting organization-wide access to the dj')->todo();
+it('groups event workspaces by partner organization without granting organization-wide access to the dj', function () {
+    $this->seedPermissions();
 
-it('uses the selected event context to scope media moderation wall and play endpoints for an event-scoped user')->todo();
+    $dj = $this->createUser([
+        'email' => 'dj-grouped-workspaces@eventovivo.test',
+        'phone' => '5511988877010',
+    ]);
+    $dj->assignRole('viewer');
+    $this->actingAs($dj);
+
+    foreach ([
+        ['partner' => 'Cerimonial Aurora', 'title' => 'Casamento A', 'role' => 'operator'],
+        ['partner' => 'Cerimonial Aurora', 'title' => 'Casamento B', 'role' => 'moderator'],
+        ['partner' => 'Bella Assessoria', 'title' => 'Casamento C', 'role' => 'viewer'],
+    ] as $definition) {
+        $organization = $this->createOrganization(['trade_name' => $definition['partner']]);
+        $event = Event::factory()->create([
+            'organization_id' => $organization->id,
+            'title' => $definition['title'],
+        ]);
+
+        EventTeamMember::query()->create([
+            'event_id' => $event->id,
+            'user_id' => $dj->id,
+            'role' => $definition['role'],
+        ]);
+    }
+
+    $response = $this->apiGet('/auth/me');
+
+    $this->assertApiSuccess($response);
+
+    $grouped = collect($response->json('data.workspaces.event_accesses'))
+        ->groupBy('organization_name')
+        ->map->count()
+        ->all();
+
+    expect($response->json('data.organization'))->toBeNull();
+    expect($response->json('data.workspaces.organizations'))->toHaveCount(0);
+    expect($grouped)->toMatchArray([
+        'Cerimonial Aurora' => 2,
+        'Bella Assessoria' => 1,
+    ]);
+});
+
+it('uses the selected event context to scope media moderation wall and play endpoints for an event-scoped user', function () {
+    $this->seedPermissions();
+
+    $organization = $this->createOrganization(['trade_name' => 'Cerimonial Contexto']);
+
+    $operatorEvent = Event::factory()->create([
+        'organization_id' => $organization->id,
+        'title' => 'Evento Operador',
+    ]);
+
+    $viewerEvent = Event::factory()->create([
+        'organization_id' => $organization->id,
+        'title' => 'Evento Midias',
+    ]);
+
+    $user = $this->createUser([
+        'email' => 'event-context-scoping@eventovivo.test',
+        'phone' => '5511988877011',
+    ]);
+    $user->assignRole('viewer');
+    $this->actingAs($user);
+
+    EventTeamMember::query()->create([
+        'event_id' => $operatorEvent->id,
+        'user_id' => $user->id,
+        'role' => 'operator',
+    ]);
+
+    EventTeamMember::query()->create([
+        'event_id' => $viewerEvent->id,
+        'user_id' => $user->id,
+        'role' => 'viewer',
+    ]);
+
+    $viewerContextResponse = $this->apiPost('/auth/context/event', [
+        'event_id' => $viewerEvent->id,
+    ]);
+
+    $this->assertApiSuccess($viewerContextResponse);
+    expect($viewerContextResponse->json('data.active_context.event_id'))->toBe($viewerEvent->id);
+    expect($viewerContextResponse->json('data.active_context.entry_path'))->toBe("/my-events/{$viewerEvent->id}");
+    expect($viewerContextResponse->json('data.active_context.capabilities'))->toBe(['overview', 'media']);
+
+    $operatorContextResponse = $this->apiPost('/auth/context/event', [
+        'event_id' => $operatorEvent->id,
+    ]);
+
+    $this->assertApiSuccess($operatorContextResponse);
+    expect($operatorContextResponse->json('data.active_context.event_id'))->toBe($operatorEvent->id);
+    expect($operatorContextResponse->json('data.active_context.entry_path'))->toBe("/my-events/{$operatorEvent->id}");
+    expect($operatorContextResponse->json('data.active_context.capabilities'))
+        ->toContain('overview', 'media', 'moderation', 'wall', 'play');
+});
 
 it('returns enough event workspace metadata for frontend filters without exposing unrelated organizations', function () {
     $this->seedPermissions();

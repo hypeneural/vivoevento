@@ -8,6 +8,7 @@ import EventDetailPage from './EventDetailPage';
 const getEventDetailMock = vi.fn();
 const getEventCommercialStatusMock = vi.fn();
 const listEventMediaMock = vi.fn();
+const listEventPublicLinkQrEditorStatesMock = vi.fn();
 
 vi.mock('./api', () => ({
   deleteEventIntakeBlacklistEntry: vi.fn(),
@@ -17,6 +18,12 @@ vi.mock('./api', () => ({
   regenerateEventPublicIdentifiers: vi.fn(),
   upsertEventIntakeBlacklistEntry: vi.fn(),
   updateEventPublicIdentifiers: vi.fn(),
+}));
+
+vi.mock('./qr/api', () => ({
+  getEventPublicLinkQrEditorQueryKey: (eventId: string | number, linkKey: string) => ['event-public-link-qr-editor', String(eventId), linkKey],
+  getEventPublicLinkQrListQueryKey: (eventId: string | number) => ['event-public-link-qr-list', String(eventId)],
+  listEventPublicLinkQrEditorStates: (...args: unknown[]) => listEventPublicLinkQrEditorStatesMock(...args),
 }));
 
 vi.mock('@/hooks/use-toast', () => ({
@@ -237,6 +244,7 @@ describe('EventDetailPage', () => {
   it('keeps the loading screen stable before the event payload exists', async () => {
     getEventDetailMock.mockReturnValue(new Promise(() => {}));
     getEventCommercialStatusMock.mockReturnValue(new Promise(() => {}));
+    listEventPublicLinkQrEditorStatesMock.mockResolvedValue([]);
 
     const { container } = renderEventDetailPage();
 
@@ -250,6 +258,7 @@ describe('EventDetailPage', () => {
   it('renders the effective branding preview and source summary', async () => {
     getEventDetailMock.mockResolvedValue(buildEventDetailMock());
     getEventCommercialStatusMock.mockResolvedValue(null);
+    listEventPublicLinkQrEditorStatesMock.mockResolvedValue([]);
     listEventMediaMock.mockResolvedValue({
       data: [],
       meta: { page: 1, per_page: 24, total: 0, last_page: 1, request_id: 'req-1' },

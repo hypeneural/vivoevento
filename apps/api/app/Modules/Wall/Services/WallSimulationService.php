@@ -148,6 +148,8 @@ class WallSimulationService
             'selection_policy' => $resolvedSettings['selection_policy'] ?? $settings->selection_policy,
             'layout' => $resolvedSettings['layout'] ?? $settings->layout?->value,
             'transition_effect' => $resolvedSettings['transition_effect'] ?? $settings->transition_effect?->value,
+            'transition_mode' => $resolvedSettings['transition_mode'] ?? $settings->resolvedTransitionMode()->value,
+            'transition_pool' => $resolvedSettings['transition_pool'] ?? $settings->resolvedTransitionPool(),
             'accepted_orientation' => $resolvedSettings['accepted_orientation'] ?? $settings->accepted_orientation?->value,
             'video_enabled' => $resolvedSettings['video_enabled'] ?? $settings->resolvedVideoEnabled(),
             'video_playback_mode' => $resolvedSettings['video_playback_mode'] ?? $settings->resolvedVideoPlaybackMode(),

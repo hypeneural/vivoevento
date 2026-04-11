@@ -11,6 +11,10 @@
 import type { Transition } from 'framer-motion';
 import type { WallTransition } from '../types';
 import type { WallMotionTokens } from '../themes/motion';
+import {
+  getWallTransitionDefinition,
+  type WallTransitionContext,
+} from './transition-registry';
 
 /**
  * When reduced-motion is active, force transition to 'none'
@@ -49,15 +53,13 @@ export function shouldShowNeonPulse(reducedMotion: boolean): boolean {
   return !reducedMotion;
 }
 
-type LayoutTransitionVariants = {
-  initial: Record<string, number>;
-  animate: Record<string, number>;
-  exit: Record<string, number>;
-};
-
 export interface ResolvedLayoutTransition {
   effect: WallTransition;
-  variants: LayoutTransitionVariants;
+  variants: {
+    initial: Record<string, number>;
+    animate: Record<string, number>;
+    exit: Record<string, number>;
+  };
   transition: Transition;
 }
 
@@ -66,62 +68,19 @@ export function resolveLayoutTransition(
   tokens: Pick<WallMotionTokens, 'enter' | 'visualDuration'>,
   reducedMotion: boolean,
 ): ResolvedLayoutTransition {
-  const effect = resolveEffectiveTransition(transition, reducedMotion);
-  const resolvedTransition: Transition = effect === 'none'
-    ? { duration: 0 }
-    : { duration: tokens.visualDuration, ease: tokens.enter.ease };
+  const requestedDefinition = getWallTransitionDefinition(transition);
+  const effect = reducedMotion
+    ? requestedDefinition.reducedMotionFallback
+    : requestedDefinition.id;
+  const resolvedDefinition = getWallTransitionDefinition(effect);
+  const context: WallTransitionContext = {
+    tokens,
+    reducedMotion,
+  };
 
-  switch (effect) {
-    case 'slide':
-      return {
-        effect,
-        variants: {
-          initial: { opacity: 0, x: 60 },
-          animate: { opacity: 1, x: 0 },
-          exit: { opacity: 0, x: -60 },
-        },
-        transition: resolvedTransition,
-      };
-    case 'zoom':
-      return {
-        effect,
-        variants: {
-          initial: { opacity: 0, scale: 0.92 },
-          animate: { opacity: 1, scale: 1 },
-          exit: { opacity: 0, scale: 1.08 },
-        },
-        transition: resolvedTransition,
-      };
-    case 'flip':
-      return {
-        effect,
-        variants: {
-          initial: { opacity: 0, rotateY: 90 },
-          animate: { opacity: 1, rotateY: 0 },
-          exit: { opacity: 0, rotateY: -90 },
-        },
-        transition: resolvedTransition,
-      };
-    case 'none':
-      return {
-        effect,
-        variants: {
-          initial: { opacity: 1 },
-          animate: { opacity: 1 },
-          exit: { opacity: 1 },
-        },
-        transition: resolvedTransition,
-      };
-    case 'fade':
-    default:
-      return {
-        effect,
-        variants: {
-          initial: { opacity: 0, scale: 0.996 },
-          animate: { opacity: 1, scale: 1 },
-          exit: { opacity: 0 },
-        },
-        transition: resolvedTransition,
-      };
-  }
+  return {
+    effect: resolvedDefinition.id,
+    variants: resolvedDefinition.buildVariants(context),
+    transition: resolvedDefinition.buildTransition(context),
+  };
 }

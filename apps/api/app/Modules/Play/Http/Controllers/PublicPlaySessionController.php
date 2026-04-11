@@ -17,8 +17,10 @@ use App\Modules\Play\Http\Resources\PlayGameRankingResource;
 use App\Modules\Play\Http\Resources\PlayGameSessionResource;
 use App\Modules\Play\Models\EventPlaySetting;
 use App\Modules\Play\Models\PlayEventGame;
+use App\Modules\Play\Services\GameLaunchReadinessService;
 use App\Modules\Play\Services\GameSessionService;
 use App\Modules\Play\Services\RankingService;
+use App\Modules\Play\Support\RuntimeAssetProfile;
 use App\Shared\Http\BaseController;
 use Illuminate\Http\JsonResponse;
 
@@ -29,9 +31,20 @@ class PublicPlaySessionController extends BaseController
         string $event,
         string $gameSlug,
         GameSessionService $sessions,
+        GameLaunchReadinessService $readiness,
     ): JsonResponse {
         $game = $this->resolvePublicGame($event, $gameSlug);
         $validated = $request->validated();
+        $assetProfile = RuntimeAssetProfile::fromDevice($validated['device'] ?? null);
+        $readinessState = $readiness->forGame($game, $assetProfile);
+
+        if (! $readinessState->bootable) {
+            return $this->error(
+                'Este jogo ainda nao possui uma imagem valida para iniciar.',
+                422,
+                ['reason' => $readinessState->reason],
+            );
+        }
 
         $session = $sessions->start($game, new StartGameSessionDTO(
             eventGameId: $game->id,

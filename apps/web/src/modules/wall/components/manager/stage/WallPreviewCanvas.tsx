@@ -11,6 +11,7 @@ import {
   WALL_OVERLAY_GRADIENT,
   WALL_TEXT_PRIMARY,
 } from '../../../player/design/tokens';
+import { resolveWallRuntimeTransitionEffect } from '../../../player/engine/transition-scheduler';
 import { isMultiItemLayout, resolveRenderableLayout, shouldRenderFloatingCaption } from '../../../player/engine/layoutStrategy';
 import { applyStageGeometryToWallSettings, useStageGeometry } from '../../../player/hooks/useStageGeometry';
 import type { WallRuntimeItem, WallSettings } from '../../../player/types';
@@ -145,6 +146,17 @@ export function WallPreviewCanvas({
     () => applyStageGeometryToWallSettings(previewSettings, stageGeometry) as WallSettings,
     [previewSettings, stageGeometry],
   );
+  const previewTransitionEffect = useMemo(
+    () => resolveWallRuntimeTransitionEffect({
+      code: 'preview',
+      eventId: 'preview',
+      settings: stageAwarePreviewSettings,
+      currentItem,
+      lastTransitionEffect: null,
+      transitionAdvanceCount: 0,
+    }),
+    [currentItem, stageAwarePreviewSettings],
+  );
   const resolvedLayout = currentItem
     ? resolveRenderableLayout(stageAwarePreviewSettings.layout, currentItem)
     : null;
@@ -226,6 +238,7 @@ export function WallPreviewCanvas({
                     allItems={allItems}
                     eventId="preview"
                     performanceTier="preview"
+                    activeTransitionEffect={previewTransitionEffect}
                   />
 
                   <BrandingOverlay

@@ -28,6 +28,7 @@ class GameAssetResolverService
         if ($game->assets->isNotEmpty()) {
             return $game->assets
                 ->filter(fn ($asset) => $asset->media !== null)
+                ->filter(fn ($asset) => $this->supportsGameMedia($asset->media, $gameKey))
                 ->map(fn ($asset) => $this->buildAssetPayload(
                     media: $asset->media,
                     gameKey: $gameKey,
@@ -35,11 +36,11 @@ class GameAssetResolverService
                     role: $asset->role,
                     sortOrder: $asset->sort_order,
                 ))
-                ->values()
-                ->all();
+            ->values()
+            ->all();
         }
 
-        return $this->fallbackMedia($game)
+        return $this->fallbackMedia($game, $gameKey)
             ->map(fn (EventMedia $media) => $this->buildAssetPayload(
                 media: $media,
                 gameKey: $gameKey,
@@ -51,10 +52,30 @@ class GameAssetResolverService
             ->all();
     }
 
+    public function hasPlayableAssets(PlayEventGame $game, ?RuntimeAssetProfile $profile = null): bool
+    {
+        return count($this->resolve($game, $profile)) >= $this->minimumPlayableAssetCount($game);
+    }
+
+    public function unavailableReason(PlayEventGame $game, ?RuntimeAssetProfile $profile = null): ?string
+    {
+        if ($this->hasPlayableAssets($game, $profile)) {
+            return null;
+        }
+
+        $gameKey = $game->gameType?->key?->value ?? $game->gameType?->key;
+
+        return match ($gameKey) {
+            PlayGameTypeKey::Puzzle->value => 'puzzle.no_image_available',
+            PlayGameTypeKey::Memory->value => 'memory.not_enough_images',
+            default => 'play.no_playable_assets',
+        };
+    }
+
     /**
      * @return Collection<int, EventMedia>
      */
-    private function fallbackMedia(PlayEventGame $game): Collection
+    private function fallbackMedia(PlayEventGame $game, ?string $gameKey): Collection
     {
         $limit = $this->fallbackLimit($game);
 
@@ -66,6 +87,7 @@ class GameAssetResolverService
             ->orderByDesc('published_at')
             ->limit(max($limit * 6, 12))
             ->get()
+            ->filter(fn (EventMedia $media) => $this->supportsGameMedia($media, $gameKey))
             ->sortByDesc(fn (EventMedia $media) => $this->fallbackScore($media, $game))
             ->take($limit)
             ->values();
@@ -194,5 +216,34 @@ class GameAssetResolverService
             PlayGameTypeKey::Puzzle->value => 1,
             default => 8,
         };
+    }
+
+    private function minimumPlayableAssetCount(PlayEventGame $game): int
+    {
+        $gameKey = $game->gameType?->key?->value ?? $game->gameType?->key;
+        $settings = $game->settings_json ?? [];
+
+        return match ($gameKey) {
+            PlayGameTypeKey::Memory->value => max(2, (int) ($settings['pairsCount'] ?? 6)),
+            PlayGameTypeKey::Puzzle->value => 1,
+            default => 1,
+        };
+    }
+
+    private function supportsGameMedia(EventMedia $media, ?string $gameKey): bool
+    {
+        return match ($gameKey) {
+            PlayGameTypeKey::Memory->value,
+            PlayGameTypeKey::Puzzle->value => $this->isImageMedia($media),
+            default => true,
+        };
+    }
+
+    private function isImageMedia(EventMedia $media): bool
+    {
+        $mediaType = strtolower(trim((string) ($media->media_type ?? '')));
+        $mimeType = strtolower(trim((string) ($media->mime_type ?? '')));
+
+        return $mediaType === 'image' || str_starts_with($mimeType, 'image/');
     }
 }

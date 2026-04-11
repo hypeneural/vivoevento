@@ -71,6 +71,13 @@ import {
 } from './buildJourneyTemplatePreview';
 import type { JourneyGraphNode } from './buildJourneyGraph';
 import { invalidateEventJourneyBuilderQueries, updateEventJourneyBuilder } from './api';
+import {
+  describeJourneyStatus,
+  getJourneyNodeCopy,
+  humanizeJourneyStageLabel,
+  humanizeJourneyStatusLabel,
+  humanizeJourneyText,
+} from './journeyCopy';
 import type {
   EventJourneyBuiltScenario,
   EventJourneyProjection,
@@ -177,8 +184,8 @@ function resolveInspectorSection(nodeId: string | null): JourneyInspectorSection
     case 'decision_event_moderation_mode':
       return {
         kind: 'moderation-mode',
-        title: 'Modo de moderacao',
-        description: 'Define se a midia aprova direto, passa por revisao humana ou usa IA.',
+        title: 'Regra principal de aprovacao',
+        description: 'Define se a midia aprova direto, passa por revisao manual ou usa IA.',
         icon: Sparkles,
       };
     case 'entry_whatsapp_direct':
@@ -213,8 +220,8 @@ function resolveInspectorSection(nodeId: string | null): JourneyInspectorSection
     case 'decision_safety_result':
       return {
         kind: 'content-moderation',
-        title: 'Safety por evento',
-        description: 'Ajusta o gate objetivo de seguranca usado na jornada.',
+        title: 'Analise de risco do evento',
+        description: 'Ajusta a etapa que percebe risco antes da publicacao.',
         icon: ShieldCheck,
       };
     case 'processing_media_intelligence':
@@ -222,8 +229,8 @@ function resolveInspectorSection(nodeId: string | null): JourneyInspectorSection
     case 'output_reply_text':
       return {
         kind: 'media-intelligence',
-        title: 'MediaIntelligence por evento',
-        description: 'Ajusta VLM, gate de contexto e resposta automatica da jornada.',
+        title: 'Contexto e resposta automatica',
+        description: 'Ajusta a IA que entende a imagem, a legenda e a resposta automatica.',
         icon: Sparkles,
       };
     default:
@@ -231,7 +238,7 @@ function resolveInspectorSection(nodeId: string | null): JourneyInspectorSection
         ? {
             kind: 'readonly',
             title: 'Inspector desta etapa',
-            description: 'Esta etapa ainda nao ganhou um formulario guiado no builder.',
+            description: 'Esta etapa ainda nao ganhou um formulario guiado nesta tela.',
             icon: Settings2,
           }
         : null;
@@ -283,27 +290,27 @@ function InspectorMetaCard({
   return (
     <Card className="border-white/70 bg-white/90 shadow-sm">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Detalhes tecnicos da projection</CardTitle>
+        <CardTitle className="text-base">Detalhes da configuracao atual</CardTitle>
         <CardDescription>
-          Apoio de QA enquanto o builder ainda cobre so a primeira fatia editavel.
+          Informacoes de apoio para conferir o estado desta tela.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Versao</p>
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Versao interna</p>
             <p className="mt-2 font-mono text-sm">{projection.version}</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Cenarios</p>
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Simulacoes</p>
             <p className="mt-2 font-mono text-sm">{scenarios.length}</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Warnings</p>
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Alertas</p>
             <p className="mt-2 font-mono text-sm">{projection.warnings.length}</p>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">No selecionado</p>
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Etapa aberta</p>
             <p className="mt-2 font-mono text-xs">{selectedNode?.id ?? 'nenhum'}</p>
           </div>
         </div>
@@ -317,7 +324,7 @@ function InspectorDraftHint() {
     <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
       <p className="font-medium">Rascunho local</p>
       <p className="mt-1">
-        As alteracoes ficam apenas neste inspector ate voce salvar. O canvas continua lendo a projection revalidada do backend.
+        As alteracoes ficam apenas neste painel ate voce salvar. O mapa visual so assume a nova configuracao depois do salvamento.
       </p>
     </div>
   );
@@ -332,7 +339,7 @@ function scenarioOutcomeMeta(outcome: EventJourneyBuiltScenario['outcome']) {
       };
     case 'review':
       return {
-        label: 'Revisao',
+        label: 'Em revisao',
         className: 'border-amber-200 bg-amber-100 text-amber-800',
       };
     case 'blocked':
@@ -354,7 +361,11 @@ function buildScenarioPathLabels(
 ) {
   const nodeById = new Map(
     projection.stages.flatMap((stage) =>
-      stage.nodes.map((node) => [node.id, { stageLabel: stage.label, nodeLabel: node.label }] as const),
+      stage.nodes.map((node) => {
+        const copy = getJourneyNodeCopy(node);
+
+        return [node.id, { stageLabel: humanizeJourneyStageLabel(stage.id), nodeLabel: copy.label }] as const;
+      }),
     ),
   );
 
@@ -389,14 +400,14 @@ function JourneyScenarioInspectorCard({
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
             <CardTitle className="text-base">Simulacao ativa</CardTitle>
-            <CardDescription>{scenario.description}</CardDescription>
+            <CardDescription>{humanizeJourneyText(scenario.description)}</CardDescription>
           </div>
           <Badge className={outcome.className}>{outcome.label}</Badge>
         </div>
-        <p className="text-sm font-medium text-foreground">{scenario.label}</p>
+        <p className="text-sm font-medium text-foreground">{humanizeJourneyText(scenario.label)}</p>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
-        <p className="leading-6 text-foreground/90">{scenario.humanText}</p>
+        <p className="leading-6 text-foreground/90">{humanizeJourneyText(scenario.humanText)}</p>
 
         {pathLabels.length > 0 ? (
           <div className="space-y-2">
@@ -468,9 +479,9 @@ function JourneyModerationModeForm({
                   className="gap-3"
                 >
                   {[
-                    { value: 'none', label: 'Aprovacao direta', description: 'Publica sem review nem IA.' },
+                    { value: 'none', label: 'Aprovacao direta', description: 'Publica sem revisao manual nem IA.' },
                     { value: 'manual', label: 'Revisao manual', description: 'Toda midia passa por operador.' },
-                    { value: 'ai', label: 'IA moderando', description: 'A IA decide e pode acionar Safety e VLM.' },
+                    { value: 'ai', label: 'IA moderando', description: 'A IA decide e pode acionar a analise de risco e a leitura de contexto.' },
                   ].map((option) => (
                     <label
                       key={option.value}
@@ -490,7 +501,7 @@ function JourneyModerationModeForm({
                 </RadioGroup>
               </FormControl>
               <FormDescription>
-                Este no define a trilha principal antes de Safety e VLM influenciarem o caminho.
+                Esta etapa define a trilha principal antes de a analise de risco e a leitura de contexto influenciarem o caminho.
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -901,14 +912,14 @@ function JourneyReadonlyInspector({
   return (
     <Card className="border-dashed border-muted-foreground/30 bg-background/60 shadow-none">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Formulario ainda nao conectado</CardTitle>
+        <CardTitle className="text-base">Edicao guiada ainda nao disponivel</CardTitle>
         <CardDescription>
-          Esta etapa ja pode ser lida no builder, mas a edicao guiada ainda nao entrou nesta fatia.
+          Esta etapa ja pode ser consultada aqui, mas a edicao guiada ainda nao entrou nesta parte da tela.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm text-muted-foreground">
         <p>
-          O proximo corte do inspector vai cobrir blacklist, destinos secundarios e configuracoes mais especificas do output.
+          O proximo corte do painel vai cobrir bloqueio de remetentes, destinos secundarios e ajustes mais especificos do fim do fluxo.
         </p>
         <Button type="button" variant="outline" asChild>
           <Link to={`/events/${eventId}`}>Abrir editor completo do evento</Link>
@@ -1167,13 +1178,13 @@ function JourneyInspectorBody({
       sectionContent = (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Carregando configuracoes detalhadas de Safety...
+          Carregando detalhes da analise de risco...
         </div>
       );
     } else if (contentModerationSettingsQuery.isError || !contentModerationSettings) {
       sectionContent = (
         <div className="rounded-2xl border border-dashed border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-          Nao foi possivel carregar os settings detalhados de Safety.
+          Nao foi possivel carregar os detalhes da analise de risco.
         </div>
       );
     } else {
@@ -1186,8 +1197,8 @@ function JourneyInspectorBody({
           onSubmit={(payload) => {
             submitJourneyPatch(
               buildContentModerationPatchPayload(payload),
-              'Safety atualizado',
-              'As configuracoes de Safety da jornada foram salvas.',
+              'Analise de risco atualizada',
+              'As configuracoes da etapa de risco foram salvas.',
             );
           }}
         />
@@ -1198,13 +1209,13 @@ function JourneyInspectorBody({
       sectionContent = (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Carregando configuracoes detalhadas de MediaIntelligence...
+          Carregando detalhes de contexto e resposta automatica...
         </div>
       );
     } else if (mediaIntelligenceSettingsQuery.isError || !mediaIntelligenceSettings) {
       sectionContent = (
         <div className="rounded-2xl border border-dashed border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-          Nao foi possivel carregar os settings detalhados de MediaIntelligence.
+          Nao foi possivel carregar os detalhes de contexto e resposta automatica.
         </div>
       );
     } else {
@@ -1218,8 +1229,8 @@ function JourneyInspectorBody({
           onSubmit={(payload) => {
             submitJourneyPatch(
               buildMediaIntelligencePatchPayload(payload),
-              'MediaIntelligence atualizado',
-              'As configuracoes de contexto, gate e resposta da jornada foram salvas.',
+              'Contexto e resposta atualizados',
+              'As configuracoes de contexto da midia e resposta automatica foram salvas.',
             );
           }}
         />
@@ -1244,9 +1255,9 @@ function JourneyInspectorBody({
       {hasTemplateDraft ? (
         <Card className="border-primary/20 bg-primary/5 shadow-none">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Template em rascunho ativo</CardTitle>
+            <CardTitle className="text-base">Modelo em rascunho ativo</CardTitle>
             <CardDescription>
-              {templateDraftPreview.template.label} ja alterou o preview local do builder. Salve ou descarte o template antes de editar manualmente neste inspector.
+              {templateDraftPreview.template.label} ja alterou a pre-visualizacao desta tela. Salve ou descarte o modelo antes de editar manualmente neste painel.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -1265,22 +1276,27 @@ function JourneyInspectorBody({
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">{selectedNode.data.stage.label}</Badge>
-              <Badge variant="outline">{selectedNode.data.node.editable ? 'Editavel' : 'Tecnico'}</Badge>
-              <Badge variant="outline">{selectedNode.data.node.status}</Badge>
+              <Badge variant="secondary">{humanizeJourneyStageLabel(selectedNode.data.stage.id)}</Badge>
+              <Badge variant="outline">{selectedNode.data.node.editable ? 'Pode ajustar' : 'Feito pelo sistema'}</Badge>
+              <Badge variant="outline">{humanizeJourneyStatusLabel(selectedNode.data.node.status)}</Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
-            <p className="leading-6 text-foreground/90">{selectedNode.data.node.summary}</p>
+            <p className="leading-6 text-foreground/90">{getJourneyNodeCopy(selectedNode.data.node).summary}</p>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              <p className="font-medium text-foreground">O que isso significa</p>
+              <p className="mt-1">{describeJourneyStatus(selectedNode.data.node.status)}</p>
+            </div>
 
             {selectedNode.data.node.warnings.length > 0 ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3">
-                <p className="text-xs font-medium uppercase tracking-[0.16em] text-amber-800">Warnings</p>
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-amber-800">Pontos de atencao</p>
                 <ul className="mt-2 space-y-2 text-sm text-amber-900">
                   {selectedNode.data.node.warnings.map((warning) => (
                     <li key={warning} className="flex gap-2">
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span>{warning}</span>
+                      <span>{humanizeJourneyText(warning)}</span>
                     </li>
                   ))}
                 </ul>
@@ -1342,9 +1358,9 @@ export function JourneyInspector(props: JourneyInspectorProps) {
           className="max-h-[92vh] overflow-hidden"
         >
           <DrawerHeader>
-            <DrawerTitle>Inspector da jornada</DrawerTitle>
+            <DrawerTitle>Etapa selecionada</DrawerTitle>
             <DrawerDescription>
-              Revise e edite a etapa selecionada sem sair do fluxo visual.
+              Revise e ajuste a etapa escolhida sem sair do mapa visual.
             </DrawerDescription>
           </DrawerHeader>
           <div className="px-4 pb-6">{content}</div>

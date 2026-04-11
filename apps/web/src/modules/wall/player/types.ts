@@ -20,6 +20,7 @@ import type {
   WallStateData,
   WallStatusChangedPayload,
   WallTransition,
+  WallTransitionMode,
 } from '@eventovivo/shared-types/wall';
 
 export type {
@@ -43,6 +44,7 @@ export type {
   WallStateData,
   WallStatusChangedPayload,
   WallTransition,
+  WallTransitionMode,
 };
 
 export type WallStatus = WallPublicStatus;
@@ -184,5 +186,8 @@ export interface WallPlayerState {
   currentIndex: number;
   currentItemId?: string | null;
   currentItemStartedAt?: string | null;
+  activeTransitionEffect: WallTransition | null;
+  lastTransitionEffect: WallTransition | null;
+  transitionAdvanceCount: number;
   videoPlayback: WallVideoPlaybackState;
 }

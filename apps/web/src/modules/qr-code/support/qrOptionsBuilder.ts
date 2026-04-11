@@ -10,6 +10,10 @@ function toGradient(gradient: QrGradientConfig | null): Gradient | undefined {
 }
 
 function resolveLogoUrl(config: EventPublicLinkQrConfig): string | undefined {
+  if (config.logo.mode === 'none') {
+    return undefined;
+  }
+
   return config.logo.asset_url ?? undefined;
 }
 

@@ -150,7 +150,9 @@ it('shows the public event invitation context without exposing organization-wide
     expect($response->json('data.organization.name'))->toBe($organization->trade_name);
     expect($response->json('data.access.role_label'))->toBeString()->toContain('Ver');
     expect($response->json('data.access.capabilities'))->toContain('overview', 'media');
+    expect($response->json('data.invited_by.name'))->toBe($owner->name);
     expect($response->json('data.requires_existing_login'))->toBeFalse();
+    expect($response->json('data'))->not->toHaveKey('workspaces');
 });
 
 it('accepts an event invitation for a new platform user without duplicating users or creating organization-wide access', function () {

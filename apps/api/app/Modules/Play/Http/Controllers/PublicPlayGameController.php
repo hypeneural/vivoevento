@@ -11,6 +11,7 @@ use App\Modules\Play\Http\Resources\PlayGameSessionResource;
 use App\Modules\Play\Models\EventPlaySetting;
 use App\Modules\Play\Models\PlayEventGame;
 use App\Modules\Play\Services\GameAssetResolverService;
+use App\Modules\Play\Services\GameLaunchReadinessService;
 use App\Modules\Play\Services\GameSessionService;
 use App\Modules\Play\Services\RankingService;
 use App\Shared\Http\BaseController;
@@ -24,11 +25,13 @@ class PublicPlayGameController extends BaseController
         string $event,
         string $gameSlug,
         GameAssetResolverService $assets,
+        GameLaunchReadinessService $readiness,
         RankingService $ranking,
         GameSessionService $sessions,
         AnalyticsTracker $analytics,
     ): JsonResponse {
         $game = $this->resolvePublicGame($event, $gameSlug);
+        $game->setAttribute('readiness', $readiness->forGame($game, $request->assetProfile())->toArray());
 
         $leaderboard = $ranking->leaderboardWithPositions($game);
         $snapshot = $sessions->realtimePayload($game);

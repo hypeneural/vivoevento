@@ -16,7 +16,7 @@ export function JourneyEdgeLabel({
   return (
     <div
       className={cn(
-        'nodrag nopan absolute rounded-full border px-2 py-1 text-[11px] font-medium',
+        'nodrag nopan absolute rounded-full border border-white/80 bg-white/90 px-2.5 py-1 text-[10px] font-semibold shadow-sm backdrop-blur-sm',
         className,
       )}
       style={{

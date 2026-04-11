@@ -23,7 +23,7 @@ it('returns wall options with per-layout capability metadata while puzzle stays 
         ->and($response->json('data.layouts.0'))->toHaveKey('defaults');
 });
 
-it('returns the current wall transition contract without random mode', function () {
+it('returns the current wall transition contract with explicit modes but without random as an effect', function () {
     [$user, $organization] = $this->actingAsOwner();
 
     $response = $this->apiGet('/wall/options');
@@ -31,15 +31,26 @@ it('returns the current wall transition contract without random mode', function 
     $this->assertApiSuccess($response);
 
     $transitions = collect($response->json('data.transitions'));
+    $transitionModes = collect($response->json('data.transition_modes'));
 
     expect($transitions->pluck('value')->all())->toBe([
         'fade',
         'slide',
         'zoom',
         'flip',
+        'lift-fade',
+        'cross-zoom',
+        'swipe-up',
         'none',
     ])->not->toContain('rand')
         ->not->toContain('random');
 
-    expect($transitions)->toHaveCount(5);
+    expect($transitions)->toHaveCount(8);
+    expect($transitionModes->pluck('value')->all())->toBe([
+        'fixed',
+        'random',
+    ]);
+
+    $response->assertJsonPath('data.transition_defaults.transition_effect', 'fade')
+        ->assertJsonPath('data.transition_defaults.transition_mode', 'fixed');
 });

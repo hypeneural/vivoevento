@@ -44,6 +44,7 @@ export function bootGame<TSettings>(
 export function createBridgeFromParams(params: CreateGameParams) {
   return new BaseGameBridge({
     onReady: params.onReady,
+    onError: params.onError,
     onProgress: params.onProgress,
     onMove: params.onMove,
     onFinish: params.onFinish,

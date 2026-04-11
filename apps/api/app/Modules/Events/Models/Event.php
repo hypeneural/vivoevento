@@ -205,6 +205,11 @@ class Event extends Model
         return $this->hasOne(\App\Modules\MediaIntelligence\Models\EventMediaIntelligenceSetting::class);
     }
 
+    public function publicLinkQrConfigs(): HasMany
+    {
+        return $this->hasMany(EventPublicLinkQrConfig::class);
+    }
+
     // ─── Scopes ────────────────────────────────────────────
 
     public function scopeActive($query)

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { ApiWallOptionsResponse, ApiWallSettings } from '@/lib/api-types';
@@ -17,6 +17,8 @@ function makeSettings(overrides?: Partial<ApiWallSettings>): ApiWallSettings {
     theme_config: {},
     layout: 'auto',
     transition_effect: 'fade',
+    transition_mode: 'fixed',
+    transition_pool: null,
     background_url: null,
     partner_logo_url: null,
     show_qr: true,
@@ -77,6 +79,22 @@ function makeOptionsWithPuzzle(): ApiWallOptionsResponse {
 }
 
 describe('WallAppearanceTab', () => {
+  const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+
+  beforeAll(() => {
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: vi.fn(),
+    });
+  });
+
+  afterAll(() => {
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: originalScrollIntoView,
+    });
+  });
+
   it('renderiza os controles de aparencia e propaga alteracoes do rascunho', () => {
     const onDraftChange = vi.fn();
 
@@ -102,6 +120,82 @@ describe('WallAppearanceTab', () => {
     });
 
     expect(onDraftChange).toHaveBeenCalledWith('neon_text', 'Nova chamada visual');
+  });
+
+  it('expoe transition_mode no editor para layouts single-item', async () => {
+    const onDraftChange = vi.fn();
+
+    render(
+      <TooltipProvider>
+        <WallAppearanceTab
+          wallSettings={makeSettings({
+            layout: 'fullscreen',
+            transition_mode: 'fixed',
+          })}
+          options={fallbackOptions}
+          videoPolicySummary="Resumo"
+          onDraftChange={onDraftChange}
+        />
+      </TooltipProvider>,
+    );
+
+    const trigger = screen.getByTestId('wall-transition-mode-select');
+
+    expect(trigger).toBeInTheDocument();
+    fireEvent.mouseDown(trigger);
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+    fireEvent.click(await screen.findByRole('option', { name: /aleatoria/i }));
+
+    expect(onDraftChange).toHaveBeenCalledWith('transition_mode', 'random');
+    expect(screen.queryByTestId('wall-transition-mode-locked')).not.toBeInTheDocument();
+  });
+
+  it('expoe transition_pool custom apenas quando o slideshow single-item esta em modo random', () => {
+    const onDraftChange = vi.fn();
+
+    render(
+      <TooltipProvider>
+        <WallAppearanceTab
+          wallSettings={makeSettings({
+            layout: 'fullscreen',
+            transition_mode: 'random',
+            transition_pool: ['fade', 'slide'],
+          })}
+          options={fallbackOptions}
+          videoPolicySummary="Resumo"
+          onDraftChange={onDraftChange}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByTestId('wall-transition-pool')).toBeInTheDocument();
+    expect(screen.getByTestId('wall-transition-pool-toggle-slide')).toBeInTheDocument();
+    expect(screen.queryByTestId('wall-transition-pool-toggle-none')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('wall-transition-pool-toggle-slide'));
+
+    expect(onDraftChange).toHaveBeenCalledWith('transition_pool', ['fade']);
+  });
+
+  it('bloqueia transition_mode random para layouts board no editor', () => {
+    render(
+      <TooltipProvider>
+        <WallAppearanceTab
+          wallSettings={makeSettings({
+            layout: 'grid',
+            transition_mode: 'fixed',
+          })}
+          options={fallbackOptions}
+          videoPolicySummary="Resumo"
+          onDraftChange={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByTestId('wall-transition-mode-locked')).toBeInTheDocument();
+    expect(screen.getByText(/layouts em grade usam troca fixa/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('wall-transition-mode-select')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('wall-transition-pool')).not.toBeInTheDocument();
   });
 
   it('mostra os controles minimos do puzzle e bloqueia capabilities incompativeis', () => {
@@ -130,9 +224,12 @@ describe('WallAppearanceTab', () => {
     expect(screen.getByText(/Preset do mosaico/i)).toBeInTheDocument();
     expect(screen.getByTestId('wall-puzzle-anchor-select')).toBeInTheDocument();
     expect(screen.getByText(/Hero slot/i)).toBeInTheDocument();
+    expect(screen.getByTestId('wall-transition-mode-locked')).toBeInTheDocument();
     expect(screen.getByText(/Puzzle exibe imagens\. Videos entram em layout individual de fallback\./i)).toBeInTheDocument();
     expect(screen.getByTestId('wall-side-thumbnails-switch')).toBeDisabled();
     expect(screen.getByTestId('wall-video-multi-layout-locked')).toBeInTheDocument();
     expect(screen.queryByTestId('wall-video-multi-layout-select')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('wall-transition-mode-select')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('wall-transition-pool')).not.toBeInTheDocument();
   });
 });

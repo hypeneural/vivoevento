@@ -107,6 +107,34 @@ it('still returns a manual invitation url when the organization has no connected
     expect($response->json('data.invitation_url'))->toContain('/convites/equipe/');
 });
 
+it('shows the public organization invitation context with inviter summary and without unrelated workspace data', function () {
+    [$owner, $organization] = $this->actingAsOwner();
+
+    $createResponse = $this->apiPost('/organizations/current/team', [
+        'user' => [
+            'name' => 'Secretaria Julia',
+            'phone' => '(11) 99901-0009',
+        ],
+        'role_key' => 'partner-manager',
+        'send_via_whatsapp' => false,
+    ]);
+
+    $this->assertApiSuccess($createResponse, 201);
+
+    $token = basename((string) $createResponse->json('data.invitation_url'));
+
+    $response = $this->apiGet("/public/organization-invitations/{$token}");
+
+    $this->assertApiSuccess($response);
+
+    expect($response->json('data.organization.name'))->toBe($organization->displayName());
+    expect($response->json('data.access.role_label'))->toBeString();
+    expect($response->json('data.invitee_name'))->toBe('Secretaria Julia');
+    expect($response->json('data.invited_by.name'))->toBe($owner->name);
+    expect($response->json('data.requires_existing_login'))->toBeFalse();
+    expect($response->json('data'))->not->toHaveKey('workspaces');
+});
+
 it('accepts a team invitation without creating a new organization for the invited user', function () {
     [$owner, $organization] = $this->actingAsOwner();
 

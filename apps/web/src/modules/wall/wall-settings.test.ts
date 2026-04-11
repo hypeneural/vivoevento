@@ -31,6 +31,7 @@ const baseSettings: ApiWallSettings = {
   },
   layout: 'puzzle',
   transition_effect: 'fade',
+  transition_mode: 'fixed',
   background_url: null,
   partner_logo_url: null,
   show_qr: true,
@@ -67,6 +68,19 @@ describe('wall settings theme config helpers', () => {
   it('clones and prepares theme_config without dropping puzzle fields', () => {
     expect(cloneWallSettings(baseSettings).theme_config).toEqual(baseSettings.theme_config);
     expect(prepareWallSettingsPayload(baseSettings).theme_config).toEqual(baseSettings.theme_config);
+  });
+
+  it('normalizes transition_pool without leaking invalid effects or none', () => {
+    const resolved = resolveManagedWallSettings({
+      ...baseSettings,
+      layout: 'fullscreen',
+      transition_mode: 'random',
+      transition_pool: ['fade', 'cross-zoom', 'none', 'fade'],
+    }, fallbackOptions.layouts);
+
+    expect(resolved.transition_mode).toBe('random');
+    expect(resolved.transition_pool).toEqual(['fade', 'cross-zoom']);
+    expect(prepareWallSettingsPayload(resolved).transition_pool).toEqual(['fade', 'cross-zoom']);
   });
 
   it('compares normalized theme_config to avoid dirty state loops', () => {
@@ -110,11 +124,14 @@ describe('wall settings theme config helpers', () => {
     const resolved = applyWallLayoutCapabilities({
       ...baseSettings,
       show_side_thumbnails: true,
+      transition_mode: 'random',
       video_multi_layout_policy: 'all',
       theme_config: {},
     }, PUZZLE_LAYOUT_FALLBACK_OPTION);
 
     expect(resolved.show_side_thumbnails).toBe(false);
+    expect(resolved.transition_mode).toBe('fixed');
+    expect(resolved.transition_pool).toBeNull();
     expect(resolved.video_multi_layout_policy).toBe('disallow');
     expect(resolved.theme_config).toEqual({
       preset: 'standard',
@@ -135,7 +152,43 @@ describe('wall settings theme config helpers', () => {
 
     expect(resolved.layout).toBe('puzzle');
     expect(resolved.show_side_thumbnails).toBe(false);
+    expect(resolved.transition_pool).toBeNull();
     expect(resolved.video_multi_layout_policy).toBe('disallow');
     expect(resolved.theme_config.preset).toBe('standard');
+  });
+
+  it('normalizes transition_mode to fixed for board layouts and preserves random for single-item', () => {
+    for (const layout of ['grid', 'mosaic', 'carousel', 'puzzle'] as const) {
+      const resolved = resolveManagedWallSettings({
+        ...baseSettings,
+        layout,
+        transition_mode: 'random',
+      }, fallbackOptions.layouts);
+
+      expect(resolved.transition_mode).toBe('fixed');
+    }
+
+    for (const layout of ['auto', 'fullscreen', 'gallery', 'cinematic'] as const) {
+      const resolved = resolveManagedWallSettings({
+        ...baseSettings,
+        layout,
+        transition_mode: 'random',
+      }, fallbackOptions.layouts);
+
+      expect(resolved.transition_mode).toBe('random');
+    }
+  });
+
+  it('hydrates legacy settings without transition_mode as fixed and avoids dirty state drift', () => {
+    const legacySettings = {
+      ...baseSettings,
+    };
+
+    delete (legacySettings as Partial<ApiWallSettings>).transition_mode;
+
+    const resolved = resolveManagedWallSettings(legacySettings as ApiWallSettings, fallbackOptions.layouts);
+
+    expect(resolved.transition_mode).toBe('fixed');
+    expect(areWallSettingsEqual(baseSettings, resolved)).toBe(true);
   });
 });

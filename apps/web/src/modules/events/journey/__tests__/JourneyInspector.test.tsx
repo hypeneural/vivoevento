@@ -376,7 +376,7 @@ describe('JourneyInspector', () => {
 
     expect(screen.getByText('Simulacao ativa')).toBeInTheDocument();
     expect(screen.getByText('Foto com legenda')).toBeInTheDocument();
-    expect(screen.getByText(/Entrada: WhatsApp privado/i)).toBeInTheDocument();
+    expect(screen.getByText(/Entrada: WhatsApp particular/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Limpar simulacao' }));
 
@@ -431,11 +431,11 @@ describe('JourneyInspector', () => {
   it('loads the detailed safety settings and saves them through the journey endpoint', async () => {
     renderInspector('processing_safety_ai');
 
-    expect(await screen.findByText('Safety por evento')).toBeInTheDocument();
+    expect(await screen.findByText('Analise de risco do evento')).toBeInTheDocument();
     expect(getEventContentModerationSettingsMock).toHaveBeenCalledWith(42);
 
     await waitFor(() => {
-      expect(screen.queryByText('Carregando configuracoes detalhadas de Safety...')).not.toBeInTheDocument();
+      expect(screen.queryByText('Carregando detalhes da analise de risco...')).not.toBeInTheDocument();
     });
     fireEvent.click(screen.getByLabelText('Habilitar safety'));
     fireEvent.click(screen.getByRole('button', { name: 'Salvar safety' }));
@@ -454,10 +454,10 @@ describe('JourneyInspector', () => {
   it('loads the detailed media intelligence settings and saves them through the journey endpoint', async () => {
     renderInspector('output_reply_text');
 
-    expect(await screen.findByText('MediaIntelligence por evento')).toBeInTheDocument();
+    expect(await screen.findByText('Contexto e resposta automatica')).toBeInTheDocument();
     expect(getEventMediaIntelligenceSettingsMock).toHaveBeenCalledWith(42);
     await waitFor(() => {
-      expect(screen.queryByText('Carregando configuracoes detalhadas de MediaIntelligence...')).not.toBeInTheDocument();
+      expect(screen.queryByText('Carregando detalhes de contexto e resposta automatica...')).not.toBeInTheDocument();
     });
 
     fireEvent.change(screen.getByLabelText(/texto de instrucao do evento/i), {
@@ -484,8 +484,8 @@ describe('JourneyInspector', () => {
     renderInspector('output_reply_text', 'drawer');
 
     expect(screen.getByTestId('journey-inspector-drawer')).toBeInTheDocument();
-    expect(screen.getByText('Inspector da jornada')).toBeInTheDocument();
-    expect(screen.getByText('Revise e edite a etapa selecionada sem sair do fluxo visual.')).toBeInTheDocument();
-    expect(await screen.findByText('MediaIntelligence por evento')).toBeInTheDocument();
+    expect(screen.getByText('Etapa selecionada')).toBeInTheDocument();
+    expect(screen.getByText('Revise e ajuste a etapa escolhida sem sair do mapa visual.')).toBeInTheDocument();
+    expect(await screen.findByText('Contexto e resposta automatica')).toBeInTheDocument();
   });
 });

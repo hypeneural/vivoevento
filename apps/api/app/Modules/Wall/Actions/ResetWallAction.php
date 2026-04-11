@@ -5,6 +5,7 @@ namespace App\Modules\Wall\Actions;
 use App\Modules\Wall\Enums\WallLayout;
 use App\Modules\Wall\Enums\WallStatus;
 use App\Modules\Wall\Enums\WallTransition;
+use App\Modules\Wall\Enums\WallTransitionMode;
 use App\Modules\Wall\Models\EventWallSetting;
 use App\Modules\Wall\Services\WallBroadcasterService;
 
@@ -30,6 +31,7 @@ class ResetWallAction
             'status'               => WallStatus::Draft,
             'layout'               => WallLayout::Auto,
             'transition_effect'    => WallTransition::Fade,
+            'transition_mode'      => WallTransitionMode::Fixed,
             'interval_ms'          => 8000,
             'queue_limit'          => 100,
             'show_qr'              => true,

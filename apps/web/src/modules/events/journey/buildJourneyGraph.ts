@@ -29,7 +29,7 @@ export interface JourneyGraphNode {
   width: number;
   height: number;
   className: string;
-  targetHandle: 'inbound';
+  targetHandles: string[];
   sourceHandles: string[];
   data: {
     node: EventJourneyNode;
@@ -42,7 +42,7 @@ export interface JourneyGraphEdge {
   source: string;
   target: string;
   sourceHandle: string;
-  targetHandle: 'inbound';
+  targetHandle: string;
   label: string;
   className: string;
   data: {
@@ -58,35 +58,37 @@ export interface JourneyGraph {
   edges: JourneyGraphEdge[];
 }
 
-const STAGE_HEIGHT = 252;
-const STAGE_VERTICAL_SPACING = 272;
-const NODE_ROW_GAP = 136;
-const NODE_WIDTH = 248;
-const NODE_HEIGHT = 132;
-const DEFAULT_STAGE_COLUMNS = [80, 360, 640, 920] as const;
+interface PendingJourneyGraphEdge extends Omit<JourneyGraphEdge, 'targetHandle'> {}
+
+const STAGE_HEIGHT = 432;
+const STAGE_VERTICAL_SPACING = 448;
+const NODE_ROW_GAP = 236;
+const NODE_WIDTH = 276;
+const NODE_HEIGHT = 196;
+const DEFAULT_STAGE_COLUMNS = [48, 352, 656] as const;
 
 const NODE_LAYOUT: Record<string, { x: number; row: 0 | 1 }> = {
-  entry_whatsapp_direct: { x: 60, row: 0 },
-  entry_whatsapp_groups: { x: 340, row: 0 },
-  entry_telegram: { x: 620, row: 0 },
-  entry_public_upload: { x: 900, row: 0 },
-  entry_sender_blacklist: { x: 480, row: 1 },
-  processing_receive_feedback: { x: 120, row: 0 },
-  processing_download_media: { x: 400, row: 0 },
-  processing_prepare_variants: { x: 680, row: 0 },
-  processing_safety_ai: { x: 250, row: 1 },
-  processing_media_intelligence: { x: 570, row: 1 },
-  decision_event_moderation_mode: { x: 100, row: 0 },
-  decision_safety_result: { x: 400, row: 0 },
-  decision_context_gate: { x: 700, row: 0 },
-  decision_media_type: { x: 250, row: 1 },
-  decision_caption_presence: { x: 570, row: 1 },
-  output_reaction_final: { x: 40, row: 0 },
-  output_reply_text: { x: 320, row: 0 },
-  output_gallery: { x: 600, row: 0 },
-  output_wall: { x: 880, row: 0 },
-  output_print: { x: 320, row: 1 },
-  output_silence: { x: 600, row: 1 },
+  entry_whatsapp_direct: { x: 48, row: 0 },
+  entry_whatsapp_groups: { x: 352, row: 0 },
+  entry_telegram: { x: 656, row: 0 },
+  entry_public_upload: { x: 200, row: 1 },
+  entry_sender_blacklist: { x: 504, row: 1 },
+  processing_receive_feedback: { x: 48, row: 0 },
+  processing_download_media: { x: 352, row: 0 },
+  processing_prepare_variants: { x: 656, row: 0 },
+  processing_safety_ai: { x: 200, row: 1 },
+  processing_media_intelligence: { x: 504, row: 1 },
+  decision_event_moderation_mode: { x: 48, row: 0 },
+  decision_safety_result: { x: 352, row: 0 },
+  decision_context_gate: { x: 656, row: 0 },
+  decision_media_type: { x: 200, row: 1 },
+  decision_caption_presence: { x: 504, row: 1 },
+  output_reaction_final: { x: 48, row: 0 },
+  output_reply_text: { x: 352, row: 0 },
+  output_gallery: { x: 656, row: 0 },
+  output_wall: { x: 48, row: 1 },
+  output_print: { x: 352, row: 1 },
+  output_silence: { x: 656, row: 1 },
 };
 
 const STAGE_CLASSNAME_BY_ID: Record<EventJourneyStageId, string> = {
@@ -155,7 +157,7 @@ function graphNode(stage: EventJourneyStage, stageIndex: number, node: EventJour
     width: NODE_WIDTH,
     height: NODE_HEIGHT,
     className: nodeClassName(node),
-    targetHandle: 'inbound',
+    targetHandles: [],
     sourceHandles: node.branches.map((branch) => `branch:${branch.id}`),
     data: {
       node,
@@ -172,7 +174,7 @@ function graphEdge(
   sourceNode: EventJourneyNode,
   branch: EventJourneyBranch,
   targetStageId: EventJourneyStageId | null,
-): JourneyGraphEdge | null {
+): PendingJourneyGraphEdge | null {
   if (!branch.target_node_id) {
     return null;
   }
@@ -182,7 +184,6 @@ function graphEdge(
     source: sourceNode.id,
     target: branch.target_node_id,
     sourceHandle: `branch:${branch.id}`,
-    targetHandle: 'inbound',
     label: branch.label,
     className: edgeClassName(branch.status, branch.active),
     data: {
@@ -193,21 +194,73 @@ function graphEdge(
   };
 }
 
+function compareIncomingEdges(
+  left: PendingJourneyGraphEdge,
+  right: PendingJourneyGraphEdge,
+  nodeById: ReadonlyMap<string, JourneyGraphNode>,
+) {
+  const leftSourceNode = nodeById.get(left.source);
+  const rightSourceNode = nodeById.get(right.source);
+
+  const leftCenterX = (leftSourceNode?.position.x ?? 0) + ((leftSourceNode?.width ?? NODE_WIDTH) / 2);
+  const rightCenterX = (rightSourceNode?.position.x ?? 0) + ((rightSourceNode?.width ?? NODE_WIDTH) / 2);
+
+  if (leftCenterX !== rightCenterX) {
+    return leftCenterX - rightCenterX;
+  }
+
+  const leftCenterY = (leftSourceNode?.position.y ?? 0) + ((leftSourceNode?.height ?? NODE_HEIGHT) / 2);
+  const rightCenterY = (rightSourceNode?.position.y ?? 0) + ((rightSourceNode?.height ?? NODE_HEIGHT) / 2);
+
+  if (leftCenterY !== rightCenterY) {
+    return leftCenterY - rightCenterY;
+  }
+
+  return left.id.localeCompare(right.id);
+}
+
 export function buildJourneyGraph(projection: EventJourneyProjection): JourneyGraph {
   const stages = projection.stages.map((stage, stageIndex) => stageBand(stage, stageIndex));
-  const nodes = projection.stages.flatMap((stage, stageIndex) =>
+  const baseNodes = projection.stages.flatMap((stage, stageIndex) =>
     stage.nodes.map((node, index) => graphNode(stage, stageIndex, node, index)),
+  );
+  const nodeById = new Map<string, JourneyGraphNode>(
+    baseNodes.map((node) => [node.id, node]),
   );
   const nodeStageById = new Map<string, EventJourneyStageId>(
     projection.stages.flatMap((stage) => stage.nodes.map((node) => [node.id, stage.id] as const)),
   );
-  const edges = projection.stages.flatMap((stage) =>
+  const pendingEdges = projection.stages.flatMap((stage) =>
     stage.nodes.flatMap((node) =>
       node.branches
         .map((branch) => graphEdge(node, branch, nodeStageById.get(branch.target_node_id ?? '') ?? null))
-        .filter((edge): edge is JourneyGraphEdge => edge !== null),
+        .filter((edge): edge is PendingJourneyGraphEdge => edge !== null),
     ),
   );
+  const targetHandlesByNodeId = new Map<string, string[]>();
+  const edgeTargetHandleById = new Map<string, string>();
+
+  for (const node of baseNodes) {
+    const incomingEdges = pendingEdges
+      .filter((edge) => edge.target === node.id)
+      .sort((left, right) => compareIncomingEdges(left, right, nodeById));
+
+    const targetHandles = incomingEdges.map((_, index) => `inbound:${index}`);
+    targetHandlesByNodeId.set(node.id, targetHandles);
+
+    incomingEdges.forEach((edge, index) => {
+      edgeTargetHandleById.set(edge.id, targetHandles[index] ?? 'inbound:0');
+    });
+  }
+
+  const nodes = baseNodes.map((node) => ({
+    ...node,
+    targetHandles: targetHandlesByNodeId.get(node.id) ?? [],
+  }));
+  const edges = pendingEdges.map((edge) => ({
+    ...edge,
+    targetHandle: edgeTargetHandleById.get(edge.id) ?? 'inbound:0',
+  }));
 
   return {
     stages,

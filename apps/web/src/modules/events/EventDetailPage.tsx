@@ -52,6 +52,11 @@ import {
   upsertEventIntakeBlacklistEntry,
   updateEventPublicIdentifiers,
 } from './api';
+import {
+  getEventPublicLinkQrEditorQueryKey,
+  getEventPublicLinkQrListQueryKey,
+  listEventPublicLinkQrEditorStates,
+} from './qr/api';
 import { EventContentModerationSettingsCard } from './components/content-moderation/EventContentModerationSettingsCard';
 import { EventSenderDirectoryCard } from './components/EventSenderDirectoryCard';
 import { EventFaceSearchSettingsCard } from './components/face-search/EventFaceSearchSettingsCard';
@@ -249,6 +254,22 @@ export default function EventDetailPage() {
   });
 
   const event = eventQuery.data;
+  const qrConfigsQuery = useQuery({
+    queryKey: getEventPublicLinkQrListQueryKey(id ?? ''),
+    enabled: !!id,
+    staleTime: 300_000,
+    queryFn: () => listEventPublicLinkQrEditorStates(id as string),
+  });
+  const qrConfigsByKey = useMemo(() => {
+    if (!qrConfigsQuery.data) {
+      return {};
+    }
+
+    return qrConfigsQuery.data.reduce((accumulator, item) => {
+      accumulator[item.linkKey] = item;
+      return accumulator;
+    }, {} as Record<string, (typeof qrConfigsQuery.data)[number]>);
+  }, [qrConfigsQuery.data]);
   const commercialStatusQuery = useQuery({
     queryKey: ['event-commercial-status', id],
     enabled: !!id,
@@ -271,6 +292,19 @@ export default function EventDetailPage() {
     event?.public_identifiers?.slug?.value,
     event?.public_identifiers?.upload_slug?.value,
   ]);
+
+  useEffect(() => {
+    if (!id || !qrConfigsQuery.data) {
+      return;
+    }
+
+    qrConfigsQuery.data.forEach((item) => {
+      queryClient.setQueryData(
+        getEventPublicLinkQrEditorQueryKey(id, item.linkKey),
+        item,
+      );
+    });
+  }, [id, queryClient, qrConfigsQuery.data]);
 
   const visibleTabs = useMemo(() => {
     if (!event) return [];
@@ -738,6 +772,7 @@ export default function EventDetailPage() {
                     eventId={event.id}
                     effectiveBranding={effectiveBranding}
                     link={link}
+                    qrState={qrConfigsByKey[link.key]}
                     onCopy={copyToClipboard}
                   />
                 ))
@@ -1028,6 +1063,7 @@ export default function EventDetailPage() {
                   eventId={event.id}
                   effectiveBranding={effectiveBranding}
                   link={event.public_links.gallery}
+                  qrState={qrConfigsByKey[event.public_links.gallery.key]}
                   onCopy={copyToClipboard}
                 />
               ) : null}
@@ -1059,6 +1095,7 @@ export default function EventDetailPage() {
                   eventId={event.id}
                   effectiveBranding={effectiveBranding}
                   link={event.public_links.wall}
+                  qrState={qrConfigsByKey[event.public_links.wall.key]}
                   onCopy={copyToClipboard}
                 />
               ) : (
@@ -1102,6 +1139,7 @@ export default function EventDetailPage() {
                   eventId={event.id}
                   effectiveBranding={effectiveBranding}
                   link={event.public_links.play}
+                  qrState={qrConfigsByKey[event.public_links.play.key]}
                   onCopy={copyToClipboard}
                 />
               ) : null}

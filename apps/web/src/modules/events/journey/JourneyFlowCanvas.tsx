@@ -19,6 +19,7 @@ import {
   JOURNEY_NODE_TYPES,
   type JourneyFlowNode,
 } from './JourneyFlowNodes';
+import { getJourneyNodeCopy } from './journeyCopy';
 
 export interface JourneyFlowCanvasControls {
   fitView: () => void;
@@ -43,7 +44,7 @@ const JOURNEY_FLOW_ARIA_LABELS = {
 } as const;
 
 const JOURNEY_FLOW_FIT_VIEW_OPTIONS = {
-  padding: 0.1,
+  padding: 0.06,
   duration: 250,
 } as const;
 
@@ -52,6 +53,8 @@ function toReactFlowNode(
   highlightedNodeIds: Set<string>,
   selectedNodeId: string | null,
 ): JourneyFlowNode {
+  const nodeCopy = getJourneyNodeCopy(graphNode.data.node);
+
   return {
     id: graphNode.id,
     type: 'journey',
@@ -64,7 +67,7 @@ function toReactFlowNode(
     selectable: true,
     focusable: true,
     selected: graphNode.id === selectedNodeId,
-    ariaLabel: `${graphNode.data.node.label}. ${graphNode.data.node.summary}`,
+    ariaLabel: `${nodeCopy.label}. ${nodeCopy.summary}`,
     data: {
       graphNode,
       isHighlighted: highlightedNodeIds.has(graphNode.id),
@@ -123,9 +126,9 @@ export function JourneyFlowCanvas({
     return (
       <Card className="border-dashed border-muted-foreground/30 bg-background/60 shadow-none">
         <CardHeader>
-          <CardTitle className="text-base">A jornada ainda nao tem etapas projetadas</CardTitle>
+          <CardTitle className="text-base">Ainda nao foi possivel montar o mapa desta jornada</CardTitle>
           <CardDescription>
-            O backend respondeu sem `stages`. Antes de ligar o canvas interativo, precisamos revalidar a projection desse evento.
+            A configuracao atual voltou sem etapas visuais. Recarregue a pagina ou revise a configuracao do evento.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -133,7 +136,7 @@ export function JourneyFlowCanvas({
   }
 
   return (
-    <div className="h-full min-h-[840px]" data-testid="journey-flow-canvas">
+    <div className="h-full min-h-[1500px] md:min-h-[1660px]" data-testid="journey-flow-canvas">
       <ReactFlow<JourneyFlowNode, JourneyFlowEdge>
         nodes={nodes}
         edges={edges}
@@ -157,7 +160,7 @@ export function JourneyFlowCanvas({
         ariaLabelConfig={JOURNEY_FLOW_ARIA_LABELS}
         preventScrolling={false}
         onlyRenderVisibleElements={false}
-        className="rounded-[26px] border border-slate-200 bg-[linear-gradient(180deg,rgba(248,250,252,0.95),rgba(241,245,249,0.92))]"
+        className="rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,rgba(250,251,255,0.98),rgba(243,247,252,0.96))]"
       >
         <Background gap={24} size={1} color="#cbd5e1" />
       </ReactFlow>

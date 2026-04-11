@@ -4,6 +4,9 @@ export interface PublicEventInvitationDetails {
   id: number;
   status: string;
   requires_existing_login: boolean;
+  invited_by?: {
+    name: string | null;
+  } | null;
   invitee_name: string;
   invitee_contact: {
     email: string | null;

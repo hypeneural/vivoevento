@@ -31,6 +31,7 @@ class WallLiveSnapshotService
             'wallStatusLabel' => $settings->status->label(),
             'layout' => $settings->layout->value,
             'transitionEffect' => $settings->transition_effect->value,
+            'transitionMode' => $settings->resolvedTransitionMode()->value,
             'currentPlayer' => $playerPayload ? [
                 'playerInstanceId' => $playerPayload['player_instance_id'],
                 'healthStatus' => $playerPayload['health_status'],

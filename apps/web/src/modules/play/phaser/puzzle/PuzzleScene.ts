@@ -4,7 +4,12 @@ import type { PuzzleGameSettings } from '@/modules/play/types';
 
 import { removeTextureKeys } from '../core/cleanup';
 import { BasePlayScene } from '../core/BasePlayScene';
-import { PUZZLE_PROMPT_TEXTURE_KEY, PUZZLE_SOURCE_TEXTURE_KEY, PUZZLE_UI_ASSETS } from './config/puzzleAssets';
+import {
+  PUZZLE_PROMPT_TEXTURE_KEY,
+  PUZZLE_SOURCE_TEXTURE_KEY,
+  PUZZLE_UI_ASSETS,
+  resolvePuzzleCoverAsset,
+} from './config/puzzleAssets';
 import { resolvePuzzleGrid } from './config/puzzleConfig';
 import {
   buildPuzzleSceneLayout,
@@ -33,7 +38,7 @@ export class PuzzleScene extends BasePlayScene<PuzzleGameSettings> {
       this.bridge.progress({ phase: 'loading', progress: value });
     });
 
-    const cover = this.payload.assets[0];
+    const cover = resolvePuzzleCoverAsset(this.payload.assets);
 
     if (cover?.url) {
       this.load.image(PUZZLE_SOURCE_TEXTURE_KEY, cover.url);
@@ -45,23 +50,14 @@ export class PuzzleScene extends BasePlayScene<PuzzleGameSettings> {
 
   create() {
     const hud = new PuzzleHudBridge(this.bridge);
-    const cover = this.payload.assets[0];
+    const cover = resolvePuzzleCoverAsset(this.payload.assets);
 
-    if (!cover?.url) {
+    if (!cover?.url || !this.textures.exists(PUZZLE_SOURCE_TEXTURE_KEY)) {
       this.add.text(34, 60, 'Nenhuma foto disponivel para montar o puzzle.', {
         color: '#ffffff',
         fontSize: '24px',
       });
-      hud.ready({
-        moves: 0,
-        wrongDrops: 0,
-        placed: 0,
-        total: 0,
-        combo: 0,
-        maxCombo: 0,
-        scorePreview: 0,
-        completionRatio: 0,
-      });
+      this.bridge.error('Nenhuma foto valida disponivel para montar o puzzle.');
       return;
     }
 

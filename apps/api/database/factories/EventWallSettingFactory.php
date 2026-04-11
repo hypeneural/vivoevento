@@ -6,6 +6,7 @@ use App\Modules\Wall\Enums\WallLayout;
 use App\Modules\Wall\Enums\WallEventPhase;
 use App\Modules\Wall\Enums\WallStatus;
 use App\Modules\Wall\Enums\WallTransition;
+use App\Modules\Wall\Enums\WallTransitionMode;
 use App\Modules\Wall\Models\EventWallSetting;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -22,6 +23,7 @@ class EventWallSettingFactory extends Factory
             'status' => WallStatus::Draft->value,
             'layout' => WallLayout::Auto->value,
             'transition_effect' => WallTransition::Fade->value,
+            'transition_mode' => WallTransitionMode::Fixed->value,
             'interval_ms' => 8000,
             'queue_limit' => 100,
             'event_phase' => WallEventPhase::Flow->value,

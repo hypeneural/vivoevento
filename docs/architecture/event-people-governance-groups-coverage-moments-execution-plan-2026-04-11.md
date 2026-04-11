@@ -14,6 +14,7 @@ Este documento complementa, e nao substitui:
 
 - `docs/architecture/event-people-identity-relations-aws-strategy-2026-04-10.md`
 - `docs/architecture/event-people-identity-relations-execution-plan-2026-04-10.md`
+- `docs/architecture/event-people-ux-graph-reference-photos-presets-analysis-2026-04-11.md`
 
 ---
 
@@ -69,6 +70,119 @@ O produto ainda nao entrega:
 - melhores fotos com uma pessoa;
 - melhores fotos com um grupo;
 - entregas prontas para operador, cerimonialista ou convidado.
+
+---
+
+## Validacao de partida
+
+## Veredito
+
+Sim, ja da para iniciar.
+
+Nao falta base tecnica para comecar.
+
+O que falta agora nao e infraestrutura minima; sao algumas decisoes de partida para evitar retrabalho logo na primeira sprint.
+
+## O que ja esta pronto para iniciar
+
+- modulo `EventPeople` ja existe e esta integrado;
+- filas dedicadas `event-people-high`, `event-people-medium` e `event-people-low` ja existem;
+- rate limit de sync AWS ja existe;
+- Horizon ja monitora as filas do modulo;
+- sync assincrono de representatives ja existe;
+- pagina dedicada, fluxo guiado e leitura local ja existem;
+- a bateria atual do modulo esta verde em backend e frontend.
+
+## O que precisa ser decidido antes do primeiro commit da proxima fase
+
+### 1. Sequencia exata da primeira sprint
+
+Decisao recomendada:
+
+- Sprint 1 = `Frente 0` inteira ou pelo menos `GP0-T1` ate `GP0-T5`;
+- nao abrir grupos, coverage ou momentos antes disso.
+
+### 2. Onde a auditoria e retention vao persistir estado
+
+Precisamos fechar se vamos:
+
+- estender `EventFaceSearchSetting`; ou
+- criar tabela propria de auditoria/cleanup.
+
+Decisao recomendada:
+
+- status atual curto em `EventFaceSearchSetting`;
+- historico detalhado em tabela propria.
+
+### 3. Como vamos testar `EXPLAIN`
+
+Os testes de plano so fazem sentido em PostgreSQL.
+
+Precisamos decidir:
+
+- se eles vao rodar apenas em ambiente PostgreSQL;
+- ou se vao ser caracterizacoes opt-in fora da suite comum.
+
+Decisao recomendada:
+
+- manter esses testes como suite PostgreSQL dedicada, nao como unit test generico.
+
+### 4. Qual sera a primeira superficie do cockpit
+
+Precisamos fechar se o primeiro overview vai nascer em:
+
+- `EventDetailPage`; ou
+- `EventPeoplePage`; ou
+- uma pagina nova de overview operacional.
+
+Decisao recomendada:
+
+- primeiro overview enxuto dentro da `EventPeoplePage`;
+- sem abrir terceira superficie agora.
+
+### 5. Quem pode disparar cleanup e audit
+
+Precisamos explicitar:
+
+- permissao administrativa;
+- se audit e cleanup entram em rota HTTP, command, job agendado ou todos;
+- como bloquear cleanup em incidente.
+
+Decisao recomendada:
+
+- command + job agendado para operacao normal;
+- rota/admin action so para suporte e super-admin.
+
+## O que NAO bloqueia o inicio
+
+- CloudWatch dashboard final;
+- guest-facing por relacao;
+- modelagem completa de grupos sociais;
+- recipe engine final de momentos;
+- grafo premium;
+- runbook finalizado em detalhe total.
+
+Esses itens importam, mas nao travam a primeira sprint util.
+
+## Go / no-go
+
+### Go agora
+
+Se a equipe aceitar estas quatro premissas:
+
+1. `Frente 0` vem antes de grupos e coverage;
+2. cleanup total por evento continua no `FaceSearch`;
+3. cleanup por pessoa nasce em `EventPeople`;
+4. testes de plano SQL vao rodar em PostgreSQL dedicado.
+
+### No-go
+
+Se a equipe quiser:
+
+- comecar por grupos ou coverage sem congelar contrato operacional;
+- tratar retention AWS como detalhe para depois;
+- deixar query quente sem `EXPLAIN` e sem query object;
+- crescer o frontend sem protocolo de cache otimista e status visivel.
 
 ---
 
@@ -192,6 +306,94 @@ Leitura pratica:
 
 ---
 
+## O que a documentacao oficial do resto da stack valida para esta fase
+
+As referencias abaixo tambem foram revisadas nas docs oficiais em `2026-04-11`.
+
+### 1. Laravel confirma que o contrato assincrono precisa ser mais explicito
+
+O Laravel documenta:
+
+- `afterCommit()` para impedir job antes do commit;
+- `ShouldBeUnique` para evitar duplicidade de dispatch;
+- `WithoutOverlapping` para bloquear disputa de processamento;
+- `RateLimited` para segurar burst e reprocessamento concorrente.
+
+Fonte oficial:
+
+- `Laravel Queues`: https://laravel.com/docs/12.x/queues
+
+Leitura pratica:
+
+- a doc atual acerta ao usar esses recursos, mas ainda falta formalizar o contrato de estados e transicoes do dominio;
+- sem isso, action, fila, read model e sync remoto continuam inferindo estado em paralelo.
+
+### 2. PostgreSQL valida partial indexes, mas exige EXPLAIN e predicado congelado
+
+O PostgreSQL documenta:
+
+- o `WHERE` da query precisa implicar de forma reconhecivel o predicado do indice parcial;
+- expressoes equivalentes escritas de outro jeito podem nao usar o indice;
+- clausulas parametrizadas podem impedir uso do indice parcial;
+- `EXPLAIN ANALYZE` executa a query e mostra contagem e tempo reais.
+
+Fontes oficiais:
+
+- `Partial Indexes`: https://www.postgresql.org/docs/current/indexes-partial.html
+- `Using EXPLAIN`: https://www.postgresql.org/docs/current/using-explain.html
+
+Leitura pratica:
+
+- review queue, listagem de pessoas, pair filters e autocomplete precisam de SQL congelado;
+- nao basta "ter indice", precisa provar plano nas leituras quentes.
+
+### 3. React e TanStack Query validam um protocolo mais rigido de cache e transicao
+
+O React documenta:
+
+- `useTransition` vale quando temos acesso ao `setState`;
+- updates depois de `await` precisam ser marcados novamente com `startTransition`;
+- `useDeferredValue` nao cria render deferido se o update ja estiver dentro de uma transition;
+- `useDeferredValue` nao evita requests extras por si so.
+
+O TanStack Query documenta:
+
+- `onMutate` serve para snapshot e update otimista;
+- `onError` deve fazer rollback do snapshot;
+- `invalidateQueries` e a invalidacao correta depois da mutacao.
+
+Fontes oficiais:
+
+- `useTransition`: https://react.dev/reference/react/useTransition
+- `useDeferredValue`: https://react.dev/reference/react/useDeferredValue
+- `Optimistic Updates`: https://tanstack.com/query/latest/docs/framework/react/guides/optimistic-updates
+- `Invalidations from Mutations`: https://tanstack.com/query/latest/docs/framework/react/guides/invalidations-from-mutations
+
+Leitura pratica:
+
+- o frontend ja usa parte desse protocolo no `MediaPage`, mas isso ainda nao esta virando regra de engenharia do modulo;
+- coverage, grupos e momentos vao herdar esse risco se a doc nao congelar o protocolo agora.
+
+### 4. W3C/WCAG valida o cockpit operacional e a acessibilidade do backoffice
+
+O W3C documenta:
+
+- mensagens de status devem informar sucesso, espera, progresso ou erro sem mudar contexto;
+- `role=status` e live regions sao o caminho correto para feedback nao intrusivo;
+- foco visivel com tamanho e contraste suficientes continua sendo requisito relevante em WCAG 2.2.
+
+Fontes oficiais:
+
+- `Status Messages`: https://www.w3.org/WAI/WCAG21/Understanding/status-messages.html
+- `What’s New in WCAG 2.2`: https://www.w3.org/WAI/standards-guidelines/wcag/new-in-22/
+
+Leitura pratica:
+
+- a proxima iteracao nao deve ser so "mais telas";
+- deve virar cockpit operacional com estados visiveis, foco claro e feedback sem roubar contexto.
+
+---
+
 ## Estado local atual e gaps objetivos
 
 ## O que ja existe
@@ -209,6 +411,27 @@ Leitura pratica:
 - relacoes manuais;
 - copy em portugues;
 - leitura local sem AWS no hot path.
+
+### Validacao local com testes atuais
+
+Bateria rodada nesta revisao:
+
+- `cd apps/api && php artisan test tests/Feature/EventPeople tests/Unit/EventPeople` -> `32 passed`, `262 assertions`
+- `cd apps/web && npx.cmd vitest run src/modules/event-people/EventPeoplePage.test.tsx src/modules/event-people/components/EventPeopleIdentitySheet.test.tsx src/modules/event-people/components/EventPeopleFaceOverlay.test.tsx src/modules/media/MediaPage.test.tsx` -> `4 files passed`, `8 tests passed`
+
+O que essa bateria confirma:
+
+- a base atual continua verde para CRUD, review queue, merge/split, representatives e sync;
+- o frontend guiado continua funcional.
+
+O que ela ainda nao trava:
+
+- transicoes permitidas de estado ponta a ponta;
+- contrato de projecao e replay por `event_id`;
+- plano real das queries quentes com `EXPLAIN`;
+- rollback do cache otimista em todos os casos de erro;
+- acessibilidade de status messages e foco;
+- fluxos de audit e cleanup AWS.
 
 ## O gap real
 
@@ -235,6 +458,25 @@ Leitura pratica:
 - nao existem colecoes derivadas por relacao;
 - nao existe pipeline de entrega por vinculo;
 - nao ha trilha guest-facing derivada das relacoes locais.
+
+### Consistencia operacional
+
+O maior risco atual nao parece ser arquitetura errada.
+
+O maior risco parece ser espalhamento de verdade entre:
+
+- banco transacional;
+- read models;
+- cache otimista do frontend;
+- fila;
+- estado remoto na AWS.
+
+Validacao local do codigo:
+
+- a pasta `Queries` do modulo existe, mas esta vazia;
+- nao ha trilha clara de eventos de dominio replayaveis dentro de `EventPeople`;
+- a coordenacao atual esta concentrada em `Actions` + `Jobs` + logs;
+- o frontend ja usa `onMutate`, `setQueryData` e `invalidateQueries` em `MediaPage`, mas isso ainda nao esta congelado como contrato do modulo.
 
 ---
 
@@ -283,6 +525,152 @@ Motivo:
 - queremos consultas rapidas;
 - queremos delta por evento, pessoa, grupo e par;
 - nao queremos recalculo global a cada clique.
+
+### 5. Antes de crescer produto, precisamos congelar o contrato operacional
+
+Isto e uma inferencia direta da combinacao entre:
+
+- comportamento atual do codigo;
+- cobertura existente;
+- docs oficiais de Laravel, PostgreSQL, React e TanStack Query.
+
+Implica:
+
+- explicitar maquina de estados e transicoes permitidas;
+- tratar projecao como contrato;
+- tratar query quente como contrato com plano;
+- tratar cache otimista como protocolo, nao implementacao ad-hoc.
+
+---
+
+## Frente 0 - Contrato operacional, performance real e cockpit do gestor
+
+## Meta
+
+Reduzir o risco de verdade espalhada antes de ampliar grupos, coverage e momentos.
+
+## Tarefas
+
+### GP0-T1 - explicitar maquina de estados do dominio
+
+Documentar e depois codificar transicoes permitidas entre:
+
+- `face`
+- `suggestion`
+- `review_item`
+- `assignment`
+- `person`
+- `remote_sync_status`
+
+Cada transicao deve ter:
+
+- estado de origem;
+- estado de destino;
+- actor da mudanca;
+- action responsavel;
+- chave de idempotencia;
+- motivo do estado;
+- efeito colateral permitido;
+- projecoes que precisam ser atualizadas.
+
+Exemplos minimos:
+
+- `pending -> confirmed`
+- `pending -> ignored`
+- `confirmed -> pending` no split
+- `conflict -> resolved`
+- `representative sync_status: pending -> synced|failed|skipped`
+
+### GP0-T2 - tratar cada projecao como contrato
+
+Para cada read model, documentar:
+
+- produtor;
+- consumidor;
+- chave de idempotencia;
+- atraso maximo aceitavel;
+- comando de replay por `event_id`;
+- politica de recomputacao parcial;
+- fallback se a projecao estiver atrasada.
+
+Alvo minimo:
+
+- `event_person_review_queue`
+- `event_person_media_stats`
+- `event_person_pair_scores`
+- `event_person_representative_faces`
+- futuros `group_stats`, `coverage_alerts` e `relational_collections`
+
+### GP0-T3 - mover leituras operacionais para query objects estaveis
+
+O modulo ja tem pasta `Queries`, mas ela ainda nao e usada.
+
+Criar pelo menos:
+
+- `ListEventPeopleQuery`
+- `ListEventPeopleReviewQueueQuery`
+- `ListEventPersonPairScoresQuery`
+- `SearchEventPeopleByNameQuery`
+
+Regra:
+
+- shape estavel de resposta;
+- SQL centralizado;
+- sem vazar join e regra de negocio para controller ou React.
+
+### GP0-T4 - blindar queries quentes com `EXPLAIN`
+
+Criar caracterizacao de plano para:
+
+- review queue;
+- listagem de pessoas;
+- autocomplete;
+- pair filters.
+
+Regra pragmatica:
+
+- nao testar custo numerico exato, porque isso e fragil;
+- testar predicado congelado, shape do SQL e uso esperado do indice;
+- rodar `EXPLAIN` ou `EXPLAIN ANALYZE` em ambiente de teste controlado quando fizer sentido.
+
+### GP0-T5 - congelar protocolo de cache otimista do frontend
+
+Definir regra de engenharia:
+
+- input sempre urgente e isolado;
+- lista derivada usa `useDeferredValue`;
+- troca de aba, drawer, filtros grandes e troca de pessoa usam `useTransition`;
+- updates depois de `await` reaplicam `startTransition`;
+- mutacoes humanas usam `onMutate` com snapshot;
+- falha usa rollback;
+- sucesso usa invalidacao inteligente;
+- ack local nunca desaparece so porque a projecao atrasou.
+
+### GP0-T6 - transformar o fluxo em cockpit operacional
+
+Organizar o backoffice para responder visualmente:
+
+- o que esta resolvido;
+- o que esta pendente;
+- o que esta em risco;
+- o que exige acao humana agora;
+- o que o sistema esta processando sozinho.
+
+Aplicar isso em:
+
+- overview do evento;
+- review queue;
+- pagina dedicada de pessoas;
+- futuros paineis de coverage e entregas.
+
+### GP0-T7 - subir acessibilidade operacional minima
+
+Padrao minimo:
+
+- status messages com semantica correta;
+- foco visivel em cards, tabs, drawers e acoes rapidas;
+- feedback de erro e sucesso sem roubar foco;
+- acoes destrutivas com recuperacao clara.
 
 ---
 
@@ -792,6 +1180,14 @@ Nao precisa abrir publico no primeiro corte, mas o backend deve nascer preparado
 
 ## Ordem recomendada de execucao
 
+### Passo 0 - Contrato operacional, performance e cockpit
+
+Motivo:
+
+- hoje o maior risco e estado espalhado, nao falta de ideia;
+- grupos, coverage e momentos vao herdar esse risco se nascerem antes;
+- essa frente reduz custo de manutencao, replay e depuracao.
+
 ### Passo 1 - AWS governance e runbook
 
 Motivo:
@@ -824,6 +1220,22 @@ Motivo:
 ---
 
 ## Bateria de testes recomendada por milestone
+
+## Milestone G0 - Contrato operacional, performance e cockpit
+
+Backend:
+
+```bash
+cd apps/api
+php artisan test tests/Unit/EventPeople/EventPeopleStateMachineTest.php tests/Unit/EventPeople/EventPeopleProjectionContractTest.php tests/Unit/EventPeople/EventPeopleHotQueriesExplainTest.php
+```
+
+Frontend:
+
+```bash
+cd apps/web
+npx.cmd vitest run src/modules/event-people/components/EventPeopleOptimisticFlow.test.tsx src/modules/event-people/components/EventPeopleStatusA11y.test.tsx
+```
 
 ## Milestone H - AWS governance e runbook
 
@@ -886,6 +1298,13 @@ npx.cmd vitest run src/modules/event-people/components/RelationalDeliveries.test
 
 ## Checklist final desta doc
 
+- [ ] explicitar maquina de estados do dominio
+- [ ] explicitar contrato das projecoes e replay por `event_id`
+- [ ] mover leituras operacionais para query objects estaveis
+- [ ] blindar queries quentes com `EXPLAIN`
+- [ ] congelar protocolo de cache otimista e transicoes do frontend
+- [ ] transformar overview, fila e pagina de pessoas em cockpit operacional
+- [ ] subir acessibilidade minima de status e foco
 - [ ] fechar politica de retention AWS por evento
 - [ ] criar auditoria remota de collection e users
 - [ ] criar cleanup de `UserId` por pessoa
@@ -916,9 +1335,10 @@ O backlog pendente do `EventPeople` agora se divide em dois tipos de trabalho:
 1. endurecimento operacional da AWS e do backend;
 2. ampliacao do produto para grupo, cobertura, momentos e entrega.
 
-Os dois importam, mas a ordem correta e:
+Os dois importam, mas a ordem correta agora fica:
 
-- primeiro limpar governanca e retention;
+- primeiro congelar contrato operacional, performance e cockpit;
+- depois limpar governanca e retention;
 - depois subir grupos;
 - depois medir cobertura;
 - depois transformar isso em momentos e entregas.

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 import type { EventJourneyBuiltScenario } from './types';
+import { humanizeJourneyText } from './journeyCopy';
 
 interface JourneyScenarioSimulatorProps {
   scenarios: EventJourneyBuiltScenario[];
@@ -21,7 +22,7 @@ function outcomeMeta(outcome: EventJourneyBuiltScenario['outcome']) {
       };
     case 'review':
       return {
-        label: 'Revisao',
+        label: 'Em revisao',
         className: 'border-amber-200 bg-amber-100 text-amber-800',
       };
     case 'blocked':
@@ -46,7 +47,7 @@ export function JourneyScenarioSimulator({
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-sm font-medium text-foreground">
         <GitBranch className="h-4 w-4 text-primary" />
-        Simulador de cenarios
+        Simular um caso real
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -60,10 +61,10 @@ export function JourneyScenarioSimulator({
               size="sm"
               variant={isActive ? 'default' : 'outline'}
               disabled={!scenario.available}
-              title={scenario.available ? scenario.description : scenario.unavailableReason ?? undefined}
+              title={scenario.available ? humanizeJourneyText(scenario.description) : humanizeJourneyText(scenario.unavailableReason ?? '') || undefined}
               onClick={() => onScenarioSelect(isActive ? null : scenario)}
             >
-              {scenario.label}
+              {humanizeJourneyText(scenario.label)}
             </Button>
           );
         })}
@@ -79,11 +80,11 @@ export function JourneyScenarioSimulator({
             </Badge>
           </AlertTitle>
           <AlertDescription className="space-y-3">
-            <p className="font-medium text-foreground">{selectedScenario.label}</p>
-            <p>{selectedScenario.humanText}</p>
+            <p className="font-medium text-foreground">{humanizeJourneyText(selectedScenario.label)}</p>
+            <p>{humanizeJourneyText(selectedScenario.humanText)}</p>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-muted-foreground">
-                O caminho destacado no canvas tambem aparece no inspector lateral.
+                O caminho destacado no mapa tambem aparece no painel lateral.
               </p>
               <Button
                 type="button"

@@ -25,17 +25,27 @@ describe('wall theme architecture characterization', () => {
 
     expect(sharedTypesSource).toContain("'puzzle'");
     expect(sharedTypesSource).toContain('theme_config');
+    expect(sharedTypesSource).toContain('transition_mode');
     expect(backendEnumSource).toContain("case Puzzle = 'puzzle'");
     expect(backendEnumSource).toContain('supports_theme_config');
     expect(managerConfigSource).toContain('export const PUZZLE_LAYOUT_FALLBACK_OPTION');
     expect(managerConfigSource).toContain('resolveManagerWallLayoutOption');
     expect(staticFallbackLayoutBlock).not.toContain("value: 'puzzle'");
     expect(settingsRequestSource).toContain('theme_config');
+    expect(settingsRequestSource).toContain('transition_mode');
   });
 
   it('still hardcodes 3 slots for board layouts, but now uses a formal registry, board subsystem and theme-level motion contract', () => {
     const layoutRendererSource = fs.readFileSync(
       path.resolve(__dirname, 'components/LayoutRenderer.tsx'),
+      'utf8',
+    );
+    const reducerSource = fs.readFileSync(
+      path.resolve(__dirname, 'engine/reducer.ts'),
+      'utf8',
+    );
+    const schedulerSource = fs.readFileSync(
+      path.resolve(__dirname, 'engine/transition-scheduler.ts'),
       'utf8',
     );
     const playerRootSource = fs.readFileSync(
@@ -56,14 +66,24 @@ describe('wall theme architecture characterization', () => {
     expect(layoutRendererSource).toContain("from 'framer-motion'");
     expect(layoutRendererSource).toContain('getWallLayoutDefinition');
     expect(layoutRendererSource).toContain('resolveLayoutTransition');
+    expect(layoutRendererSource).toContain('activeTransitionEffect ?? settings.transition_effect');
     expect(layoutRendererSource).toContain('useWallBoard');
     expect(layoutRendererSource).toContain('createBoardInstanceKey');
     expect(layoutRendererSource).not.toContain('useMultiSlot');
     expect(layoutRendererSource).not.toContain('function renderSingleLayout');
     expect(layoutRendererSource).not.toContain('function renderMultiLayout');
 
+    expect(reducerSource).toContain('activeTransitionEffect');
+    expect(reducerSource).toContain('transitionAdvanceCount');
+    expect(reducerSource).toContain('resolveWallRuntimeTransitionEffect');
+
+    expect(schedulerSource).toContain('DEFAULT_RANDOM_TRANSITION_POOL');
+    expect(schedulerSource).toContain("settings.transition_mode !== 'random'");
+    expect(schedulerSource).not.toContain('Math.random(');
+
     expect(playerRootSource).toContain('MotionConfig');
     expect(playerRootSource).toContain('resolveWallMotionConfig');
+    expect(playerRootSource).toContain('activeTransitionEffect={state.activeTransitionEffect}');
     expect(playerRootSource).not.toContain("from 'motion/react'");
 
     expect(registrySource).toContain('interface WallLayoutDefinition');
@@ -113,6 +133,8 @@ describe('wall theme architecture characterization', () => {
     );
 
     expect(previewSource).toContain('new ResizeObserver');
+    expect(previewSource).toContain('resolveWallRuntimeTransitionEffect');
+    expect(previewSource).toContain('activeTransitionEffect={previewTransitionEffect}');
     expect(stageGeometrySource).toContain('new ResizeObserver');
     expect(queryOptionsSource).toContain('placeholderData: previousData');
     expect(queryOptionsSource).toContain('placeholderData: previousLiveSnapshot');
@@ -163,17 +185,21 @@ describe('wall theme architecture characterization', () => {
     expect(managerConfigSource).toContain('supports_multi_video');
     expect(managerConfigSource).toContain('max_simultaneous_videos');
     expect(managerConfigSource).toContain('supports_theme_config');
+    expect(managerConfigSource).toContain('transition_modes');
     expect(managerConfigSource).not.toContain('posterOnlyMode');
 
     expect(appearanceTabSource).toContain('resolveManagerWallLayoutOption');
     expect(appearanceTabSource).toContain('layoutCapabilities');
     expect(appearanceTabSource).toContain('supportsThemeConfig');
+    expect(appearanceTabSource).toContain('wall-transition-mode-select');
+    expect(appearanceTabSource).toContain('wall-transition-mode-locked');
     expect(appearanceTabSource).toContain('wall-video-multi-layout-locked');
     expect(appearanceTabSource).toContain('wall-side-thumbnails-switch');
 
     expect(optionsControllerSource).toContain("'layouts' => collect(WallLayout::enabledCases())->map");
     expect(optionsControllerSource).toContain('capabilities');
     expect(optionsControllerSource).toContain('defaults');
+    expect(optionsControllerSource).toContain('transition_modes');
   });
 
   it('keeps the puzzle execution plan aligned with the final video policy during implementation', () => {

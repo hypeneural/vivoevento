@@ -99,6 +99,100 @@ describe('useWallEngine', () => {
     expect(result.current.state.status).toBe('playing');
     expect(result.current.state.items).toHaveLength(1);
     expect(result.current.currentItem?.id).toBe('media_1');
+    expect(result.current.state.activeTransitionEffect).toBe('fade');
+    expect(result.current.state.transitionAdvanceCount).toBe(0);
+  });
+
+  it('keeps the active transition stable for the same slide even if settings change while mode is random', () => {
+    const { result } = renderHook(() => useWallEngine('ABCD1234'));
+
+    act(() => {
+      result.current.applySnapshot({
+        ...makeSnapshot('live', [
+          makeMedia({ id: 'media_a', sender_name: 'Ana', sender_key: 'sender-ana', type: 'image', created_at: '2026-04-01T10:01:00Z' }),
+          makeMedia({ id: 'media_b', sender_name: 'Bruno', sender_key: 'sender-bruno', type: 'image', created_at: '2026-04-01T10:02:00Z' }),
+        ]),
+        settings: {
+          ...makeSnapshot('live').settings,
+          layout: 'fullscreen',
+          transition_effect: 'fade',
+          transition_mode: 'random',
+        },
+      });
+    });
+
+    const firstEffect = result.current.state.activeTransitionEffect;
+    expect(firstEffect).toBeTruthy();
+
+    act(() => {
+      result.current.applySettings({
+        ...makeSnapshot('live').settings,
+        layout: 'fullscreen',
+        transition_effect: 'flip',
+        transition_mode: 'random',
+      });
+    });
+
+    expect(result.current.state.currentItemId).toBe('media_b');
+    expect(result.current.state.activeTransitionEffect).toBe(firstEffect);
+    expect(result.current.state.transitionAdvanceCount).toBe(0);
+  });
+
+  it('resolves a new deterministic random effect only when the slideshow advances', () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() => useWallEngine('ABCD1234'));
+
+    act(() => {
+      result.current.applySnapshot({
+        ...makeSnapshot('live', [
+          makeMedia({ id: 'media_a', sender_name: 'Ana', sender_key: 'sender-ana', type: 'image', created_at: '2026-04-01T10:01:00Z' }),
+          makeMedia({ id: 'media_b', sender_name: 'Bruno', sender_key: 'sender-bruno', type: 'image', created_at: '2026-04-01T10:02:00Z' }),
+          makeMedia({ id: 'media_c', sender_name: 'Carla', sender_key: 'sender-carla', type: 'image', created_at: '2026-04-01T10:03:00Z' }),
+        ]),
+        settings: {
+          ...makeSnapshot('live').settings,
+          layout: 'fullscreen',
+          transition_effect: 'fade',
+          transition_mode: 'random',
+        },
+      });
+    });
+
+    const firstItemId = result.current.currentItem?.id;
+    const firstEffect = result.current.state.activeTransitionEffect;
+
+    act(() => {
+      vi.advanceTimersByTime(8_000);
+    });
+
+    expect(result.current.currentItem?.id).not.toBe(firstItemId);
+    expect(result.current.state.activeTransitionEffect).toBeTruthy();
+    expect(result.current.state.activeTransitionEffect).not.toBe(firstEffect);
+    expect(result.current.state.lastTransitionEffect).toBe(firstEffect);
+    expect(result.current.state.transitionAdvanceCount).toBe(1);
+  });
+
+  it('ignores random mode for board layouts and keeps the configured base transition effect', () => {
+    const { result } = renderHook(() => useWallEngine('ABCD1234'));
+
+    act(() => {
+      result.current.applySnapshot({
+        ...makeSnapshot('live', [
+          makeMedia({ id: 'media_a', sender_name: 'Ana', sender_key: 'sender-ana', type: 'image', created_at: '2026-04-01T10:01:00Z' }),
+          makeMedia({ id: 'media_b', sender_name: 'Bruno', sender_key: 'sender-bruno', type: 'image', created_at: '2026-04-01T10:02:00Z' }),
+        ]),
+        settings: {
+          ...makeSnapshot('live').settings,
+          layout: 'grid',
+          transition_effect: 'slide',
+          transition_mode: 'random',
+        },
+      });
+    });
+
+    expect(result.current.state.activeTransitionEffect).toBe('slide');
+    expect(result.current.state.transitionAdvanceCount).toBe(0);
   });
 
   it('moves from playing to stopped when realtime status becomes disabled', () => {

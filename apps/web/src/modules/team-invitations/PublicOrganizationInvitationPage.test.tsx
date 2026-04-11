@@ -12,6 +12,7 @@ const persistSessionMock = vi.fn();
 const setTokenMock = vi.fn();
 const useAuthMock = vi.fn();
 const redirectToInvitationNextPathMock = vi.fn();
+const logoutMock = vi.fn();
 
 vi.mock('./api', () => ({
   organizationInvitationsApi: {
@@ -68,6 +69,7 @@ describe('PublicOrganizationInvitationPage', () => {
     vi.clearAllMocks();
     useAuthMock.mockReturnValue({
       isAuthenticated: false,
+      logout: logoutMock,
       meUser: null,
     });
   });
@@ -87,6 +89,9 @@ describe('PublicOrganizationInvitationPage', () => {
         slug: 'cerimonial-aurora',
         logo_url: null,
       },
+      invited_by: {
+        name: 'Marina Aurora',
+      },
       access: {
         role_key: 'partner-manager',
         role_label: 'Gerente / Secretaria',
@@ -99,11 +104,17 @@ describe('PublicOrganizationInvitationPage', () => {
     renderPage();
 
     expect(await screen.findByRole('heading', { name: 'Cerimonial Aurora' })).toBeInTheDocument();
-    expect(screen.getByText(/este convite libera seu acesso pessoal para a rotina desta organizacao/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /fazer login para continuar/i })).toHaveAttribute(
+    expect(screen.getByText(/marina aurora convidou você/i)).toBeInTheDocument();
+    expect(screen.getByText(/quem convidou:/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /entrar para aceitar convite/i })).toHaveAttribute(
       'href',
       '/login?returnTo=%2Fconvites%2Fequipe%2Ftoken-123',
     );
+    expect(screen.getByRole('link', { name: /esqueci a senha/i })).toHaveAttribute(
+      'href',
+      '/login?returnTo=%2Fconvites%2Fequipe%2Ftoken-123&flow=forgot',
+    );
+    expect(screen.getByText(/você voltará para este convite após entrar/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/^senha$/i)).not.toBeInTheDocument();
   });
 
@@ -121,6 +132,9 @@ describe('PublicOrganizationInvitationPage', () => {
         name: 'Bella Assessoria',
         slug: 'bella-assessoria',
         logo_url: null,
+      },
+      invited_by: {
+        name: 'Paula Bella',
       },
       access: {
         role_key: 'financeiro',
@@ -151,7 +165,7 @@ describe('PublicOrganizationInvitationPage', () => {
 
     fireEvent.change(screen.getByLabelText(/^senha$/i), { target: { value: 'SenhaForte123!' } });
     fireEvent.change(screen.getByLabelText(/confirmar senha/i), { target: { value: 'SenhaForte123!' } });
-    fireEvent.click(screen.getByRole('button', { name: /criar conta e entrar/i }));
+    fireEvent.click(screen.getByRole('button', { name: /criar conta, aceitar convite e entrar/i }));
 
     await waitFor(() => {
       expect(acceptPublicInvitationMock).toHaveBeenCalledWith('token-123', expect.objectContaining({
@@ -163,5 +177,51 @@ describe('PublicOrganizationInvitationPage', () => {
     expect(setTokenMock).toHaveBeenCalledWith('token-organizacao');
     expect(persistSessionMock).toHaveBeenCalled();
     expect(redirectToInvitationNextPathMock).toHaveBeenCalledWith('/');
+  });
+
+  it('allows the authenticated user to switch account before accepting an organization invitation', async () => {
+    getPublicInvitationMock.mockResolvedValue({
+      id: 3,
+      requires_existing_login: true,
+      invitee_name: 'Secretaria Ana',
+      invitee_contact: {
+        email: 'ana@eventovivo.test',
+        phone_masked: '+55 ******7765',
+      },
+      organization: {
+        id: 7,
+        name: 'Cerimonial Aurora',
+        slug: 'cerimonial-aurora',
+        logo_url: null,
+      },
+      invited_by: {
+        name: 'Marina Aurora',
+      },
+      access: {
+        role_key: 'partner-manager',
+        role_label: 'Gerente / Secretaria',
+        description: 'Pode organizar clientes, eventos e a rotina da operacao da empresa.',
+      },
+      invitation_url: 'https://eventovivo.test/convites/equipe/token-123',
+      token_expires_at: '2026-05-10T12:00:00Z',
+    });
+
+    useAuthMock.mockReturnValue({
+      isAuthenticated: true,
+      logout: logoutMock,
+      meUser: { name: 'Conta errada' },
+    });
+
+    renderPage();
+
+    expect(await screen.findByRole('heading', { name: 'Cerimonial Aurora' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /usar outra conta/i }));
+
+    await waitFor(() => {
+      expect(logoutMock).toHaveBeenCalled();
+    });
+
+    expect(await screen.findByText('login-page')).toBeInTheDocument();
   });
 });

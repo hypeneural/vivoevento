@@ -13,7 +13,16 @@ export const WALL_EVENT_NAMES = {
 
 export type WallMediaType = 'image' | 'video';
 export type WallLayout = 'auto' | 'polaroid' | 'fullscreen' | 'split' | 'cinematic' | 'kenburns' | 'spotlight' | 'gallery' | 'carousel' | 'mosaic' | 'grid' | 'puzzle';
-export type WallTransition = 'fade' | 'slide' | 'zoom' | 'flip' | 'none';
+export type WallTransition =
+  | 'fade'
+  | 'slide'
+  | 'zoom'
+  | 'flip'
+  | 'lift-fade'
+  | 'cross-zoom'
+  | 'swipe-up'
+  | 'none';
+export type WallTransitionMode = 'fixed' | 'random';
 export type WallLifecycleStatus = 'draft' | 'live' | 'paused' | 'stopped' | 'expired';
 export type WallPublicStatus = WallLifecycleStatus | 'disabled';
 export type WallSelectionMode = 'balanced' | 'live' | 'inclusive' | 'editorial' | 'custom';
@@ -117,6 +126,8 @@ export interface WallSettings {
   theme_config: WallThemeConfig;
   layout: WallLayout;
   transition_effect: WallTransition;
+  transition_mode?: WallTransitionMode;
+  transition_pool?: WallTransition[] | null;
   background_url?: string | null;
   partner_logo_url?: string | null;
   show_qr: boolean;

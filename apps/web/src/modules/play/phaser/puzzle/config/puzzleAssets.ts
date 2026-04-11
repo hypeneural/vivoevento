@@ -1,3 +1,5 @@
+import type { PlayRuntimeAsset } from '@/lib/api-types';
+
 export const PUZZLE_SOURCE_TEXTURE_KEY = 'puzzle-source';
 export const PUZZLE_PARTICLE_TEXTURE_KEY = 'puzzle-particle-dot';
 export const PUZZLE_PROMPT_TEXTURE_KEY = 'puzzle-prompt-touch';
@@ -25,3 +27,17 @@ export const PUZZLE_UI_ASSETS = {
   iconTimer: '/assets/play/puzzle/icons/timer.svg',
   particleSpark: '/assets/play/puzzle/particles/spark-dot.svg',
 } as const;
+
+export function isPuzzleCoverAsset(asset: PlayRuntimeAsset | null | undefined) {
+  if (!asset?.url) {
+    return false;
+  }
+
+  const mimeType = String(asset.mimeType ?? '').toLowerCase();
+
+  return mimeType.startsWith('image/');
+}
+
+export function resolvePuzzleCoverAsset(assets: PlayRuntimeAsset[] | null | undefined) {
+  return (assets ?? []).find((asset) => isPuzzleCoverAsset(asset)) ?? null;
+}

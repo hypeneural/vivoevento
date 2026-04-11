@@ -6,6 +6,7 @@ use App\Modules\Wall\Enums\WallLayout;
 use App\Modules\Wall\Enums\WallEventPhase;
 use App\Modules\Wall\Enums\WallSelectionMode;
 use App\Modules\Wall\Enums\WallTransition;
+use App\Modules\Wall\Enums\WallTransitionMode;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -21,6 +22,9 @@ class SimulateWallRequest extends FormRequest
         return [
             'layout' => ['sometimes', Rule::enum(WallLayout::class)],
             'transition_effect' => ['sometimes', Rule::enum(WallTransition::class)],
+            'transition_mode' => ['sometimes', Rule::enum(WallTransitionMode::class)],
+            'transition_pool' => ['sometimes', 'nullable', 'array'],
+            'transition_pool.*' => ['bail', 'string', 'distinct:strict', Rule::in(WallTransition::randomPoolValues())],
             'interval_ms' => ['sometimes', 'integer', 'min:2000', 'max:60000'],
             'queue_limit' => ['sometimes', 'integer', 'min:5', 'max:500'],
             'selection_mode' => ['sometimes', Rule::enum(WallSelectionMode::class)],

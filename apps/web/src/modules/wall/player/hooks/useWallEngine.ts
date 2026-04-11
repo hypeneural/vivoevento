@@ -295,6 +295,18 @@ export function useWallEngine(code: string) {
       stateRef.current.currentItemStartedAt
       ?? persistedState?.currentItemStartedAt
       ?? null;
+    const preferredActiveTransitionEffect =
+      stateRef.current.activeTransitionEffect
+      ?? persistedState?.activeTransitionEffect
+      ?? null;
+    const preferredLastTransitionEffect =
+      stateRef.current.lastTransitionEffect
+      ?? persistedState?.lastTransitionEffect
+      ?? null;
+    const preferredTransitionAdvanceCount =
+      stateRef.current.transitionAdvanceCount
+      ?? persistedState?.transitionAdvanceCount
+      ?? 0;
 
     dispatch({
       type: 'apply-snapshot',
@@ -304,6 +316,9 @@ export function useWallEngine(code: string) {
       persistedVideoPlayback: persistedState?.videoPlayback ?? null,
       preferredCurrentItemId,
       preferredCurrentItemStartedAt,
+      preferredActiveTransitionEffect,
+      preferredLastTransitionEffect,
+      preferredTransitionAdvanceCount,
       fallbackStatus: 'playing' satisfies WallPlayerStatus,
     });
 

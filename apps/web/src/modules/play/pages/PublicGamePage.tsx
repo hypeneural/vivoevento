@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import type {
   PlayGameAnalytics,
   PlayGameSession,
+  PlayGameReadiness,
   PlayRankingEntry,
   PlaySessionAnalytics,
   StartPlaySessionResponse,
@@ -161,6 +162,45 @@ function connectionLabel(status: string) {
   }
 }
 
+function resolveGameReadiness(game: {
+  is_active: boolean;
+  readiness?: PlayGameReadiness | null;
+}): PlayGameReadiness {
+  return game.readiness ?? {
+    published: Boolean(game.is_active),
+    launchable: Boolean(game.is_active),
+    bootable: Boolean(game.is_active),
+    reason: null,
+  };
+}
+
+function resolveGameUnavailableMessage(gameKey: string | null, reason: string | null | undefined) {
+  switch (reason) {
+    case 'puzzle.no_image_available':
+      return {
+        title: 'Este jogo ainda nao esta pronto para jogar.',
+        description: 'Falta uma imagem publicada valida para montar o quebra-cabeca.',
+      };
+    case 'memory.not_enough_images':
+      return {
+        title: 'Este jogo ainda nao esta pronto para jogar.',
+        description: 'Faltam fotos publicadas suficientes para montar o tabuleiro.',
+      };
+    case 'play.not_published':
+      return {
+        title: 'Este jogo nao esta publicado.',
+        description: 'Ative o jogo no evento para liberar o acesso publico.',
+      };
+    default:
+      return {
+        title: 'Este jogo ainda nao esta disponivel.',
+        description: gameKey === 'puzzle'
+          ? 'Ainda nao existe uma imagem valida para iniciar o puzzle.'
+          : 'Ainda faltam assets validos para iniciar esta partida.',
+      };
+  }
+}
+
 function buildStoredSession(
   eventSlug: string,
   gameSlug: string,
@@ -282,13 +322,14 @@ export default function PublicGamePage() {
 
   const primeCurrentGameRuntime = useCallback((force = false) => {
     const gameTypeKey = gameQuery.data?.game.game_type_key;
+    const readiness = gameQuery.data?.game.readiness;
 
-    if (!gameTypeKey) {
+    if (!gameTypeKey || readiness?.bootable === false) {
       return;
     }
 
     void warmPlayableGameRuntime(gameTypeKey, 'intent', { force });
-  }, [gameQuery.data?.game.game_type_key]);
+  }, [gameQuery.data?.game.game_type_key, gameQuery.data?.game.readiness]);
 
   const primeGameMenu = useCallback(() => {
     void import('@/modules/play/components/PublicGameMenuSheet');
@@ -423,7 +464,7 @@ export default function PublicGamePage() {
       }
       toast({
         title: 'Partida iniciada',
-        description: 'O jogo ja esta pronto para rodar no navegador.',
+        description: 'Sessao criada. O jogo esta sendo preparado neste dispositivo.',
       });
     },
     onError: (error: Error) => {
@@ -632,7 +673,12 @@ export default function PublicGamePage() {
 
   const manifest = manifestQuery.data;
   const gameResponse = gameQuery.data;
+  const gameReadiness = resolveGameReadiness(gameResponse.game);
+  const canStartNewSession = gameReadiness.bootable;
   const currentGameKey = runtimePayload?.gameKey ?? gameResponse.game.game_type_key ?? null;
+  const unavailableState = !runtimePayload && !canStartNewSession
+    ? resolveGameUnavailableMessage(currentGameKey, gameReadiness.reason)
+    : null;
   const localMoves = Number(progress.moves ?? latestResult?.moves ?? 0);
   const sessionStatus = runtimePayload?.status ?? runtimePayload?.session?.status ?? 'idle';
   const resumeDeadline = runtimePayload?.expiresAt ?? runtimePayload?.session?.expiresAt ?? null;
@@ -678,7 +724,7 @@ export default function PublicGamePage() {
           <p className="text-sm text-white/70">{manifest.event.title}</p>
         </div>
 
-        {resumeCandidate && !runtimePayload ? (
+        {resumeCandidate && !runtimePayload && canStartNewSession ? (
           <SessionResumeBanner
             playerName={resumeCandidate.playerName}
             expiresAt={resumeCandidate.expiresAt}
@@ -723,7 +769,29 @@ export default function PublicGamePage() {
               </div>
             </div>
 
-            <form className="flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={playerForm.handleSubmit((values) => startMutation.mutate(values))}>
+            {unavailableState ? (
+              <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-4 text-sm text-amber-50">
+                <p className="font-semibold">{unavailableState.title}</p>
+                <p className="mt-1 text-amber-50/80">{unavailableState.description}</p>
+              </div>
+            ) : null}
+
+            <form
+              className="flex flex-col gap-3 sm:flex-row sm:items-end"
+              onSubmit={playerForm.handleSubmit((values) => {
+                if (!canStartNewSession) {
+                  const message = resolveGameUnavailableMessage(currentGameKey, gameReadiness.reason);
+                  toast({
+                    title: message.title,
+                    description: message.description,
+                    variant: 'destructive',
+                  });
+                  return;
+                }
+
+                startMutation.mutate(values);
+              })}
+            >
               <div className="flex-1 space-y-2">
                 <Label htmlFor="player-name" className="text-white">Apelido para ranking</Label>
                 <Input
@@ -736,7 +804,7 @@ export default function PublicGamePage() {
               </div>
               <Button
                 type="submit"
-                disabled={startMutation.isPending}
+                disabled={startMutation.isPending || !canStartNewSession}
                 className="sm:min-w-[190px]"
                 onMouseEnter={() => primeCurrentGameRuntime()}
                 onTouchStart={() => primeCurrentGameRuntime()}
@@ -746,7 +814,7 @@ export default function PublicGamePage() {
                 ) : (
                   <Play className="mr-1.5 h-4 w-4" />
                 )}
-                {runtimePayload ? 'Nova partida' : 'Iniciar partida'}
+                {runtimePayload ? 'Nova partida' : canStartNewSession ? 'Iniciar partida' : 'Jogo indisponivel'}
               </Button>
             </form>
 
@@ -805,7 +873,7 @@ export default function PublicGamePage() {
 
             {!runtimePayload ? (
               <div className="flex min-h-[96px] items-center justify-center text-center text-sm text-white/45">
-                Inicie uma partida para carregar este jogo.
+                {unavailableState ? unavailableState.description : 'Inicie uma partida para carregar este jogo.'}
               </div>
             ) : null}
 

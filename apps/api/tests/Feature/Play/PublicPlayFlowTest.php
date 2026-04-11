@@ -70,6 +70,10 @@ it('starts and finishes a public play session and exposes ranking data', functio
     $manifestResponse = $this->apiGet("/public/events/{$event->slug}/play");
     $this->assertApiSuccess($manifestResponse);
     $manifestResponse->assertJsonPath('data.games.0.slug', 'memoria-publica')
+        ->assertJsonPath('data.games.0.readiness.published', true)
+        ->assertJsonPath('data.games.0.readiness.launchable', true)
+        ->assertJsonPath('data.games.0.readiness.bootable', true)
+        ->assertJsonPath('data.games.0.readiness.reason', null)
         ->assertJsonPath('data.pwa.installable', true);
 
     $startResponse = $this->apiPost("/public/events/{$event->slug}/play/{$game->slug}/sessions", [
@@ -177,7 +181,11 @@ it('starts and finishes a public play session and exposes ranking data', functio
     $showResponse = $this->apiGet("/public/events/{$event->slug}/play/{$game->slug}?save_data=1&effective_type=3g&downlink=1.1&viewport_width=390&viewport_height=844&pixel_ratio=3");
 
     $this->assertApiSuccess($showResponse);
-    $showResponse->assertJsonPath('data.runtime.analytics.total_sessions', 1)
+    $showResponse->assertJsonPath('data.game.readiness.published', true)
+        ->assertJsonPath('data.game.readiness.launchable', true)
+        ->assertJsonPath('data.game.readiness.bootable', true)
+        ->assertJsonPath('data.game.readiness.reason', null)
+        ->assertJsonPath('data.runtime.analytics.total_sessions', 1)
         ->assertJsonPath('data.runtime.analytics.total_moves', 3)
         ->assertJsonPath('data.runtime.assets.0.variantKey', 'fast_preview')
         ->assertJsonPath('data.runtime.assets.0.deliveryProfile', 'constrained')

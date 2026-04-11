@@ -11,6 +11,7 @@ use App\Modules\Wall\Enums\WallEventPhase;
 use App\Modules\Wall\Enums\WallLayout;
 use App\Modules\Wall\Enums\WallStatus;
 use App\Modules\Wall\Enums\WallTransition;
+use App\Modules\Wall\Enums\WallTransitionMode;
 use App\Modules\Wall\Http\Requests\RunWallPlayerCommandRequest;
 use App\Modules\Wall\Http\Requests\SimulateWallRequest;
 use App\Modules\Wall\Http\Requests\UpdateWallSettingsRequest;
@@ -277,6 +278,14 @@ class EventWallController extends BaseController
                 'value' => $transition->value,
                 'label' => $transition->label(),
             ]),
+            'transition_modes' => collect(WallTransitionMode::cases())->map(fn ($mode) => [
+                'value' => $mode->value,
+                'label' => $mode->label(),
+            ]),
+            'transition_defaults' => [
+                'transition_effect' => WallTransition::Fade->value,
+                'transition_mode' => WallTransitionMode::Fixed->value,
+            ],
             'statuses' => collect(WallStatus::cases())->map(fn ($status) => [
                 'value' => $status->value,
                 'label' => $status->label(),

@@ -23,6 +23,9 @@ class PublicEventTeamInvitationResource extends JsonResource
                     ? \App\Shared\Support\PhoneNumber::mask($this->invitee_phone)
                     : null,
             ],
+            'invited_by' => [
+                'name' => $this->inviter?->name,
+            ],
             'event' => [
                 'id' => $this->event?->id,
                 'title' => $this->event?->title,

@@ -6,6 +6,7 @@ import type {
   ApiWallSelectionPolicy,
   ApiWallSettings,
   ApiWallThemeConfig,
+  ApiWallTransitionMode,
   ApiWallVideoAudioPolicy,
   ApiWallVideoMultiLayoutPolicy,
   ApiWallVideoPlaybackMode,
@@ -13,6 +14,7 @@ import type {
   ApiWallVideoResumeMode,
 } from '@/lib/api-types';
 import { resolveManagerWallLayoutOption } from './manager-config';
+import { sanitizeWallTransitionPool } from './player/engine/transition-registry';
 
 export const DEFAULT_WALL_SELECTION_POLICY: ApiWallSelectionPolicy = {
   max_eligible_items_per_sender: 4,
@@ -151,6 +153,8 @@ export function cloneWallSettings(settings: ApiWallSettings): ApiWallSettings {
     video_preferred_variant: normalizeVideoPreferredVariant(settings.video_preferred_variant),
     theme_config: normalizeWallThemeConfig(settings.theme_config),
     selection_policy: normalizeWallSelectionPolicy(settings.selection_policy),
+    transition_mode: normalizeTransitionMode(settings.transition_mode),
+    transition_pool: normalizeTransitionPool(settings.transition_pool),
   };
 }
 
@@ -172,6 +176,8 @@ export function prepareWallSettingsPayload(settings: ApiWallSettings): ApiWallSe
     video_preferred_variant: normalizeVideoPreferredVariant(settings.video_preferred_variant),
     theme_config: normalizeWallThemeConfig(settings.theme_config),
     selection_policy: normalizeWallSelectionPolicy(settings.selection_policy),
+    transition_mode: normalizeTransitionMode(settings.transition_mode),
+    transition_pool: normalizeTransitionPool(settings.transition_pool),
     neon_text: blankToNull(settings.neon_text),
     instructions_text: blankToNull(settings.instructions_text),
   };
@@ -191,6 +197,12 @@ export function applyWallLayoutCapabilities(
 
   return {
     ...settings,
+    transition_mode: supportsRandomTransitionModeForLayout(settings.layout, resolvedLayoutOption)
+      ? normalizeTransitionMode(settings.transition_mode)
+      : 'fixed',
+    transition_pool: supportsRandomTransitionModeForLayout(settings.layout, resolvedLayoutOption)
+      ? normalizeTransitionPool(settings.transition_pool)
+      : null,
     show_side_thumbnails: resolvedLayoutOption?.capabilities.supports_side_thumbnails === false
       ? false
       : (settings.show_side_thumbnails ?? true),
@@ -199,6 +211,18 @@ export function applyWallLayoutCapabilities(
       : normalizeVideoMultiLayoutPolicy(settings.video_multi_layout_policy),
     theme_config: normalizedThemeConfig,
   };
+}
+
+export function supportsRandomTransitionModeForLayout(
+  layout: ApiWallSettings['layout'],
+  layoutOption?: ApiWallLayoutOption | null,
+): boolean {
+  const resolvedLayout = layoutOption?.value ?? layout;
+
+  return resolvedLayout !== 'grid'
+    && resolvedLayout !== 'mosaic'
+    && resolvedLayout !== 'carousel'
+    && resolvedLayout !== 'puzzle';
 }
 
 export function resolveManagedWallSettings(
@@ -238,6 +262,8 @@ export function areWallSettingsEqual(
     && leftSelection.avoid_same_duplicate_cluster_if_alternative_exists === rightSelection.avoid_same_duplicate_cluster_if_alternative_exists
     && left.layout === right.layout
     && left.transition_effect === right.transition_effect
+    && normalizeTransitionMode(left.transition_mode) === normalizeTransitionMode(right.transition_mode)
+    && serializeWallTransitionPool(left.transition_pool) === serializeWallTransitionPool(right.transition_pool)
     && left.background_url === right.background_url
     && left.partner_logo_url === right.partner_logo_url
     && left.show_qr === right.show_qr
@@ -398,6 +424,18 @@ function normalizeVideoPlaybackMode(value?: ApiWallVideoPlaybackMode | string | 
   return 'play_to_end_if_short_else_cap';
 }
 
+function normalizeTransitionMode(value?: ApiWallTransitionMode | string | null): ApiWallTransitionMode {
+  return value === 'random' ? 'random' : 'fixed';
+}
+
+export function normalizeTransitionPool(
+  value?: readonly (string | null | undefined)[] | null,
+): ApiWallSettings['transition_pool'] {
+  const sanitized = sanitizeWallTransitionPool(value);
+
+  return sanitized.length > 0 ? sanitized : null;
+}
+
 function normalizeVideoResumeMode(value?: ApiWallVideoResumeMode | string | null): ApiWallVideoResumeMode {
   if (value === 'resume_if_same_item' || value === 'restart_from_zero' || value === 'resume_if_same_item_else_restart') {
     return value;
@@ -449,6 +487,10 @@ function serializeWallThemeConfig(config?: Partial<ApiWallThemeConfig> | null): 
     }, {});
 
   return JSON.stringify(sorted);
+}
+
+function serializeWallTransitionPool(pool?: ApiWallSettings['transition_pool']): string {
+  return JSON.stringify(normalizeTransitionPool(pool));
 }
 
 function describePlaybackMode(mode: ApiWallVideoPlaybackMode | string | null | undefined, maxSeconds: number): string {

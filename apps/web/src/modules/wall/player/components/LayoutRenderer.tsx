@@ -23,6 +23,7 @@ import type {
   WallPerformanceTier,
   WallRuntimeItem,
   WallSettings,
+  WallTransition,
 } from '../types';
 import type { MediaSurfaceVideoControlProps } from './MediaSurface';
 
@@ -36,6 +37,7 @@ interface LayoutRendererProps {
   videoControl?: MediaSurfaceVideoControlProps | null;
   eventId?: string | number | null;
   performanceTier?: WallPerformanceTier;
+  activeTransitionEffect?: WallTransition | null;
 }
 
 export function LayoutRenderer({
@@ -46,6 +48,7 @@ export function LayoutRenderer({
   videoControl = null,
   eventId = null,
   performanceTier = reducedMotion ? 'performance' : 'premium',
+  activeTransitionEffect = null,
 }: LayoutRendererProps) {
   const resolvedLayout = resolveRenderableLayout(
     settings.layout,
@@ -119,7 +122,7 @@ export function LayoutRenderer({
   }
 
   const resolvedTransition = resolveLayoutTransition(
-    settings.transition_effect,
+    activeTransitionEffect ?? settings.transition_effect,
     definition.motion,
     reducedMotion,
   );

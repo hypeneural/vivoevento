@@ -1632,7 +1632,16 @@ export type ApiWallLayout =
   | 'grid'
   | 'puzzle';
 
-export type ApiWallTransition = 'fade' | 'slide' | 'zoom' | 'flip' | 'none';
+export type ApiWallTransition =
+  | 'fade'
+  | 'slide'
+  | 'zoom'
+  | 'flip'
+  | 'lift-fade'
+  | 'cross-zoom'
+  | 'swipe-up'
+  | 'none';
+export type ApiWallTransitionMode = 'fixed' | 'random';
 export type ApiWallThemePreset = 'compact' | 'standard';
 export type ApiWallThemeAnchorMode = 'event_brand' | 'qr_prompt' | 'none';
 export type ApiWallThemeBurstIntensity = 'gentle' | 'normal';
@@ -1655,6 +1664,8 @@ export interface ApiWallSettings {
   theme_config: ApiWallThemeConfig;
   layout: ApiWallLayout;
   transition_effect: ApiWallTransition;
+  transition_mode?: ApiWallTransitionMode;
+  transition_pool?: ApiWallTransition[] | null;
   background_url: string | null;
   partner_logo_url: string | null;
   show_qr: boolean;
@@ -1967,6 +1978,15 @@ export interface ApiWallLayoutOption extends ApiWallOption {
   defaults: ApiWallLayoutDefaults;
 }
 
+export interface ApiWallTransitionModeOption extends ApiWallOption {
+  value: ApiWallTransitionMode;
+}
+
+export interface ApiWallTransitionDefaults {
+  transition_effect: ApiWallTransition;
+  transition_mode: ApiWallTransitionMode;
+}
+
 export interface ApiWallSelectionModeOption extends ApiWallOption {
   value: ApiWallSelectionMode;
   description: string;
@@ -1981,6 +2001,8 @@ export interface ApiWallEventPhaseOption extends ApiWallOption {
 export interface ApiWallOptionsResponse {
   layouts: ApiWallLayoutOption[];
   transitions: ApiWallOption[];
+  transition_modes?: ApiWallTransitionModeOption[];
+  transition_defaults?: ApiWallTransitionDefaults;
   statuses: ApiWallOption[];
   selection_modes: ApiWallSelectionModeOption[];
   event_phases: ApiWallEventPhaseOption[];
@@ -2094,6 +2116,7 @@ export interface ApiWallLiveSnapshotResponse {
   wallStatusLabel: string;
   layout: ApiWallLayout;
   transitionEffect: ApiWallTransition;
+  transitionMode?: ApiWallTransitionMode;
   currentPlayer: ApiWallLiveSnapshotPlayer | null;
   currentItem: ApiWallLiveSnapshotItem | null;
   nextItem?: ApiWallLiveSnapshotItem | null;
@@ -2393,6 +2416,13 @@ export interface PlayGameAsset {
   media?: PlayGameAssetMedia;
 }
 
+export interface PlayGameReadiness {
+  published: boolean;
+  launchable: boolean;
+  bootable: boolean;
+  reason: string | null;
+}
+
 export interface PlayEventGame {
   id: number;
   uuid: string;
@@ -2405,6 +2435,7 @@ export interface PlayEventGame {
   sort_order: number;
   ranking_enabled: boolean;
   settings: Record<string, unknown>;
+  readiness?: PlayGameReadiness | null;
   assets?: PlayGameAsset[];
   assets_count?: number;
   sessions_count?: number;

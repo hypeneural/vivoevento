@@ -214,13 +214,14 @@ describe('LayoutRenderer transition characterization', () => {
       <LayoutRenderer
         media={makeItem('hero')}
         settings={makeSettings('fullscreen')}
+        activeTransitionEffect="flip"
         reducedMotion={false}
         allItems={[makeItem('hero')]}
       />,
     );
 
     expect(resolveLayoutTransitionMock).toHaveBeenCalledWith(
-      'slide',
+      'flip',
       expect.objectContaining({
         visualDuration: 0.42,
       }),

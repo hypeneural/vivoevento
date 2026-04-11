@@ -245,7 +245,305 @@ Cobertura pratica desta etapa:
   - desktop usa `Dialog`;
   - mobile usa `Drawer`.
 
+## Status de execucao do preview ao vivo em 2026-04-11
+
+A Fase 3 saiu do placeholder estatico e entrou no desenho performatico previsto no plano.
+
+Entregue nesta etapa:
+
+- o preview do editor agora usa `qr-code-styling` de verdade, nao mais `QRCodeSVG` como placeholder;
+- a integracao segue o fluxo oficial da lib:
+  - `new QRCodeStyling(options)`;
+  - `append(container)` uma vez;
+  - `update(options)` nas mudancas seguintes;
+- a instanciacao ficou encapsulada em `useQrCodePreview`, reaproveitando o wrapper local da dependencia;
+- o shell agora sobe `useForm + FormProvider` para trabalhar sobre um draft real do schema semantico;
+- o preview observa apenas o subconjunto de campos que realmente mudam renderizacao:
+  - `usage_preset`
+  - `skin_preset`
+  - `render`
+  - `style`
+  - `logo`
+  - `advanced`
+- `export_defaults` ficou fora do caminho do preview, o que evita `update()` desnecessario quando o usuario mexe apenas na exportacao;
+- o draft do preview passa por `useDeferredValue`, deixando o caminho visual menos agressivo que o input controlado;
+- o reset do editor agora usa `startTransition`, o que encaixa com a recomendacao do React para trabalho nao urgente;
+- os paines de `Conteudo`, `Estilo`, `Logo`, `Exportacao` e `Avancado` passaram a existir como componentes separados da engine de preview.
+
+Observacao importante:
+
+- `logo.mode = none` agora desliga a imagem no adapter da lib; isso evita drift entre o schema semantico e o resultado visual do preview.
+
+## Testes executados para o preview ao vivo
+
+Comandos:
+
+```bash
+cd apps/web
+npm run test -- src/modules/qr-code/support/qrOptionsBuilder.test.ts src/modules/qr-code/hooks/useQrCodePreview.test.tsx src/modules/qr-code/components/QrCodePreviewPane.test.tsx src/modules/events/qr/EventPublicLinkQrEditorShell.test.tsx
+npm run test -- src/modules/qr-code src/modules/events/qr src/modules/events/EventDetailPage.test.tsx
+npm run type-check
+```
+
+Resultado:
+
+- `4` arquivos passaram na bateria focada da Fase 3;
+- `9` testes passaram na bateria focada da Fase 3;
+- `12` arquivos passaram na bateria combinada;
+- `25` testes passaram na bateria combinada;
+- `type-check` passou.
+
+Cobertura pratica desta etapa:
+
+- `qrOptionsBuilder.test.ts`
+  - garante que `logo.mode = none` remove `image` e `crossOrigin` do preview.
+- `useQrCodePreview.test.tsx`
+  - instancia uma vez;
+  - faz `append()` uma vez;
+  - faz `update()` apenas quando as opcoes mudam.
+- `QrCodePreviewPane.test.tsx`
+  - monta o preview vivo;
+  - nao chama exportacao no fluxo de render/update;
+  - exibe estado indisponivel quando nao ha dados.
+- `EventPublicLinkQrEditorShell.test.tsx`
+  - desktop usa `Dialog`;
+  - mobile usa `Drawer`;
+  - o preview vive dentro do shell;
+  - mudanca visual dispara `update()`;
+  - mudanca de exportacao nao dispara `update()`.
+
+## Status de execucao da persistencia real em 2026-04-11
+
+A Fase 4 saiu do estado derivado local e passou a usar persistencia real no backend `Events`.
+
+Entregue nesta etapa:
+
+- storage dedicado em `event_public_link_qr_configs`, com unique por `event_id + link_key`;
+- model `EventPublicLinkQrConfig` e relacao `Event::publicLinkQrConfigs()`;
+- espelho de schema no backend via `EventPublicLinkQrConfigSchema`, incluindo:
+  - `config_version`;
+  - migracao de payload legado;
+  - defaults por `link_key`;
+  - seed de branding efetivo;
+  - guardrails de margem, logo, transparencia e exportacao;
+- state builder `EventPublicLinkQrStateBuilder` para devolver:
+  - `link` atual;
+  - `effective_branding`;
+  - `config` normalizado;
+  - `config_source`;
+  - `has_saved_config`;
+- endpoints reais no modulo `Events`:
+  - `GET /api/v1/events/{event}/qr-codes`
+  - `GET /api/v1/events/{event}/qr-codes/{linkKey}`
+  - `PUT /api/v1/events/{event}/qr-codes/{linkKey}`
+  - `POST /api/v1/events/{event}/qr-codes/{linkKey}/reset`
+- query do editor trocada para `GET/PUT/reset` real, mantendo apenas placeholder leve para o primeiro frame;
+- shell do editor agora salva e restaura de verdade, sem persistir o payload encoded do QR.
+
+Leitura pratica:
+
+- o contrato do produto ficou blindado no backend antes de qualquer asset server-side;
+- o frontend parou de depender da query puramente derivada para reabrir o editor;
+- o `qr_value` continua vindo do `EventPublicLinksService`, entao mudar `slug`, `upload_slug` ou `wall_code` nao perde o visual salvo;
+- a imagem final continua fora do escopo desta fase; a persistencia desta rodada e de schema semantico, nao de asset renderizado.
+
+## Testes executados para a persistencia real
+
+Comandos:
+
+```bash
+cd apps/api
+php artisan test tests/Feature/Events/EventPublicLinkQrConfigTest.php tests/Unit/Events/GetEventPublicLinkQrConfigActionTest.php tests/Unit/Events/UpsertEventPublicLinkQrConfigActionTest.php
+php artisan test tests/Feature/Events/EventDetailAndLinksTest.php
+
+cd apps/web
+npm run test -- src/modules/events/qr/api.test.ts src/modules/events/qr/preload.test.ts src/modules/events/qr/EventPublicLinkQrEditorShell.test.tsx
+npm run test -- src/modules/qr-code src/modules/events/qr src/modules/events/EventDetailPage.test.tsx
+npm run type-check
+```
+
+Resultado:
+
+- backend da Fase 4:
+  - `6` testes passaram;
+  - `61` assertions passaram;
+- baseline de `EventDetailAndLinksTest.php` permaneceu verde:
+  - `3` testes passaram;
+  - `37` assertions passaram;
+- frontend focado da persistencia:
+  - `3` arquivos passaram;
+  - `8` testes passaram;
+- bateria combinada de `qr-code + events/qr + EventDetailPage`:
+  - `13` arquivos passaram;
+  - `28` testes passaram;
+- `type-check` permaneceu verde.
+
+Cobertura pratica desta etapa:
+
+- `EventPublicLinkQrConfigTest.php`
+  - default derivado de branding efetivo;
+  - save normalizado por `event_id + link_key`;
+  - reset;
+  - `qr_value` atualizado apos troca de identificador;
+  - proibicao fora da organizacao;
+- `GetEventPublicLinkQrConfigActionTest.php`
+  - garante que o encoded vem do link atual, nao do JSON salvo;
+- `UpsertEventPublicLinkQrConfigActionTest.php`
+  - garante migracao e guardrails no write path;
+- `src/modules/events/qr/api.test.ts`
+  - garante `GET/PUT/reset` real do editor;
+  - garante mapeamento de `snake_case` para o estado do frontend;
+- `src/modules/events/qr/EventPublicLinkQrEditorShell.test.tsx`
+  - submit do schema semantico;
+  - reset via callback de backend quando existe override salvo.
+
 ---
+
+## Status de execucao do save otimista e preview no card em 2026-04-11
+
+A Fase 5 entrou na trilha do editor para que o usuario perceba o save no card sem esperar roundtrip completo.
+
+Entregue nesta etapa:
+
+- save otimista no editor, com rollback em falha e invalidacao pos-save;
+- query agregada de QR configs no `EventDetailPage` usando o endpoint de lista;
+- cache populado por link para evitar fetch extra ao abrir o editor;
+- a listagem real `Links publicos e QR Code` do `overview` ja mostra o QR basico ou salvo para cada link ativo;
+- clicar no proprio QR do card abre o editor;
+- `PublicLinkCard` passou a renderizar o QR com o visual salvo/default no proprio card;
+- `EventPublicLinkQrTrigger` agora troca o `QRCodeSVG` pelo preview estilizado quando a config existe;
+- o card ganhou copy mais humana para orientar um usuario leigo.
+
+Leitura pratica:
+
+- o estado salvo aparece no card assim que o usuario clica em `Salvar`;
+- se o backend falhar, o card volta ao estado anterior;
+- mesmo sem estilo salvo, o usuario ja enxerga um QR pronto para uso na listagem principal do evento.
+- o `qr_value` continua dinâmico, mas o visual reflete a configuracao persistida.
+
+## Testes executados para o save otimista e card
+
+Comandos:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/components/PublicLinkCard.test.tsx src/modules/events/EventDetailPage.test.tsx src/modules/events/qr/EventPublicLinkQrTrigger.test.tsx
+npm run test -- src/modules/qr-code src/modules/events/qr src/modules/events/components/PublicLinkCard.test.tsx src/modules/events/EventDetailPage.test.tsx
+```
+
+Resultado:
+
+- bateria focada da fase:
+  - `3` arquivos passaram;
+  - `5` testes passaram;
+- bateria combinada com QR/editor:
+  - `14` arquivos passaram;
+  - `29` testes passaram.
+
+Cobertura pratica desta etapa:
+
+- `PublicLinkCard.test.tsx`
+  - preview mini estilizado quando existe config;
+  - badge `Estilo salvo`.
+- `EventDetailPage.test.tsx`
+  - mocks do endpoint de lista de QR configs;
+  - pagina segue estavel com a nova query.
+
+## Status de execucao da cascata e presets guiados em 2026-04-11
+
+A Fase 6 entrou no ponto mais sensivel do produto: deixar presets guiados e explicar de onde vem cada campo chave.
+
+Entregue nesta etapa:
+
+- resolver de cascata de defaults no frontend (`qrPresetCascade.ts`);
+- explicabilidade por campo principal (`qrCascadeExplanation.ts`);
+- cards de presets de uso no painel `Conteudo`;
+- cards de presets de skin no painel `Estilo`;
+- badges de origem para:
+  - preset de uso;
+  - preset de skin;
+  - cor principal e fundo;
+  - logo;
+  - defaults de exportacao;
+- CTA `Usar logo do evento` para aplicar branding direto.
+- mini-preview real por preset;
+- `Restaurar esta secao` nos paineis;
+- `Copiar estilo` entre links via selecao guiada;
+- upload real de logo customizada via endpoint de branding assets do modulo `Events`;
+- painel de logo trocado de seletor tecnico para fluxo guiado:
+  - `Usar logo do evento`;
+  - `Enviar arquivo`;
+  - `Remover logo`;
+- reset por secao tambem no painel `Conteudo`.
+
+Limites intencionais desta etapa:
+
+- os previews sao pequenos (nao substituem o preview principal);
+- preset de organizacao continua implicito no branding efetivo, sem template dedicado.
+
+## Endurecimento de rollout e UX em 2026-04-11
+
+Depois da entrada da persistencia real, apareceu um risco de rollout no backend:
+
+- o `GET /api/v1/events/{event}/qr-codes/{linkKey}` e o endpoint de lista podiam quebrar com `500` quando a migration de `event_public_link_qr_configs` ainda nao estava aplicada.
+
+Correcoes aplicadas:
+
+- `EventPublicLinkQrStateBuilder` agora faz fallback seguro para o default quando a tabela ainda nao existe;
+- a migration foi aplicada localmente;
+- existe teste automatizado cobrindo esse cenario de tabela ausente.
+
+Leitura pratica:
+
+- deploy parcial nao precisa derrubar a leitura de QR do evento;
+- o editor continua abrindo com defaults seguros ate a migration existir.
+
+## Testes executados para a Fase 6
+
+Comandos:
+
+```bash
+cd apps/web
+npx.cmd vitest run src/modules/qr-code/support/qrPresetCascade.test.ts src/modules/qr-code/support/qrCascadeExplanation.test.ts src/modules/qr-code/support/qrCopyStyle.test.ts src/modules/qr-code/support/qrSectionReset.test.ts src/modules/events/qr/EventPublicLinkQrEditorShell.test.tsx src/modules/events/qr/qrPresetChooser.test.tsx
+```
+
+Resultado:
+
+- `6` arquivos passaram;
+- `12` testes passaram.
+
+## Validacao final desta rodada
+
+Comandos:
+
+```bash
+cd apps/api
+php artisan test tests/Feature/Events/EventPublicLinkQrConfigTest.php tests/Unit/Events/GetEventPublicLinkQrConfigActionTest.php tests/Unit/Events/UpsertEventPublicLinkQrConfigActionTest.php tests/Feature/Events/EventDetailAndLinksTest.php
+
+cd ../web
+npx.cmd vitest run src/modules/events/qr/api.test.ts src/modules/events/components/PublicLinkCard.test.tsx src/modules/events/qr/EventPublicLinkQrTrigger.test.tsx src/modules/events/qr/EventPublicLinkQrEditorShell.test.tsx src/modules/events/qr/qrPresetChooser.test.tsx src/modules/qr-code/components/QrCodeLogoPanel.test.tsx src/modules/qr-code/support/qrPresetCascade.test.ts src/modules/qr-code/support/qrCascadeExplanation.test.ts src/modules/qr-code/support/qrCopyStyle.test.ts src/modules/qr-code/support/qrSectionReset.test.ts src/modules/events/EventDetailPage.test.tsx
+npm run type-check
+```
+
+Resultado:
+
+- backend:
+  - `10` testes passaram;
+  - `112` assertions passaram.
+- frontend:
+  - `11` arquivos passaram;
+  - `21` testes passaram.
+- `type-check` passou.
+
+## O que ainda fica pendente frente as docs
+
+Depois desta rodada, o que ainda esta aberto nas docs internas nao e base do editor, e sim evolucao de maturidade:
+
+- suite dedicada de acessibilidade do trigger/modal com foco inicial, trap e `Escape`;
+- heuristica de leitura em tempo real com guardrails mais fortes;
+- decode opcional via `BarcodeDetector` como melhoria progressiva;
+- telemetria de UX com `performance.mark()` e `performance.measure()`;
+- extensoes SVG curadas com `applyExtension` e assets server-side como fase seguinte.
 
 ## Leitura real da stack atual
 

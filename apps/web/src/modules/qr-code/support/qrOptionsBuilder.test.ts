@@ -53,4 +53,19 @@ describe('qrOptionsBuilder', () => {
 
     expect(options.data).toBe('https://app.eventovivo.com/e/evento/gallery');
   });
+
+  it('removes the image when the semantic config disables logo mode', () => {
+    const options = buildQrCodeStylingOptions({
+      config: normalizeEventPublicLinkQrConfig({
+        logo: {
+          mode: 'none',
+          asset_url: 'https://cdn.example.com/branding/event-logo.png',
+        },
+      }),
+      data: 'https://app.eventovivo.com/e/evento/wall',
+    });
+
+    expect(options.image).toBeUndefined();
+    expect(options.imageOptions?.crossOrigin).toBeUndefined();
+  });
 });

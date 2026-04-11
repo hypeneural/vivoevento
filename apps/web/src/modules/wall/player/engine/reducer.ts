@@ -8,6 +8,7 @@ import type {
   WallRuntimeItem,
   WallSettings,
   WallStatusChangedPayload,
+  WallTransition,
   WallVideoPlaybackExitReason,
   WallVideoPlaybackFailureReason,
   WallVideoPlaybackState,
@@ -28,6 +29,7 @@ import {
   resolveWallSelectionPolicy,
   resolveInitialWallItemId,
 } from './selectors';
+import { resolveWallRuntimeTransitionEffect } from './transition-scheduler';
 
 type MediaStatusPayload = {
   id: string;
@@ -62,6 +64,9 @@ export type WallEngineAction =
       fallbackStatus: WallPlayerStatus;
       preferredCurrentItemId?: string | null;
       preferredCurrentItemStartedAt?: string | null;
+      preferredActiveTransitionEffect?: WallTransition | null;
+      preferredLastTransitionEffect?: WallTransition | null;
+      preferredTransitionAdvanceCount?: number | null;
     }
   | { type: 'apply-settings'; settings: WallSettings }
   | { type: 'status-changed'; payload: WallStatusChangedPayload }
@@ -331,6 +336,49 @@ function resolveStateWithCurrentItem(
 
     return new Date().toISOString();
   })();
+  const currentItem = resolvedCurrentItemId
+    ? items.find((item) => item.id === resolvedCurrentItemId) ?? null
+    : null;
+  const previousCurrentItemId = state.currentItemId ?? null;
+  const didAdvanceToNewItem = Boolean(
+    previousCurrentItemId
+    && resolvedCurrentItemId
+    && previousCurrentItemId !== resolvedCurrentItemId,
+  );
+  const previousActiveTransitionEffect = state.activeTransitionEffect ?? null;
+  const previousLastTransitionEffect = state.lastTransitionEffect ?? null;
+  const nextTransitionAdvanceCount = didAdvanceToNewItem
+    ? state.transitionAdvanceCount + 1
+    : state.transitionAdvanceCount;
+  const nextLastTransitionEffect = (() => {
+    if (didAdvanceToNewItem) {
+      return previousActiveTransitionEffect ?? previousLastTransitionEffect;
+    }
+
+    if (previousCurrentItemId && !resolvedCurrentItemId) {
+      return previousActiveTransitionEffect ?? previousLastTransitionEffect;
+    }
+
+    return previousLastTransitionEffect;
+  })();
+  const nextActiveTransitionEffect = (() => {
+    if (!currentItem) {
+      return null;
+    }
+
+    if (resolvedCurrentItemId === previousCurrentItemId && previousActiveTransitionEffect) {
+      return previousActiveTransitionEffect;
+    }
+
+    return resolveWallRuntimeTransitionEffect({
+      code: state.code,
+      eventId: state.event?.id ?? null,
+      settings: state.settings,
+      currentItem,
+      lastTransitionEffect: nextLastTransitionEffect,
+      transitionAdvanceCount: nextTransitionAdvanceCount,
+    });
+  })();
 
   const nextState: WallPlayerState = {
     ...state,
@@ -339,11 +387,10 @@ function resolveStateWithCurrentItem(
     currentItemId: resolvedCurrentItemId,
     currentItemStartedAt: resolvedCurrentItemStartedAt,
     currentIndex: findWallCurrentIndex(items, resolvedCurrentItemId),
+    activeTransitionEffect: nextActiveTransitionEffect,
+    lastTransitionEffect: nextLastTransitionEffect,
+    transitionAdvanceCount: nextTransitionAdvanceCount,
   };
-
-  const currentItem = resolvedCurrentItemId
-    ? items.find((item) => item.id === resolvedCurrentItemId) ?? null
-    : null;
 
   if (!currentItem || currentItem.type !== 'video') {
     return {
@@ -379,6 +426,9 @@ export function createEmptyState(code: string): WallPlayerState {
     currentIndex: 0,
     currentItemId: null,
     currentItemStartedAt: null,
+    activeTransitionEffect: null,
+    lastTransitionEffect: null,
+    transitionAdvanceCount: 0,
     videoPlayback: createEmptyVideoPlaybackState(),
   };
 }
@@ -516,6 +566,9 @@ export function wallReducer(state: WallPlayerState, action: WallEngineAction): W
       const nextState = resolveStateWithCurrentItem(
         {
           ...state,
+          activeTransitionEffect: action.preferredActiveTransitionEffect ?? state.activeTransitionEffect,
+          lastTransitionEffect: action.preferredLastTransitionEffect ?? state.lastTransitionEffect,
+          transitionAdvanceCount: action.preferredTransitionAdvanceCount ?? state.transitionAdvanceCount,
           videoPlayback: action.persistedVideoPlayback
             ? {
                 ...createEmptyVideoPlaybackState(action.persistedVideoPlayback),
@@ -541,8 +594,23 @@ export function wallReducer(state: WallPlayerState, action: WallEngineAction): W
           : null,
       );
 
+      const shouldPreservePersistedTransitionState = Boolean(
+        resolvedCurrentItemId
+        && resolvedCurrentItemId === preferredCurrentItemId
+        && action.preferredActiveTransitionEffect,
+      );
+
+      const stateWithResolvedTransitions = shouldPreservePersistedTransitionState
+        ? {
+            ...nextState,
+            activeTransitionEffect: action.preferredActiveTransitionEffect ?? nextState.activeTransitionEffect,
+            lastTransitionEffect: action.preferredLastTransitionEffect ?? nextState.lastTransitionEffect,
+            transitionAdvanceCount: action.preferredTransitionAdvanceCount ?? nextState.transitionAdvanceCount,
+          }
+        : nextState;
+
       return {
-        ...nextState,
+        ...stateWithResolvedTransitions,
         senderStats: playbackState.senderStats,
       };
     }

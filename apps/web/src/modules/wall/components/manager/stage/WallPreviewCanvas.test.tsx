@@ -26,6 +26,7 @@ const wallSettings: ApiWallSettings = {
   },
   layout: 'fullscreen',
   transition_effect: 'fade',
+  transition_mode: 'fixed',
   background_url: 'https://cdn.example.com/background.jpg',
   partner_logo_url: 'https://cdn.example.com/logo.png',
   show_qr: true,
@@ -46,7 +47,10 @@ describe('WallPreviewCanvas', () => {
   it('reaproveita o renderer visual do player com overlays reais de branding, QR e credito', () => {
     render(
       <WallPreviewCanvas
-        settings={wallSettings}
+        settings={{
+          ...wallSettings,
+          transition_mode: 'random',
+        }}
         primaryItem={{
           itemId: 'media-1',
           previewUrl: 'https://cdn.example.com/current.jpg',
@@ -84,6 +88,7 @@ describe('WallPreviewCanvas', () => {
         settings={{
           ...wallSettings,
           layout: 'puzzle',
+          transition_mode: 'random',
           show_side_thumbnails: true,
           theme_config: {
             preset: 'compact',

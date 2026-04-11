@@ -125,6 +125,111 @@ Leitura pratica:
 - o frontend publico do jogo esta subcoberto;
 - a principal zona de risco hoje e a ponte React <-> Phaser.
 
+## Validacao complementar do `puzzle` em 2026-04-11
+
+Depois da abertura deste plano, foi feita uma rodada extra de caracterizacao automatizada focada no runtime do `puzzle`.
+
+### Backend
+
+Comando:
+
+```bash
+cd apps/api
+php artisan test tests/Feature/Play/PublicPlayPuzzleCharacterizationTest.php
+```
+
+Resultado:
+
+- `2` testes passaram;
+- `24` assertions;
+- validacao nova:
+  - o `puzzle` ja recebe `runtime asset pack` minimo de `1` asset;
+  - em perfil `rich`, o backend prefere `variantKey = wall` para `puzzle`;
+  - o backend **ainda pode** expor `video/mp4` como asset do `puzzle` quando o evento nao tem imagem publicada valida.
+
+### Frontend
+
+Comandos:
+
+```bash
+cd apps/web
+npm run test -- src/modules/play/hooks/usePhaserGame.test.tsx src/modules/play/phaser/core/bootGame.test.ts
+npm run type-check
+```
+
+Resultado:
+
+- `2 arquivos`
+- `4 testes`
+- `PASS`
+- `type-check` passou
+
+Validacao nova:
+
+- `usePhaserGame` ainda marca `ready` logo apos `boot()`, antes de `onReady`;
+- `bootGame` ja sobe o Phaser com:
+  - `Scale.FIT`
+  - `CENTER_BOTH`
+  - `activePointers = 1`
+- ou seja:
+  - a base de escala e input do `puzzle` esta razoavel;
+  - o gap principal continua sendo contrato de prontidao + gate real de boot.
+
+### Leitura pratica do `puzzle`
+
+Para o `puzzle`, o estado real agora fica mais claro:
+
+- o backend ja se comporta como pack minimo de sessao;
+- o runtime usa apenas `assets[0]`;
+- mas ainda nao existe garantia de que esse `assets[0]` seja `image/*`;
+- e o frontend ainda trata `boot()` como se fosse `runtime pronto`.
+
+Conclusao:
+
+- o `puzzle` nao invalida o plano;
+- ele reforca o plano;
+- a diferenca e que, para `puzzle`, a regra minima correta e:
+  - `1` imagem valida;
+  - `0` videos aceitos como capa jogavel.
+
+---
+
+## Validacao complementar contra a documentacao oficial do Phaser
+
+As docs oficiais reforcam quatro pontos diretamente relevantes para este plano:
+
+1. `Scenes READY`:
+   - o evento `READY` do Phaser so acontece quando a Scene ja esta ativa e renderizando;
+   - isso valida a regra de que `session criada` e `boot()` nao equivalem a `ready`.
+2. `Loader`:
+   - `preload()` inicia o Loader automaticamente;
+   - `create()` so roda depois do carregamento terminar;
+   - `progress` e `loaderror` existem como eventos oficiais;
+   - isso valida a necessidade do estado separado `preloading`.
+3. `Scale Manager`:
+   - `FIT` e o modo oficial para manter proporcao dentro da area alvo;
+   - `CENTER_BOTH` e o centramento oficial do canvas;
+   - isso valida a base atual do `bootGame` para mobile.
+4. `Input`:
+   - Phaser unifica mouse e touch em eventos de ponteiro, como `pointerdown`;
+   - isso valida a direcao `pointer-first` no runtime publico.
+
+Leitura pratica:
+
+- para o `puzzle`, o maior erro atual nao e de escala nem de input;
+- o maior erro atual continua sendo lifecycle:
+  - asset invalido pode entrar;
+  - `ready` aparece cedo demais;
+  - o jogo pode parecer iniciado antes de estar realmente jogavel.
+
+Referencias oficiais validadas nesta rodada:
+
+- Phaser Scenes Events: `https://docs.phaser.io/api-documentation/namespace/scenes-events`
+- Phaser Loader Concepts: `https://docs.phaser.io/phaser/concepts/loader`
+- Phaser Scale Manager Concepts: `https://docs.phaser.io/phaser/concepts/scale-manager`
+- Phaser Input Concepts: `https://docs.phaser.io/phaser/concepts/input`
+- Phaser Game API: `https://docs.phaser.io/api-documentation/class/game`
+
 ---
 
 ## Decisoes tecnicas fixadas antes da implementacao
@@ -146,22 +251,26 @@ Estas decisoes ja ficam travadas para evitar rediscussao durante a execucao:
    - `estimated_load_weight`
 5. O `memory` so aceita `image/*` como asset valido para deck.
 6. O `memory` exige minimo real de imagens distintas igual a `pairsCount`.
-7. O frontend nao tenta bootar runtime se `bootable = false`.
-8. `usePhaserGame` so marca `ready` quando receber `onBootReady` real da cena.
-9. Falha de preload e indisponibilidade de asset devem convergir para estado claro de `error` ou `unavailable`, nunca para canvas silenciosamente vazio.
-10. A mesma regra de prontidao usada no `manifest` e no `show` deve ser revalidada no `start session`.
-11. `StrictMode` entra como ferramenta opcional de dev para achar side effects, nao como solucao de producao.
-12. Nao havera memoizacao em massa; o foco e estabilizar a fronteira do runtime.
-13. Antes da primeira partida, a shell publica deve ter uma acao principal por tela.
-14. Ranking, historico e analytics nao devem disputar atencao antes da primeira partida terminada.
-15. O apelido continua opcional e pulavel.
-16. O fim da partida vira ponto de compartilhamento, nao a entrada do jogo.
-17. `touch-action`, safe area, haptics, CTA e limpeza visual ficam fora do P0.
-18. O canvas deve ser tratado como runtime host estavel, nao como bloco reativo qualquer.
-19. Input do jogo deve ser `pointer-first`, coerente entre mouse, toque e caneta.
-20. O ajuste de escala do canvas deve ser tratado como parte do jogo, nao como detalhe visual.
-21. Nao criar endpoint extra so para prontidao nesta entrega; o contrato entra nos payloads publicos ja existentes.
-22. Se a complexidade do pacote de assets crescer, extrair service dedicado; se nao crescer, manter dentro do modulo `Play` sem inflar a superficie.
+7. O `puzzle` so aceita `image/*` como asset valido de capa.
+8. O `puzzle` exige pelo menos `1` imagem valida para ficar `launchable` e `bootable`.
+9. O `puzzle` continua recebendo pack minimo de `1` asset por sessao, nao um lote inteiro do evento.
+10. O frontend nao tenta bootar runtime se `bootable = false`.
+11. `usePhaserGame` so marca `ready` quando receber `onBootReady` real da cena.
+12. Falha de preload e indisponibilidade de asset devem convergir para estado claro de `error` ou `unavailable`, nunca para canvas silenciosamente vazio.
+13. A mesma regra de prontidao usada no `manifest` e no `show` deve ser revalidada no `start session`.
+14. `StrictMode` entra como ferramenta opcional de dev para achar side effects, nao como solucao de producao.
+15. Nao havera memoizacao em massa; o foco e estabilizar a fronteira do runtime.
+16. Antes da primeira partida, a shell publica deve ter uma acao principal por tela.
+17. Ranking, historico e analytics nao devem disputar atencao antes da primeira partida terminada.
+18. O apelido continua opcional e pulavel.
+19. O fim da partida vira ponto de compartilhamento, nao a entrada do jogo.
+20. `touch-action`, safe area, haptics, CTA e limpeza visual ficam fora do P0.
+21. O canvas deve ser tratado como runtime host estavel, nao como bloco reativo qualquer.
+22. Input do jogo deve ser `pointer-first`, coerente entre mouse, toque e caneta.
+23. O ajuste de escala do canvas deve ser tratado como parte do jogo, nao como detalhe visual.
+24. O `bootGame` base permanece em `Scale.FIT` + `CENTER_BOTH` ate surgir motivo real para outra estrategia.
+25. Nao criar endpoint extra so para prontidao nesta entrega; o contrato entra nos payloads publicos ja existentes.
+26. Se a complexidade do pacote de assets crescer, extrair service dedicado; se nao crescer, manter dentro do modulo `Play` sem inflar a superficie.
 
 ---
 
@@ -451,7 +560,8 @@ Subtarefas:
   - `memory` com imagens suficientes => `launchable=true`, `bootable=true`;
   - `memory` com videos apenas => `launchable=false`, `bootable=false`, `reason=memory.only_video_assets`;
   - `memory` com imagens insuficientes => `reason=memory.not_enough_images`;
-  - `puzzle` com ao menos uma imagem valida => bootavel.
+  - `puzzle` com ao menos uma imagem valida => `launchable=true`, `bootable=true`;
+  - `puzzle` com apenas video publicado => `launchable=false`, `bootable=false`, `reason=puzzle.no_image_available`.
 - `apps/api/tests/Feature/Play/PublicPlayReadinessTest.php`
   - manifesto devolve `readiness` por jogo;
   - `show` devolve `readiness` coerente;
@@ -489,6 +599,7 @@ Subtarefas:
 - filtrar assets manuais tambem por MIME valido;
 - contar assets rejeitados como `unsupported_asset_count`;
 - impedir entrada de `video/*` no deck final.
+- aplicar a mesma regra de MIME valido ao `puzzle`, mas mantendo pack minimo de `1` asset.
 
 ### T2.2 - Exigir minimo real de imagens por `pairsCount`
 
@@ -525,9 +636,11 @@ Subtarefas:
   - `memory` ignora `video/mp4`;
   - `memory` mantem apenas imagens validas;
   - `puzzle` devolve somente o asset necessario;
+  - `puzzle` ignora `video/mp4` quando a regra de prontidao entrar;
   - fallback respeita ordenacao e limite.
 - `apps/api/tests/Feature/Play/PublicPlayReadinessTest.php`
   - `show` do `memory` nao expoe `video/*` em `runtime.assets`;
+  - `show` do `puzzle` nao expoe `video/*` em `runtime.assets`;
   - `start session` usa asset pack coerente com o `show`.
 
 ## Criterios de aceite
@@ -550,6 +663,7 @@ Parar de tratar `gameDefinition.boot(...)` como `runtime pronto` e formalizar o 
 apps/web/src/modules/play/phaser/core/runtimeTypes.ts
 apps/web/src/modules/play/phaser/core/BaseGameBridge.ts
 apps/web/src/modules/play/phaser/core/bootGame.ts
+apps/web/src/modules/play/phaser/core/bootGame.test.ts
 apps/web/src/modules/play/hooks/usePhaserGame.ts
 apps/web/src/modules/play/pages/PublicGamePage.tsx
 apps/web/src/modules/play/types/index.ts
@@ -608,6 +722,11 @@ Subtarefas:
   - marca `ready` apenas em `onBootReady`;
   - vai para `error` em `onBootFailed`;
   - faz cleanup ao desmontar ou trocar payload.
+- `apps/web/src/modules/play/phaser/core/bootGame.test.ts`
+  - mantem `Scale.FIT`;
+  - mantem `CENTER_BOTH`;
+  - mantem `activePointers = 1`;
+  - continua iniciando a Scene via `postBoot`.
 - `apps/web/src/modules/play/pages/PublicGamePage.runtime.test.tsx`
   - jogo nao inicia se `bootable=false`;
   - `start session` entra em `starting-session`;
@@ -683,6 +802,11 @@ Subtarefas:
   - exige minimo real de imagens;
   - nao chama `ready` em preload invalido;
   - mostra mensagem clara quando faltam fotos.
+- `apps/web/src/modules/play/phaser/puzzle/PuzzleScene.test.ts`
+  - ignora `video/*` como capa;
+  - falha cedo quando nao houver imagem valida;
+  - nao chama `ready` em cover invalida;
+  - mantem `ready` apenas quando o puzzle puder montar o tabuleiro.
 - `apps/web/src/modules/play/phaser/core/cleanup.test.ts`
   - remove texturas temporarias;
   - nao deixa lixo ao trocar runtime.
@@ -977,13 +1101,16 @@ Arquivos provaveis:
 - `apps/api/tests/Unit/Play/GameAssetResolverServiceTest.php`
 - `apps/api/tests/Feature/Play/PublicPlayReadinessTest.php`
 - `apps/api/tests/Feature/Play/PublicPlayFlowTest.php`
+- `apps/api/tests/Feature/Play/PublicPlayPuzzleCharacterizationTest.php`
 
 ## Frontend
 
 Arquivos provaveis:
 
 - `apps/web/src/modules/play/hooks/usePhaserGame.test.ts`
+- `apps/web/src/modules/play/phaser/core/bootGame.test.ts`
 - `apps/web/src/modules/play/phaser/memory/MemoryScene.test.ts`
+- `apps/web/src/modules/play/phaser/puzzle/PuzzleScene.test.ts`
 - `apps/web/src/modules/play/phaser/core/cleanup.test.ts`
 - `apps/web/src/modules/play/pages/PublicGamePage.runtime.test.tsx`
 - `apps/web/src/modules/play/pages/PublicGamePage.shell.test.tsx`
@@ -1008,7 +1135,7 @@ php artisan test tests/Feature/Play
 
 ```bash
 cd apps/web
-npm run test -- src/modules/play/hooks/usePhaserGame.test.ts src/modules/play/phaser/memory/MemoryScene.test.ts src/modules/play/pages/PublicGamePage.runtime.test.tsx
+npm run test -- src/modules/play/hooks/usePhaserGame.test.tsx src/modules/play/phaser/core/bootGame.test.ts src/modules/play/phaser/memory/MemoryScene.test.ts src/modules/play/phaser/puzzle/PuzzleScene.test.ts src/modules/play/pages/PublicGamePage.runtime.test.tsx
 npm run type-check
 ```
 

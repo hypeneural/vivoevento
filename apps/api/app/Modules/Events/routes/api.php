@@ -3,6 +3,7 @@
 use App\Modules\Events\Http\Controllers\EventController;
 use App\Modules\Events\Http\Controllers\EventJourneyController;
 use App\Modules\Events\Http\Controllers\EventIntakeBlacklistController;
+use App\Modules\Events\Http\Controllers\EventPublicLinkQrController;
 use App\Modules\Events\Http\Controllers\EventStatusController;
 use App\Modules\Events\Http\Controllers\EventBrandingController;
 use App\Modules\Events\Http\Controllers\EventQrController;
@@ -33,6 +34,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('events/{event}/share-links', [EventQrController::class, 'shareLinks']);
     Route::patch('events/{event}/public-links', [EventQrController::class, 'updateIdentifiers']);
     Route::post('events/{event}/public-links/regenerate', [EventQrController::class, 'regenerateIdentifiers']);
+    Route::get('events/{event}/qr-codes', [EventPublicLinkQrController::class, 'index']);
+    Route::get('events/{event}/qr-codes/{linkKey}', [EventPublicLinkQrController::class, 'show']);
+    Route::put('events/{event}/qr-codes/{linkKey}', [EventPublicLinkQrController::class, 'update']);
+    Route::post('events/{event}/qr-codes/{linkKey}/reset', [EventPublicLinkQrController::class, 'reset']);
 
     // Moderation settings
     Route::patch('events/{event}/moderation-settings', [EventController::class, 'updateModerationSettings']);

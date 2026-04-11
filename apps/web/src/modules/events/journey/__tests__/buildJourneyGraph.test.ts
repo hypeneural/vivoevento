@@ -532,10 +532,10 @@ describe('buildJourneyGraph', () => {
     const graph = buildJourneyGraph(makeProjection());
 
     expect(graph.stages.map((stage) => stage.id)).toEqual(['entry', 'processing', 'decision', 'output']);
-    expect(graph.stages.map((stage) => stage.y)).toEqual([0, 272, 544, 816]);
+    expect(graph.stages.map((stage) => stage.y)).toEqual([0, 448, 896, 1344]);
     expect(graph.nodes.find((node) => node.id === 'decision_context_gate')?.position).toEqual({
-      x: 700,
-      y: 544,
+      x: 656,
+      y: 896,
     });
   });
 
@@ -575,9 +575,23 @@ describe('buildJourneyGraph', () => {
       source: 'decision_event_moderation_mode',
       target: 'decision_safety_result',
       sourceHandle: 'branch:default',
-      targetHandle: 'inbound',
+      targetHandle: 'inbound:0',
       label: 'Padrao',
     });
+  });
+
+  it('spreads multiple incoming connections across deterministic target handles and skips unused inbound handles on entry nodes', () => {
+    const graph = buildJourneyGraph(makeProjection());
+    const entryNode = graph.nodes.find((node) => node.id === 'entry_whatsapp_direct');
+    const galleryNode = graph.nodes.find((node) => node.id === 'output_gallery');
+    const galleryEdges = graph.edges
+      .filter((edge) => edge.target === 'output_gallery')
+      .map((edge) => edge.targetHandle);
+
+    expect(entryNode?.targetHandles).toEqual([]);
+    expect(galleryNode?.targetHandles.length).toBe(8);
+    expect(new Set(galleryNode?.targetHandles).size).toBe(galleryNode?.targetHandles.length);
+    expect([...galleryEdges].sort()).toEqual([...(galleryNode?.targetHandles ?? [])].sort());
   });
 
   it('keeps blocked safety branches visible but inactive when Safety is effectively disabled', () => {

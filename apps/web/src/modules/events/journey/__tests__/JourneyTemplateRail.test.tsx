@@ -239,16 +239,16 @@ describe('JourneyTemplateRail', () => {
     const dialog = screen.getByRole('alertdialog');
 
     expect(within(dialog).getByRole('heading', { name: 'Aprovacao direta' })).toBeInTheDocument();
-    expect(within(dialog).getByText(/diff local antes do save/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/o que vai mudar nesta tela/i)).toBeInTheDocument();
     expect(screen.queryByText(/Rascunho local ativo/i)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Aplicar ao rascunho' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar nesta tela' }));
 
     const activeDraftAlert = screen.getByRole('alert');
 
     expect(within(activeDraftAlert).getByText('Rascunho local ativo')).toBeInTheDocument();
     expect(within(activeDraftAlert).getByText('Aprovacao direta')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Salvar template' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Salvar modelo' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Descartar rascunho' })).toBeInTheDocument();
   });
 
@@ -256,7 +256,7 @@ describe('JourneyTemplateRail', () => {
     render(<TemplateHarness onSave={vi.fn()} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Revisao manual' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Aplicar ao rascunho' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar nesta tela' }));
     fireEvent.click(screen.getByRole('button', { name: 'Descartar rascunho' }));
 
     expect(screen.queryByText('Rascunho local ativo')).not.toBeInTheDocument();
@@ -268,8 +268,8 @@ describe('JourneyTemplateRail', () => {
     render(<TemplateHarness onSave={onSave} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'IA moderando' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Aplicar ao rascunho' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar template' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar nesta tela' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar modelo' }));
 
     expect(onSave).toHaveBeenCalledTimes(1);
   });

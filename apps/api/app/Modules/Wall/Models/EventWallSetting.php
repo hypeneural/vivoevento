@@ -9,6 +9,7 @@ use App\Modules\Wall\Enums\WallLayout;
 use App\Modules\Wall\Enums\WallSelectionMode;
 use App\Modules\Wall\Enums\WallStatus;
 use App\Modules\Wall\Enums\WallTransition;
+use App\Modules\Wall\Enums\WallTransitionMode;
 use App\Modules\Wall\Support\WallSelectionPreset;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -33,6 +34,8 @@ class EventWallSetting extends Model
         'status',
         'layout',
         'transition_effect',
+        'transition_mode',
+        'transition_pool',
         'interval_ms',
         'queue_limit',
         'selection_mode',
@@ -70,6 +73,8 @@ class EventWallSetting extends Model
         'status' => WallStatus::class,
         'layout' => WallLayout::class,
         'transition_effect' => WallTransition::class,
+        'transition_mode' => WallTransitionMode::class,
+        'transition_pool' => 'array',
         'interval_ms' => 'integer',
         'queue_limit' => 'integer',
         'selection_mode' => WallSelectionMode::class,
@@ -108,6 +113,10 @@ class EventWallSetting extends Model
 
             if (empty($setting->transition_effect)) {
                 $setting->transition_effect = WallTransition::Fade;
+            }
+
+            if (empty($setting->transition_mode)) {
+                $setting->transition_mode = WallTransitionMode::Fixed;
             }
 
             if (empty($setting->selection_mode)) {
@@ -276,6 +285,21 @@ class EventWallSetting extends Model
         return (bool) ($this->video_enabled ?? config('media_processing.wall_video.enabled', true));
     }
 
+    public function resolvedTransitionMode(): WallTransitionMode
+    {
+        return $this->transition_mode instanceof WallTransitionMode
+            ? $this->transition_mode
+            : WallTransitionMode::Fixed;
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    public function resolvedTransitionPool(): ?array
+    {
+        return WallTransition::sanitizeRandomPool($this->transition_pool);
+    }
+
     public function resolvedPublicUploadVideoEnabled(): bool
     {
         if (! $this->resolvedVideoEnabled()) {
@@ -350,5 +374,14 @@ class EventWallSetting extends Model
 
         return $event?->isActive() === true
             && $event->isModuleEnabled('wall');
+    }
+
+    public function setTransitionPoolAttribute(mixed $value): void
+    {
+        $sanitized = WallTransition::sanitizeRandomPool($value);
+
+        $this->attributes['transition_pool'] = $sanitized === null
+            ? null
+            : json_encode($sanitized, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 }

@@ -16,6 +16,7 @@ import {
   WALL_PUZZLE_PRESET_OPTIONS,
   WALL_SLIDER_FIELDS,
   WALL_TOGGLE_FIELDS,
+  WALL_TRANSITION_MODE_OPTIONS,
   WALL_VIDEO_AUDIO_POLICY_OPTIONS,
   WALL_VIDEO_MAX_SECONDS_OPTIONS,
   WALL_VIDEO_MULTI_LAYOUT_OPTIONS,
@@ -23,6 +24,7 @@ import {
   WALL_VIDEO_PREFERRED_VARIANT_OPTIONS,
   WALL_VIDEO_RESUME_MODE_OPTIONS,
 } from '../../../manager-config';
+import { normalizeTransitionPool, supportsRandomTransitionModeForLayout } from '../../../wall-settings';
 
 type UpdateDraft = <K extends keyof ApiWallSettings>(key: K, value: ApiWallSettings[K]) => void;
 
@@ -47,6 +49,25 @@ export function WallAppearanceTab({
   const isPuzzleLayout = currentLayoutOption?.value === 'puzzle';
   const supportsThemeConfig = Boolean(layoutCapabilities?.supports_theme_config);
   const sideThumbnailsLocked = layoutCapabilities?.supports_side_thumbnails === false;
+  const transitionModeOptions = options.transition_modes?.length
+    ? options.transition_modes
+    : WALL_TRANSITION_MODE_OPTIONS;
+  const transitionModeLocked = !supportsRandomTransitionModeForLayout(
+    wallSettings.layout,
+    currentLayoutOption,
+  );
+  const transitionModeValue = wallSettings.transition_mode
+    ?? options.transition_defaults?.transition_mode
+    ?? 'fixed';
+  const safeTransitionPoolOptions = options.transitions.filter((transition) => transition.value !== 'none');
+  const safeTransitionPoolValues = normalizeTransitionPool(
+    safeTransitionPoolOptions.map((transition) => transition.value),
+  ) ?? [];
+  const customTransitionPool = normalizeTransitionPool(wallSettings.transition_pool);
+  const effectiveTransitionPool = customTransitionPool ?? safeTransitionPoolValues;
+  const showTransitionPool = !transitionModeLocked
+    && transitionModeValue === 'random'
+    && safeTransitionPoolValues.length > 0;
   const themeConfig = {
     ...currentLayoutOption?.defaults.theme_config,
     ...wallSettings.theme_config,
@@ -60,6 +81,19 @@ export function WallAppearanceTab({
       ...themeConfig,
       [key]: value,
     });
+  }
+
+  function toggleTransitionPool(effect: NonNullable<ApiWallSettings['transition_pool']>[number]) {
+    const basePool = normalizeTransitionPool(wallSettings.transition_pool) ?? safeTransitionPoolValues;
+    const nextPool = basePool.includes(effect)
+      ? basePool.filter((value) => value !== effect)
+      : safeTransitionPoolValues.filter((value) => value === effect || basePool.includes(value));
+    const normalized = normalizeTransitionPool(nextPool);
+
+    onDraftChange(
+      'transition_pool',
+      normalized && normalized.length === safeTransitionPoolValues.length ? null : normalized,
+    );
   }
 
   return (
@@ -173,6 +207,81 @@ export function WallAppearanceTab({
               </SelectContent>
             </Select>
           </div>
+
+          {transitionModeLocked ? (
+            <div
+              data-testid="wall-transition-mode-locked"
+              className="space-y-2 rounded-2xl border border-border/60 bg-background/60 p-4"
+            >
+              <HelpLabel helpKey="transitionMode" className="text-sm">Modo da animacao</HelpLabel>
+              <p className="text-sm font-medium text-foreground">Travado em fixa</p>
+              <p className="text-[11px] text-muted-foreground">
+                Layouts em grade usam troca fixa para manter o board previsivel e evitar burst aleatorio por slot.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <HelpLabel helpKey="transitionMode" className="text-sm">Modo da animacao</HelpLabel>
+              <Select
+                value={transitionModeValue}
+                onValueChange={(value) => onDraftChange('transition_mode', value)}
+              >
+                <SelectTrigger data-testid="wall-transition-mode-select">
+                  <SelectValue placeholder="Selecione o modo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {transitionModeOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {transitionModeOptions.find((option) => option.value === transitionModeValue)?.description}
+              </p>
+            </div>
+          )}
+
+          {showTransitionPool ? (
+            <div
+              data-testid="wall-transition-pool"
+              className="space-y-3 rounded-2xl border border-border/60 bg-background/60 p-4"
+            >
+              <div>
+                <HelpLabel helpKey="transitionMode" className="text-sm">Pool aleatoria</HelpLabel>
+                <p className="text-[11px] text-muted-foreground">
+                  Escolha quais efeitos seguros entram no sorteio. Se todos ficarem ativos, o wall volta para a pool padrao.
+                </p>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                {safeTransitionPoolOptions.map((transition) => {
+                  const transitionValue = transition.value as NonNullable<ApiWallSettings['transition_pool']>[number];
+                  const enabled = effectiveTransitionPool.includes(transitionValue);
+
+                  return (
+                    <button
+                      key={transition.value}
+                      type="button"
+                      data-testid={`wall-transition-pool-toggle-${transition.value}`}
+                      aria-pressed={enabled}
+                      onClick={() => toggleTransitionPool(transitionValue)}
+                      className={[
+                        'rounded-2xl border px-3 py-2 text-left text-sm transition-colors',
+                        enabled
+                          ? 'border-foreground/20 bg-foreground/5 text-foreground'
+                          : 'border-border/60 bg-background text-muted-foreground',
+                      ].join(' ')}
+                    >
+                      <span className="block font-medium">{transition.label}</span>
+                      <span className="mt-1 block text-[11px]">
+                        {enabled ? 'Entrando no modo aleatorio.' : 'Fora da pool custom.'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
 
           <div className="space-y-2">
             <HelpLabel helpKey="orientation" className="text-sm">Orientacao aceita</HelpLabel>

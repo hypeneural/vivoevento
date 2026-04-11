@@ -21,6 +21,7 @@ Documento base:
 
 - `docs/architecture/event-people-identity-relations-aws-strategy-2026-04-10.md`
 - `docs/architecture/event-people-governance-groups-coverage-moments-execution-plan-2026-04-11.md`
+- `docs/architecture/event-people-ux-graph-reference-photos-presets-analysis-2026-04-11.md`
 
 ---
 
@@ -1835,6 +1836,32 @@ Pendente apos esta rodada:
 
 - implementar a frente de retention/limpeza AWS e o runbook operacional;
 - depois seguir para grupos, coverage intelligence, momentos e entregas por relacao.
+
+---
+
+### 2026-04-11 - Validacao adicional com docs oficiais e TDD refinou a ordem do backlog
+
+Concluido:
+
+- a doc complementar foi endurecida com validacao adicional nas docs oficiais de Laravel, PostgreSQL, React, TanStack Query, WCAG e AWS;
+- a ordem recomendada mudou para incluir uma `Frente 0` antes de grupos e coverage:
+  - contrato operacional do dominio;
+  - contrato das projecoes;
+  - query objects e `EXPLAIN` nas leituras quentes;
+  - protocolo de cache otimista e transicoes do frontend;
+  - cockpit operacional com foco e status visiveis;
+- a leitura local do modulo confirmou que a pasta `Queries` ainda esta vazia e que ainda nao existe trilha clara de eventos de dominio replayaveis em `EventPeople`;
+- a bateria atual verde confirma a base, mas ainda nao trava transicoes de estado, plano real das queries quentes, rollback otimista e acessibilidade operacional.
+
+Bateria executada:
+
+- `cd apps/api && php artisan test tests/Feature/EventPeople tests/Unit/EventPeople` -> `32 passed`, `262 assertions`
+- `cd apps/web && npx.cmd vitest run src/modules/event-people/EventPeoplePage.test.tsx src/modules/event-people/components/EventPeopleIdentitySheet.test.tsx src/modules/event-people/components/EventPeopleFaceOverlay.test.tsx src/modules/media/MediaPage.test.tsx` -> `4 files passed`, `8 tests passed`
+
+Pendente apos esta rodada:
+
+- implementar a `Frente 0` antes das frentes de grupos, coverage e momentos;
+- depois seguir com retention/limpeza AWS, runbook, grupos, coverage intelligence e entregas por relacao.
 
 ---
 

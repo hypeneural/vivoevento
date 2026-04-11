@@ -2336,6 +2336,69 @@ Resultado:
 - `76` testes passaram na regressao ampliada do modulo `events`;
 - `type-check` passou sem erros.
 
+## Polimento visual e limpeza de linguagem em `2026-04-11`
+
+Depois do renderer real, apareceu um problema de produto que nao era mais arquitetural: o fluxo ainda estava correto tecnicamente, mas seguia denso demais para usuario leigo.
+
+O que mais pesava na leitura:
+
+- cards apertados demais na viewport inicial;
+- labels de edge como `Padrao` espalhadas por todo o canvas;
+- vazamento de termos de engenharia na UI, como `React Flow`, `projection`, `builder`, `Safety`, `VLM` e `MediaIntelligence`;
+- cards com pouca personalidade visual entre si.
+
+O ajuste que entrou foi deliberadamente pragmatica:
+
+- nao puxar `Dagre` ou `ELK` so para resolver uma V1 ainda pequena;
+- manter coordenadas deterministicas;
+- reduzir largura total do grafo;
+- dar mais respiro vertical e mais altura util ao viewport;
+- esconder labels de aresta que so repetiam o caminho obvio;
+- reforcar o entendimento por copy, icones e tooltips secundarios.
+
+Entrega realizada:
+
+- `apps/web/src/modules/events/journey/journeyCopy.ts` virou a camada central de copy humana da jornada;
+- `JourneyNodeCard.tsx` ganhou icones por etapa, status mais claros e tooltips de apoio;
+- `JourneyFlowEdges.tsx` passou a usar `getSmoothStepPath` e a ocultar labels triviais como `Padrao`;
+- `buildJourneyGraph.ts` foi reorganizado para uma malha mais equilibrada, com menos sensacao de cards "colados";
+- `EventJourneyBuilderPage.tsx`, `JourneyInspector.tsx`, `JourneyScenarioSimulator.tsx` e `JourneyTemplateRail.tsx` trocaram a linguagem de engine por linguagem de operacao.
+
+Leitura pratica:
+
+- o canvas continua sendo projection visual da configuracao real, mas agora conversa melhor com noiva, cerimonialista e operador;
+- o ganho principal nao veio de mais tecnologia, e sim de menos ruido;
+- a V1 fica mais proxima de "mapa de processo" e mais longe de "grafo tecnico".
+
+Decisao importante:
+
+- a trilha certa continuou sendo `React Flow` travado com geometria deterministica;
+- o passe de UX mostrou que a dor principal era de apresentacao, nao de motor de layout.
+
+Validacao oficial usada nesta rodada:
+
+- `React Flow Layouting`: https://reactflow.dev/learn/layouting/layouting
+- `React Flow Edge Labels`: https://reactflow.dev/learn/customization/edge-labels
+- `shadcn/ui Tooltip`: https://ui.shadcn.com/docs/components/tooltip
+- `Radix Tooltip`: https://www.radix-ui.com/primitives/docs/components/tooltip
+
+Bateria validada:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey
+npm run test -- src/modules/events
+npm run type-check
+```
+
+Resultado:
+
+- `12` arquivos de teste passaram na trilha `journey`;
+- `52` testes passaram;
+- `27` arquivos de teste passaram na regressao ampliada de `src/modules/events`;
+- `100` testes passaram na regressao ampliada;
+- `type-check` passou sem erros.
+
 ## Inspector editavel responsivo em `2026-04-11`
 
 A `Tarefa 3.5` entrou na primeira fatia realmente editavel do builder.

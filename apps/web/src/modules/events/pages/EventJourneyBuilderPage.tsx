@@ -45,6 +45,7 @@ import {
   type JourneyFlowCanvasControls,
 } from '../journey/JourneyFlowCanvas';
 import { JourneyInspector } from '../journey/JourneyInspector';
+import { humanizeJourneyText } from '../journey/journeyCopy';
 import { JourneyScenarioSimulator } from '../journey/JourneyScenarioSimulator';
 import { JourneyTemplateRail } from '../journey/JourneyTemplateRail';
 import type {
@@ -115,18 +116,18 @@ function JourneySummaryCard({
     <Card className="border-white/70 bg-white/90 shadow-sm">
       <CardHeader className="space-y-3 pb-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">Modo simples</Badge>
-          <Badge variant="outline">{projection.version}</Badge>
+          <Badge variant="secondary">Edicao simplificada</Badge>
+          <Badge variant="outline">Visao resumida</Badge>
         </div>
         <div className="space-y-1">
           <CardTitle className="text-base">Resumo humano da jornada</CardTitle>
           <CardDescription>
-            O fluxo visual continua preso ao agregado real do evento. O resumo traduz esse caminho em linguagem operacional.
+            Veja em poucas linhas como uma foto ou video passam pelas etapas do evento.
           </CardDescription>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-sm leading-6 text-foreground">{summaryText}</p>
+        <p className="text-sm leading-6 text-foreground">{humanizeJourneyText(summaryText)}</p>
 
         <div className="space-y-2">
           <JourneyScenarioSimulator
@@ -165,7 +166,7 @@ export default function EventJourneyBuilderPage() {
   const templateSaveMutation = useMutation({
     mutationFn: async () => {
       if (!activeTemplatePreview) {
-        throw new Error('Nenhum template foi aplicado ao rascunho local.');
+        throw new Error('Nenhum modelo foi aplicado ao rascunho local.');
       }
 
       return updateEventJourneyBuilder(id, activeTemplatePreview.payload);
@@ -175,15 +176,15 @@ export default function EventJourneyBuilderPage() {
       await invalidateEventJourneyBuilderQueries(queryClient, id);
       setActiveTemplateId(null);
       toast({
-        title: 'Template salvo',
-        description: 'A jornada foi atualizada com o template guiado.',
+        title: 'Modelo salvo',
+        description: 'A jornada foi atualizada com o modelo escolhido.',
       });
     },
     onError: (error) => {
-      const message = error instanceof Error ? error.message : 'Nao foi possivel salvar o template da jornada.';
+      const message = error instanceof Error ? error.message : 'Nao foi possivel salvar o modelo da jornada.';
 
       toast({
-        title: 'Falha ao salvar template',
+        title: 'Falha ao salvar modelo',
         description: message,
         variant: 'destructive',
       });
@@ -271,7 +272,7 @@ export default function EventJourneyBuilderPage() {
         description="Como o evento trata cada foto ou video recebido"
         actions={(
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">Builder guiado</Badge>
+            <Badge variant="secondary">Edicao simplificada</Badge>
             <Button
               type="button"
               variant="outline"
@@ -289,7 +290,7 @@ export default function EventJourneyBuilderPage() {
               onClick={() => setTechnicalDetailsOpen((current) => !current)}
             >
               <PanelRightOpen className="mr-1.5 h-3.5 w-3.5" />
-              Ver detalhes tecnicos
+              Ver detalhes da configuracao
             </Button>
             <Button variant="outline" size="sm" asChild>
               <Link to={`/events/${id}`}>Voltar ao evento</Link>
@@ -318,10 +319,10 @@ export default function EventJourneyBuilderPage() {
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <Info className="h-4 w-4 text-primary" />
-            <CardTitle className="text-base">Legenda fixa da jornada</CardTitle>
+            <CardTitle className="text-base">Como ler este mapa</CardTitle>
           </div>
           <CardDescription>
-            A leitura segue sempre o mesmo processo de negocio: entrada, processamento, decisao e saida.
+            A leitura segue sempre a mesma ordem: chegada da midia, tratamento, decisao e destino final.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -341,9 +342,9 @@ export default function EventJourneyBuilderPage() {
             <div className="mb-4 flex items-center gap-2">
               <GitBranch className="h-4 w-4 text-primary" />
               <div>
-                <h2 className="text-base font-semibold text-foreground">Fluxo visual guiado</h2>
+                <h2 className="text-base font-semibold text-foreground">Mapa visual da jornada</h2>
                 <p className="text-sm text-muted-foreground">
-                  O renderer agora usa React Flow com canvas travado, mantendo a projection como fonte de verdade.
+                  Veja cada etapa em ordem, da chegada da midia ate o que acontece com ela no final.
                 </p>
               </div>
             </div>
@@ -381,15 +382,15 @@ export default function EventJourneyBuilderPage() {
         </div>
       ) : (
         <div className="overflow-hidden rounded-3xl border border-white/70 bg-white/90 shadow-sm">
-          <ResizablePanelGroup direction="horizontal" className="min-h-[920px]">
-            <ResizablePanel defaultSize={68} minSize={55}>
+          <ResizablePanelGroup direction="horizontal" className="min-h-[1660px]">
+            <ResizablePanel defaultSize={78} minSize={62}>
               <div className="h-full p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <GitBranch className="h-4 w-4 text-primary" />
                   <div>
-                    <h2 className="text-base font-semibold text-foreground">Fluxo visual guiado</h2>
+                    <h2 className="text-base font-semibold text-foreground">Mapa visual da jornada</h2>
                     <p className="text-sm text-muted-foreground">
-                      O renderer agora usa React Flow com canvas travado, mantendo a projection como fonte de verdade.
+                      Veja cada etapa em ordem, da chegada da midia ate o que acontece com ela no final.
                     </p>
                   </div>
                 </div>
@@ -407,7 +408,7 @@ export default function EventJourneyBuilderPage() {
               </div>
             </ResizablePanel>
             <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={32} minSize={25}>
+            <ResizablePanel defaultSize={22} minSize={20}>
               <JourneyInspector
                 mode="panel"
                 eventId={id}

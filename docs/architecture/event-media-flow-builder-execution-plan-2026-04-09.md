@@ -1836,6 +1836,54 @@ Resultado:
 - `76` testes passaram na regressao ampliada do modulo `events`;
 - `type-check` passou sem erros.
 
+### Polimento visual e linguagem operacional em `2026-04-11`
+
+Motivo do ajuste:
+
+- a primeira distribuicao do grafo ainda ficava apertada para usuario leigo;
+- labels como `Padrao`, `projection`, `builder`, `Safety`, `VLM` e `React Flow` ainda vazavam para a interface;
+- a leitura do fluxo ficava mais tecnica do que operacional.
+
+Entrega realizada:
+
+- [x] `apps/web/src/modules/events/journey/journeyCopy.ts` entrou como camada central de linguagem humana para cards, branches, badges e textos auxiliares;
+- [x] `JourneyNodeCard.tsx` ganhou icones por etapa, tooltips explicativos e chips mais claros para status e editabilidade;
+- [x] `JourneyFlowEdges.tsx` passou a esconder labels triviais de aresta e a usar `getSmoothStepPath`, reduzindo ruido visual;
+- [x] `buildJourneyGraph.ts` foi redistribuido para uma malha mais equilibrada, com menos largura total e mais respiro entre linhas;
+- [x] `JourneyFlowCanvas.tsx` ganhou empty state mais humano, viewport menos agressivo e area util maior;
+- [x] `EventJourneyBuilderPage.tsx`, `JourneyInspector.tsx`, `JourneyScenarioSimulator.tsx` e `JourneyTemplateRail.tsx` tiveram a copy reescrita para operador leigo;
+- [x] termos tecnicos visiveis como `projection`, `builder`, `Safety`, `VLM` e `MediaIntelligence` deixaram de aparecer como linguagem principal da tela.
+
+Decisao tecnica preservada:
+
+- a V1 continua sem `Dagre` e sem `ELK`;
+- o problema foi resolvido com geometria deterministica melhor distribuida, labels menos barulhentas e linguagem mais humana;
+- isso mantem a trilha do plano: canvas travado, projection como fonte de verdade e complexidade visual sob controle.
+
+Validacao oficial rechecada nesta rodada:
+
+- `React Flow Layouting`: https://reactflow.dev/learn/layouting/layouting
+- `React Flow Edge Labels`: https://reactflow.dev/learn/customization/edge-labels
+- `shadcn/ui Tooltip`: https://ui.shadcn.com/docs/components/tooltip
+- `Radix Tooltip`: https://www.radix-ui.com/primitives/docs/components/tooltip
+
+Bateria validada em `2026-04-11`:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey
+npm run test -- src/modules/events
+npm run type-check
+```
+
+Resultado:
+
+- `12` arquivos de teste passaram na trilha `journey`;
+- `52` testes passaram;
+- `27` arquivos de teste passaram na regressao ampliada de `src/modules/events`;
+- `100` testes passaram na regressao ampliada;
+- `type-check` passou sem erros.
+
 ### Tarefa 3.5 - Criar inspector lateral
 
 Subtarefas:

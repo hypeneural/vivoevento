@@ -1,17 +1,21 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { CheckCircle2, KeyRound, Loader2, LogIn, ShieldCheck } from 'lucide-react';
-import { Link, useParams } from 'react-router-dom';
+import { CheckCircle2, KeyRound, Loader2 } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
 
+import { useAuth } from '@/app/providers/AuthProvider';
+import { AuthenticatedInvitationActions } from '@/modules/auth/components/invitation-flow/AuthenticatedInvitationActions';
+import { InvitationExistingLoginActions } from '@/modules/auth/components/invitation-flow/InvitationExistingLoginActions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAuth } from '@/app/providers/AuthProvider';
+import { buildLoginPath } from '@/modules/auth/login-navigation';
 import { ApiError, setToken } from '@/lib/api';
 import { persistSession } from '@/modules/auth/services/auth.service';
 import { capabilityLabel, formatEventDate } from '@/modules/auth/workspace-utils';
+
 import { eventInvitationsApi } from './api';
 import { redirectToInvitationNextPath } from './navigation';
 
@@ -29,10 +33,12 @@ function resolveErrorMessage(error: unknown, fallback: string): string {
 
 export default function PublicEventInvitationPage() {
   const { token } = useParams<{ token: string }>();
-  const { isAuthenticated, meUser } = useAuth();
+  const navigate = useNavigate();
+  const { isAuthenticated, logout, meUser } = useAuth();
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSwitchingAccount, setIsSwitchingAccount] = useState(false);
 
   const invitationQuery = useQuery({
     queryKey: ['public-event-invitation', token],
@@ -43,7 +49,11 @@ export default function PublicEventInvitationPage() {
 
   const invitation = invitationQuery.data;
   const loginPath = useMemo(
-    () => `/login?returnTo=${encodeURIComponent(`/convites/eventos/${token ?? ''}`)}`,
+    () => buildLoginPath(`/convites/eventos/${token ?? ''}`),
+    [token],
+  );
+  const forgotPasswordPath = useMemo(
+    () => buildLoginPath(`/convites/eventos/${token ?? ''}`, { flow: 'forgot' }),
     [token],
   );
 
@@ -77,6 +87,16 @@ export default function PublicEventInvitationPage() {
       setSubmitError(resolveErrorMessage(error, 'Nao foi possivel aceitar este convite agora.'));
     },
   });
+
+  async function handleSwitchAccount() {
+    setIsSwitchingAccount(true);
+    try {
+      await logout();
+      navigate(loginPath, { replace: true });
+    } finally {
+      setIsSwitchingAccount(false);
+    }
+  }
 
   if (!token) {
     return (
@@ -134,7 +154,9 @@ export default function PublicEventInvitationPage() {
             <div className="space-y-2">
               <CardTitle className="text-3xl leading-tight">{invitation.event.title}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                {invitation.invitee_name}, este convite libera acesso somente a este evento.
+                {invitation.invited_by?.name
+                  ? `${invitation.invited_by.name} convidou você para acessar apenas este evento com segurança.`
+                  : `${invitation.invitee_name}, este convite libera acesso somente a este evento.`}
               </p>
             </div>
           </CardHeader>
@@ -144,6 +166,9 @@ export default function PublicEventInvitationPage() {
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Resumo</p>
                 <div className="mt-3 space-y-2 text-sm">
                   <p><span className="font-medium">Parceira:</span> {invitation.organization.name}</p>
+                  {invitation.invited_by?.name ? (
+                    <p><span className="font-medium">Quem convidou:</span> {invitation.invited_by.name}</p>
+                  ) : null}
                   <p><span className="font-medium">Data:</span> {formatEventDate(invitation.event.date)}</p>
                   <p><span className="font-medium">Contato:</span> {invitation.invitee_contact.phone_masked ?? invitation.invitee_contact.email ?? 'Nao informado'}</p>
                 </div>
@@ -167,35 +192,26 @@ export default function PublicEventInvitationPage() {
                 <CardTitle className="text-xl">Ativar meu acesso</CardTitle>
                 <p className="text-sm text-muted-foreground">
                   {invitation.requires_existing_login
-                    ? 'Este convite esta ligado a uma conta existente da plataforma.'
-                    : 'Defina uma senha para entrar e acessar este evento quando quiser.'}
+                    ? 'Entre com sua conta atual da plataforma para aceitar este convite com seguranca.'
+                    : 'Defina uma senha para ativar sua conta agora. Essa mesma conta podera ser usada em outros eventos e convites.'}
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
                 {invitation.requires_existing_login ? (
                   isAuthenticated ? (
-                    <div className="space-y-4">
-                      <div className="rounded-2xl border bg-muted/20 p-4 text-sm">
-                        <p className="font-medium">Voce esta logado como</p>
-                        <p className="mt-1 text-muted-foreground">{meUser?.name ?? 'Usuario autenticado'}</p>
-                      </div>
-                      <Button className="w-full" onClick={() => acceptMutation.mutate()} disabled={acceptMutation.isPending}>
-                        {acceptMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
-                        Aceitar convite
-                      </Button>
-                    </div>
+                    <AuthenticatedInvitationActions
+                      userName={meUser?.name ?? 'Usuario autenticado'}
+                      onAccept={() => acceptMutation.mutate()}
+                      onSwitchAccount={handleSwitchAccount}
+                      isAccepting={acceptMutation.isPending}
+                      isSwitchingAccount={isSwitchingAccount}
+                    />
                   ) : (
-                    <div className="space-y-4">
-                      <div className="rounded-2xl border bg-muted/20 p-4 text-sm text-muted-foreground">
-                        Faça login com sua conta da plataforma para concluir este aceite com segurança.
-                      </div>
-                      <Button asChild className="w-full">
-                        <Link to={loginPath}>
-                          <LogIn className="mr-2 h-4 w-4" />
-                          Fazer login para continuar
-                        </Link>
-                      </Button>
-                    </div>
+                    <InvitationExistingLoginActions
+                      intro="Faça login com a sua conta da plataforma para concluir este aceite sem perder o contexto do convite."
+                      loginPath={loginPath}
+                      forgotPasswordPath={forgotPasswordPath}
+                    />
                   )
                 ) : (
                   <div className="space-y-4">
@@ -221,8 +237,11 @@ export default function PublicEventInvitationPage() {
                     </div>
                     <Button className="w-full" onClick={() => acceptMutation.mutate()} disabled={acceptMutation.isPending || !canSubmit}>
                       {acceptMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
-                      Criar conta e entrar
+                      Criar conta, aceitar convite e entrar
                     </Button>
+                    <div className="rounded-2xl border bg-background px-4 py-3 text-sm text-muted-foreground">
+                      A conta criada aqui tambem podera ser usada em outros eventos e convites da plataforma.
+                    </div>
                   </div>
                 )}
 

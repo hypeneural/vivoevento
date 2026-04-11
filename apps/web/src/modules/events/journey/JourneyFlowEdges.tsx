@@ -3,13 +3,14 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   MarkerType,
-  getBezierPath,
+  getSmoothStepPath,
   type Edge,
   type EdgeProps,
 } from '@xyflow/react';
 
 import type { JourneyGraphEdge } from './buildJourneyGraph';
 import { JourneyEdgeLabel } from './JourneyEdgeLabel';
+import { humanizeJourneyBranchLabel } from './journeyCopy';
 
 export interface JourneyFlowEdgeData {
   graphEdge: JourneyGraphEdge;
@@ -69,14 +70,19 @@ const JourneyEdgeComponent = memo(function JourneyEdgeComponent({
   data,
 }: EdgeProps<JourneyFlowEdge>) {
   const tone = resolveJourneyEdgeTone(data.graphEdge, data.isHighlighted);
-  const [path, labelX, labelY] = getBezierPath({
+  const [path, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
     targetX,
     targetY,
     sourcePosition,
     targetPosition,
+    borderRadius: 22,
+    offset: 20,
   });
+  const visibleLabel = data.isHighlighted
+    ? humanizeJourneyBranchLabel(data.graphEdge.data.branch.id, String(label ?? ''))
+    : null;
 
   return (
     <>
@@ -89,14 +95,16 @@ const JourneyEdgeComponent = memo(function JourneyEdgeComponent({
           strokeWidth: data.isHighlighted ? 2.5 : 1.75,
         }}
       />
-      <EdgeLabelRenderer>
-        <JourneyEdgeLabel
-          label={String(label ?? '')}
-          x={labelX}
-          y={labelY}
-          className={tone.labelClassName}
-        />
-      </EdgeLabelRenderer>
+      {visibleLabel ? (
+        <EdgeLabelRenderer>
+          <JourneyEdgeLabel
+            label={visibleLabel}
+            x={labelX}
+            y={labelY}
+            className={tone.labelClassName}
+          />
+        </EdgeLabelRenderer>
+      ) : null}
     </>
   );
 });

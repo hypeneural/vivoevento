@@ -1,29 +1,49 @@
-import { useState, useCallback, useEffect } from 'react';
+﻿import { useState, useCallback, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { resolveLoginReturnPath } from '@/modules/auth/login-navigation';
+import { AuthFlowFooter } from '@/modules/auth/components/invitation-flow/AuthFlowFooter';
+import { AuthFlowSuccessState } from '@/modules/auth/components/invitation-flow/AuthFlowSuccessState';
+import { AuthHelpHint } from '@/modules/auth/components/invitation-flow/AuthHelpHint';
+import { InvitationContextCard } from '@/modules/auth/components/invitation-flow/InvitationContextCard';
+import { OtpCodeStep } from '@/modules/auth/components/invitation-flow/OtpCodeStep';
+import { PasswordSetupStep } from '@/modules/auth/components/invitation-flow/PasswordSetupStep';
+import { RecoveryRequestStep } from '@/modules/auth/components/invitation-flow/RecoveryRequestStep';
+import { useInvitationAuthFlow } from '@/modules/auth/hooks/useInvitationAuthFlow';
+import { resolveInvitationReturnContext, resolveLoginInitialStep, resolveLoginReturnPath } from '@/modules/auth/login-navigation';
 import { authService } from '@/modules/auth/services/auth.service';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
-import { Eye, EyeOff, ArrowRight, ArrowLeft, Loader2, ChevronDown, Phone, Lock, Sparkles, KeyRound, CheckCircle2, Shield } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Loader2, ChevronDown, Phone, Lock, Eye, EyeOff, Sparkles, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/hooks/use-toast';
 
-type AuthStep = 'method' | 'login' | 'register' | 'register-otp' | 'register-welcome' | 'forgot' | 'forgot-code' | 'forgot-reset' | 'forgot-success';
-
 // WhatsApp palette
 const WA_GREEN = '#25D366';
-const WA_GREEN_DARK = '#128C7E';
-
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, loginMock, availableUsers, isLoading, refreshSession } = useAuth();
   const { toast } = useToast();
   const loginReturnPath = resolveLoginReturnPath(location.search, '/');
+  const invitationReturnContext = resolveInvitationReturnContext(loginReturnPath);
+  const initialStep = resolveLoginInitialStep(location.search);
+  const {
+    step,
+    chooseLogin,
+    chooseRegister,
+    registerOtpSent,
+    registerCompleted,
+    startPasswordRecovery,
+    forgotOtpSent,
+    forgotOtpConfirmed,
+    passwordResetSucceeded,
+    returnToMethod,
+    returnToLogin,
+    returnToRegister,
+    returnToForgotRequest,
+    returnToForgotCode,
+  } = useInvitationAuthFlow(initialStep);
 
-  const [step, setStep] = useState<AuthStep>('method');
   const [loginValue, setLoginValue] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -65,7 +85,7 @@ export default function LoginPage() {
     return () => window.clearTimeout(timer);
   }, [forgotResendCountdown]);
 
-  // ─── Helpers ─────────────────────────────────────────────
+  // â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const isPhoneInput = useCallback((value: string) => {
     const digits = value.replace(/\D/g, '');
@@ -143,12 +163,12 @@ export default function LoginPage() {
     if (/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) score++;
     
     if (score <= 1) return { level: 1, label: 'Fraca', color: '#ef4444' };
-    if (score <= 2) return { level: 2, label: 'Razoável', color: '#f59e0b' };
+    if (score <= 2) return { level: 2, label: 'RazoÃ¡vel', color: '#f59e0b' };
     if (score <= 3) return { level: 3, label: 'Boa', color: WA_GREEN };
-    return { level: 4, label: 'Forte ✓', color: WA_GREEN };
+    return { level: 4, label: 'Forte âœ“', color: WA_GREEN };
   }, []);
 
-  // ─── Actions ─────────────────────────────────────────────
+  // â”€â”€â”€ Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleLogin = useCallback(async () => {
     if (!isValidLogin() || !password) return;
@@ -156,7 +176,7 @@ export default function LoginPage() {
     try {
       await login({ login: getLoginRaw(), password });
       navigate(loginReturnPath, { replace: true });
-      toast({ title: 'Bem-vindo! 🎉', description: 'Login realizado com sucesso.' });
+      toast({ title: 'Bem-vindo! ðŸŽ‰', description: 'Login realizado com sucesso.' });
     } catch (err: any) {
       toast({
         title: 'Erro ao entrar',
@@ -183,7 +203,7 @@ export default function LoginPage() {
       setRegisterMaskedPhone(result.phone_masked);
       setRegisterCode('');
       setRegisterResendCountdown(result.resend_in);
-      setStep('register-otp');
+      registerOtpSent();
 
       toast({
         title: 'Codigo enviado',
@@ -198,7 +218,7 @@ export default function LoginPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [name, toast, getLoginRaw]);
+  }, [getLoginRaw, name, registerOtpSent, toast]);
 
   const handleFinishRegister = useCallback(async () => {
     if (!password || password.length < 8) return;
@@ -206,7 +226,7 @@ export default function LoginPage() {
     try {
       // Register + login (backend will handle this)
       await login({ login: getLoginRaw(), password });
-      toast({ title: 'Conta criada! 🎉', description: 'Bem-vindo ao Evento Vivo.' });
+      toast({ title: 'Conta criada! ðŸŽ‰', description: 'Bem-vindo ao Evento Vivo.' });
     } catch (err: any) {
       toast({
         title: 'Erro ao criar conta',
@@ -258,7 +278,7 @@ export default function LoginPage() {
       setRegisterWelcomeTitle(result.onboarding.title);
       setRegisterWelcomeDescription(result.onboarding.description);
       setRegisterNextPath(result.onboarding.next_path || '/plans');
-      setStep('register-welcome');
+      registerCompleted();
 
       toast({
         title: 'WhatsApp validado',
@@ -273,7 +293,7 @@ export default function LoginPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [registerCode, registerSessionToken, toast]);
+  }, [registerCompleted, registerCode, registerSessionToken, toast]);
 
   const handleContinueAfterRegister = useCallback(async () => {
     setIsContinuing(true);
@@ -295,7 +315,7 @@ export default function LoginPage() {
       setForgotDestinationMasked(result.destination_masked);
       setForgotResendCountdown(result.resend_in);
       setResetCode('');
-      setStep('forgot-code');
+      forgotOtpSent();
       toast({
         title: 'Solicitacao recebida',
         description: result.method === 'whatsapp'
@@ -311,7 +331,7 @@ export default function LoginPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [loginValue, toast, getLoginRaw, isValidLogin]);
+  }, [forgotOtpSent, getLoginRaw, isValidLogin, toast]);
 
   const handleResendForgotCode = useCallback(async () => {
     if (!forgotSessionToken || forgotResendCountdown > 0) return;
@@ -354,7 +374,7 @@ export default function LoginPage() {
         code: resetCode,
       });
 
-      setStep('forgot-reset');
+      forgotOtpConfirmed();
       toast({
         title: 'Codigo validado',
         description: 'Agora voce ja pode criar uma nova senha.',
@@ -368,7 +388,7 @@ export default function LoginPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [forgotSessionToken, resetCode, toast]);
+  }, [forgotOtpConfirmed, forgotSessionToken, resetCode, toast]);
 
   const handleResetPassword = useCallback(async () => {
     if (!forgotSessionToken || password.length < 8 || password !== passwordConfirm) return;
@@ -380,20 +400,22 @@ export default function LoginPage() {
         password_confirmation: passwordConfirm,
         device_name: 'web-panel',
       });
-      setStep('forgot-success');
-      toast({ title: 'Senha redefinida! 🔐', description: 'Entrando na sua conta...' });
-      // Auto-login happens in resetPassword
-      setTimeout(() => window.location.reload(), 1500);
+      passwordResetSucceeded();
+      toast({ title: 'Senha redefinida! ðŸ”', description: 'Entrando na sua conta...' });
+      window.setTimeout(async () => {
+        await refreshSession();
+        navigate(loginReturnPath, { replace: true });
+      }, 1200);
     } catch (err: any) {
       toast({
         title: 'Erro',
-        description: err?.message || 'Código inválido ou expirado.',
+        description: err?.message || 'CÃ³digo invÃ¡lido ou expirado.',
         variant: 'destructive',
       });
     } finally {
       setIsSubmitting(false);
     }
-  }, [forgotSessionToken, password, passwordConfirm, toast]);
+  }, [forgotSessionToken, loginReturnPath, navigate, password, passwordConfirm, passwordResetSucceeded, refreshSession, toast]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent, action: () => void) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -419,8 +441,16 @@ export default function LoginPage() {
     : registerNextPath === '/events/create'
       ? 'Proximo passo: abrir a criacao do evento para continuar a jornada comercial.'
       : 'Proximo passo: continuar o fluxo iniciado no cadastro.';
+  const loginIdentityInputId = 'login-identity';
+  const loginPasswordInputId = 'login-password';
+  const registerNameInputId = 'register-name';
+  const registerPhoneInputId = 'register-phone';
+  const forgotIdentityInputId = 'forgot-identity';
+  const forgotCodeInputId = 'forgot-code';
+  const forgotPasswordInputId = 'forgot-new-password';
+  const forgotPasswordConfirmationInputId = 'forgot-new-password-confirmation';
 
-  // ─── WhatsApp SVG Icon ───────────────────────────────────
+  // â”€â”€â”€ WhatsApp SVG Icon â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const WhatsAppIcon = ({ className = '', size = 16 }: { className?: string; size?: number }) => (
     <svg viewBox="0 0 24 24" width={size} height={size} className={className} fill="currentColor">
@@ -454,9 +484,25 @@ export default function LoginPage() {
               <h1 className="text-2xl sm:text-3xl font-bold gradient-text">Evento Vivo</h1>
             </div>
             <p className="text-muted-foreground text-sm sm:text-base">
-              Plataforma de experiências vivas
+              Plataforma de experiÃªncias vivas
             </p>
           </motion.div>
+
+          {invitationReturnContext ? (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: 0.05 }}
+              className="mb-4"
+            >
+              <InvitationContextCard
+                className="rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3"
+                badge={invitationReturnContext.badge}
+                title={invitationReturnContext.title}
+                description={invitationReturnContext.description}
+              />
+            </motion.div>
+          ) : null}
 
           {/* Card */}
           <motion.div
@@ -466,7 +512,7 @@ export default function LoginPage() {
             className="glass-strong rounded-2xl sm:rounded-3xl overflow-hidden"
           >
             <AnimatePresence mode="wait" custom={1}>
-              {/* ─── Step: Choose Method ─── */}
+              {/* â”€â”€â”€ Step: Choose Method â”€â”€â”€ */}
               {step === 'method' && (
                 <motion.div
                   key="method"
@@ -487,7 +533,7 @@ export default function LoginPage() {
 
                   <div className="space-y-3">
                     <button
-                      onClick={() => setStep('login')}
+                      onClick={chooseLogin}
                       className="group w-full flex items-center gap-3.5 p-3.5 sm:p-4 rounded-xl bg-muted/40 hover:bg-muted/70 border border-border/40 hover:border-border transition-all duration-200"
                     >
                       <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl flex items-center justify-center shrink-0"
@@ -496,7 +542,7 @@ export default function LoginPage() {
                       </div>
                       <div className="flex-1 text-left min-w-0">
                         <p className="text-sm sm:text-base font-medium">Entrar com WhatsApp</p>
-                        <p className="text-xs text-muted-foreground truncate">Use seu número de WhatsApp e senha</p>
+                        <p className="text-xs text-muted-foreground truncate">Use seu nÃºmero de WhatsApp e senha</p>
                       </div>
                       <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all shrink-0" />
                     </button>
@@ -504,7 +550,7 @@ export default function LoginPage() {
                     <button
                       onClick={() => {
                         resetRegisterState();
-                        setStep('register');
+                        chooseRegister();
                       }}
                       className="group w-full flex items-center gap-3.5 p-3.5 sm:p-4 rounded-xl bg-muted/40 hover:bg-muted/70 border border-border/40 hover:border-border transition-all duration-200"
                     >
@@ -513,7 +559,7 @@ export default function LoginPage() {
                       </div>
                       <div className="flex-1 text-left min-w-0">
                         <p className="text-sm sm:text-base font-medium">Criar conta</p>
-                        <p className="text-xs text-muted-foreground truncate">Comece sua experiência no Evento Vivo</p>
+                        <p className="text-xs text-muted-foreground truncate">Comece sua experiÃªncia no Evento Vivo</p>
                       </div>
                       <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all shrink-0" />
                     </button>
@@ -528,7 +574,7 @@ export default function LoginPage() {
                         }}
                         className="flex items-center justify-center gap-1.5 w-full text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
                       >
-                        <span>Acesso rápido (dev)</span>
+                        <span>Acesso rÃ¡pido (dev)</span>
                         <ChevronDown className="h-3 w-3" />
                       </button>
                       <div id="dev-users" className="hidden mt-3 space-y-1.5">
@@ -553,7 +599,7 @@ export default function LoginPage() {
                 </motion.div>
               )}
 
-              {/* ─── Step: Login (WhatsApp/Email + Password) ─── */}
+              {/* â”€â”€â”€ Step: Login (WhatsApp/Email + Password) â”€â”€â”€ */}
               {step === 'login' && (
                 <motion.div
                   key="login"
@@ -567,7 +613,7 @@ export default function LoginPage() {
                 >
                   <div className="space-y-1.5">
                     <button
-                      onClick={() => setStep('method')}
+                      onClick={returnToMethod}
                       className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 -ml-0.5 mb-2"
                     >
                       <ArrowLeft className="h-3 w-3" />
@@ -579,10 +625,12 @@ export default function LoginPage() {
 
                   <div className="space-y-3 sm:space-y-4">
                     <div>
-                      <label className="text-xs sm:text-sm font-medium mb-1 sm:mb-1.5 block text-muted-foreground">WhatsApp ou E-mail</label>
+                      <label htmlFor={loginIdentityInputId} className="text-xs sm:text-sm font-medium mb-1 sm:mb-1.5 block text-muted-foreground">WhatsApp ou E-mail</label>
                       <div className="relative">
                         <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
+                          id={loginIdentityInputId}
+                          aria-label="WhatsApp ou E-mail"
                           type="text"
                           value={loginValue}
                           onChange={handleLoginInputChange}
@@ -597,13 +645,14 @@ export default function LoginPage() {
 
                     <div>
                       <div className="flex justify-between items-center mb-1 sm:mb-1.5">
-                        <label className="text-xs sm:text-sm font-medium text-muted-foreground">Senha</label>
+                        <label htmlFor={loginPasswordInputId} className="text-xs sm:text-sm font-medium text-muted-foreground">Senha</label>
                         <button
+                          type="button"
                           onClick={() => {
                             resetForgotState();
                             setPassword('');
                             setPasswordConfirm('');
-                            setStep('forgot');
+                            startPasswordRecovery();
                           }}
                           className="text-[10px] sm:text-xs text-primary hover:underline font-medium"
                         >
@@ -613,11 +662,13 @@ export default function LoginPage() {
                       <div className="relative">
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
+                          id={loginPasswordInputId}
+                          aria-label="Senha"
                           type={showPassword ? 'text' : 'password'}
                           value={password}
                           onChange={e => setPassword(e.target.value)}
                           onKeyDown={e => handleKeyDown(e, handleLogin)}
-                          placeholder="••••••••"
+                          placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                           className="pl-9 pr-10 h-10 sm:h-11 text-sm sm:text-base"
                           autoComplete="current-password"
                         />
@@ -644,22 +695,18 @@ export default function LoginPage() {
                     </Button>
                   </div>
 
-                  <p className="text-center text-xs text-muted-foreground/70 pt-1">
-                    Não tem conta?{' '}
-                    <button
-                      onClick={() => {
-                        resetRegisterState();
-                        setStep('register');
-                      }}
-                      className="text-primary hover:underline font-medium"
-                    >
-                      Criar conta
-                    </button>
-                  </p>
+                  <AuthFlowFooter
+                    prefix="Nao tem conta?"
+                    actionLabel="Criar conta"
+                    onAction={() => {
+                      resetRegisterState();
+                      chooseRegister();
+                    }}
+                  />
                 </motion.div>
               )}
 
-              {/* ─── Step: Register (WhatsApp + Name) ─── */}
+              {/* â”€â”€â”€ Step: Register (WhatsApp + Name) â”€â”€â”€ */}
               {step === 'register' && (
                 <motion.div
                   key="register"
@@ -675,7 +722,7 @@ export default function LoginPage() {
                     <button
                       onClick={() => {
                         resetRegisterState();
-                        setStep('method');
+                        returnToMethod();
                       }}
                       className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 -ml-0.5 mb-2"
                     >
@@ -683,7 +730,7 @@ export default function LoginPage() {
                       Voltar
                     </button>
                     <h2 className="text-lg sm:text-xl font-semibold">Criar conta</h2>
-                    <p className="text-sm text-muted-foreground">Comece sua experiência no Evento Vivo</p>
+                    <p className="text-sm text-muted-foreground">Comece sua experiÃªncia no Evento Vivo</p>
                   </div>
 
                   {/* WhatsApp highlight */}
@@ -694,17 +741,19 @@ export default function LoginPage() {
                       <WhatsAppIcon size={16} className="text-[#25D366]" />
                     </div>
                     <div>
-                      <p className="text-xs sm:text-sm font-medium" style={{ color: WA_GREEN }}>WhatsApp é o canal principal</p>
+                      <p className="text-xs sm:text-sm font-medium" style={{ color: WA_GREEN }}>WhatsApp Ã© o canal principal</p>
                       <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                        Seu número será usado para suporte, notificações e recebimento de mídias
+                        Seu nÃºmero serÃ¡ usado para suporte, notificaÃ§Ãµes e recebimento de mÃ­dias
                       </p>
                     </div>
                   </div>
 
                   <div className="space-y-3 sm:space-y-4">
                     <div>
-                      <label className="text-xs sm:text-sm font-medium mb-1 sm:mb-1.5 block text-muted-foreground">Seu nome</label>
+                      <label htmlFor={registerNameInputId} className="text-xs sm:text-sm font-medium mb-1 sm:mb-1.5 block text-muted-foreground">Seu nome</label>
                       <Input
+                        id={registerNameInputId}
+                        aria-label="Seu nome"
                         value={name}
                         onChange={e => setName(e.target.value)}
                         onKeyDown={e => handleKeyDown(e, handleRegister)}
@@ -715,10 +764,12 @@ export default function LoginPage() {
                     </div>
 
                     <div>
-                      <label className="text-xs sm:text-sm font-medium mb-1 sm:mb-1.5 block text-muted-foreground">WhatsApp</label>
+                      <label htmlFor={registerPhoneInputId} className="text-xs sm:text-sm font-medium mb-1 sm:mb-1.5 block text-muted-foreground">WhatsApp</label>
                       <div className="relative">
                         <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
+                          id={registerPhoneInputId}
+                          aria-label="WhatsApp"
                           type="tel"
                           value={loginValue}
                           onChange={handleLoginInputChange}
@@ -741,16 +792,15 @@ export default function LoginPage() {
                     </Button>
                   </div>
 
-                  <p className="text-center text-xs text-muted-foreground/70 pt-1">
-                    Já tem conta?{' '}
-                    <button onClick={() => setStep('login')} className="text-primary hover:underline font-medium">
-                      Entrar
-                    </button>
-                  </p>
+                  <AuthFlowFooter
+                    prefix="Ja tem conta?"
+                    actionLabel="Entrar"
+                    onAction={chooseLogin}
+                  />
                 </motion.div>
               )}
 
-              {/* ─── Step: Register Password ─── */}
+              {/* â”€â”€â”€ Step: Register Password â”€â”€â”€ */}
               {step === 'register-otp' && (
                 <motion.div
                   key="register-otp"
@@ -762,71 +812,32 @@ export default function LoginPage() {
                   transition={{ duration: 0.25 }}
                   className="p-5 sm:p-8 space-y-4 sm:space-y-5"
                 >
-                  <div className="space-y-1.5">
-                    <button
-                      onClick={() => setStep('register')}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 -ml-0.5 mb-2"
-                    >
-                      <ArrowLeft className="h-3 w-3" />
-                      Voltar
-                    </button>
-                    <h2 className="text-lg sm:text-xl font-semibold">Valide seu WhatsApp</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Enviamos um codigo de 6 digitos para {registerMaskedPhone || 'seu numero'}.
-                    </p>
-                  </div>
-
-                  <div className="space-y-3 sm:space-y-4">
-                    <div className="flex items-start gap-2.5 p-3 rounded-xl bg-muted/30 border border-border/30">
-                      <Shield className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                      <p className="text-[10px] sm:text-xs text-muted-foreground leading-relaxed">
+                  <OtpCodeStep
+                    title="Valide seu WhatsApp"
+                    description={`Enviamos um codigo de 6 digitos para ${registerMaskedPhone || 'seu numero'}.`}
+                    onBack={returnToRegister}
+                    helper={
+                      <AuthHelpHint>
                         O cadastro so continua quando esse numero for confirmado e ainda nao existir na base.
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="text-xs sm:text-sm font-medium mb-1.5 block text-muted-foreground">Codigo de verificacao</label>
-                      <InputOTP
-                        maxLength={6}
-                        value={registerCode}
-                        onChange={(value) => setRegisterCode(value.replace(/\D/g, '').slice(0, 6))}
-                        containerClassName="justify-center"
-                      >
-                        <InputOTPGroup>
-                          {[0, 1, 2, 3, 4, 5].map((index) => (
-                            <InputOTPSlot key={index} index={index} className="h-11 w-11 sm:h-12 sm:w-12" />
-                          ))}
-                        </InputOTPGroup>
-                      </InputOTP>
-                    </div>
-
-                    <Button
-                      className="w-full h-10 sm:h-11 border-0 text-sm sm:text-base font-medium text-white"
-                      style={{ background: WA_GREEN }}
-                      onClick={handleVerifyRegisterCode}
-                      disabled={isSubmitting || registerCode.length !== 6}
-                    >
-                      {isSubmitting ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : null}
-                      {isSubmitting ? 'Validando...' : 'Confirmar codigo'}
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs text-muted-foreground/70">
-                    <span>Nao recebeu?</span>
-                    {registerResendCountdown > 0 ? (
-                      <span className="font-mono">{formatCountdown(registerResendCountdown)}</span>
-                    ) : (
-                      <button
-                        onClick={handleResendRegisterCode}
-                        disabled={isSubmitting}
-                        className="text-primary hover:underline font-medium"
-                      >
-                        Reenviar codigo
-                      </button>
-                    )}
-                  </div>
+                      </AuthHelpHint>
+                    }
+                    inputVariant="slots"
+                    value={registerCode}
+                    onChange={setRegisterCode}
+                    submitLabel="Confirmar codigo"
+                    submitLoadingLabel="Validando..."
+                    onSubmit={handleVerifyRegisterCode}
+                    submitDisabled={registerCode.length !== 6}
+                    isSubmitting={isSubmitting}
+                    buttonClassName="w-full h-10 sm:h-11 border-0 text-sm sm:text-base font-medium text-white"
+                    buttonStyle={{ background: WA_GREEN }}
+                    resendLayout="inline"
+                    resendPrompt="Nao recebeu?"
+                    resendCountdown={registerResendCountdown}
+                    formatCountdown={formatCountdown}
+                    onResend={handleResendRegisterCode}
+                    resendButtonLabel="Reenviar codigo"
+                  />
                 </motion.div>
               )}
 
@@ -878,7 +889,7 @@ export default function LoginPage() {
                 </motion.div>
               )}
 
-              {/* ─── Step: Forgot Password ─── */}
+              {/* â”€â”€â”€ Step: Forgot Password â”€â”€â”€ */}
               {step === 'forgot' && (
                 <motion.div
                   key="forgot"
@@ -890,67 +901,29 @@ export default function LoginPage() {
                   transition={{ duration: 0.25 }}
                   className="p-5 sm:p-8 space-y-4 sm:space-y-5"
                 >
-                  <div className="space-y-1.5">
-                    <button
-                      onClick={() => setStep('login')}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 -ml-0.5 mb-2"
-                    >
-                      <ArrowLeft className="h-3 w-3" />
-                      Voltar ao login
-                    </button>
-                    <div className="flex items-center gap-2">
-                      <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <KeyRound className="h-4.5 w-4.5 text-primary" />
-                      </div>
-                      <div>
-                        <h2 className="text-lg sm:text-xl font-semibold">Esqueci a senha</h2>
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Informe seu WhatsApp ou e-mail para receber um código de recuperação
-                    </p>
-                  </div>
-
-                  <div className="space-y-3 sm:space-y-4">
-                    <div>
-                      <label className="text-xs sm:text-sm font-medium mb-1 sm:mb-1.5 block text-muted-foreground">WhatsApp ou E-mail</label>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          type="text"
-                          value={loginValue}
-                          onChange={handleLoginInputChange}
-                          onKeyDown={e => handleKeyDown(e, handleForgotPassword)}
-                          placeholder="(51) 99999-9999 ou seu@email.com"
-                          className="pl-9 h-10 sm:h-11 text-sm sm:text-base"
-                          autoFocus
-                        />
-                      </div>
-                    </div>
-
-                    {/* Method info */}
-                    <div className="flex items-start gap-2.5 p-3 rounded-xl bg-muted/30 border border-border/30">
-                      <Shield className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                      <p className="text-[10px] sm:text-xs text-muted-foreground leading-relaxed">
-                        Enviaremos um código de 6 dígitos via <strong>WhatsApp</strong> ou <strong>e-mail</strong> para confirmar sua identidade.
-                      </p>
-                    </div>
-
-                    <Button
-                      className="w-full h-10 sm:h-11 gradient-primary border-0 text-sm sm:text-base font-medium"
-                      onClick={handleForgotPassword}
-                      disabled={isSubmitting || !isValidLogin()}
-                    >
-                      {isSubmitting ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : null}
-                      {isSubmitting ? 'Enviando...' : 'Enviar código'}
-                    </Button>
-                  </div>
+                  <RecoveryRequestStep
+                    description="Informe seu WhatsApp ou e-mail para receber um codigo de recuperacao"
+                    onBack={returnToLogin}
+                    identityInputId={forgotIdentityInputId}
+                    identityAriaLabel="WhatsApp ou E-mail"
+                    identityValue={loginValue}
+                    onIdentityChange={handleLoginInputChange}
+                    onIdentityKeyDown={(event) => handleKeyDown(event, handleForgotPassword)}
+                    helper={
+                      <AuthHelpHint>
+                        Enviaremos um codigo de 6 digitos via <strong>WhatsApp</strong> ou <strong>e-mail</strong> para confirmar sua identidade.
+                      </AuthHelpHint>
+                    }
+                    submitLabel="Enviar codigo"
+                    submitLoadingLabel="Enviando..."
+                    onSubmit={handleForgotPassword}
+                    submitDisabled={!isValidLogin()}
+                    isSubmitting={isSubmitting}
+                  />
                 </motion.div>
               )}
 
-              {/* ─── Step: Enter Code ─── */}
+              {/* â”€â”€â”€ Step: Enter Code â”€â”€â”€ */}
               {step === 'forgot-code' && (
                 <motion.div
                   key="forgot-code"
@@ -962,67 +935,34 @@ export default function LoginPage() {
                   transition={{ duration: 0.25 }}
                   className="p-5 sm:p-8 space-y-4 sm:space-y-5"
                 >
-                  <div className="space-y-1.5">
-                    <button
-                      onClick={() => setStep('forgot')}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 -ml-0.5 mb-2"
-                    >
-                      <ArrowLeft className="h-3 w-3" />
-                      Voltar
-                    </button>
-                    <h2 className="text-lg sm:text-xl font-semibold">Digite o código</h2>
-                    <p className="text-sm text-muted-foreground">
-                      {resetMethod === 'whatsapp'
+                  <OtpCodeStep
+                    title="Digite o codigo"
+                    description={
+                      resetMethod === 'whatsapp'
                         ? `Se encontrarmos uma conta vinculada a ${forgotDestinationMasked || 'este WhatsApp'}, enviaremos um codigo de 6 digitos por WhatsApp.`
-                        : `Se encontrarmos uma conta vinculada a ${forgotDestinationMasked || 'este e-mail'}, enviaremos um codigo de 6 digitos por e-mail.`}
-                    </p>
-                    <p className="text-xs text-muted-foreground/70">
-                      Por seguranca, nao confirmamos se o contato informado esta cadastrado.
-                    </p>
-                  </div>
-
-                  {/* Code input with individual boxes look */}
-                  <div>
-                    <label className="text-xs sm:text-sm font-medium mb-1.5 block text-muted-foreground">Código de verificação</label>
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={6}
-                      value={resetCode}
-                      onChange={e => setResetCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="000000"
-                      className="h-12 sm:h-14 text-center text-xl sm:text-2xl font-mono tracking-[0.5em] font-bold"
-                      autoFocus
-                    />
-                  </div>
-
-                  <Button
-                    className="w-full h-10 sm:h-11 gradient-primary border-0 text-sm sm:text-base font-medium"
-                    onClick={handleVerifyForgotCode}
-                    disabled={isSubmitting || resetCode.length !== 6}
-                  >
-                    Confirmar código
-                    <ArrowRight className="h-4 w-4 ml-1.5" />
-                  </Button>
-
-                  <div className="text-center">
-                    {forgotResendCountdown > 0 ? (
-                      <p className="mb-2 font-mono text-[11px] text-muted-foreground/70">
-                        Novo envio em {formatCountdown(forgotResendCountdown)}
-                      </p>
-                    ) : null}
-                    <button
-                      onClick={handleResendForgotCode}
-                      className="text-xs text-muted-foreground hover:text-primary transition-colors"
-                      disabled={isSubmitting || forgotResendCountdown > 0}
-                    >
-                      {isSubmitting ? 'Reenviando...' : 'Reenviar código'}
-                    </button>
-                  </div>
+                        : `Se encontrarmos uma conta vinculada a ${forgotDestinationMasked || 'este e-mail'}, enviaremos um codigo de 6 digitos por e-mail.`
+                    }
+                    secondaryDescription="Por seguranca, nao confirmamos se o contato informado esta cadastrado."
+                    onBack={returnToForgotRequest}
+                    value={resetCode}
+                    onChange={setResetCode}
+                    inputId={forgotCodeInputId}
+                    inputAriaLabel="Codigo de verificacao"
+                    submitLabel="Confirmar codigo"
+                    onSubmit={handleVerifyForgotCode}
+                    submitDisabled={resetCode.length !== 6}
+                    isSubmitting={isSubmitting}
+                    resendLayout="stacked"
+                    resendCountdownPrefix="Novo envio em"
+                    resendCountdown={forgotResendCountdown}
+                    formatCountdown={formatCountdown}
+                    onResend={handleResendForgotCode}
+                    resendButtonLabel="Reenviar codigo"
+                  />
                 </motion.div>
               )}
 
-              {/* ─── Step: New Password ─── */}
+              {/* â”€â”€â”€ Step: New Password â”€â”€â”€ */}
               {step === 'forgot-reset' && (
                 <motion.div
                   key="forgot-reset"
@@ -1034,90 +974,32 @@ export default function LoginPage() {
                   transition={{ duration: 0.25 }}
                   className="p-5 sm:p-8 space-y-4 sm:space-y-5"
                 >
-                  <div className="space-y-1.5">
-                    <button
-                      onClick={() => setStep('forgot-code')}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 -ml-0.5 mb-2"
-                    >
-                      <ArrowLeft className="h-3 w-3" />
-                      Voltar
-                    </button>
-                    <h2 className="text-lg sm:text-xl font-semibold">Nova senha</h2>
-                    <p className="text-sm text-muted-foreground">Crie uma nova senha segura</p>
-                  </div>
-
-                  <div className="space-y-3 sm:space-y-4">
-                    <div>
-                      <label className="text-xs sm:text-sm font-medium mb-1 sm:mb-1.5 block text-muted-foreground">Nova senha</label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          type={showPassword ? 'text' : 'password'}
-                          value={password}
-                          onChange={e => setPassword(e.target.value)}
-                          placeholder="Mínimo 8 caracteres"
-                          className="pl-9 pr-10 h-10 sm:h-11 text-sm sm:text-base"
-                          autoComplete="new-password"
-                          autoFocus
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-0.5"
-                          tabIndex={-1}
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Strength */}
-                    {password && (
-                      <div className="space-y-1.5">
-                        <div className="flex gap-1">
-                          {[1, 2, 3, 4].map(level => (
-                            <div key={level} className="flex-1 h-1 rounded-full transition-colors duration-300"
-                              style={{ background: strength.level >= level ? strength.color : 'hsl(var(--muted))' }} />
-                          ))}
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">{strength.label}</p>
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="text-xs sm:text-sm font-medium mb-1 sm:mb-1.5 block text-muted-foreground">Confirmar nova senha</label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          type={showPassword ? 'text' : 'password'}
-                          value={passwordConfirm}
-                          onChange={e => setPasswordConfirm(e.target.value)}
-                          onKeyDown={e => handleKeyDown(e, handleResetPassword)}
-                          placeholder="Repita a nova senha"
-                          className="pl-9 h-10 sm:h-11 text-sm sm:text-base"
-                          autoComplete="new-password"
-                        />
-                      </div>
-                      {passwordConfirm && password !== passwordConfirm && (
-                        <p className="text-[10px] text-destructive mt-1">As senhas não conferem</p>
-                      )}
-                    </div>
-
-                    <Button
-                      className="w-full h-10 sm:h-11 gradient-primary border-0 text-sm sm:text-base font-medium"
-                      onClick={handleResetPassword}
-                      disabled={isSubmitting || password.length < 8 || password !== passwordConfirm}
-                    >
-                      {isSubmitting ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : null}
-                      {isSubmitting ? 'Redefinindo...' : 'Redefinir senha'}
-                    </Button>
-                  </div>
+                  <PasswordSetupStep
+                    title="Nova senha"
+                    description="Crie uma nova senha segura"
+                    onBack={returnToForgotCode}
+                    passwordInputId={forgotPasswordInputId}
+                    passwordAriaLabel="Nova senha"
+                    password={password}
+                    onPasswordChange={setPassword}
+                    confirmationInputId={forgotPasswordConfirmationInputId}
+                    confirmationAriaLabel="Confirmar nova senha"
+                    confirmation={passwordConfirm}
+                    onConfirmationChange={setPasswordConfirm}
+                    onConfirmationKeyDown={(event) => handleKeyDown(event, handleResetPassword)}
+                    showPassword={showPassword}
+                    onToggleShowPassword={() => setShowPassword(!showPassword)}
+                    strength={password ? strength : undefined}
+                    submitLabel="Redefinir senha"
+                    submitLoadingLabel="Redefinindo..."
+                    onSubmit={handleResetPassword}
+                    submitDisabled={password.length < 8 || password !== passwordConfirm}
+                    isSubmitting={isSubmitting}
+                  />
                 </motion.div>
               )}
 
-              {/* ─── Step: Success ─── */}
+              {/* â”€â”€â”€ Step: Success â”€â”€â”€ */}
               {step === 'forgot-success' && (
                 <motion.div
                   key="forgot-success"
@@ -1129,26 +1011,11 @@ export default function LoginPage() {
                   transition={{ duration: 0.25 }}
                   className="p-5 sm:p-8 space-y-5 sm:space-y-6"
                 >
-                  <div className="text-center space-y-3">
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: 'spring', duration: 0.6 }}
-                      className="inline-flex"
-                    >
-                      <div className="h-16 w-16 rounded-2xl bg-green-500/10 flex items-center justify-center">
-                        <CheckCircle2 className="h-8 w-8 text-green-500" />
-                      </div>
-                    </motion.div>
-                    <h2 className="text-lg sm:text-xl font-semibold">Senha redefinida! 🎉</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Sua senha foi alterada com sucesso. Entrando na sua conta...
-                    </p>
-                    <div className="flex items-center justify-center gap-2 pt-2">
-                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                      <span className="text-xs text-muted-foreground">Redirecionando...</span>
-                    </div>
-                  </div>
+                  <AuthFlowSuccessState
+                    title="Senha redefinida!"
+                    description="Sua senha foi alterada com sucesso. Entrando na sua conta..."
+                    statusLabel="Redirecionando..."
+                  />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1161,10 +1028,16 @@ export default function LoginPage() {
             transition={{ delay: 0.5 }}
             className="text-center text-[10px] sm:text-xs text-muted-foreground/40 mt-6 sm:mt-8"
           >
-            © {new Date().getFullYear()} Evento Vivo · Plataforma de experiências vivas
+            Â© {new Date().getFullYear()} Evento Vivo Â· Plataforma de experiÃªncias vivas
           </motion.p>
         </div>
       </div>
     </div>
   );
 }
+
+
+
+
+
+

@@ -95,4 +95,15 @@ describe('resolveLayoutTransition', () => {
     expect(resolved.transition).toMatchObject({ duration: 0 });
     expect(resolved.variants.initial).toMatchObject({ opacity: 1 });
   });
+
+  it('falls back to fade when an unsupported transition effect reaches the resolver', () => {
+    const resolved = resolveLayoutTransition('unsupported-effect' as never, tokens, false);
+
+    expect(resolved.effect).toBe('fade');
+    expect(resolved.transition).toMatchObject({
+      duration: tokens.visualDuration,
+      ease: tokens.enter.ease,
+    });
+    expect(resolved.variants.initial).toMatchObject({ opacity: 0, scale: 0.996 });
+  });
 });

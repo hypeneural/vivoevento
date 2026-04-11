@@ -75,14 +75,29 @@ export function usePhaserGame({
         const game = gameDefinition.boot({
           container: containerRef.current,
           payload,
-          onReady: () => onReadyRef.current?.(),
+          onReady: () => {
+            if (disposed) {
+              return;
+            }
+
+            setRuntimeStatus('ready');
+            setRuntimeError(null);
+            onReadyRef.current?.();
+          },
+          onError: (error) => {
+            if (disposed) {
+              return;
+            }
+
+            setRuntimeStatus('error');
+            setRuntimeError(error instanceof Error ? error : new Error(String(error)));
+          },
           onProgress: (data) => onProgressRef.current?.(data),
           onMove: (move) => onMoveRef.current?.(move),
           onFinish: (result) => onFinishRef.current(result),
         });
 
         gameRef.current = game;
-        setRuntimeStatus('ready');
         setRuntimeError(null);
         cleanupRuntime = () => {
           if (gameDefinition.destroy) {

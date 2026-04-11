@@ -43,6 +43,12 @@ abstract class TestCase extends BaseTestCase
             ->patchJson("/api/v1{$uri}", $data);
     }
 
+    protected function apiPut(string $uri, array $data = [], array $headers = []): TestResponse
+    {
+        return $this->withHeaders(array_merge($this->defaultHeaders(), $headers))
+            ->putJson("/api/v1{$uri}", $data);
+    }
+
     protected function apiDelete(string $uri, array $headers = []): TestResponse
     {
         return $this->withHeaders(array_merge($this->defaultHeaders(), $headers))

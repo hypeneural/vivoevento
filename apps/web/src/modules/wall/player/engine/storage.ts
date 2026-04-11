@@ -3,6 +3,7 @@ import type {
   WallPlayerState,
   WallSenderRuntimeStats,
   WallRuntimeItem,
+  WallTransition,
   WallVideoPlaybackState,
 } from '../types';
 import { mediaToRuntimeItem } from './selectors';
@@ -28,6 +29,9 @@ interface PersistedWallRuntimeState {
   version: number;
   currentItemId?: string | null;
   currentItemStartedAt?: string | null;
+  activeTransitionEffect?: WallTransition | null;
+  lastTransitionEffect?: WallTransition | null;
+  transitionAdvanceCount?: number;
   senderStats: Record<string, WallSenderRuntimeStats>;
   items: PersistedWallRuntimeItem[];
   videoPlayback?: Pick<
@@ -203,6 +207,9 @@ export function writeWallRuntimeStorage(code: string, state: WallPlayerState): v
     version: STORAGE_VERSION,
     currentItemId: state.currentItemId ?? null,
     currentItemStartedAt: state.currentItemStartedAt ?? null,
+    activeTransitionEffect: state.activeTransitionEffect ?? null,
+    lastTransitionEffect: state.lastTransitionEffect ?? null,
+    transitionAdvanceCount: state.transitionAdvanceCount,
     senderStats: state.senderStats,
     items: state.items.map((item) => ({
       id: item.id,

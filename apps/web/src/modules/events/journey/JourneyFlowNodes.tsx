@@ -1,9 +1,10 @@
-import { memo } from 'react';
+import { memo, useEffect } from 'react';
 import {
   Handle,
   Position,
   type Node,
   type NodeProps,
+  useUpdateNodeInternals,
 } from '@xyflow/react';
 
 import type { JourneyGraphNode } from './buildJourneyGraph';
@@ -16,8 +17,6 @@ export interface JourneyFlowNodeData {
 
 export type JourneyFlowNode = Node<JourneyFlowNodeData, 'journey'>;
 
-const TARGET_HANDLE_ID = 'inbound';
-
 function JourneyStepNode({
   data,
   selected,
@@ -25,22 +24,44 @@ function JourneyStepNode({
   const graphNode = data.graphNode;
   const accent = resolveJourneyStageAccent(graphNode.stage);
   const branchCount = Math.max(graphNode.sourceHandles.length, 1);
+  const inboundHandleCount = graphNode.targetHandles.length;
+  const updateNodeInternals = useUpdateNodeInternals();
+
+  useEffect(() => {
+    updateNodeInternals(graphNode.id);
+  }, [
+    graphNode.id,
+    graphNode.sourceHandles.join('|'),
+    graphNode.targetHandles.join('|'),
+    updateNodeInternals,
+  ]);
 
   return (
     <>
-      <Handle
-        id={TARGET_HANDLE_ID}
-        type="target"
-        position={Position.Top}
-        isConnectable={false}
-        aria-hidden="true"
-        className="!h-3 !w-3 !border-2 !border-white"
-        style={{
-          background: accent.handleColor,
-        }}
-      />
+      {graphNode.targetHandles.map((targetHandleId, index) => {
+        const left = `${((index + 1) / (inboundHandleCount + 1)) * 100}%`;
+
+        return (
+          <Handle
+            key={targetHandleId}
+            id={targetHandleId}
+            type="target"
+            position={Position.Top}
+            isConnectable={false}
+            aria-hidden="true"
+            className="!h-3 !w-3 !border-2 !border-white"
+            style={{
+              left,
+              transform: 'translate(-50%, -50%)',
+              background: accent.handleColor,
+              visibility: 'visible',
+            }}
+          />
+        );
+      })}
 
       <JourneyNodeCard
+        nodeId={graphNode.id}
         stage={graphNode.stage}
         kind={graphNode.kind}
         status={graphNode.status}

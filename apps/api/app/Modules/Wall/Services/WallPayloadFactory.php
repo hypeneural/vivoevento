@@ -83,6 +83,8 @@ class WallPayloadFactory
             'theme_config' => $this->themeConfig($settings),
             'layout' => $settings->layout->value,
             'transition_effect' => $settings->transition_effect->value,
+            'transition_mode' => $settings->resolvedTransitionMode()->value,
+            'transition_pool' => $settings->resolvedTransitionPool(),
             'background_url' => $this->assets->toPublicUrl($settings->background_image_path),
             'partner_logo_url' => $this->assets->toPublicUrl($settings->partner_logo_path),
             'show_qr' => (bool) $settings->show_qr,

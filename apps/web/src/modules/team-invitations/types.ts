@@ -8,6 +8,9 @@ export interface PublicOrganizationInvitation {
     slug: string;
     logo_url: string | null;
   };
+  invited_by?: {
+    name: string | null;
+  } | null;
   invitee_name: string;
   invitee_contact: {
     email: string | null;
