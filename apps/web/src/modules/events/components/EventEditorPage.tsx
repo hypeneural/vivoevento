@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
+  Building2,
   CalendarDays,
   Clock3,
   Eye,
@@ -22,7 +23,7 @@ import {
   UserCheck,
   Users,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFieldArray, useForm, type UseFormReturn } from 'react-hook-form';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { z } from 'zod';
@@ -76,6 +77,13 @@ import {
 } from '../sender-utils';
 import { TelegramOperationalStatusCard } from './TelegramOperationalStatusCard';
 import {
+  getOrganizationBrandingPreview,
+  resolveEffectiveBrandingDisplayColors,
+  resolveEffectiveBrandingPreview,
+  resolveEffectiveBrandingSourceDescription,
+  resolveEffectiveBrandingSourceLabel,
+} from '../branding';
+import {
   EVENT_MODERATION_LABELS,
   EVENT_MODERATION_OPTIONS,
   EVENT_MODULE_LABELS,
@@ -91,6 +99,12 @@ import {
   type EventTelegramOperationalStatus,
 } from '../types';
 
+const HEX_COLOR_REGEX = /^#[0-9a-fA-F]{6}$/;
+
+const optionalHexColor = z.string()
+  .trim()
+  .refine((value) => value === '' || HEX_COLOR_REGEX.test(value), 'Use uma cor hexadecimal valida, como #7c3aed.');
+
 const eventFormSchema = z.object({
   client_id: z.string(),
   title: z.string().trim().min(3, 'Informe um titulo com pelo menos 3 caracteres.').max(180, 'Maximo de 180 caracteres.'),
@@ -104,8 +118,9 @@ const eventFormSchema = z.object({
   ends_at: z.string().optional(),
   location_name: z.string().trim().max(180, 'Maximo de 180 caracteres.').optional(),
   description: z.string().trim().max(2000, 'Maximo de 2000 caracteres.').optional(),
-  primary_color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Cor principal invalida.'),
-  secondary_color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Cor secundaria invalida.'),
+  inherit_branding: z.boolean(),
+  primary_color: optionalHexColor,
+  secondary_color: optionalHexColor,
   cover_image_path: z.string().trim().max(255, 'Maximo de 255 caracteres.').optional(),
   logo_path: z.string().trim().max(255, 'Maximo de 255 caracteres.').optional(),
   visibility: z.enum(['public', 'private', 'unlisted']),
@@ -299,6 +314,18 @@ function parseSelectInteger(value: string): number | null {
   return parsePositiveInteger(value);
 }
 
+function resolveColorPickerValue(value?: string | null, fallback?: string | null, defaultValue = '#f97316') {
+  if (value && HEX_COLOR_REGEX.test(value)) {
+    return value;
+  }
+
+  if (fallback && HEX_COLOR_REGEX.test(fallback)) {
+    return fallback;
+  }
+
+  return defaultValue;
+}
+
 function buildRetentionOptions(currentValue: string) {
   const current = parsePositiveInteger(currentValue);
 
@@ -324,8 +351,9 @@ function buildDefaultValues(): EventFormValues {
     ends_at: '',
     location_name: '',
     description: '',
-    primary_color: '#f97316',
-    secondary_color: '#1d4ed8',
+    inherit_branding: true,
+    primary_color: '',
+    secondary_color: '',
     cover_image_path: '',
     logo_path: '',
     visibility: 'public',
@@ -384,8 +412,9 @@ function buildFormValues(event: EventDetailItem): EventFormValues {
     ends_at: toDateTimeLocal(event.ends_at),
     location_name: event.location_name ?? '',
     description: event.description ?? '',
-    primary_color: event.primary_color ?? '#f97316',
-    secondary_color: event.secondary_color ?? '#1d4ed8',
+    inherit_branding: event.inherit_branding ?? true,
+    primary_color: event.primary_color ?? '',
+    secondary_color: event.secondary_color ?? '',
     cover_image_path: event.cover_image_path ?? '',
     logo_path: event.logo_path ?? '',
     visibility: event.visibility ?? 'public',
@@ -463,10 +492,11 @@ function buildPayload(
     location_name: values.location_name?.trim() ? values.location_name.trim() : null,
     description: values.description?.trim() ? values.description.trim() : null,
     branding: {
-      primary_color: values.primary_color,
-      secondary_color: values.secondary_color,
+      primary_color: values.primary_color.trim() || null,
+      secondary_color: values.secondary_color.trim() || null,
       cover_image_path: values.cover_image_path?.trim() || null,
       logo_path: values.logo_path?.trim() || null,
+      inherit_branding: values.inherit_branding,
     },
     modules: values.modules,
     privacy: {
@@ -1608,6 +1638,9 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
   const watchedFaceSearch = form.watch('face_search');
   const watchedModules = form.watch('modules');
   const watchedColors = form.watch(['primary_color', 'secondary_color']);
+  const watchedInheritBranding = form.watch('inherit_branding');
+  const watchedCoverImagePath = form.watch('cover_image_path');
+  const watchedLogoPath = form.watch('logo_path');
   const watchedClientId = form.watch('client_id');
   const watchedIntakeChannels = form.watch('intake_channels');
 
@@ -1705,12 +1738,48 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
 
   const currentEvent = eventQuery.data ?? null;
 
-  const coverPreview = brandingPreviewUrls.cover !== undefined
+  const eventCoverPreview = brandingPreviewUrls.cover !== undefined
     ? brandingPreviewUrls.cover
     : currentEvent?.cover_image_url ?? null;
-  const logoPreview = brandingPreviewUrls.logo !== undefined
+  const eventLogoPreview = brandingPreviewUrls.logo !== undefined
     ? brandingPreviewUrls.logo
     : currentEvent?.logo_url ?? null;
+  const organizationBrandingPreview = useMemo(() => getOrganizationBrandingPreview(meOrganization), [meOrganization]);
+  const organizationHasBranding = useMemo(() => {
+    if (!organizationBrandingPreview) {
+      return false;
+    }
+
+    return Object.values(organizationBrandingPreview).some((value) => typeof value === 'string' && value.trim().length > 0);
+  }, [organizationBrandingPreview]);
+  const effectiveBrandingPreview = useMemo(() => resolveEffectiveBrandingPreview({
+    inheritBranding: watchedInheritBranding,
+    organizationBranding: organizationBrandingPreview,
+    eventBranding: {
+      logo_path: watchedLogoPath || null,
+      logo_url: eventLogoPreview,
+      cover_image_path: watchedCoverImagePath || null,
+      cover_image_url: eventCoverPreview,
+      primary_color: watchedColors[0] || null,
+      secondary_color: watchedColors[1] || null,
+    },
+  }), [
+    eventCoverPreview,
+    eventLogoPreview,
+    organizationBrandingPreview,
+    watchedColors,
+    watchedCoverImagePath,
+    watchedInheritBranding,
+    watchedLogoPath,
+  ]);
+  const effectiveBrandingSourceLabel = resolveEffectiveBrandingSourceLabel(effectiveBrandingPreview.source);
+  const effectiveBrandingSourceDescription = resolveEffectiveBrandingSourceDescription(
+    effectiveBrandingPreview.source,
+    meOrganization?.name,
+  );
+  const effectiveBrandingColors = resolveEffectiveBrandingDisplayColors(effectiveBrandingPreview);
+  const coverPreview = effectiveBrandingPreview.cover_image_url;
+  const logoPreview = effectiveBrandingPreview.logo_url;
 
   const previewModules = Object.entries(watchedModules)
     .filter(([, enabled]) => enabled)
@@ -2007,6 +2076,42 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
               <div className="grid gap-4">
                 <FormField
                   control={form.control}
+                  name="inherit_branding"
+                  render={({ field }) => (
+                    <FormItem className="rounded-3xl border border-border/60 bg-background/60 p-4">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="rounded-2xl bg-primary/10 p-2">
+                              <Building2 className="h-4 w-4 text-primary" />
+                            </div>
+                            <div>
+                              <FormLabel>Herdar branding da organizacao</FormLabel>
+                              <FormDescription>
+                                Quando ligado, o evento aproveita capa, logo e cores da conta sempre que este formulario estiver sem um item proprio.
+                              </FormDescription>
+                            </div>
+                            <Badge variant="secondary">{effectiveBrandingSourceLabel}</Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{effectiveBrandingSourceDescription}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {field.value
+                              ? organizationHasBranding
+                                ? 'Deixe campos vazios para reutilizar automaticamente os ativos da organizacao.'
+                                : 'A heranca esta ligada, mas a organizacao ainda nao possui capa, logo ou cores suficientes para servir como fallback.'
+                              : 'Com a heranca desligada, este evento usa apenas o que voce preencher aqui.'}
+                          </p>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="slug"
                   render={({ field }) => (
                     <FormItem>
@@ -2040,10 +2145,27 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                         <FormLabel>Cor principal</FormLabel>
                         <div className="flex gap-2">
                           <FormControl>
-                            <Input {...field} type="color" className="h-11 w-14 p-1" />
+                            <Input
+                              value={resolveColorPickerValue(field.value, effectiveBrandingColors.primary, '#f97316')}
+                              type="color"
+                              className="h-11 w-14 p-1"
+                              onChange={field.onChange}
+                            />
                           </FormControl>
-                          <Input value={field.value} onChange={field.onChange} className="font-mono" />
+                          <Input
+                            value={field.value}
+                            onChange={field.onChange}
+                            className="font-mono"
+                            placeholder={watchedInheritBranding && effectiveBrandingPreview.primary_color
+                              ? `${effectiveBrandingPreview.primary_color} da organizacao`
+                              : '#f97316'}
+                          />
                         </div>
+                        <FormDescription>
+                          {watchedInheritBranding
+                            ? 'Pode deixar vazio para reutilizar a cor resolvida da organizacao.'
+                            : 'Defina uma cor propria deste evento.'}
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -2057,10 +2179,27 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                         <FormLabel>Cor secundaria</FormLabel>
                         <div className="flex gap-2">
                           <FormControl>
-                            <Input {...field} type="color" className="h-11 w-14 p-1" />
+                            <Input
+                              value={resolveColorPickerValue(field.value, effectiveBrandingColors.secondary, '#1d4ed8')}
+                              type="color"
+                              className="h-11 w-14 p-1"
+                              onChange={field.onChange}
+                            />
                           </FormControl>
-                          <Input value={field.value} onChange={field.onChange} className="font-mono" />
+                          <Input
+                            value={field.value}
+                            onChange={field.onChange}
+                            className="font-mono"
+                            placeholder={watchedInheritBranding && effectiveBrandingPreview.secondary_color
+                              ? `${effectiveBrandingPreview.secondary_color} da organizacao`
+                              : '#1d4ed8'}
+                          />
                         </div>
+                        <FormDescription>
+                          {watchedInheritBranding
+                            ? 'Pode deixar vazio para aproveitar a cor secundaria herdada.'
+                            : 'Defina uma cor complementar do proprio evento.'}
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -2082,13 +2221,13 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                         </div>
 
                         <div className="mt-4 overflow-hidden rounded-2xl border border-border/60">
-                          {coverPreview ? (
-                            <img src={coverPreview} alt="Preview da capa" className="aspect-[16/9] w-full object-cover" />
+                          {eventCoverPreview ? (
+                            <img src={eventCoverPreview} alt="Preview da capa" className="aspect-[16/9] w-full object-cover" />
                           ) : (
                             <div
                               className="flex aspect-[16/9] items-center justify-center"
                               style={{
-                                background: `linear-gradient(135deg, ${watchedColors[0]} 0%, ${watchedColors[1]} 100%)`,
+                                background: `linear-gradient(135deg, ${effectiveBrandingColors.primary} 0%, ${effectiveBrandingColors.secondary} 100%)`,
                               }}
                             >
                               <CalendarDays className="h-10 w-10 text-white/80" />
@@ -2135,6 +2274,10 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                           <p className="mt-3 break-all text-xs text-muted-foreground">
                             Caminho salvo: {field.value}
                           </p>
+                        ) : watchedInheritBranding && effectiveBrandingPreview.cover_image_url ? (
+                          <p className="mt-3 text-xs text-muted-foreground">
+                            Sem capa propria. A capa herdada da organizacao sera aplicada na experiencia publica.
+                          </p>
                         ) : null}
 
                         <FormMessage />
@@ -2156,8 +2299,8 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                         </div>
 
                         <div className="mt-4 flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 p-6">
-                          {logoPreview ? (
-                            <img src={logoPreview} alt="Preview da logo" className="max-h-40 w-auto max-w-full object-contain" />
+                          {eventLogoPreview ? (
+                            <img src={eventLogoPreview} alt="Preview da logo" className="max-h-40 w-auto max-w-full object-contain" />
                           ) : (
                             <div className="text-center">
                               <ImageIcon className="mx-auto h-10 w-10 text-muted-foreground" />
@@ -2204,6 +2347,10 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                         {field.value ? (
                           <p className="mt-3 break-all text-xs text-muted-foreground">
                             Caminho salvo: {field.value}
+                          </p>
+                        ) : watchedInheritBranding && effectiveBrandingPreview.logo_url ? (
+                          <p className="mt-3 text-xs text-muted-foreground">
+                            Sem logo propria. A logo resolvida da organizacao sera usada no hub e nas experiencias publicas.
                           </p>
                         ) : null}
 
@@ -2433,7 +2580,7 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
           <div className="glass rounded-3xl border border-border/60 p-4 sm:p-5 xl:sticky xl:top-20">
             <div className="mb-4 flex items-center gap-2">
               <Eye className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold">Preview operacional</h2>
+              <h2 className="text-sm font-semibold">Preview com branding aplicado</h2>
             </div>
 
             <div className="overflow-hidden rounded-3xl border border-border/60 bg-background/70">
@@ -2443,7 +2590,7 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                 <div
                   className="flex h-44 items-center justify-center"
                   style={{
-                    background: `linear-gradient(135deg, ${watchedColors[0]} 0%, ${watchedColors[1]} 100%)`,
+                    background: `linear-gradient(135deg, ${effectiveBrandingColors.primary} 0%, ${effectiveBrandingColors.secondary} 100%)`,
                   }}
                 >
                   <CalendarDays className="h-10 w-10 text-white/80" />
@@ -2457,10 +2604,12 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                       {currentEvent ? <EventStatusBadge status={currentEvent.status} /> : null}
                       <Badge variant="secondary">{EVENT_TYPE_LABELS[watchedEventType as ApiEventType]}</Badge>
                       <Badge variant="outline">{EVENT_VISIBILITY_LABELS[watchedVisibility]}</Badge>
+                      <Badge variant="secondary">{effectiveBrandingSourceLabel}</Badge>
                     </div>
 
                     <p className="mt-3 text-lg font-semibold">{watchedTitle || 'Nome do evento'}</p>
                     <p className="mt-1 text-sm text-muted-foreground">{watchedLocation || 'Local ainda nao informado'}</p>
+                    <p className="mt-2 text-xs text-muted-foreground">{effectiveBrandingSourceDescription}</p>
                   </div>
 
                   {logoPreview ? (
@@ -2488,6 +2637,10 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                     Reconhecimento facial {watchedFaceSearch.enabled ? 'ativado' : 'desligado'}
                   </p>
                   <p className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Branding {watchedInheritBranding ? 'herdando da organizacao' : 'proprio do evento'}
+                  </p>
+                  <p className="flex items-center gap-2">
                     <Users className="h-4 w-4" />
                     Grupos {watchedIntakeChannels.whatsapp_groups.enabled ? 'ativos' : 'desligados'}
                   </p>
@@ -2509,6 +2662,35 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                   )) : (
                     <span className="text-sm text-muted-foreground">Nenhum modulo ativo.</span>
                   )}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-3xl border border-border/60 bg-background/70 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold">Fonte do branding</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Esta e a identidade visual que realmente sera aplicada no hub, no upload e nas paginas publicas.
+                  </p>
+                </div>
+                <Badge variant="secondary">{effectiveBrandingSourceLabel}</Badge>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-border/60 bg-muted/20 p-3">
+                  <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Cor principal</p>
+                  <div className="mt-2 flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-2xl border border-border/60" style={{ backgroundColor: effectiveBrandingColors.primary }} />
+                    <span className="font-mono text-sm">{effectiveBrandingColors.primary}</span>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-border/60 bg-muted/20 p-3">
+                  <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Cor secundaria</p>
+                  <div className="mt-2 flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-2xl border border-border/60" style={{ backgroundColor: effectiveBrandingColors.secondary }} />
+                    <span className="font-mono text-sm">{effectiveBrandingColors.secondary}</span>
+                  </div>
                 </div>
               </div>
             </div>

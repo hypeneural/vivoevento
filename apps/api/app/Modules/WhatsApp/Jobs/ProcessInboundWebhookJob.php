@@ -11,6 +11,7 @@ use App\Modules\WhatsApp\Events\WhatsAppInstanceStatusChanged;
 use App\Modules\WhatsApp\Models\WhatsAppInboundEvent;
 use App\Modules\WhatsApp\Models\WhatsAppInstance;
 use App\Modules\WhatsApp\Models\WhatsAppMessage;
+use App\Modules\WhatsApp\Support\WhatsAppLog;
 use App\Modules\WhatsApp\Services\WhatsAppInboundRouter;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
@@ -18,7 +19,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Processes an inbound webhook from a WhatsApp provider.
@@ -54,7 +54,7 @@ class ProcessInboundWebhookJob implements ShouldQueue
         $traceId = $this->resolveTraceId();
 
         if (! $instance) {
-            Log::channel('whatsapp')->warning('Inbound webhook for unknown instance', [
+            WhatsAppLog::warning('Inbound webhook for unknown instance', [
                 'provider' => $this->providerKey,
                 'instance_key' => $this->instanceKey,
                 'trace_id' => $traceId,
@@ -85,7 +85,7 @@ class ProcessInboundWebhookJob implements ShouldQueue
         } catch (\Throwable $e) {
             $inboundEvent->markFailed($e->getMessage());
 
-            Log::channel('whatsapp')->error('Failed to process inbound webhook', [
+            WhatsAppLog::error('Failed to process inbound webhook', [
                 'inbound_event_id' => $inboundEvent->id,
                 'instance_id' => $instance->id,
                 'trace_id' => $traceId,
@@ -209,7 +209,7 @@ class ProcessInboundWebhookJob implements ShouldQueue
             ->get();
 
         if ($messages->isEmpty()) {
-            Log::channel('whatsapp')->info('Outbound delivery callback ignored because no message matched', [
+            WhatsAppLog::info('Outbound delivery callback ignored because no message matched', [
                 'instance_id' => $instance->id,
                 'trace_id' => $this->resolveTraceId(),
                 'message_ids' => $messageIds,

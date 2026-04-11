@@ -5,6 +5,7 @@ namespace App\Modules\FaceSearch\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EventMediaFace extends Model
 {
@@ -73,9 +74,14 @@ class EventMediaFace extends Model
         return $this->belongsTo(\App\Modules\MediaProcessing\Models\EventMedia::class, 'event_media_id');
     }
 
-    public function personAssignments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function personAssignments(): HasMany
     {
         return $this->hasMany(\App\Modules\EventPeople\Models\EventPersonFaceAssignment::class, 'event_media_face_id');
+    }
+
+    public function reviewQueueItems(): HasMany
+    {
+        return $this->hasMany(\App\Modules\EventPeople\Models\EventPersonReviewQueueItem::class, 'event_media_face_id');
     }
 
     public function scopeForEvent($query, int $eventId)

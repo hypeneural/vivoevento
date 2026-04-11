@@ -3,10 +3,8 @@
 use App\Modules\Events\Models\Event;
 use App\Modules\Wall\Models\EventWallSetting;
 
-it('stores and returns wall theme_config for puzzle settings when the rollout gate is enabled', function () {
+it('stores and returns wall theme_config for puzzle settings without requiring a rollout gate', function () {
     [$user, $organization] = $this->actingAsManager();
-
-    config()->set('wall.layouts.puzzle.enabled', true);
 
     $event = Event::factory()->active()->create([
         'organization_id' => $organization->id,
@@ -45,7 +43,7 @@ it('stores and returns wall theme_config for puzzle settings when the rollout ga
     );
 });
 
-it('rejects puzzle layout while the rollout gate is disabled', function () {
+it('still accepts puzzle layout when the legacy rollout config is disabled', function () {
     [$user, $organization] = $this->actingAsManager();
 
     config()->set('wall.layouts.puzzle.enabled', false);
@@ -62,14 +60,12 @@ it('rejects puzzle layout while the rollout gate is disabled', function () {
         'layout' => 'puzzle',
     ]);
 
-    $response->assertStatus(422);
-    $response->assertJsonValidationErrors(['layout']);
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.settings.layout', 'puzzle');
 });
 
 it('rejects invalid wall theme_config values', function () {
     [$user, $organization] = $this->actingAsManager();
-
-    config()->set('wall.layouts.puzzle.enabled', true);
 
     $event = Event::factory()->active()->create([
         'organization_id' => $organization->id,

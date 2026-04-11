@@ -262,6 +262,25 @@ Quando o layout selecionado for `puzzle`, o manager deve:
 
 Enquanto a capability matrix nao existir, esta policy deve ser aplicada na camada de UI e validacao de request.
 
+## 6. Liberacao oficial do puzzle
+
+Quando o `puzzle` sair do rollout controlado e virar tema oficial:
+
+- `/wall/options` deve continuar sendo a fonte de verdade do manager;
+- `puzzle` deve aparecer sempre no backend, sem depender de `.env`;
+- a seguranca operacional deixa de ser `feature flag` e passa a ser:
+  - capability restritiva;
+  - fallback single-item para video;
+  - budget de runtime;
+  - diagnostics e downgrade observavel.
+
+Regras objetivas dessa liberacao:
+
+- `WALL_PUZZLE_ENABLED` e `WALL_PUZZLE_PREVIEW_ENABLED` deixam de ser prerequisito operacional;
+- `fallbackOptions` do frontend nao vira fonte de promocao do tema;
+- `maxSimultaneousVideos default = 1` continua como policy global do produto;
+- `puzzle` continua com `0` videos no board e `1` apenas via fallback controlado.
+
 ---
 
 ## Policy de extensibilidade para novos templates
@@ -343,7 +362,8 @@ Aceitamos a policy como pronta quando:
 - os testes de caracterizacao travam o estado atual que ela pretende corrigir;
 - o execution plan do `puzzle` puder assumir `video no puzzle = fallback`;
 - o time tiver uma regra unica para `maxSimultaneousVideos`;
-- o manager tiver diretriz clara para bloquear combinacoes invalidas na implementacao.
+- o manager tiver diretriz clara para bloquear combinacoes invalidas na implementacao;
+- a liberacao oficial do `puzzle` nao depender mais de `env gate`.
 
 ## Proximo passo recomendado
 

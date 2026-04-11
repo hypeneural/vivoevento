@@ -13,8 +13,13 @@ use App\Modules\WhatsApp\Models\WhatsAppGroupBinding;
 use App\Modules\WhatsApp\Models\WhatsAppInboxSession;
 use App\Modules\WhatsApp\Models\WhatsAppInstance;
 use App\Modules\WhatsApp\Models\WhatsAppMessage;
+use App\Modules\WhatsApp\Services\WhatsAppFeedbackAutomationService;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
+
+afterEach(function () {
+    \Mockery::close();
+});
 
 function loadZApiIntakeFixture(string $name, array $overrides = []): array
 {
@@ -627,6 +632,65 @@ it('routes private video to the inbound media pipeline with explicit video metad
             && data_get($job->payload, 'mime_type') === 'video/mp4'
             && data_get($job->payload, '_event_context.media_url') === 'https://cdn.z-api.io/media/private-video.mp4'
             && data_get($job->payload, '_event_context.provider_message_id') === '3EB0VIDEOFAEACB6BC8';
+    });
+});
+
+it('continues routing private video even when detected reaction feedback fails', function () {
+    Bus::fake([ProcessInboundMediaWebhookJob::class, SendWhatsAppMessageJob::class]);
+
+    $feedback = \Mockery::mock(WhatsAppFeedbackAutomationService::class);
+    $feedback->shouldReceive('sendDetectedReaction')
+        ->once()
+        ->andThrow(new RuntimeException('reaction dispatch failed'));
+    $feedback->shouldIgnoreMissing();
+    app()->instance(WhatsAppFeedbackAutomationService::class, $feedback);
+
+    $instance = WhatsAppInstance::factory()->connected()->create([
+        'external_instance_id' => 'INSTANCE-INTAKE-001',
+    ]);
+
+    $event = Event::factory()->create([
+        'organization_id' => $instance->organization_id,
+        'status' => EventStatus::Active->value,
+        'default_whatsapp_instance_id' => $instance->id,
+        'whatsapp_instance_mode' => 'shared',
+        'current_entitlements_json' => makeChannelEntitlements(),
+    ]);
+
+    enableEventModule($event, 'live');
+    $directChannel = createWhatsAppDirectChannel($event, 'ANAEJOAO', 180);
+
+    WhatsAppInboxSession::query()->create([
+        'organization_id' => $event->organization_id,
+        'event_id' => $event->id,
+        'event_channel_id' => $directChannel->id,
+        'instance_id' => $instance->id,
+        'sender_external_id' => '5548996553954',
+        'sender_phone' => '5548996553954',
+        'chat_external_id' => '5548996553954',
+        'status' => 'active',
+        'activated_by_provider_message_id' => '3EB0689AF3EAE352EC526D',
+        'last_inbound_provider_message_id' => '3EB0689AF3EAE352EC526D',
+        'activated_at' => now()->subMinute(),
+        'last_interaction_at' => now()->subMinute(),
+        'expires_at' => now()->addMinutes(180),
+    ]);
+
+    $response = $this->postJson(
+        "/api/v1/webhooks/whatsapp/zapi/{$instance->external_instance_id}/inbound",
+        makeZapiPrivateVideoPayload([
+            'messageId' => '3EB0VIDEOBESTEFFORT',
+        ]),
+    );
+
+    $response->assertOk()->assertJson(['status' => 'received']);
+
+    Bus::assertDispatched(ProcessInboundMediaWebhookJob::class, function (ProcessInboundMediaWebhookJob $job) use ($event, $directChannel) {
+        return data_get($job->payload, '_event_context.event_id') === $event->id
+            && data_get($job->payload, '_event_context.event_channel_id') === $directChannel->id
+            && data_get($job->payload, '_event_context.intake_source') === 'whatsapp_direct'
+            && data_get($job->payload, 'message_type') === 'video'
+            && data_get($job->payload, '_event_context.provider_message_id') === '3EB0VIDEOBESTEFFORT';
     });
 });
 

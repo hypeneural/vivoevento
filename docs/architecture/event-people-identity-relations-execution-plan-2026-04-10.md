@@ -1699,6 +1699,34 @@ Ainda pendente na Fase 0:
 
 ---
 
+### 2026-04-10 - Fase 1 backend de escrita local concluida
+
+Concluido:
+
+- action local `Quem e esta pessoa?` implementada com confirmacao por pessoa existente ou criacao inline;
+- movimentacao de rosto entre pessoas implementada no mesmo fluxo de confirmacao, sem depender da AWS;
+- endpoints reais da review queue adicionados para `confirm`, `ignore`, `reject`, `merge` e `split`;
+- projecao local real da `event_person_review_queue` implementada a partir de `EventMediaFace`;
+- inbox passa a nascer do estado local dos rostos detectados, sem inserts manuais para o caso `unknown_person`;
+- overlay por foto agora devolve `current_assignment` e `review_item` por rosto;
+- split reabre o rosto como pendente localmente e merge resolve a consolidacao entre pessoas;
+- jobs de counters, review queue e sync continuam fora do hot path, com ack local antes da reconciliacao assíncrona.
+
+Bateria executada:
+
+- `php artisan test tests/Feature/EventPeople tests/Unit/EventPeople` -> `26 passed`, `184 assertions`
+- `php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch` -> `156 passed`, `7 skipped`, `1141 assertions`
+
+Ainda pendente na Fase 1:
+
+- UI do inbox de revisao no frontend;
+- fluxo visual do overlay com CTA `Quem e esta pessoa?`;
+- feedback local no frontend antes do sync remoto;
+- conflito projetado automaticamente para `merge/split` sem precisar item manual de teste;
+- endurecer projecoes incrementais para evitar qualquer recomputacao desnecessaria em leitura.
+
+---
+
 ## Riscos reais e mitigacoes
 
 ### R1. Misturar `FaceSearch` e `EventPeople`

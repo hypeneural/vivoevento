@@ -8,6 +8,7 @@ import {
   Copy,
   Crown,
   FileImage,
+  Globe,
   ImageUp,
   Loader2,
   LockKeyhole,
@@ -144,22 +145,22 @@ const PREMIUM_BRANDING_ASSETS: Array<{
   {
     kind: 'cover',
     label: 'Capa padrao',
-    description: 'Imagem de abertura herdada por eventos novos quando eles nao tiverem uma capa propria.',
+    description: 'Imagem de abertura para novos eventos que ainda nao tenham capa propria.',
   },
   {
     kind: 'logo_dark',
     label: 'Logo para fundo escuro',
-    description: 'Versao alternativa do logo para telas, wall e materiais com fundo escuro.',
+    description: 'Versao do logo pensada para fundos escuros, como telas e paginas mais escuras.',
   },
   {
     kind: 'favicon',
     label: 'Icone do navegador',
-    description: 'Icone pequeno usado em experiencias white-label e atalhos do navegador.',
+    description: 'Icone pequeno que aparece na aba do navegador e nos atalhos salvos.',
   },
   {
     kind: 'watermark',
     label: 'Marca d agua',
-    description: 'Ativo usado quando o plano permite aplicar marca d agua nas entregas.',
+    description: 'Marca usada nas entregas quando a organizacao trabalha com essa personalizacao.',
   },
 ];
 
@@ -216,6 +217,19 @@ function organizationBrandingAssetUrl(
       return organization?.branding?.cover_url ?? null;
     default:
       return null;
+  }
+}
+
+function getBrandingAssetIcon(kind: CurrentOrganizationBrandingAssetKind) {
+  switch (kind) {
+    case 'cover':
+      return ImageUp;
+    case 'favicon':
+      return Globe;
+    case 'watermark':
+      return ShieldCheck;
+    default:
+      return FileImage;
   }
 }
 
@@ -346,14 +360,14 @@ export default function SettingsPage() {
     onSuccess: async () => {
       await refreshSession();
       toast({
-        title: 'Branding atualizado',
-        description: 'As cores da organizacao foram salvas.',
+        title: 'Identidade visual atualizada',
+        description: 'As cores principais da organizacao foram salvas.',
       });
     },
     onError: () => {
       toast({
-        title: 'Falha ao salvar branding',
-        description: 'Nao foi possivel persistir as configuracoes de branding.',
+        title: 'Falha ao salvar a identidade visual',
+        description: 'Nao foi possivel guardar as configuracoes visuais da organizacao.',
         variant: 'destructive',
       });
     },
@@ -663,7 +677,7 @@ export default function SettingsPage() {
         <TabsList className="flex-wrap bg-muted/50">
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           <TabsTrigger value="organization">Organizacao</TabsTrigger>
-          {canManageBranding ? <TabsTrigger value="branding">Branding</TabsTrigger> : null}
+          {canManageBranding ? <TabsTrigger value="branding">Identidade visual</TabsTrigger> : null}
           {canManageTeam ? <TabsTrigger value="team">Equipe</TabsTrigger> : null}
           {canViewPermissionsMatrix ? <TabsTrigger value="permissions">Permissoes</TabsTrigger> : null}
           {canViewIntegrations ? <TabsTrigger value="integrations">Integracoes</TabsTrigger> : null}
@@ -712,7 +726,17 @@ export default function SettingsPage() {
 
         <TabsContent value="organization" className="mt-6">
           <div className="glass max-w-xl space-y-4 rounded-xl p-6">
-            <h3 className="font-semibold">Dados da Organizacao</h3>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="rounded-full bg-primary/10 p-2 text-primary">
+                  <Globe className="h-4 w-4" />
+                </div>
+                <h3 className="font-semibold">Dados da organizacao</h3>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Ajuste os dados principais da sua conta para manter links e identificacao sempre corretos.
+              </p>
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -740,9 +764,9 @@ export default function SettingsPage() {
 
             <div>
               <div className="flex items-center gap-2">
-                <Label htmlFor="organization-custom-domain">Dominio proprio</Label>
-                <HelpTooltip text="Use quando o plano permite publicar experiencias no dominio da sua marca, como eventos.suaempresa.com." />
-                {!canUseCustomDomain ? <Badge variant="outline">Plano premium</Badge> : null}
+                <Label htmlFor="organization-custom-domain">Dominio da sua marca</Label>
+                <HelpTooltip text="Use este campo quando a sua conta puder publicar as paginas do evento em um endereco como eventos.suaempresa.com." />
+                {!canUseCustomDomain ? <Badge variant="outline">Indisponivel no plano atual</Badge> : null}
               </div>
               <Input
                 id="organization-custom-domain"
@@ -753,10 +777,15 @@ export default function SettingsPage() {
                 disabled={!canManageSettings || !canUseCustomDomain}
               />
               {!canUseCustomDomain ? (
-                <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <LockKeyhole className="h-3.5 w-3.5" />
-                  Disponivel em planos com dominio proprio ou white-label.
-                </p>
+                <div className="mt-2 rounded-lg border border-dashed border-border/60 bg-muted/20 p-3 text-xs text-muted-foreground">
+                  <p className="flex items-center gap-1.5 font-medium text-foreground">
+                    <LockKeyhole className="h-3.5 w-3.5" />
+                    Dominio personalizado ainda bloqueado
+                  </p>
+                  <p className="mt-1">
+                    Por enquanto, a organizacao continua usando os links padrao da plataforma. Quando este recurso estiver liberado, este campo sera habilitado aqui.
+                  </p>
+                </div>
               ) : null}
             </div>
 
@@ -770,10 +799,23 @@ export default function SettingsPage() {
         {canManageBranding ? (
           <TabsContent value="branding" className="mt-6">
             <div className="glass max-w-xl space-y-4 rounded-xl p-6">
-              <h3 className="font-semibold">Branding</h3>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-full bg-primary/10 p-2 text-primary">
+                    <Palette className="h-4 w-4" />
+                  </div>
+                  <h3 className="font-semibold">Identidade visual da organizacao</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Defina como sua marca aparece nas paginas, convites e experiencias que herdam o visual da organizacao.
+                </p>
+              </div>
 
               <div className="space-y-3">
-                <Label htmlFor="branding-logo-upload">Logo da organizacao</Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="branding-logo-upload">Logo principal da organizacao</Label>
+                  <HelpTooltip text="Este logo aparece como imagem principal da sua organizacao e tambem pode servir de base para eventos que usam o visual herdado." />
+                </div>
 
                 {organization?.logo_url ? (
                   <div className="flex items-center gap-3 rounded-lg border border-border/50 bg-muted/20 p-3">
@@ -782,9 +824,7 @@ export default function SettingsPage() {
                       alt="Logo atual da organizacao"
                       className="h-14 w-14 rounded-md border border-border/50 bg-background object-contain p-1"
                     />
-                    <div className="text-sm text-muted-foreground">
-                      Logo atual carregado da organizacao.
-                    </div>
+                    <div className="text-sm text-muted-foreground">Logo atual salvo para a organizacao.</div>
                   </div>
                 ) : null}
 
@@ -798,7 +838,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-border/60 p-3 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <ImageUp className="h-4 w-4" />
-                    <span>{selectedLogoFile?.name ?? 'Selecione um arquivo PNG, JPG ou WebP.'}</span>
+                    <span>{selectedLogoFile?.name ?? 'Selecione um arquivo em PNG, JPG ou WebP.'}</span>
                   </div>
 
                   <Button
@@ -819,40 +859,59 @@ export default function SettingsPage() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <Palette className="h-4 w-4 text-primary" />
-                      <h4 className="text-sm font-semibold">Ativos premium da marca</h4>
-                      <HelpTooltip text="Estes arquivos ficam no nivel da organizacao. Eventos novos herdam capa, logos e cores quando nao tiverem identidade propria." />
+                      <h4 className="text-sm font-semibold">Arquivos extras da sua marca</h4>
+                      <HelpTooltip text="Esses arquivos ficam salvos na organizacao. Eventos novos podem reaproveitar capa, logos e cores quando nao tiverem um visual proprio." />
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Use para deixar as paginas publicas consistentes sem configurar cada evento manualmente.
+                      Use esta area para deixar as paginas mais consistentes sem precisar repetir configuracao em cada evento.
                     </p>
                   </div>
 
                   <Badge variant={canUploadExpandedBranding ? 'default' : 'outline'}>
-                    {canUploadExpandedBranding ? 'White-label ativo' : 'Depende do plano'}
+                    {canUploadExpandedBranding ? 'Liberado nesta conta' : 'Bloqueado no momento'}
                   </Badge>
                 </div>
+
+                {!canUploadExpandedBranding ? (
+                  <div className="mt-4 rounded-lg border border-dashed border-border/60 bg-muted/20 p-3 text-xs text-muted-foreground">
+                    <p className="flex items-center gap-1.5 font-medium text-foreground">
+                      <LockKeyhole className="h-3.5 w-3.5" />
+                      Arquivos extras ainda nao disponiveis
+                    </p>
+                    <p className="mt-1">
+                      A conta pode continuar usando a logo principal e as cores. Os demais arquivos visuais ficam bloqueados ate a liberacao deste recurso.
+                    </p>
+                  </div>
+                ) : null}
 
                 <div className="mt-4 grid gap-3">
                   {PREMIUM_BRANDING_ASSETS.map((asset) => {
                     const allowed = asset.kind === 'watermark' ? canUploadWatermark : canUploadExpandedBranding;
                     const selectedFile = selectedBrandingAssetFiles[asset.kind];
                     const currentAssetUrl = organizationBrandingAssetUrl(organization, asset.kind);
+                    const AssetIcon = getBrandingAssetIcon(asset.kind);
 
                     return (
                       <div key={asset.kind} className="rounded-lg border border-border/50 bg-muted/20 p-3">
                         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                           <div className="flex items-start gap-3">
                             <div className="rounded-lg bg-background p-2 text-muted-foreground">
-                              {allowed ? <FileImage className="h-4 w-4" /> : <LockKeyhole className="h-4 w-4" />}
+                              {allowed ? <AssetIcon className="h-4 w-4" /> : <LockKeyhole className="h-4 w-4" />}
                             </div>
                             <div className="space-y-1">
                               <div className="flex flex-wrap items-center gap-2">
                                 <p className="text-sm font-medium">{asset.label}</p>
                                 {currentAssetUrl ? <Badge variant="secondary">Configurado</Badge> : null}
+                                {!allowed ? <Badge variant="outline">Bloqueado</Badge> : null}
                               </div>
                               <p className="text-xs text-muted-foreground">{asset.description}</p>
                               {selectedFile ? (
                                 <p className="text-xs text-muted-foreground">Selecionado: {selectedFile.name}</p>
+                              ) : null}
+                              {!allowed ? (
+                                <p className="text-xs text-muted-foreground">
+                                  Este arquivo ainda nao esta disponivel para a sua conta.
+                                </p>
                               ) : null}
                             </div>
                           </div>
@@ -896,6 +955,9 @@ export default function SettingsPage() {
                       onChange={(event) => setBrandingForm((current) => ({ ...current, primary_color: event.target.value }))}
                     />
                   </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Cor usada como destaque principal nas paginas da organizacao.
+                  </p>
                 </div>
 
                 <div>
@@ -908,6 +970,9 @@ export default function SettingsPage() {
                       onChange={(event) => setBrandingForm((current) => ({ ...current, secondary_color: event.target.value }))}
                     />
                   </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Cor complementar usada em gradientes, botoes e detalhes visuais.
+                  </p>
                 </div>
               </div>
 

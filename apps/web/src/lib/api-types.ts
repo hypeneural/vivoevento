@@ -979,6 +979,8 @@ export interface ApiEvent {
   qr_code_path: string | null;
   primary_color: string | null;
   secondary_color: string | null;
+  inherit_branding: boolean;
+  effective_branding: ApiEventEffectiveBranding | null;
   public_url: string | null;
   upload_url: string | null;
   upload_api_url?: string | null;
@@ -1002,6 +1004,19 @@ export interface ApiEvent {
   banners?: any[];
   team_members?: any[];
   media_count?: number;
+}
+
+export type ApiEventEffectiveBrandingSource = 'organization' | 'event' | 'mixed';
+
+export interface ApiEventEffectiveBranding {
+  logo_path: string | null;
+  logo_url: string | null;
+  cover_image_path: string | null;
+  cover_image_url: string | null;
+  primary_color: string | null;
+  secondary_color: string | null;
+  source: ApiEventEffectiveBrandingSource;
+  inherits_from_organization: boolean;
 }
 
 export interface ApiEventWallSummary {

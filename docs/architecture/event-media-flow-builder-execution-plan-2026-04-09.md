@@ -1578,6 +1578,34 @@ cd apps/web
 npm run test -- src/modules/events/journey/__tests__/toJourneyUpdatePayload.test.ts
 ```
 
+Status em `2026-04-10`:
+
+- [x] `apps/web/src/modules/events/journey/toJourneyUpdatePayload.ts` criado;
+- [x] o mapper agora aceita draft do inspector e `dirtyFields` recursivo sem depender de APIs novas do `react-hook-form`;
+- [x] o payload sai minimo e so inclui chaves realmente tocadas;
+- [x] TTL, thresholds, `whatsapp_instance_id`, preset de reply e templates fixos sao normalizados para o contrato real do backend;
+- [x] campos de reply que nao se aplicam sao limpos de forma coerente com o modo atual (`ai`, `fixed_random`, `disabled`);
+- [x] arrays de grupos e blacklist passam a ser tratados como substituicao inteira quando houver interacao;
+- [x] configuracoes nao tocadas continuam fora do payload e nao sao apagadas.
+
+Bateria validada em `2026-04-10`:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/toJourneyUpdatePayload.test.ts src/modules/events/journey/__tests__/buildJourneyScenarios.test.ts src/modules/events/journey/__tests__/buildJourneyGraph.test.ts src/modules/events/journey/__tests__/api.test.ts src/modules/events/event-media-flow-builder-architecture-characterization.test.ts
+npm run type-check
+```
+
+Resultado:
+
+- `7` testes passaram na bateria do mapper de update;
+- `28` testes passaram na bateria combinada do builder inicial;
+- `type-check` passou sem erros.
+
+Observacao desta rodada:
+
+- a regressao ampliada `npm run test -- src/modules/events` expôs `1` falha fora da trilha da jornada em `src/modules/events/EventDetailPage.test.tsx`, relacionada ao bloco de branding aplicado; a falha nao toca `journey/*` e ficou registrada como risco residual fora do escopo desta tarefa.
+
 ---
 
 ## Fase 3 - UI da Jornada da midia
@@ -1611,6 +1639,34 @@ Testes:
 cd apps/web
 npm run test -- src/modules/events/journey/__tests__/EventJourneyBuilderPage.test.tsx
 ```
+
+Status em `2026-04-10`:
+
+- [x] `apps/web/src/modules/events/pages/EventJourneyBuilderPage.tsx` criado como shell guiado da jornada;
+- [x] a rota `/events/:id/flow` foi registrada em `apps/web/src/App.tsx`;
+- [x] `apps/web/src/app/routing/route-preload.ts` passou a preaquecer a nova page dentro do matcher de `/events`;
+- [x] `apps/web/src/modules/events/EventDetailPage.tsx` ganhou atalho visivel para `Jornada da midia`;
+- [x] a page carrega a projection real por query e trata `loading`, `403`, erro generico e `stages=[]`;
+- [x] o modo simples virou a experiencia padrao com titulo, subtitulo, resumo humano, legenda fixa e split `canvas + inspector`;
+- [x] o lado esquerdo ficou como `fluxo visual guiado`, sem canvas livre nem dependencia de `@xyflow/react` nesta tarefa;
+- [x] o lado direito ficou reservado para inspector, com estado vazio e bloco opcional de detalhes tecnicos;
+- [x] a bateria residual de `EventDetailPage` foi saneada e a regressao ampla de `src/modules/events` voltou a fechar verde.
+
+Bateria validada em `2026-04-10`:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/EventJourneyBuilderPage.test.tsx src/modules/events/EventDetailPage.test.tsx src/modules/events/event-media-flow-builder-architecture-characterization.test.ts
+npm run test -- src/modules/events
+npm run type-check
+```
+
+Resultado:
+
+- `4` testes passaram na bateria da nova page;
+- `10` testes passaram na bateria focada `page + detail + characterization`;
+- `69` testes passaram na regressao ampliada do modulo `events`;
+- `type-check` passou sem erros.
 
 ### Tarefa 3.2 - Criar `JourneyFlowCanvas`
 
@@ -1648,6 +1704,35 @@ Testes:
 
 - unitarios apenas para wrappers puros;
 - comportamento real em Playwright.
+
+Status em `2026-04-11`:
+
+- [x] `@xyflow/react` foi instalado em `apps/web/package.json`;
+- [x] `apps/web/src/modules/events/journey/JourneyFlowCanvas.tsx` foi criado como wrapper travado do `ReactFlow`;
+- [x] `nodeTypes` e `edgeTypes` ficaram estaveis fora do corpo do componente;
+- [x] `fitViewOptions` e `ariaLabelConfig` em portugues ficaram memoizados/constantes;
+- [x] o canvas foi travado com `nodesDraggable={false}`, `nodesConnectable={false}`, `selectNodesOnDrag={false}`, `zoomOnDoubleClick={false}` e `preventScrolling={false}`;
+- [x] `onlyRenderVisibleElements` ficou explicitamente `false` na V1;
+- [x] handles continuam visiveis com `visibility`, sem `display: none`;
+- [x] labels de edge usam `nopan` e o simulador agora destaca `node IDs` e `edge IDs` reais no canvas;
+- [x] `EventJourneyBuilderPage` passou a consumir `JourneyFlowCanvas`, abrir inspector por selecao real do node e acionar `fitView` pela toolbar externa sem `ReactFlowProvider`;
+- [x] o estado da page foi ajustado para respeitar a ordem dos hooks, com `graph`, `scenarios` e `selectedNode` derivados de forma estavel mesmo em `loading/error`.
+
+Bateria validada em `2026-04-11`:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/JourneyFlowCanvas.test.tsx src/modules/events/journey/__tests__/EventJourneyBuilderPage.test.tsx src/modules/events/event-media-flow-builder-architecture-characterization.test.ts
+npm run test -- src/modules/events
+npm run type-check
+```
+
+Resultado:
+
+- `3` testes passaram na bateria do `JourneyFlowCanvas`;
+- `11` testes passaram na bateria focada `canvas + page + characterization`;
+- `72` testes passaram na regressao ampliada do modulo `events`;
+- `type-check` passou sem erros.
 
 ### Tarefa 3.3 - Criar nodes customizados
 

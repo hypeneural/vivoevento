@@ -1,6 +1,6 @@
 <?php
 
-it('returns wall options with per-layout capability metadata while puzzle remains gated', function () {
+it('returns wall options with per-layout capability metadata while puzzle stays officially enabled', function () {
     [$user, $organization] = $this->actingAsOwner();
 
     config()->set('wall.layouts.puzzle.enabled', false);
@@ -14,7 +14,7 @@ it('returns wall options with per-layout capability metadata while puzzle remain
     expect($response->json('data.layouts.0.label'))->toBeString()
         ->and($response->json('data.layouts.0.label'))->not->toBe('');
 
-    expect(collect($response->json('data.layouts'))->pluck('value')->all())->not->toContain('puzzle');
+    expect(collect($response->json('data.layouts'))->pluck('value')->all())->toContain('puzzle');
 
     expect($response->json('data.layouts.0'))->toHaveKey('capabilities')
         ->and($response->json('data.layouts.0.capabilities.supports_video_playback'))->toBeTrue()

@@ -39,6 +39,7 @@ const DashboardPage = lazy(routeImports.dashboard);
 const EventsListPage = lazy(routeImports.eventsList);
 const CreateEventPage = lazy(routeImports.eventCreate);
 const EventDetailPage = lazy(routeImports.eventDetail);
+const EventJourneyBuilderPage = lazy(routeImports.eventJourneyBuilder);
 const EventAccessPage = lazy(routeImports.eventAccess);
 const EditEventPage = lazy(routeImports.eventEdit);
 const MediaPage = lazy(routeImports.media);
@@ -176,6 +177,7 @@ const router = createBrowserRouter(
             <Route path="events" element={<EventsListPage />} />
             <Route path="events/create" element={<CreateEventPage />} />
             <Route path="events/:id" element={<EventDetailPage />} />
+            <Route path="events/:id/flow" element={<EventJourneyBuilderPage />} />
             <Route
               path="events/:id/access"
               element={(

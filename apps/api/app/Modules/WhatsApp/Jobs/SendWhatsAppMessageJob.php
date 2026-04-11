@@ -8,12 +8,12 @@ use App\Modules\WhatsApp\Exceptions\MessageSendFailedException;
 use App\Modules\WhatsApp\Models\WhatsAppDispatchLog;
 use App\Modules\WhatsApp\Models\WhatsAppMessage;
 use App\Modules\WhatsApp\Services\WhatsAppProviderResolver;
+use App\Modules\WhatsApp\Support\WhatsAppLog;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Sends a WhatsApp message via the provider adapter.
@@ -106,7 +106,7 @@ class SendWhatsAppMessageJob implements ShouldQueue
 
             $this->createDispatchLog($instance, $message, $durationMs, false, [], null, $e->getMessage());
 
-            Log::channel('whatsapp')->error('Message send failed', [
+            WhatsAppLog::error('Message send failed', [
                 'message_id' => $message->id,
                 'instance_id' => $instance->id,
                 'method' => $this->method,

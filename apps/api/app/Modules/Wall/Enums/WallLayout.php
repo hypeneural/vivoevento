@@ -37,10 +37,7 @@ enum WallLayout: string
 
     public function isEnabled(): bool
     {
-        return match ($this) {
-            self::Puzzle => (bool) config('wall.layouts.puzzle.enabled', false),
-            default => true,
-        };
+        return true;
     }
 
     public function capabilities(): array

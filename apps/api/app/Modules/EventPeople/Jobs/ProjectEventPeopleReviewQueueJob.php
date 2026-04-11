@@ -2,7 +2,10 @@
 
 namespace App\Modules\EventPeople\Jobs;
 
+use App\Modules\EventPeople\Actions\ProjectEventPeopleReviewQueueAction;
 use App\Modules\EventPeople\Support\EventPeopleQueues;
+use App\Modules\Events\Models\Event;
+use App\Modules\FaceSearch\Models\EventMediaFace;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -67,8 +70,24 @@ class ProjectEventPeopleReviewQueueJob implements ShouldBeEncrypted, ShouldBeUni
         return $tags;
     }
 
-    public function handle(): void
+    public function handle(ProjectEventPeopleReviewQueueAction $action): void
     {
+        if ($this->eventMediaFaceId !== null) {
+            $face = EventMediaFace::query()
+                ->with('personAssignments.person')
+                ->find($this->eventMediaFaceId);
+
+            if ($face && (int) $face->event_id === (int) $this->eventId) {
+                $action->executeForFace($face, reopenIgnored: true);
+            }
+        } else {
+            $event = Event::query()->find($this->eventId);
+
+            if ($event) {
+                $action->executeForEvent($event, onlyMissing: false);
+            }
+        }
+
         Log::channel((string) config('observability.queue_log_channel', config('logging.default')))
             ->info('event_people.review_queue.projected', [
                 'event_id' => $this->eventId,

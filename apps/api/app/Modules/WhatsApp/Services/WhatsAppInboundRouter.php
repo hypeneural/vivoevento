@@ -12,8 +12,8 @@ use App\Modules\WhatsApp\Models\WhatsAppChat;
 use App\Modules\WhatsApp\Models\WhatsAppGroupBinding;
 use App\Modules\WhatsApp\Models\WhatsAppInstance;
 use App\Modules\WhatsApp\Models\WhatsAppMessage;
+use App\Modules\WhatsApp\Support\WhatsAppLog;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Routes normalized inbound messages to the appropriate internal handlers.
@@ -39,7 +39,7 @@ class WhatsAppInboundRouter
         $existing = $this->findExistingInboundMessage($instance, $normalized);
 
         if ($existing) {
-            Log::channel('whatsapp')->info('Duplicate inbound message ignored', [
+            WhatsAppLog::info('Duplicate inbound message ignored', [
                 'instance_id' => $instance->id,
                 'message_id' => $normalized->messageId,
             ]);
@@ -71,7 +71,7 @@ class WhatsAppInboundRouter
             $existing = $this->findExistingInboundMessage($instance, $normalized);
 
             if ($existing) {
-                Log::channel('whatsapp')->warning('Concurrent duplicate inbound message resolved from unique constraint', [
+                WhatsAppLog::warning('Concurrent duplicate inbound message resolved from unique constraint', [
                     'instance_id' => $instance->id,
                     'message_id' => $normalized->messageId,
                 ]);
@@ -88,7 +88,7 @@ class WhatsAppInboundRouter
         // 5. Dispatch internal event for listeners
         WhatsAppMessageReceived::dispatch($message, $normalized, $this->findGroupBinding($instance, $normalized));
 
-        Log::channel('whatsapp')->info('Inbound message routed', [
+        WhatsAppLog::info('Inbound message routed', [
             'instance_id' => $instance->id,
             'message_id' => $message->id,
             'type' => $normalized->messageType,

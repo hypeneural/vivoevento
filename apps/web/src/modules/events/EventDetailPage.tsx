@@ -3,17 +3,20 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
+  Building2,
   Camera,
   CheckCircle,
   Clock,
   Edit3,
   ExternalLink,
+  GitBranch,
   Globe,
   Image,
   Link2,
   Loader2,
   Monitor,
   Gamepad2,
+  Palette,
   RefreshCw,
   Save,
   Settings,
@@ -56,6 +59,12 @@ import { EventMediaIntelligenceSettingsCard } from './components/media-intellige
 import { PublicLinkCard } from './components/PublicLinkCard';
 import { EventFaceSearchSearchCard } from '@/modules/face-search/components/EventFaceSearchSearchCard';
 import { resolveEventFaceSearchOperationalStatus } from './face-search-status';
+import {
+  resolveEffectiveBrandingDisplayColors,
+  resolveEffectiveBrandingPreview,
+  resolveEffectiveBrandingSourceDescription,
+  resolveEffectiveBrandingSourceLabel,
+} from './branding';
 
 const MODULE_CARD_CONFIG = [
   { key: 'live', name: 'Galeria ao vivo', icon: Image },
@@ -380,6 +389,23 @@ export default function EventDetailPage() {
   ) as EventResolvedEntitlements | null;
   const primaryCommercialSource = getPrimaryCommercialSource(commercialStatus);
   const canManageEvent = can('events.update');
+  const effectiveBranding = event?.effective_branding ?? resolveEffectiveBrandingPreview({
+    inheritBranding: event?.inherit_branding ?? true,
+    eventBranding: {
+      logo_path: event?.logo_path ?? null,
+      logo_url: event?.logo_url ?? null,
+      cover_image_path: event?.cover_image_path ?? null,
+      cover_image_url: event?.cover_image_url ?? null,
+      primary_color: event?.primary_color ?? null,
+      secondary_color: event?.secondary_color ?? null,
+    },
+  });
+  const effectiveBrandingColors = resolveEffectiveBrandingDisplayColors(effectiveBranding);
+  const effectiveBrandingSourceLabel = resolveEffectiveBrandingSourceLabel(effectiveBranding.source);
+  const effectiveBrandingSourceDescription = resolveEffectiveBrandingSourceDescription(
+    effectiveBranding.source,
+    event?.organization_name,
+  );
 
   function copyToClipboard(value: string, label: string) {
     navigator.clipboard.writeText(value);
@@ -434,6 +460,12 @@ export default function EventDetailPage() {
                 </Link>
               </Button>
             ) : null}
+            <Button variant="outline" size="sm" asChild>
+              <Link to={`/events/${event.id}/flow`}>
+                <GitBranch className="mr-1.5 h-3.5 w-3.5" />
+                Jornada da midia
+              </Link>
+            </Button>
             {event.public_links.gallery.enabled && event.public_links.gallery.url ? (
               <Button variant="outline" size="sm" onClick={() => window.open(event.public_links.gallery.url!, '_blank', 'noopener,noreferrer')}>
                 <Link2 className="mr-1.5 h-3.5 w-3.5" />
@@ -451,10 +483,16 @@ export default function EventDetailPage() {
       />
 
       <div className="relative overflow-hidden rounded-3xl border border-white/50 bg-slate-950">
-        {event.cover_image_url ? (
-          <img src={event.cover_image_url} alt={event.title} className="absolute inset-0 h-full w-full object-cover opacity-30" />
+        {effectiveBranding.cover_image_url ? (
+          <img src={effectiveBranding.cover_image_url} alt={event.title} className="absolute inset-0 h-full w-full object-cover opacity-30" />
         ) : null}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900/92 to-slate-800/80" />
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(135deg, ${effectiveBrandingColors.primary} 0%, ${effectiveBrandingColors.secondary} 100%)`,
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-950/85 via-slate-900/82 to-slate-800/72" />
 
         <div className="relative grid gap-6 px-5 py-6 md:grid-cols-[1fr_auto] md:px-8">
           <div className="space-y-3">
@@ -465,6 +503,9 @@ export default function EventDetailPage() {
               <EventStatusBadge status={(event.status || 'draft') as EventStatus} />
               <Badge variant="outline" className="border-white/20 bg-white/10 text-white">
                 {EVENT_COMMERCIAL_MODE_LABELS[event.commercial_mode || 'none']}
+              </Badge>
+              <Badge variant="outline" className="border-white/20 bg-white/10 text-white">
+                Branding {effectiveBrandingSourceLabel}
               </Badge>
             </div>
 
@@ -478,6 +519,16 @@ export default function EventDetailPage() {
             <p className="max-w-3xl text-sm text-white/75">
               {event.description || 'Sem descricao cadastrada para este evento.'}
             </p>
+            <div className="flex flex-wrap items-center gap-3">
+              {effectiveBranding.logo_url ? (
+                <div className="rounded-3xl border border-white/15 bg-white/95 p-3 shadow-sm backdrop-blur">
+                  <img src={effectiveBranding.logo_url} alt={`Logo de ${event.title}`} className="h-12 w-auto max-w-[132px] object-contain" />
+                </div>
+              ) : null}
+              <p className="max-w-2xl text-xs text-white/70">
+                {effectiveBrandingSourceDescription}
+              </p>
+            </div>
           </div>
 
           <div className="grid min-w-[220px] gap-3 sm:grid-cols-2 md:grid-cols-1">
@@ -545,6 +596,97 @@ export default function EventDetailPage() {
           icon={Image}
           description="Capacidade comercial efetiva aplicada ao evento."
         />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_320px]">
+        <Card className="border-white/70 bg-white/90 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Palette className="h-4 w-4 text-primary" />
+              Branding aplicado
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50">
+              {effectiveBranding.cover_image_url ? (
+                <img src={effectiveBranding.cover_image_url} alt={`Capa de ${event.title}`} className="aspect-[16/7] w-full object-cover" />
+              ) : (
+                <div
+                  className="flex aspect-[16/7] items-center justify-center"
+                  style={{
+                    background: `linear-gradient(135deg, ${effectiveBrandingColors.primary} 0%, ${effectiveBrandingColors.secondary} 100%)`,
+                  }}
+                >
+                  <Palette className="h-8 w-8 text-white/80" />
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary">{effectiveBrandingSourceLabel}</Badge>
+              <Badge variant="outline">
+                {effectiveBranding.inherits_from_organization ? 'Herdando da organizacao' : 'Branding proprio do evento'}
+              </Badge>
+            </div>
+
+            <p className="text-sm text-muted-foreground">{effectiveBrandingSourceDescription}</p>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Cor principal</p>
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-2xl border border-slate-200" style={{ backgroundColor: effectiveBrandingColors.primary }} />
+                  <span className="font-mono text-sm">{effectiveBrandingColors.primary}</span>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Cor secundaria</p>
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-2xl border border-slate-200" style={{ backgroundColor: effectiveBrandingColors.secondary }} />
+                  <span className="font-mono text-sm">{effectiveBrandingColors.secondary}</span>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Logo efetiva</p>
+                <div className="mt-2 flex min-h-12 items-center justify-center rounded-2xl bg-white p-2">
+                  {effectiveBranding.logo_url ? (
+                    <img src={effectiveBranding.logo_url} alt={`Logo efetiva de ${event.title}`} className="max-h-12 w-auto object-contain" />
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Sem logo aplicada</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/70 bg-white/90 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Building2 className="h-4 w-4 text-primary" />
+              Regra de heranca
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm font-medium">Origem atual</p>
+              <p className="mt-1 text-sm text-muted-foreground">{effectiveBrandingSourceLabel}</p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-sm font-medium">Herdando da organizacao</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {effectiveBranding.inherits_from_organization
+                  ? 'Sim, o evento pode aproveitar automaticamente os ativos da organizacao.'
+                  : 'Nao, o evento esta isolado do branding da organizacao.'}
+              </p>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              O preview considera exatamente o `effective_branding` devolvido pela API, sem depender de leitura tecnica de `logo_path` ou `cover_image_path`.
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>

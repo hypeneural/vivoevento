@@ -905,3 +905,26 @@ Pendencias fora desta V1:
 - preview visual do `effective_branding` no detalhe/editor do evento.
 - fluxo operacional completo de DNS/SSL para `custom_domain`.
 - CTA comercial de upgrade para planos sem branding premium.
+
+## Atualizacao visual do branding em eventos em `2026-04-10 23:55:00 -03:00`
+
+Fechamento desta dependência de UX:
+
+- [x] o editor de evento agora expõe `Herdar branding da organizacao` de forma explicita e legível para operador nao tecnico.
+- [x] o preview do editor passou a refletir o branding efetivo, nao apenas os campos crus do evento.
+- [x] o detalhe do evento passou a mostrar `Branding aplicado`, com capa/logo/cores efetivas e explicacao de origem.
+- [x] a semantica de heranca ficou coerente com os entitlements organizacionais ja entregues em `/settings`.
+
+Validacao desta rodada:
+
+- `php artisan test tests/Feature/Events/EventBrandingInheritanceTest.php tests/Feature/Events/CreateEventTest.php`
+  - `18 passed`, `160 assertions`
+- `npx vitest run src/modules/events/branding.test.ts src/modules/events/EventDetailPage.test.tsx`
+  - `6 passed`
+- `npm run type-check`
+  - `ok`
+
+Pendencias restantes fora desta rodada:
+
+- CTA comercial de upgrade para entitlements de branding premium.
+- operacao completa de `custom_domain` com DNS/SSL.

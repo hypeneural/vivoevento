@@ -66,6 +66,17 @@ export const queryKeys = {
     duplicateCluster: (id: string) => [...queryKeys.media.detail(id), 'duplicates'] as const,
   },
 
+  // Event People
+  eventPeople: {
+    all: () => ['event-people'] as const,
+    byEvent: (eventId: number | string) => [...queryKeys.eventPeople.all(), String(eventId)] as const,
+    peopleLists: (eventId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'people'] as const,
+    peopleList: (eventId: number | string, filters: Record<string, unknown>) => [...queryKeys.eventPeople.peopleLists(eventId), filters] as const,
+    reviewQueues: (eventId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'review-queue'] as const,
+    reviewQueue: (eventId: number | string, filters: Record<string, unknown>) => [...queryKeys.eventPeople.reviewQueues(eventId), filters] as const,
+    mediaFaces: (eventId: number | string, mediaId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'media', String(mediaId), 'faces'] as const,
+  },
+
   // Gallery
   gallery: {
     all: () => ['gallery'] as const,

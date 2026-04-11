@@ -24,6 +24,45 @@ Antes de implementar, toda pessoa da sprint deve alinhar a leitura com estes doc
 - [telao-ao-vivo-implementation.md](C:/laragon/www/eventovivo/docs/architecture/telao-ao-vivo-implementation.md)
 - [wall-improvements-validation-2026-04-08.md](C:/laragon/www/eventovivo/docs/architecture/wall-improvements-validation-2026-04-08.md)
 
+## Revalidacao apos ajustes externos em 2026-04-10
+
+Leitura objetiva:
+
+- o checklist desta sprint do cockpit continua fechado;
+- os ajustes externos mais relevantes no modulo `Wall` foram:
+  - `puzzle` promovido a layout oficial com `theme_config` e capabilities proprias;
+  - diagnostico enriquecido com runtime de video e contadores de `board`;
+  - prefetch da simulacao por `theme fingerprint` para reduzir troca visivel da previsao.
+
+Testes direcionados executados nesta revalidacao:
+
+- backend:
+  - `cd apps/api && php artisan test --filter=WallDiagnosticsTest`
+  - `9` testes passando
+  - `cd apps/api && php artisan test --filter=WallInsightsTest`
+  - `7` testes passando
+  - `cd apps/api && php artisan test --filter=WallLiveSnapshotTest`
+  - `7` testes passando
+  - `cd apps/api && php artisan test --filter=WallOptionsPuzzleLayoutTest`
+  - `2` testes passando
+  - `cd apps/api && php artisan test --filter=WallSettingsThemeConfigTest`
+  - `3` testes passando
+- frontend:
+  - `cd apps/web && npm run test -- src/modules/wall/pages/EventWallManagerPage.test.tsx src/modules/wall/components/manager/diagnostics/WallPlayerRuntimeCard.test.tsx src/modules/wall/wall-query-options.test.ts src/modules/wall/player/hooks/useStageGeometry.test.ts src/modules/wall/player/themes/puzzle/PuzzleLayout.test.tsx src/modules/wall/player/themes/puzzle/premium-motion.test.tsx`
+  - `29` testes passando
+  - `cd apps/web && npm run test -- src/modules/wall`
+  - `299` testes passando
+  - `cd apps/web && npm run type-check`
+  - sem erros
+
+Observacao importante:
+
+- `cd apps/api && php artisan test --filter=Wall` nao esta 100% verde nesta revalidacao;
+- hoje existem `2` falhas fora do cockpit UI e ligadas ao pipeline de variantes de video:
+  - `Tests\\Unit\\Modules\\MediaProcessing\\MediaVariantGeneratorServiceTest`
+  - `Tests\\Feature\\MediaProcessing\\MediaPipelineJobsTest`
+- portanto, o cockpit do manager continua estavel, mas o baseline backend wall-adjacent nao deve mais ser descrito como totalmente verde sem essa correcao.
+
 ## Baseline revalidado nesta rodada
 
 Antes de atualizar este plano, o baseline atual do modulo wall foi revalidado com testes automatizados existentes:

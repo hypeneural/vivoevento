@@ -1839,3 +1839,26 @@ Leitura de seguranca:
 - `EventTeamMember` continua sendo o vinculo event-scoped.
 - ownership nao vira permission dinamica nem role global solta; a titularidade continua no membership da organizacao.
 - para usuarios com acesso apenas por evento, nada desta mudanca libera `/settings`, equipe da organizacao, clientes, financeiro ou billing.
+
+## Atualizacao de UX e isolamento de branding em `2026-04-10 23:55:00 -03:00`
+
+Complemento importante para a trilha event-scoped:
+
+- [x] o editor de evento agora mostra `Herdar branding da organizacao` como escolha explicita, sem misturar isso com permissao de acesso.
+- [x] o preview do editor e o detalhe do evento passaram a usar `effective_branding`, deixando claro para o operador o que vem do evento e o que vem da organizacao.
+- [x] a explicacao visual de origem (`Evento`, `Organizacao`, `Evento + organizacao`) melhora governanca sem ampliar escopo de permissao.
+
+Leitura de seguranca desta rodada:
+
+- a heranca de branding continua sendo leitura de configuracao, nao concessao de acesso.
+- usuario event-scoped continua limitado ao evento; o preview so mostra o resultado efetivo aplicavel ao proprio evento.
+- a UI deixou de exigir cor propria no front quando `inherit_branding=true`, evitando gravacao indevida que mascarava o fallback organizacional.
+
+Validacao:
+
+- `php artisan test tests/Feature/Events/EventBrandingInheritanceTest.php tests/Feature/Events/CreateEventTest.php`
+  - `18 passed`, `160 assertions`
+- `npx vitest run src/modules/events/branding.test.ts src/modules/events/EventDetailPage.test.tsx`
+  - `6 passed`
+- `npm run type-check`
+  - `ok`

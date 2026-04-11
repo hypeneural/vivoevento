@@ -21,6 +21,23 @@ class EventPersonReviewQueueResource extends JsonResource
             'payload' => $this->payload,
             'last_signal_at' => $this->last_signal_at?->toIso8601String(),
             'resolved_at' => $this->resolved_at?->toIso8601String(),
+            'person' => $this->whenLoaded('person', fn () => [
+                'id' => $this->person?->id,
+                'display_name' => $this->person?->display_name,
+                'type' => $this->person?->type?->value ?? $this->person?->type,
+                'side' => $this->person?->side?->value ?? $this->person?->side,
+            ]),
+            'face' => $this->whenLoaded('face', fn () => [
+                'id' => $this->face?->id,
+                'event_media_id' => $this->face?->event_media_id,
+                'face_index' => $this->face?->face_index,
+                'bbox' => [
+                    'x' => $this->face?->bbox_x,
+                    'y' => $this->face?->bbox_y,
+                    'w' => $this->face?->bbox_w,
+                    'h' => $this->face?->bbox_h,
+                ],
+            ]),
         ];
     }
 }

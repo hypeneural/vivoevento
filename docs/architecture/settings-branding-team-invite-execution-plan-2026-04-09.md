@@ -840,3 +840,35 @@ Pendencias reais para fechar 100% da trilha visual:
 - [ ] mostrar preview do `effective_branding` no editor/detalhe do evento, nao apenas no payload.
 - [ ] criar CTA comercial de upgrade quando o usuario tenta usar dominio proprio ou asset premium sem entitlement.
 - [ ] definir operacao completa de DNS/SSL para `custom_domain`, fora do escopo desta V1.
+
+Atualizacao visual do branding em `2026-04-10 23:55:00 -03:00`:
+
+- [x] o editor de evento agora mostra a opcao explicita `Herdar branding da organizacao`.
+- [x] o payload do editor deixou de forcar cor propria por default; campos vazios agora preservam o fallback organizacao -> evento quando `inherit_branding=true`.
+- [x] o editor agora calcula preview local do `effective_branding`, reaproveitando capa, logo e cores da organizacao quando o evento nao tiver override proprio.
+- [x] o detalhe do evento agora mostra preview visual do `effective_branding`, com origem atual (`Evento`, `Organizacao` ou `Evento + organizacao`) e explicacao legivel.
+- [x] os contratos do front (`types.ts` e `api-types.ts`) agora conhecem `inherit_branding` e `effective_branding`.
+
+Validacao executada nesta rodada:
+
+Backend:
+
+- `php artisan test tests/Feature/Events/EventBrandingInheritanceTest.php tests/Feature/Events/CreateEventTest.php`
+  - `18 passed`, `160 assertions`
+
+Frontend:
+
+- `npx vitest run src/modules/events/branding.test.ts src/modules/events/EventDetailPage.test.tsx`
+  - `6 passed`
+
+Type-check:
+
+- `npm run type-check`
+  - `ok`
+
+Pendencias reais apos esta rodada:
+
+- [x] adicionar no editor de evento a opcao explicita `Herdar branding da organizacao`.
+- [x] mostrar preview do `effective_branding` no editor/detalhe do evento, nao apenas no payload.
+- [ ] criar CTA comercial de upgrade quando o usuario tenta usar dominio proprio ou asset premium sem entitlement.
+- [ ] definir operacao completa de DNS/SSL para `custom_domain`, fora do escopo desta V1.

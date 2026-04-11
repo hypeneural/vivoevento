@@ -3,10 +3,10 @@
 namespace App\Modules\WhatsApp\Clients\Providers\ZApi;
 
 use App\Modules\WhatsApp\Models\WhatsAppInstance;
+use App\Modules\WhatsApp\Support\WhatsAppLog;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Low-level HTTP client for Z-API.
@@ -252,7 +252,7 @@ class ZApiApiClient
     ): void {
         $durationMs = (int) ((microtime(true) - $startTime) * 1000);
 
-        Log::channel('whatsapp')->info('Z-API Request', [
+        WhatsAppLog::info('Z-API Request', [
             'method' => $method,
             'endpoint' => $endpoint,
             'instance_id' => $instance->id,
@@ -273,7 +273,7 @@ class ZApiApiClient
     ): void {
         $durationMs = (int) ((microtime(true) - $startTime) * 1000);
 
-        Log::channel('whatsapp')->error('Z-API Request Failed', [
+        WhatsAppLog::error('Z-API Request Failed', [
             'method' => $method,
             'endpoint' => $endpoint,
             'instance_id' => $instance->id,

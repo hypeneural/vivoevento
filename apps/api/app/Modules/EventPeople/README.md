@@ -45,4 +45,9 @@ Jobs do modulo devem usar `redis`, `afterCommit`, tags por `event_id` e, quando 
 - `GET /api/v1/events/{event}/people`
 - `GET /api/v1/events/{event}/people/{person}`
 - `GET /api/v1/events/{event}/people/review-queue`
+- `POST /api/v1/events/{event}/people/review-queue/{reviewItem}/confirm`
+- `POST /api/v1/events/{event}/people/review-queue/{reviewItem}/ignore`
+- `POST /api/v1/events/{event}/people/review-queue/{reviewItem}/reject`
+- `POST /api/v1/events/{event}/people/review-queue/{reviewItem}/merge`
+- `POST /api/v1/events/{event}/people/review-queue/{reviewItem}/split`
 - `GET /api/v1/events/{event}/media/{media}/people`

@@ -9,6 +9,18 @@ export type EventVisibility = 'public' | 'private' | 'unlisted';
 export type EventModerationMode = 'none' | 'manual' | 'ai';
 export type EventBrandingAssetKind = 'cover' | 'logo';
 export type EventCommercialMode = 'none' | 'subscription_covered' | 'trial' | 'single_purchase' | 'bonus' | 'manual_override';
+export type EventEffectiveBrandingSource = 'organization' | 'event' | 'mixed';
+
+export interface EventEffectiveBranding {
+  logo_path: string | null;
+  logo_url: string | null;
+  cover_image_path: string | null;
+  cover_image_url: string | null;
+  primary_color: string | null;
+  secondary_color: string | null;
+  source: EventEffectiveBrandingSource;
+  inherits_from_organization: boolean;
+}
 
 export interface EventFaceSearchSettings {
   id: number | null;
@@ -108,6 +120,8 @@ export interface EventListItem {
   cover_image_url: string | null;
   primary_color: string | null;
   secondary_color: string | null;
+  inherit_branding: boolean;
+  effective_branding: EventEffectiveBranding | null;
   public_url: string | null;
   upload_url: string | null;
   created_at: string | null;
@@ -222,6 +236,7 @@ export interface EventFormPayload {
     secondary_color?: string | null;
     cover_image_path?: string | null;
     logo_path?: string | null;
+    inherit_branding?: boolean;
   };
   modules?: Partial<Record<EventModuleKey, boolean>>;
   privacy?: {

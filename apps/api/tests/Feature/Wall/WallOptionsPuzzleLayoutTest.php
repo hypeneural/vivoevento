@@ -1,6 +1,6 @@
 <?php
 
-it('hides puzzle from wall options while the rollout gate is disabled', function () {
+it('keeps puzzle visible in wall options even when the legacy rollout config is disabled', function () {
     [$user, $organization] = $this->actingAsOwner();
 
     config()->set('wall.layouts.puzzle.enabled', false);
@@ -11,14 +11,12 @@ it('hides puzzle from wall options while the rollout gate is disabled', function
 
     $layouts = collect($response->json('data.layouts'));
 
-    expect($layouts->pluck('value')->all())->not->toContain('puzzle')
+    expect($layouts->pluck('value')->all())->toContain('puzzle')
         ->and($layouts->first())->toHaveKey('capabilities');
 });
 
-it('returns puzzle with explicit capabilities when the rollout gate is enabled', function () {
+it('returns puzzle with restrictive capabilities as an official layout', function () {
     [$user, $organization] = $this->actingAsOwner();
-
-    config()->set('wall.layouts.puzzle.enabled', true);
 
     $response = $this->apiGet('/wall/options');
 

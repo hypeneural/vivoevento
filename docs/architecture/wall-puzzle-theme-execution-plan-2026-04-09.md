@@ -1161,6 +1161,73 @@ Subtarefas:
 - `apps/web/src/modules/wall/player/hooks/useStageGeometry.test.ts`
 - `apps/web/src/modules/wall/wall-query-options.test.ts`
 
+## Integracao oficial - puzzle sem env gate
+
+Objetivo:
+
+- promover `puzzle` para tema oficial do wall;
+- remover atrito operacional de `WALL_PUZZLE_ENABLED` e `WALL_PUZZLE_PREVIEW_ENABLED`;
+- manter as capabilities restritivas que protegem runtime, rede e decode;
+- continuar usando `/wall/options` como fonte de verdade do manager.
+
+Arquivos-alvo:
+
+- `apps/api/app/Modules/Wall/Enums/WallLayout.php`
+- `apps/api/config/wall.php`
+- `apps/api/tests/Feature/Wall/WallOptionsPuzzleLayoutTest.php`
+- `apps/api/tests/Feature/Wall/WallSettingsThemeConfigTest.php`
+- `apps/api/tests/Feature/Wall/WallOptionsCharacterizationTest.php`
+- `docs/architecture/wall-puzzle-video-policy-and-theme-capabilities-2026-04-10.md`
+
+Subtarefas:
+
+- [x] remover o gate real de `WallLayout::isEnabled()` para `puzzle`;
+- [x] manter `puzzle` oficial em `/wall/options` mesmo com config legada forçada para `false`;
+- [x] manter guardrails de capability:
+  - `max_simultaneous_videos=0`;
+  - `fallback_video_layout=cinematic`;
+  - `supports_side_thumbnails=false`;
+  - `supports_theme_config=true`.
+- [x] manter `UpdateWallSettingsRequest` aceitando `layout=puzzle` sem depender de `.env`;
+- [x] manter `fallbackOptions.layouts` do frontend fora da decisao oficial, com `/wall/options` como fonte de verdade;
+- [x] trocar a config legada de `wall.php` para valores estaticos e sem dependencia de env;
+- [x] registrar no plano que o rollout final do `puzzle` passa a ser capability-driven, nao env-driven.
+
+### Bateria TDD da integracao oficial
+
+- [x] inverter `apps/api/tests/Feature/Wall/WallOptionsPuzzleLayoutTest.php` para exigir `puzzle` sempre visivel;
+- [x] inverter `apps/api/tests/Feature/Wall/WallSettingsThemeConfigTest.php` para exigir `layout=puzzle` valido mesmo com config legada desligada;
+- [x] inverter `apps/api/tests/Feature/Wall/WallOptionsCharacterizationTest.php` para travar `puzzle` como layout oficial;
+- [x] rodar bateria focada do backend;
+- [x] rodar bateria ampla do modulo `Wall`;
+- [x] rodar bateria do frontend `wall` + `type-check`.
+
+### Validacao da integracao oficial - 2026-04-10
+
+Backend:
+
+- `cd apps/api && php artisan test tests/Feature/Wall/WallOptionsPuzzleLayoutTest.php tests/Feature/Wall/WallSettingsThemeConfigTest.php tests/Feature/Wall/WallOptionsCharacterizationTest.php`
+  - `6 testes`
+  - `68 assertions`
+  - `PASS`
+- `cd apps/api && php artisan test tests/Feature/Wall tests/Unit/Modules/Wall`
+  - `88 testes`
+  - `577 assertions`
+  - `PASS`
+
+Frontend:
+
+- `cd apps/web && npm run test -- src/modules/wall/player/hooks/useWallPlayer.test.tsx`
+  - `1 arquivo`
+  - `7 testes`
+  - `PASS`
+- `cd apps/web && npm run test -- src/modules/wall --testTimeout=15000`
+  - `61 arquivos`
+  - `299 testes`
+  - `PASS`
+- `cd apps/web && npm run type-check`
+  - `PASS`
+
 ## Ordem recomendada de entrega
 
 ## PR 1 - Contrato e gate
@@ -1237,6 +1304,17 @@ Saida esperada:
 - board fica mais premium;
 - degradacao e budget ficam observaveis no manager.
 
+## PR 8 - Liberacao oficial sem env gate
+
+- integracao oficial completa
+
+Saida esperada:
+
+- `puzzle` aparece sempre em `/wall/options`;
+- `layout=puzzle` salva sem depender de `.env`;
+- capabilities restritivas continuam sendo a barreira de seguranca operacional;
+- o frontend continua lendo a lista oficial do backend, sem promover `puzzle` por fallback estatico.
+
 ## Sequencia recomendada por sprint
 
 ### Sprint 1
@@ -1285,6 +1363,12 @@ Saida esperada:
 - manter feature flag por tenant;
 - so promover depois de estabilidade real.
 
+### Etapa E - liberacao oficial sem env gate
+
+- remover o gate real de rollout por `.env`;
+- manter as restricoes de capability como contrato produtivo;
+- usar telemetria, diagnostics e budget como alavancas de seguranca, nao flag operacional manual.
+
 ## Definicao de pronto da v1
 
 O `Quebra Cabeca` so deve ser considerado pronto quando:
@@ -1303,6 +1387,7 @@ O `Quebra Cabeca` so deve ser considerado pronto quando:
 - [x] manager bloqueia video e outras capabilities incompativeis;
 - [x] `puzzle` nao monta `<video>` dentro do board;
 - [x] video elegivel em `puzzle` cai para fallback single-item com `WallVideoSurface`;
+- [x] `puzzle` oficial nao depende mais de `WALL_PUZZLE_ENABLED` nem `WALL_PUZZLE_PREVIEW_ENABLED`;
 - [ ] `maxSimultaneousVideos` default do produto continua `1`;
 - [x] board so reseta quando a identidade oficial muda;
 - [ ] em FHD padrao com `9` pecas o layout se mantem fluido e sem loading visivel reentrante;
@@ -1314,7 +1399,7 @@ O erro mais caro aqui seria tentar "desenhar o puzzle" antes de criar a fundacao
 
 O `P0` real e:
 
-1. contrato compartilhado + `theme_config` + gate de rollout;
+1. contrato compartilhado + `theme_config` + capabilities formais;
 2. registry de layout + contrato global de motion;
 3. subsistema de board;
 4. readiness/cache/budget;

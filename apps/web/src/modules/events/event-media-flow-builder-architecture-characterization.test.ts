@@ -4,7 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('event media flow builder architecture characterization', () => {
-  it('does not yet install React Flow or expose a dedicated event journey route', () => {
+  it('now installs @xyflow/react and exposes the dedicated event journey route with a canvas wrapper', () => {
     const packageJsonSource = fs.readFileSync(
       path.resolve(__dirname, '../../../package.json'),
       'utf8',
@@ -13,10 +13,16 @@ describe('event media flow builder architecture characterization', () => {
       path.resolve(__dirname, '../../App.tsx'),
       'utf8',
     );
+    const journeyPageSource = fs.readFileSync(
+      path.resolve(__dirname, 'pages/EventJourneyBuilderPage.tsx'),
+      'utf8',
+    );
 
-    expect(packageJsonSource).not.toContain('"@xyflow/react"');
-    expect(appSource).not.toContain('events/:id/flow');
-    expect(appSource).not.toContain('journey-builder');
+    expect(packageJsonSource).toContain('"@xyflow/react"');
+    expect(appSource).toContain('events/:id/flow');
+    expect(appSource).toContain('EventJourneyBuilderPage');
+    expect(journeyPageSource).toContain('JourneyFlowCanvas');
+    expect(journeyPageSource).toContain('highlightedNodeIds');
   });
 
   it('already has reusable event aggregate editing and layout primitives for a split journey editor', () => {

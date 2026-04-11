@@ -10,8 +10,8 @@ use App\Modules\WhatsApp\Services\WhatsAppDirectIntakeSessionService;
 use App\Modules\WhatsApp\Services\WhatsAppFeedbackAutomationService;
 use App\Modules\WhatsApp\Services\WhatsAppGroupActivationService;
 use App\Modules\WhatsApp\Services\WhatsAppInboundEventContextResolver;
+use App\Modules\WhatsApp\Support\WhatsAppLog;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Commercially-aware bridge between WhatsApp inbound events and the media intake pipeline.
@@ -35,7 +35,7 @@ class RouteInboundToMediaPipeline implements ShouldQueue
         $feedback = app(WhatsAppFeedbackAutomationService::class);
 
         if (($event->normalized->fromMe ?? false) === true) {
-            Log::channel('whatsapp')->info('Inbound intake ignored because the message is from the instance itself', [
+            WhatsAppLog::info('Inbound intake ignored because the message is from the instance itself', [
                 'message_id' => $event->message->id,
                 'provider_message_id' => $event->normalized->messageId,
             ]);
@@ -51,7 +51,7 @@ class RouteInboundToMediaPipeline implements ShouldQueue
             );
 
             if ($handledGroupActivation) {
-                Log::channel('whatsapp')->info('Inbound WhatsApp text handled as a group activation command', [
+                WhatsAppLog::info('Inbound WhatsApp text handled as a group activation command', [
                     'message_id' => $event->message->id,
                     'provider_message_id' => $event->normalized->messageId,
                     'chat_id' => $event->normalized->chatId,
@@ -67,7 +67,7 @@ class RouteInboundToMediaPipeline implements ShouldQueue
             );
 
             if ($handled) {
-                Log::channel('whatsapp')->info('Inbound WhatsApp text handled as a direct intake command', [
+                WhatsAppLog::info('Inbound WhatsApp text handled as a direct intake command', [
                     'message_id' => $event->message->id,
                     'provider_message_id' => $event->normalized->messageId,
                     'chat_id' => $event->normalized->chatId,
@@ -82,7 +82,7 @@ class RouteInboundToMediaPipeline implements ShouldQueue
         }
 
         if ($event->normalized->messageType === 'sticker') {
-            Log::channel('whatsapp')->info('Inbound sticker ignored for event media intake because stickers are not treated as gallery media', [
+            WhatsAppLog::info('Inbound sticker ignored for event media intake because stickers are not treated as gallery media', [
                 'message_id' => $event->message->id,
                 'provider_message_id' => $event->normalized->messageId,
                 'chat_id' => $event->normalized->chatId,
@@ -107,7 +107,7 @@ class RouteInboundToMediaPipeline implements ShouldQueue
 
         if (! $context) {
             if ($event->normalized->isFromGroup()) {
-                Log::channel('whatsapp')->warning('Inbound group media ignored because no eligible event context was resolved', [
+                WhatsAppLog::warning('Inbound group media ignored because no eligible event context was resolved', [
                     'message_id' => $event->message->id,
                     'provider_message_id' => $event->normalized->messageId,
                     'chat_id' => $event->normalized->chatId,
@@ -123,7 +123,7 @@ class RouteInboundToMediaPipeline implements ShouldQueue
                 $event->normalized,
             );
 
-            Log::channel('whatsapp')->warning('Inbound direct media ignored because no active intake session was resolved', [
+            WhatsAppLog::warning('Inbound direct media ignored because no active intake session was resolved', [
                 'message_id' => $event->message->id,
                 'provider_message_id' => $event->normalized->messageId,
                 'chat_id' => $event->normalized->chatId,
@@ -173,7 +173,7 @@ class RouteInboundToMediaPipeline implements ShouldQueue
             ]),
         ]);
 
-        Log::channel('whatsapp')->info(
+        WhatsAppLog::info(
             $captureTarget === 'event_audio'
                 ? 'Routing inbound audio to the event capture pipeline'
                 : 'Routing inbound media to gallery pipeline',
@@ -189,12 +189,22 @@ class RouteInboundToMediaPipeline implements ShouldQueue
             ],
         );
 
-        $feedback->sendDetectedReaction($context->event, $event->message->instance, [
-            'provider_message_id' => $event->normalized->messageId,
-            'chat_external_id' => $event->normalized->chatId,
-            'sender_external_id' => $event->normalized->senderExternalId(),
-            'intake_source' => $context->intakeSource,
-        ]);
+        try {
+            $feedback->sendDetectedReaction($context->event, $event->message->instance, [
+                'provider_message_id' => $event->normalized->messageId,
+                'chat_external_id' => $event->normalized->chatId,
+                'sender_external_id' => $event->normalized->senderExternalId(),
+                'intake_source' => $context->intakeSource,
+            ]);
+        } catch (\Throwable $exception) {
+            WhatsAppLog::warning('Detected reaction failed but inbound media dispatch will continue', [
+                'message_id' => $event->message->id,
+                'provider_message_id' => $event->normalized->messageId,
+                'event_id' => $context->event->id,
+                'event_channel_id' => $context->eventChannel->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
 
         ProcessInboundWebhookJob::dispatch(
             $event->normalized->providerKey,

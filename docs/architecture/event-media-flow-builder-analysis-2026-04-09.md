@@ -576,6 +576,57 @@ Resultado:
 - `53` testes passaram na regressao do modulo `events`;
 - `type-check` passou sem erros.
 
+## Mapper de update do inspector em `2026-04-10`
+
+A `Tarefa 2.5` foi concluida para fechar a ida do draft do inspector para o payload agregado do backend sem apagar configuracao nao tocada.
+
+O que entrou:
+
+- `apps/web/src/modules/events/journey/toJourneyUpdatePayload.ts`;
+- tipo `EventJourneyInspectorDraft`;
+- tipo recursivo `EventJourneyDirtyFields<T>`;
+- normalizacao local para strings, inteiros, thresholds, datas, templates e arrays do draft;
+- tratamento coerente de `reply_text_mode`, `reply_prompt_override`, `reply_prompt_preset_id` e `reply_fixed_templates`.
+
+Decisao tecnica importante:
+
+- a implementacao ficou em mapper proprio e recursivo, em vez de depender de `getValues(undefined, { dirtyFields: true })`.
+
+Motivo:
+
+- a documentacao oficial do `react-hook-form` registra essa extracao por estado do form na release `v7.63.0`;
+- o nosso repo segue em `react-hook-form 7.61.1`;
+- portanto, usar essa API agora criaria acoplamento a uma capacidade que a nossa stack atual ainda nao garante.
+
+Fonte oficial considerada:
+
+- `react-hook-form v7.63.0`: https://github.com/react-hook-form/react-hook-form/releases/tag/v7.63.0
+
+Leitura pratica:
+
+- o inspector futuro pode usar `react-hook-form` normal, `dirtyFields` padrao e esse mapper puro para gerar patch minimo;
+- o payload agora preserva campos nao tocados em vez de remandar blocos inteiros;
+- TTL, thresholds, `whatsapp_instance_id`, prompt preset e templates seguem a mesma normalizacao ja validada nos forms atuais de intake, Safety e VLM;
+- quando o modo de resposta muda, o payload limpa os campos que deixam de fazer sentido, evitando lixo residual no backend.
+
+Bateria validada:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/toJourneyUpdatePayload.test.ts src/modules/events/journey/__tests__/buildJourneyScenarios.test.ts src/modules/events/journey/__tests__/buildJourneyGraph.test.ts src/modules/events/journey/__tests__/api.test.ts src/modules/events/event-media-flow-builder-architecture-characterization.test.ts
+npm run type-check
+```
+
+Resultado:
+
+- `7` testes passaram na bateria do mapper de update;
+- `28` testes passaram na bateria combinada do builder inicial;
+- `type-check` passou sem erros.
+
+Observacao desta rodada:
+
+- a regressao ampliada `npm run test -- src/modules/events` encontrou `1` falha fora da trilha da jornada em `EventDetailPage.test.tsx`, ligada ao card de branding aplicado; como a falha nao toca `journey/*`, ela ficou registrada como regressao residual do worktree atual e nao como defeito do mapper novo.
+
 ## Leitura real da stack atual
 
 ## Frontend auditado hoje
@@ -2089,6 +2140,131 @@ Recomendacao:
 
 ---
 
+## Shell inicial da pagina em `2026-04-10`
+
+A `Tarefa 3.1` saiu do papel mantendo a decisao central da analise:
+
+- a jornada abriu como pagina propria em `apps/web/src/modules/events/pages/EventJourneyBuilderPage.tsx`;
+- a rota `/events/:id/flow` entrou em `apps/web/src/App.tsx`;
+- o preload dessa page entrou no matcher de `/events` em `apps/web/src/app/routing/route-preload.ts`;
+- o detalhe do evento ganhou atalho visivel para `Jornada da midia`;
+- o layout principal reaproveita `react-resizable-panels` via `apps/web/src/components/ui/resizable.tsx`;
+- o lado esquerdo ficou como trilho visual guiado e fixo;
+- o lado direito ficou como inspector reservado, ainda sem formulario contextual.
+
+Leitura pratica:
+
+- a page ja entrega titulo, subtitulo, resumo humano, legenda semantica fixa e leitura por etapas;
+- naquele corte, o canvas ainda nao era `React Flow`, por escolha;
+- a pagina ja deixa pronto o espaco de `canvas + inspector` sem vender liberdade tecnica antes da hora;
+- o simulador local passou a ser consumido na propria page por botoes de cenarios, mas ainda sem highlight visual de edge/node;
+- a etapa seguinte pode focar so no renderer de grafo, sem rediscutir rota, shell ou copy base.
+
+## Validacao oficial usada nesta etapa em `2026-04-10`
+
+### React Router
+
+Foi revalidado na documentacao oficial que o roteamento atual em `createRoutesFromElements` continua sendo a forma certa de registrar a nova page no `Router` principal:
+
+- https://reactrouter.com/api/components/Route
+
+### shadcn/ui + resizable
+
+Foi revalidado na documentacao oficial do componente `Resizable` do shadcn/ui que o split `canvas + inspector` reaproveitando `react-resizable-panels` e uma trilha compativel com a stack atual:
+
+- https://ui.shadcn.com/docs/components/resizable
+
+## Bateria adicional validada nesta etapa
+
+Comandos executados:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/EventJourneyBuilderPage.test.tsx src/modules/events/EventDetailPage.test.tsx src/modules/events/event-media-flow-builder-architecture-characterization.test.ts
+npm run test -- src/modules/events
+npm run type-check
+```
+
+Resultado:
+
+- `4` testes passaram na bateria da page nova;
+- `10` testes passaram na bateria focada `page + detail + characterization`;
+- `69` testes passaram na regressao ampliada do modulo `events`;
+- `type-check` passou sem erros.
+
+Leitura pratica:
+
+- o shell da nova page entrou verde;
+- a regressao residual do `EventDetailPage` foi saneada;
+- o proximo passo tecnico agora e isolar `JourneyFlowCanvas` e trocar o trilho visual guiado pelo renderer com `React Flow`.
+
+## Renderer real com React Flow em `2026-04-11`
+
+A `Tarefa 3.2` foi concluida e o canvas da jornada deixou de ser apenas shell visual.
+
+Entrega realizada:
+
+- `@xyflow/react` entrou no frontend como dependencia real;
+- `apps/web/src/modules/events/journey/JourneyFlowCanvas.tsx` passou a encapsular o renderer;
+- o canvas agora recebe `graph`, `selectedNodeId`, `highlightedNodeIds` e `highlightedEdgeIds` a partir da projection tipada;
+- a toolbar externa aciona `fitView` por callback de `onReady`, sem necessidade de `ReactFlowProvider` nesta fase;
+- a selecao de node passou a abrir o inspector real da page;
+- o simulador local agora destaca o caminho no canvas usando `node IDs` e `edge IDs` estaveis;
+- o fallback de `stages=[]` continuou tratado dentro do proprio canvas.
+
+Decisoes que sairam da documentacao oficial e viraram codigo:
+
+- o wrapper usa `nodesDraggable={false}` e `nodesConnectable={false}` para manter o canvas travado;
+- `selectNodesOnDrag={false}` e `zoomOnDoubleClick={false}` reduzem interacao acidental;
+- `preventScrolling={false}` preserva o scroll natural da pagina;
+- `onlyRenderVisibleElements={false}` ficou explicito na V1;
+- `ariaLabelConfig` em portugues entrou no renderer;
+- handles condicionais continuam visiveis com `visibility`, sem `display: none`;
+- `nodeTypes`, `edgeTypes`, callbacks e objetos de config ficaram estaveis para evitar rerender desnecessario.
+
+Leitura pratica:
+
+- a jornada agora ja usa `React Flow` de verdade, mas continua sem vender canvas livre;
+- o design segue o compromisso da V1: renderer visual forte, regra de negocio fora do canvas;
+- ainda nao houve necessidade tecnica de `ReactFlowProvider`, `MiniMap`, `NodeToolbar` ou `onlyRenderVisibleElements`;
+- a proxima etapa pode focar em nodes customizados e inspector editavel sem reabrir a discussao de renderer.
+
+## Validacao oficial usada nesta etapa em `2026-04-11`
+
+### React Flow API Reference
+
+Foi revalidado na documentacao oficial que as props de interacao usadas na V1 continuam sendo o caminho correto para um canvas travado e acessivel:
+
+- https://reactflow.dev/api-reference/react-flow
+
+### React Flow hooks, providers e testing
+
+Foram revalidadas as guias oficiais que sustentam as decisoes de nao usar `ReactFlowProvider` por inercia e de manter testes reais do canvas em browser:
+
+- https://reactflow.dev/learn/advanced-use/hooks-providers
+- https://reactflow.dev/learn/advanced-use/testing
+- https://reactflow.dev/learn/customization/handles
+
+## Bateria adicional validada nesta etapa
+
+Comandos executados:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/JourneyFlowCanvas.test.tsx src/modules/events/journey/__tests__/EventJourneyBuilderPage.test.tsx src/modules/events/event-media-flow-builder-architecture-characterization.test.ts
+npm run test -- src/modules/events
+npm run type-check
+```
+
+Resultado:
+
+- `3` testes passaram na bateria do `JourneyFlowCanvas`;
+- `11` testes passaram na bateria focada `canvas + page + characterization`;
+- `72` testes passaram na regressao ampliada do modulo `events`;
+- `type-check` passou sem erros.
+
+---
+
 ## Fontes oficiais consultadas em 2026-04-09
 
 ## Stack real do repositorio
@@ -2151,6 +2327,11 @@ Recomendacao:
 ## shadcn/ui
 
 - https://ui.shadcn.com/docs/theming
+- https://ui.shadcn.com/docs/components/resizable
+
+## React Router
+
+- https://reactrouter.com/api/components/Route
 
 ## Tailwind CSS
 

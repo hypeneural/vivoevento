@@ -1174,11 +1174,11 @@ Observacao:
 
 `WallPayloadFactory::media()` ja conhece `url` e `source_type`.
 Nesta fase, `WallSimulationService` ja repassa `preview_url`, `source_type`, `caption` e `layout_hint` no `sequence_preview`.
-As proximas pendencias aqui continuam sendo:
+Com a `Etapa 4` e o polimento final ja entregues, esta parte ficou assim:
 
-- icones de origem mais ricos no proprio payload ou no mapper do frontend;
-- semantica visual mais forte para video, duracao e estado de replay;
-- ligacao ainda mais direta entre previsao, snapshot ao vivo e detalhe operacional.
+- origem e badges agora vivem num mapper unico do frontend;
+- video, duracao e politica operacional agora aparecem de forma consistente em palco, timeline e detalhe;
+- a proxima pendencia real daqui para frente volta a ser monitor live mais autoritativo e plano dedicado de playback.
 
 ## Icones de origem
 
@@ -2242,6 +2242,44 @@ Leitura:
 - a base atual do cockpit esta verde para seguir evoluindo;
 - a trilha de video atual continua caracterizada por testes reais;
 - isso reduz risco de misturar a proxima fase de monitor autoritativo com regressao de playback atual.
+
+## Atualizacao de validacao em 2026-04-10
+
+Depois de ajustes externos ao bloco original do cockpit, o estado real ficou assim:
+
+- `puzzle` agora e layout oficial no backend e no manager, com `theme_config` proprio e sem depender do gate legado;
+- o manager ganhou cobertura real para controles de `puzzle`, persistencia de `theme_config` sem dirty state infinito e prefetch da simulacao por `theme fingerprint`;
+- o diagnostico agora conhece runtime de video mais fino e contadores de `board`, incluindo motivo de downgrade operacional;
+- o frontend do modulo `Wall` continua verde nesta data;
+- o backend do fluxo principal do cockpit continua verde nos testes direcionados, mas a regressao ampla `--filter=Wall` deixou de ficar 100% verde por duas falhas no pipeline de variantes de video.
+
+Testes direcionados executados nesta atualizacao:
+
+- backend:
+  - `cd apps/api && php artisan test --filter=WallDiagnosticsTest`
+  - `9` testes passando
+  - `cd apps/api && php artisan test --filter=WallInsightsTest`
+  - `7` testes passando
+  - `cd apps/api && php artisan test --filter=WallLiveSnapshotTest`
+  - `7` testes passando
+  - `cd apps/api && php artisan test --filter=WallOptionsPuzzleLayoutTest`
+  - `2` testes passando
+  - `cd apps/api && php artisan test --filter=WallSettingsThemeConfigTest`
+  - `3` testes passando
+- frontend:
+  - `cd apps/web && npm run test -- src/modules/wall/pages/EventWallManagerPage.test.tsx src/modules/wall/components/manager/diagnostics/WallPlayerRuntimeCard.test.tsx src/modules/wall/wall-query-options.test.ts src/modules/wall/player/hooks/useStageGeometry.test.ts src/modules/wall/player/themes/puzzle/PuzzleLayout.test.tsx src/modules/wall/player/themes/puzzle/premium-motion.test.tsx`
+  - `29` testes passando
+  - `cd apps/web && npm run test -- src/modules/wall`
+  - `299` testes passando
+  - `cd apps/web && npm run type-check`
+  - sem erros
+
+Pendencia real aberta por esta rodada:
+
+- `cd apps/api && php artisan test --filter=Wall` falhou com `2` testes do pipeline de variantes de video:
+  - `Tests\\Unit\\Modules\\MediaProcessing\\MediaVariantGeneratorServiceTest`
+  - `Tests\\Feature\\MediaProcessing\\MediaPipelineJobsTest`
+- isso nao reabre a sprint do cockpit em si, mas reabre o baseline backend wall-adjacent como item tecnico a corrigir antes de chamar o pacote inteiro de `100% verde`.
 
 ### Ordem recomendada desta continuidade
 
