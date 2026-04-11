@@ -49,4 +49,28 @@ describe('useQRDraggable', () => {
     const { result } = renderHook(() => useQRDraggable('TEST123', false));
     expect(result.current.handlers.style).toEqual({});
   });
+
+  it('currently does not clamp drag movement to viewport bounds', () => {
+    const { result } = renderHook(() => useQRDraggable('TEST123', true));
+
+    act(() => {
+      result.current.handlers.onPointerDown?.({
+        clientX: 10,
+        clientY: 20,
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+        pointerId: 1,
+        target: { setPointerCapture: vi.fn() },
+      } as any);
+    });
+
+    act(() => {
+      result.current.handlers.onPointerMove?.({
+        clientX: 5000,
+        clientY: 4000,
+      } as any);
+    });
+
+    expect(result.current.position).toEqual({ x: 4990, y: 3980 });
+  });
 });

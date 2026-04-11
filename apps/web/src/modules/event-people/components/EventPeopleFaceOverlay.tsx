@@ -31,7 +31,7 @@ export function EventPeopleFaceOverlay({
       <div className="flex min-h-[320px] items-center justify-center rounded-3xl border border-border/60 bg-muted text-muted-foreground">
         <div className="flex flex-col items-center gap-3 text-center">
           <ImageIcon className="h-10 w-10" />
-          <p className="text-sm">Overlay de rostos disponivel apenas para imagens.</p>
+          <p className="text-sm">A marcacao dos rostos aparece apenas em imagens.</p>
         </div>
       </div>
     );

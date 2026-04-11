@@ -30,6 +30,7 @@ import { eventPeopleApi } from '@/modules/event-people/api';
 import { EventPeopleFaceOverlay } from '@/modules/event-people/components/EventPeopleFaceOverlay';
 import { EventPeopleIdentitySheet } from '@/modules/event-people/components/EventPeopleIdentitySheet';
 import { EventPeopleReviewInboxCard } from '@/modules/event-people/components/EventPeopleReviewInboxCard';
+import { formatEventPersonReviewStatus } from '@/modules/event-people/labels';
 import type {
   EventMediaFacePeople,
   EventPerson,
@@ -389,7 +390,7 @@ export default function MediaPage() {
 
       toast({
         title: variables.payload.person ? 'Pessoa criada localmente' : 'Confirmacao salva localmente',
-        description: 'A mudanca ja refletiu no painel. O sync remoto segue na fila assíncrona.',
+        description: 'A mudanca ja apareceu no painel. O restante continua sendo atualizado na fila.',
       });
     },
     onError: (error) => {
@@ -420,7 +421,7 @@ export default function MediaPage() {
 
       toast({
         title: 'Item tratado localmente',
-        description: 'A inbox foi atualizada sem depender do sync remoto.',
+        description: 'A fila foi atualizada na hora.',
       });
     },
     onError: (error) => {
@@ -448,7 +449,7 @@ export default function MediaPage() {
 
       toast({
         title: 'Identidade reaberta localmente',
-        description: 'O rosto voltou para revisao e o sync remoto continua fora do hot path.',
+        description: 'O rosto voltou para revisao. O restante continua na fila.',
       });
     },
     onError: (error) => {
@@ -783,21 +784,21 @@ export default function MediaPage() {
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <p className="text-sm font-semibold">Rostos detectados</p>
-                        <p className="text-xs text-muted-foreground">Clique no overlay ou selecione um rosto abaixo para abrir o fluxo “Quem e esta pessoa?”.</p>
+                        <p className="text-xs text-muted-foreground">Clique na marcacao da foto ou escolha um rosto abaixo para revisar quem aparece nela.</p>
                       </div>
-                      {isIdentityMutationPending ? <Badge variant="secondary">Atualizacao local em andamento</Badge> : null}
+                      {isIdentityMutationPending ? <Badge variant="secondary">Atualizando painel</Badge> : null}
                     </div>
 
                     {mediaFacesQuery.isLoading ? (
                       <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Carregando overlay de rostos...
+                        Carregando marcacoes dos rostos...
                       </div>
                     ) : null}
 
                     {mediaFacesQuery.isError ? (
                       <div className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm text-destructive">
-                        Nao foi possivel carregar o overlay de rostos desta midia.
+                        Nao foi possivel carregar as marcacoes dos rostos desta midia.
                       </div>
                     ) : null}
 
@@ -826,7 +827,7 @@ export default function MediaPage() {
                                 </p>
                               </div>
                               <Badge variant={face.review_item?.status === 'conflict' ? 'destructive' : 'outline'}>
-                                {face.review_item?.status || 'overlay'}
+                                {formatEventPersonReviewStatus(face.review_item?.status)}
                               </Badge>
                             </div>
                           </button>
@@ -841,8 +842,8 @@ export default function MediaPage() {
                   <MediaStatusBadge status={selectedMediaPreview.status as never} />
                   <ChannelBadge channel={selectedMediaPreview.channel as never} />
                   {selectedMediaPreview.is_duplicate_candidate ? <Badge variant="secondary">Duplicada</Badge> : null}
-                  {selectedMediaPreview.event_face_search_enabled ? <Badge variant="secondary">Face search ativo</Badge> : null}
-                  {selectedMediaPreview.event_allow_public_selfie_search ? <Badge variant="secondary">Selfie publica</Badge> : null}
+                  {selectedMediaPreview.event_face_search_enabled ? <Badge variant="secondary">Busca facial ativa</Badge> : null}
+                  {selectedMediaPreview.event_allow_public_selfie_search ? <Badge variant="secondary">Selfie liberada</Badge> : null}
                 </div>
                 <div className="grid gap-3 rounded-3xl border border-border/60 bg-background/80 p-4 text-sm">
                   <div><p className="text-xs uppercase tracking-wide text-muted-foreground">Evento</p><p className="mt-1 font-medium">{selectedMediaPreview.event_title || 'Nao informado'}</p></div>
@@ -891,8 +892,8 @@ export default function MediaPage() {
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {selectedFace.current_assignment?.person
-                            ? 'Use o drawer para corrigir, reabrir ou consolidar a identidade.'
-                          : 'Abra o drawer para confirmar a pessoa ou criar uma nova entrada.'}
+                            ? 'Use o painel lateral para corrigir, reabrir ou consolidar a identidade.'
+                          : 'Abra o painel lateral para confirmar a pessoa ou criar um novo cadastro.'}
                         </p>
                       </div>
                       <Button type="button" size="sm" onClick={() => openFaceIdentity(selectedFace)}>

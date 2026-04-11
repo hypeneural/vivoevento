@@ -41,7 +41,7 @@ function renderPage(initialEntry = '/events/42/people') {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[initialEntry]}>
+      <MemoryRouter initialEntries={[initialEntry]} future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
         <Routes>
           <Route path="/events/:id/people" element={<EventPeoplePage />} />
         </Routes>
@@ -145,7 +145,7 @@ describe('EventPeoplePage', () => {
     expect(await screen.findByText('Pessoas de Casamento Ana e Pedro')).toBeInTheDocument();
     expect(screen.getByText('Mae da noiva')).toBeInTheDocument();
     expect(await screen.findByText('Conjuge de')).toBeInTheDocument();
-    expect(screen.getAllByText('synced').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Sincronizado').length).toBeGreaterThan(0);
     expect(screen.getByText('Casal principal')).toBeInTheDocument();
   });
 

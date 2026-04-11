@@ -2373,6 +2373,82 @@ Leitura pratica:
 - a noiva, cerimonial ou operador conseguem editar entrada, moderacao e automacao sem cair imediatamente no editor tecnico completo;
 - a page ainda evita prometer liberdade total: cada node continua preso ao que o backend realmente suporta.
 
+## Templates guiados locais em `2026-04-11`
+
+A `Tarefa 3.6` foi fechada em cima do mesmo principio da arquitetura:
+
+- o backend continua sendo a fonte de verdade do estado salvo;
+- o frontend pode projetar um estado local temporario para explicar a mudanca antes do save;
+- o template nao vira automacao escondida nem mutacao silenciosa.
+
+Entrega realizada:
+
+- `apps/web/src/modules/events/journey/buildJourneyTemplatePreview.ts` passou a concentrar catalogo, patch, diff humano e preview de projection;
+- `apps/web/src/modules/events/journey/JourneyTemplateRail.tsx` entrou como trilho guiado acima do canvas;
+- os `6` templates da V1 ja funcionam sobre o estado atual do evento:
+  - `Aprovacao direta`;
+  - `Revisao manual`;
+  - `IA moderando`;
+  - `Hibrido IA + humano`;
+  - `Evento social simples`;
+  - `Evento corporativo controlado`;
+- a page passou a calcular `effectiveProjection`, trocando resumo, simulador e canvas para o preview local do template antes do save real;
+- o save do template continua usando a mutation agregada `updateEventJourneyBuilder`, seguido de `invalidateQueries` e projection revalidada;
+- o inspector agora recebe `templateDraftPreview` e trava edicao manual enquanto existe um template em rascunho;
+- Safety e MediaIntelligence detalhados tambem recebem merge local do patch do template, para o preview ficar coerente com o restante da tela.
+
+Decisao importante de UX:
+
+- o template nao salva sozinho;
+- o usuario compara o diff primeiro;
+- confirma a aplicacao ao rascunho;
+- ve o resultado no canvas e no resumo;
+- so depois usa `Salvar template`.
+
+Isso manteve a direcao correta do produto:
+
+- continua parecendo um builder guiado;
+- nao abre liberdade total de n8n logo de cara;
+- deixa claro o que mudou;
+- reduz medo de errar para noiva, cerimonialista e operador.
+
+Regra de capability preservada:
+
+- templates nao ativam capability indisponivel;
+- quando `wall` nao esta liberado por pacote ou modulo, o diff entra como `Nao aplicado`;
+- isso impede a V1 de prometer um caminho que o entitlement real nao sustenta.
+
+Tradeoff tecnico:
+
+- o preview do template hoje reconstroi um subconjunto relevante da projection no frontend para manter `summary`, `nodes`, `branches` e `warnings` coerentes;
+- isso foi suficiente para a V1 porque os templates alteram um conjunto controlado de settings;
+- se a projection ficar muito mais rica no futuro, vale considerar um endpoint server-side de `preview patch` para reduzir a logica espelhada no cliente.
+
+## Validacao oficial usada nesta etapa em `2026-04-11`
+
+### shadcn/ui alert dialog
+
+Foi revalidado na documentacao oficial que `AlertDialog` continua sendo o componente certo para confirmacao explicita antes de aplicar um template ao rascunho local:
+
+- https://ui.shadcn.com/docs/components/alert-dialog
+
+## Bateria adicional validada nesta etapa
+
+Comandos executados:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/buildJourneyTemplatePreview.test.ts src/modules/events/journey/__tests__/JourneyTemplateRail.test.tsx src/modules/events/journey/__tests__/EventJourneyBuilderPage.test.tsx src/modules/events/journey/__tests__/JourneyInspector.test.tsx
+npm run test -- src/modules/events
+npm run type-check
+```
+
+Resultado:
+
+- `17` testes passaram na bateria focada `template preview + rail + page + inspector`;
+- `89` testes passaram na regressao ampliada do modulo `events`;
+- `type-check` passou sem erros.
+
 ## Validacao oficial usada nesta etapa em `2026-04-11`
 
 ### shadcn/ui drawer e sheet

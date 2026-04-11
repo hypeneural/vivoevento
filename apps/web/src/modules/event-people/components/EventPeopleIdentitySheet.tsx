@@ -20,6 +20,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { queryKeys } from '@/lib/query-client';
 
 import { eventPeopleApi } from '../api';
+import {
+  EVENT_PERSON_SIDE_OPTIONS,
+  EVENT_PERSON_TYPE_OPTIONS,
+  formatEventPersonAssignmentStatus,
+  formatEventPersonMeta,
+  formatEventPersonQualityTier,
+  formatEventPersonReviewStatus,
+} from '../labels';
 import type {
   EventMediaFacePeople,
   EventPeopleCreatePayload,
@@ -28,25 +36,6 @@ import type {
   EventPersonSide,
   EventPersonType,
 } from '../types';
-
-const PERSON_TYPE_OPTIONS: Array<{ value: EventPersonType; label: string }> = [
-  { value: 'guest', label: 'Convidado' },
-  { value: 'bride', label: 'Noiva' },
-  { value: 'groom', label: 'Noivo' },
-  { value: 'mother', label: 'Mae' },
-  { value: 'father', label: 'Pai' },
-  { value: 'friend', label: 'Amigo(a)' },
-  { value: 'vendor', label: 'Fornecedor' },
-  { value: 'staff', label: 'Equipe' },
-];
-
-const PERSON_SIDE_OPTIONS: Array<{ value: EventPersonSide; label: string }> = [
-  { value: 'neutral', label: 'Neutro' },
-  { value: 'bride_side', label: 'Lado da noiva' },
-  { value: 'groom_side', label: 'Lado do noivo' },
-  { value: 'host_side', label: 'Lado anfitriao' },
-  { value: 'company_side', label: 'Lado empresa' },
-];
 
 export interface EventPeopleIdentitySheetProps {
   open: boolean;
@@ -187,8 +176,8 @@ export function EventPeopleIdentitySheet({
               <Badge variant={isConflict ? 'destructive' : 'outline'}>
                 {isConflict ? 'Conflito de identidade' : 'Confirmacao guiada'}
               </Badge>
-              {reviewItem?.status ? <Badge variant="secondary">{reviewItem.status}</Badge> : null}
-              {face?.quality.tier ? <Badge variant="outline">{face.quality.tier}</Badge> : null}
+                {reviewItem?.status ? <Badge variant="secondary">{formatEventPersonReviewStatus(reviewItem.status)}</Badge> : null}
+              {face?.quality.tier ? <Badge variant="outline">{formatEventPersonQualityTier(face.quality.tier)}</Badge> : null}
             </div>
             <SheetTitle className="mt-2">Quem e esta pessoa?</SheetTitle>
             <SheetDescription>
@@ -223,7 +212,7 @@ export function EventPeopleIdentitySheet({
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">BBox</p>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Tamanho do rosto</p>
                     <p className="mt-1 font-medium">
                       {Math.round(face.bbox.w * 100)}% × {Math.round(face.bbox.h * 100)}%
                     </p>
@@ -244,7 +233,7 @@ export function EventPeopleIdentitySheet({
                         id="event-people-search"
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
-                        placeholder="Digite o nome para filtrar localmente"
+                        placeholder="Digite o nome da pessoa"
                       />
                     </div>
 
@@ -282,7 +271,7 @@ export function EventPeopleIdentitySheet({
                                   <div>
                                     <p className="font-medium">{person.display_name}</p>
                                     <p className="text-xs text-muted-foreground">
-                                      {[person.type, person.side].filter(Boolean).join(' • ') || 'Pessoa ativa do evento'}
+                                  {formatEventPersonMeta(person, 'Pessoa ativa do evento')}
                                     </p>
                                   </div>
                                   {selected ? <Badge>Selecionada</Badge> : null}
@@ -318,7 +307,7 @@ export function EventPeopleIdentitySheet({
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {PERSON_TYPE_OPTIONS.map((option) => (
+                            {EVENT_PERSON_TYPE_OPTIONS.map((option) => (
                               <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                             ))}
                           </SelectContent>
@@ -331,7 +320,7 @@ export function EventPeopleIdentitySheet({
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {PERSON_SIDE_OPTIONS.map((option) => (
+                            {EVENT_PERSON_SIDE_OPTIONS.map((option) => (
                               <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                             ))}
                           </SelectContent>
@@ -361,7 +350,7 @@ export function EventPeopleIdentitySheet({
                         Identidades concorrentes para o mesmo rosto
                       </div>
                       <p className="mt-2 text-muted-foreground">
-                        Revise as pessoas candidatas e defina quem deve absorver a identidade final.
+                        Revise as pessoas abaixo e escolha qual cadastro deve continuar.
                       </p>
                     </div>
 
@@ -370,7 +359,7 @@ export function EventPeopleIdentitySheet({
                         <div key={candidate.id} className="rounded-2xl border border-border/60 bg-background/80 px-3 py-3">
                           <p className="font-medium">{candidate.display_name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {[candidate.assignment_status, candidate.type, candidate.side].filter(Boolean).join(' • ') || 'Candidata ao merge'}
+                            {[formatEventPersonAssignmentStatus(candidate.assignment_status), formatEventPersonMeta(candidate, '')].filter(Boolean).join(' - ') || 'Candidata ao ajuste'}
                           </p>
                         </div>
                       ))}
@@ -420,7 +409,7 @@ export function EventPeopleIdentitySheet({
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button type="button" variant="outline" disabled={!reviewItem || activeAction} onClick={onIgnore}>
                   {pendingAction === 'ignore' ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanFace className="h-4 w-4" />}
-                  Marcar irrelevante
+                  Ignorar rosto
                 </Button>
                 <Button
                   type="button"
@@ -429,13 +418,13 @@ export function EventPeopleIdentitySheet({
                   onClick={onSplit}
                 >
                   {pendingAction === 'split' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Split className="h-4 w-4" />}
-                  Reabrir identidade
+                  Reabrir revisao
                 </Button>
               </div>
               {isTabPending ? (
                 <div className="flex items-center text-xs text-muted-foreground">
                   <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                  Ajustando painel
+                  Atualizando painel
                 </div>
               ) : null}
             </div>

@@ -20,6 +20,47 @@ Documento base:
 
 ---
 
+## Status da execucao inicial em 2026-04-11
+
+### Fase 0
+
+- [x] instalar e travar `qr-code-styling@1.9.2` no `apps/web`
+- [x] validar import real da lib no setup atual
+- [x] validar `append`, `update` e `getRawData('svg')` em spike com `jsdom`
+- [x] criar wrapper local minimo `qrCodeStylingDriver.ts`
+- [x] rodar `npm run test -- src/modules/qr-code/support`
+- [x] rodar `npm run type-check`
+
+### Blindagem inicial do schema e adapter
+
+- [x] criar `qrTypes.ts`
+- [x] criar `qrDefaults.ts`
+- [x] criar `qrSchemaMigrator.ts`
+- [x] criar `qrSchemaNormalizer.ts`
+- [x] criar `qrGuardrails.ts`
+- [x] criar `qrOptionsBuilder.ts`
+- [x] cobrir schema/adapter/wrapper com testes puros
+- [ ] integrar essa camada ao editor lazy-load
+- [ ] conectar persistencia backend
+
+### Resultado automatizado desta rodada
+
+Comandos executados:
+
+```bash
+cd apps/web
+npm run test -- src/modules/qr-code/support
+npm run type-check
+```
+
+Resultado:
+
+- `6` arquivos de teste passaram;
+- `12` testes passaram;
+- `type-check` passou.
+
+---
+
 ## Resultado dos testes executados antes do plano
 
 ## Frontend

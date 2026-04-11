@@ -1492,6 +1492,24 @@ No backend Laravel, vale expor:
 
 ## Melhor fluxo de produto para usuario leigo
 
+## Diretriz de linguagem no frontend
+
+As superficies operacionais de `EventPeople` devem falar a lingua do operador, nao a lingua da stack.
+
+Isso significa:
+
+- labels, badges, tabs e CTAs em portugues;
+- tipos como `bride`, `groom`, `groomsman`, `bridesmaid` e `vendor` aparecem como `noiva`, `noivo`, `padrinho`, `madrinha` e `fornecedor`;
+- estados tecnicos como `pending`, `synced`, `failed` e `skipped` aparecem como `pendente`, `na fila`, `falhou` e `ignorado`;
+- a interface nao deve expor `AWS`, `representatives`, `user vectors`, `provider`, `hot path`, `sync remoto` ou linguagem equivalente;
+- a interface deve falar de `fotos de referencia`, `pessoas do evento`, `relacoes importantes`, `fila de revisao` e `atualizando painel`.
+
+Implicacao pratica:
+
+- a AWS continua existindo no backend, na fila e na observabilidade;
+- o frontend fica provider-agnostic e centrado na tarefa humana;
+- a complexidade tecnica nao aparece para cerimonialista, noivos ou operador leigo.
+
 ## No cadastro do evento
 
 Continuar simples:

@@ -51,7 +51,7 @@ export function EventPeopleReviewInboxCard({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">Fase 1</Badge>
+            <Badge variant="outline">Revisao guiada</Badge>
             {pendingCount > 0 ? <Badge variant="outline">{pendingCount} pendentes</Badge> : null}
             {conflictCount > 0 ? <Badge variant="destructive">{conflictCount} conflitos</Badge> : null}
             {isPendingUi ? <Badge variant="secondary">Atualizando localmente</Badge> : null}
@@ -60,7 +60,7 @@ export function EventPeopleReviewInboxCard({
             <p className="text-lg font-semibold">Organizar pessoas do evento</p>
             <p className="text-sm text-muted-foreground">
               {eventName
-                ? `Inbox priorizada de revisao para ${eventName}.`
+                ? `Revise os rostos que ainda precisam de nome ou ajuste em ${eventName}.`
                 : 'Selecione um evento para revisar os rostos detectados e nomear as pessoas.'}
             </p>
           </div>
@@ -76,7 +76,7 @@ export function EventPeopleReviewInboxCard({
           <div className="rounded-2xl border border-border/50 bg-background/60 p-3">
             <div className="flex items-center gap-2 text-muted-foreground">
               <UsersRound className="h-4 w-4" />
-              <span>Itens ativos</span>
+              <span>Na fila</span>
             </div>
             <p className="mt-2 text-2xl font-semibold">{items.length}</p>
           </div>
@@ -129,7 +129,7 @@ export function EventPeopleReviewInboxCard({
                     <p className="font-medium">{item.payload.question || 'Quem e esta pessoa?'}</p>
                     <p className="text-sm text-muted-foreground">
                       Midia #{item.face?.event_media_id ?? item.payload.event_media_id ?? 'n/a'}
-                      {item.person?.display_name ? ` • atual: ${item.person.display_name}` : ''}
+                      {item.person?.display_name ? ` - atual: ${item.person.display_name}` : ''}
                     </p>
                   </div>
 
@@ -146,10 +146,10 @@ export function EventPeopleReviewInboxCard({
                   <div className="mt-4 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       {isConflict ? <AlertTriangle className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-                      <span>{isConflict ? 'Revisao de identidade' : 'Confirmacao guiada'}</span>
+                      <span>{isConflict ? 'Precisa de ajuste' : 'Pronto para confirmar'}</span>
                     </div>
                     <Button type="button" size="sm" onClick={() => onOpenItem(item)}>
-                      {isConflict ? 'Revisar conflito' : 'Quem e esta pessoa?'}
+                      {isConflict ? 'Resolver agora' : 'Quem e esta pessoa?'}
                       <ArrowUpRight className="h-4 w-4" />
                     </Button>
                   </div>

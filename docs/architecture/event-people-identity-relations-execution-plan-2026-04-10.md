@@ -1658,6 +1658,7 @@ npx.cmd vitest run src/modules/event-people/components/CerimonialistaFlow.test.t
 - [x] criar observabilidade minima
 - [x] configurar tags Horizon e thresholds das filas `event-people-*`
 - [x] definir partial indexes e unique partial indexes da V1
+- [x] padronizar copy do frontend em portugues e esconder termos tecnicos da stack
 - [ ] explicitar governanca de retention e limpeza AWS
 - [x] garantir `afterCommit`, jobs unicos e jobs criptografados onde couber
 - [x] explicitar regras de `useDeferredValue` e `useTransition` nas telas quentes
@@ -1784,6 +1785,31 @@ Pendente apos esta rodada:
 - documentar runbook de reprocessamento, ressync, fallback e limpeza de evento;
 - seguir para grupos sociais, coverage intelligence, momentos e entregas por relacao;
 - endurecer a camada guest-facing e a trilha de produto emocional acima do dominio local ja entregue.
+
+---
+
+### 2026-04-11 - Polimento de linguagem e UX do frontend concluido
+
+Concluido:
+
+- pagina dedicada de pessoas, inbox de revisao, overlay da midia e painel de identidade revisados com copy 100% em portugues;
+- labels de tipo, lado, status, relacao, fila e sincronizacao mapeados para termos humanos e consistentes;
+- termos tecnicos como `AWS`, `representatives`, `hot path`, `sync remoto` e enums crus deixaram de aparecer nas superficies operacionais;
+- estados e acoes foram simplificados para linguagem de tarefa humana, como `Quem e esta pessoa?`, `Relacoes importantes`, `Fotos de referencia`, `Atualizando painel` e `Na fila`;
+- os icones e cards principais da pagina dedicada passaram a reforcar leitura humana: pessoa, fotos encontradas, fotos de referencia e relacoes importantes;
+- `MediaPage` e o fluxo guiado continuam locais e defensivos, mas sem vazar linguagem de provider para o operador.
+
+Bateria executada:
+
+- `cd apps/web && npx.cmd vitest run src/modules/event-people/EventPeoplePage.test.tsx src/modules/event-people/components/EventPeopleIdentitySheet.test.tsx src/modules/event-people/components/EventPeopleFaceOverlay.test.tsx src/modules/media/MediaPage.test.tsx` -> `4 files passed`, `8 tests passed`
+- `cd apps/web && npx.cmd vitest run src/modules/event-people/EventPeoplePage.test.tsx src/modules/event-people/components/EventPeopleIdentitySheet.test.tsx src/modules/event-people/components/EventPeopleFaceOverlay.test.tsx src/modules/media/MediaPage.test.tsx src/modules/face-search/components/FaceSearchSearchPanel.test.tsx src/modules/face-search/components/EventFaceSearchSearchCard.test.tsx src/modules/face-search/PublicFaceSearchPage.test.tsx src/modules/events/face-search-status.test.ts src/modules/events/components/face-search/EventFaceSearchSettingsForm.test.tsx src/modules/events/components/face-search/EventFaceSearchSettingsCard.test.tsx src/modules/events/EventDetailPage.test.tsx` -> `11 files passed`, `28 tests passed`
+- `cd apps/web && npm run type-check` -> `tsc --noEmit` verde
+
+Pendente apos esta rodada:
+
+- manter essa diretriz de linguagem nas proximas fases de grupos, coverage, momentos e guest-facing;
+- explicitar retention/limpeza AWS e runbook operacional fora da superficie do operador;
+- continuar a evolucao do produto em cobertura e entregas emocionais, sem reintroduzir copy tecnica no frontend.
 
 ---
 

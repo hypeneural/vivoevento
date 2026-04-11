@@ -41,4 +41,23 @@ describe('BrandingOverlay', () => {
 
     expect(screen.queryByText('Envie sua foto')).not.toBeInTheDocument();
   });
+
+  it('renders the current qr overlay as a passive layer without operator controls', () => {
+    const { container } = render(
+      <BrandingOverlay
+        showBranding={true}
+        showQr={true}
+        qrUrl="https://eventovivo.com.br/u/evento"
+        showNeon={false}
+        neonText={null}
+        neonColor={null}
+        partnerLogoUrl={null}
+        showSenderCredit={false}
+        senderCredit={null}
+      />,
+    );
+
+    expect(container.querySelector('button')).not.toBeInTheDocument();
+    expect(container.firstElementChild?.className).toContain('pointer-events-none');
+  });
 });

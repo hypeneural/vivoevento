@@ -392,6 +392,58 @@ Ela precisa apenas:
 - facilitar testes puros;
 - reduzir custo de migracao futura.
 
+## Spike real executado em 2026-04-11
+
+O spike inicial da dependencia foi executado no `apps/web` e confirmou que a trilha escolhida e viavel no setup atual.
+
+Resultado validado:
+
+- `qr-code-styling@1.9.2` foi instalado e travado com versao exata no `package.json`;
+- a leitura do `node_modules/qr-code-styling/package.json` confirmou `version = 1.9.2`;
+- o import real da lib funcionou no ambiente atual;
+- um spike em `jsdom` validou:
+  - `new QRCodeStyling(...)`
+  - `append(container)`
+  - `update(options)`
+  - `getRawData('svg')`
+- o retorno de `getRawData('svg')` veio como `Blob` no browser test environment;
+- nao foi necessario workaround extra no `vite.config.ts` para esse primeiro passo.
+
+Saida pratica do spike:
+
+- wrapper local minimo criado em `apps/web/src/modules/qr-code/support/qrCodeStylingDriver.ts`;
+- camada inicial de contrato criada em:
+  - `qrTypes.ts`
+  - `qrDefaults.ts`
+  - `qrSchemaMigrator.ts`
+  - `qrSchemaNormalizer.ts`
+  - `qrGuardrails.ts`
+  - `qrOptionsBuilder.ts`
+
+Teste automatizado que comprovou o spike:
+
+```bash
+cd apps/web
+npm run test -- src/modules/qr-code/support
+```
+
+Resultado:
+
+- `6` arquivos passaram;
+- `12` testes passaram;
+- o teste de smoke da lib real validou runtime e exportacao `svg`.
+
+Comando complementar:
+
+```bash
+cd apps/web
+npm run type-check
+```
+
+Resultado:
+
+- `type-check` passou.
+
 ---
 
 ## Por que `qrcode.react` nao resolve esse caso

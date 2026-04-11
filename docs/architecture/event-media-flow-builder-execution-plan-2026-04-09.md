@@ -1936,6 +1936,39 @@ cd apps/web
 npm run test -- src/modules/events/journey/__tests__/JourneyTemplateRail.test.tsx
 ```
 
+Status em `2026-04-11`:
+
+- [x] `apps/web/src/modules/events/journey/buildJourneyTemplatePreview.ts` foi criado como camada local de templates, diff humano e preview de projection;
+- [x] os `6` templates da V1 entraram no catalogo local: `Aprovacao direta`, `Revisao manual`, `IA moderando`, `Hibrido IA + humano`, `Evento social simples` e `Evento corporativo controlado`;
+- [x] `apps/web/src/modules/events/journey/JourneyTemplateRail.tsx` foi criado para listar templates, abrir comparacao e controlar o rascunho local;
+- [x] cada template agora abre confirmacao antes de aplicar patch no rascunho;
+- [x] o template muda `summary`, `scenarios` e `canvas` localmente via `effectiveProjection`, sem salvar automaticamente;
+- [x] o save real continua centralizado em `updateEventJourneyBuilder`, seguido de `invalidateQueries` e projection revalidada;
+- [x] templates nao ativam capability indisponivel: quando `wall` esta bloqueado pelo pacote ou modulo, o diff aparece como `Nao aplicado`;
+- [x] o inspector passou a receber `templateDraftPreview` e bloqueia edicao manual enquanto o rascunho do template estiver ativo;
+- [x] Safety e MediaIntelligence reaproveitados no inspector tambem enxergam o patch local do template para preview antes do save;
+- [x] o usuario consegue descartar o rascunho do template antes de persistir qualquer mudanca.
+
+Validacao oficial usada nesta etapa em `2026-04-11`:
+
+- `AlertDialog` do shadcn/ui para confirmacao explicita antes de aplicar o patch local:
+  - https://ui.shadcn.com/docs/components/alert-dialog
+
+Bateria validada em `2026-04-11`:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/buildJourneyTemplatePreview.test.ts src/modules/events/journey/__tests__/JourneyTemplateRail.test.tsx src/modules/events/journey/__tests__/EventJourneyBuilderPage.test.tsx src/modules/events/journey/__tests__/JourneyInspector.test.tsx
+npm run test -- src/modules/events
+npm run type-check
+```
+
+Resultado:
+
+- `17` testes passaram na bateria focada `template preview + rail + page + inspector`;
+- `89` testes passaram na regressao ampliada do modulo `events`;
+- `type-check` passou sem erros.
+
 ### Tarefa 3.7 - Criar simulador de cenarios
 
 Subtarefas:
