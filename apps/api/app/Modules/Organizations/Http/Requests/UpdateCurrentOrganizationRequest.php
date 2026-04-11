@@ -3,6 +3,7 @@
 namespace App\Modules\Organizations\Http\Requests;
 
 use App\Modules\Organizations\Support\CurrentOrganizationAccess;
+use App\Modules\Organizations\Services\OrganizationBrandingEntitlementService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -39,5 +40,27 @@ class UpdateCurrentOrganizationRequest extends FormRequest
                 Rule::unique('organizations', 'custom_domain')->ignore($organization?->id),
             ],
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            if ($validator->errors()->isNotEmpty() || ! $this->filled('custom_domain')) {
+                return;
+            }
+
+            $organization = $this->user()?->currentOrganization();
+
+            if (! $organization) {
+                return;
+            }
+
+            if (! app(OrganizationBrandingEntitlementService::class)->canUseCustomDomain($organization)) {
+                $validator->errors()->add(
+                    'custom_domain',
+                    'Dominio proprio depende de um plano com white-label ou dominio customizado.'
+                );
+            }
+        });
     }
 }

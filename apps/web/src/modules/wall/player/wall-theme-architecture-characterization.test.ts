@@ -94,9 +94,13 @@ describe('wall theme architecture characterization', () => {
     expect(playerSource).not.toContain('useTransition');
   });
 
-  it('already uses ResizeObserver in the manager preview and placeholderData in wall queries, but not prefetchQuery in the manager flow', () => {
+  it('uses ResizeObserver in preview and live stage geometry, plus placeholderData and prefetchQuery in the manager flow', () => {
     const previewSource = fs.readFileSync(
       path.resolve(__dirname, '../components/manager/stage/WallPreviewCanvas.tsx'),
+      'utf8',
+    );
+    const stageGeometrySource = fs.readFileSync(
+      path.resolve(__dirname, 'hooks/useStageGeometry.ts'),
       'utf8',
     );
     const queryOptionsSource = fs.readFileSync(
@@ -109,9 +113,11 @@ describe('wall theme architecture characterization', () => {
     );
 
     expect(previewSource).toContain('new ResizeObserver');
+    expect(stageGeometrySource).toContain('new ResizeObserver');
     expect(queryOptionsSource).toContain('placeholderData: previousData');
     expect(queryOptionsSource).toContain('placeholderData: previousLiveSnapshot');
-    expect(managerSource).not.toContain('prefetchQuery');
+    expect(queryOptionsSource).toContain('simulation');
+    expect(managerSource).toContain('prefetchQuery');
   });
 
   it('uses decode-based readiness both in proactive preload and in the generic wall asset probe pipeline, with a bounded warm window', () => {

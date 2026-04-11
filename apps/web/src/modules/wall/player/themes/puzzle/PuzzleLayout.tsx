@@ -1,3 +1,5 @@
+import { AnimatePresence, LayoutGroup } from 'framer-motion';
+
 import type { WallRuntimeItem } from '../../types';
 import { resolveStrongAnimationSlotIndexes } from '../board/board-utils';
 import type { WallLayoutRendererProps } from '../registry';
@@ -65,40 +67,50 @@ export function PuzzleLayout({
   );
   const usedVariants = Array.from(new Set(cells.map((cell) => cell.pieceVariant)));
   const anchorLabel = anchorMode === 'qr_prompt' ? 'Envie sua foto' : 'Evento Vivo';
+  const heroEnabled = settings.theme_config?.hero_enabled ?? true;
+  const heroMediaId = heroEnabled
+    ? cells.find((cell) => cell.media?.is_featured)?.media?.id ?? null
+    : null;
 
   return (
-    <div
-      className="puzzle-board"
-      data-preset={preset}
-      data-piece-count={pieceCount}
-    >
-      <svg width="0" height="0" aria-hidden="true">
-        <defs>
-          {usedVariants.map((variant) => (
-            <clipPath
-              key={variant}
-              id={resolvePuzzleClipPathId(variant)}
-              clipPathUnits="objectBoundingBox"
-            >
-              <path d={PUZZLE_SHAPE_PATHS[variant]} />
-            </clipPath>
-          ))}
-        </defs>
-      </svg>
+    <LayoutGroup id={`puzzle-board-${preset}`}>
+      <div
+        data-testid="puzzle-board"
+        className="puzzle-board"
+        data-preset={preset}
+        data-piece-count={pieceCount}
+      >
+        <svg width="0" height="0" aria-hidden="true">
+          <defs>
+            {usedVariants.map((variant) => (
+              <clipPath
+                key={variant}
+                id={resolvePuzzleClipPathId(variant)}
+                clipPathUnits="objectBoundingBox"
+              >
+                <path d={PUZZLE_SHAPE_PATHS[variant]} />
+              </clipPath>
+            ))}
+          </defs>
+        </svg>
 
-      {cells.map((cell) => (
-        <PuzzlePiece
-          key={`puzzle-piece-${cell.pieceIndex}-${cell.media?.id ?? 'anchor'}`}
-          pieceIndex={cell.pieceIndex}
-          pieceVariant={cell.pieceVariant}
-          media={cell.media}
-          isAnchor={cell.isAnchor}
-          anchorLabel={anchorLabel}
-          isStrongAnimation={cell.sourceSlotIndex != null && strongSlotIndexes.has(cell.sourceSlotIndex)}
-          reducedMotion={reducedMotion}
-        />
-      ))}
-    </div>
+        <AnimatePresence initial={false} mode="popLayout">
+          {cells.map((cell) => (
+            <PuzzlePiece
+              key={`puzzle-piece-${cell.pieceIndex}-${cell.media?.id ?? 'anchor'}`}
+              pieceIndex={cell.pieceIndex}
+              pieceVariant={cell.pieceVariant}
+              media={cell.media}
+              isAnchor={cell.isAnchor}
+              anchorLabel={anchorLabel}
+              isHero={Boolean(heroMediaId && cell.media?.id === heroMediaId)}
+              isStrongAnimation={cell.sourceSlotIndex != null && strongSlotIndexes.has(cell.sourceSlotIndex)}
+              reducedMotion={reducedMotion}
+            />
+          ))}
+        </AnimatePresence>
+      </div>
+    </LayoutGroup>
   );
 }
 

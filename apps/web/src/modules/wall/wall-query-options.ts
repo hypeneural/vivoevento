@@ -1,12 +1,18 @@
-import type { ApiWallInsightsResponse, ApiWallLiveSnapshotResponse } from '@/lib/api-types';
+import type {
+  ApiWallInsightsResponse,
+  ApiWallLiveSnapshotResponse,
+  ApiWallSimulationResponse,
+} from '@/lib/api-types';
 
 const previousData = (current: ApiWallInsightsResponse | undefined) => current;
 const previousLiveSnapshot = (current: ApiWallLiveSnapshotResponse | undefined) => current;
+const previousSimulation = (current: ApiWallSimulationResponse | undefined) => current;
 
 export const wallQueryOptions = {
   event: {
-    staleTime: 30 * 1000,
+    staleTime: 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    refetchOnReconnect: false,
   },
   options: {
     staleTime: Infinity,
@@ -14,8 +20,9 @@ export const wallQueryOptions = {
     refetchOnWindowFocus: false,
   },
   settings: {
-    staleTime: 30 * 1000,
+    staleTime: 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    refetchOnReconnect: false,
   },
   insights: {
     staleTime: 15 * 1000,
@@ -25,9 +32,10 @@ export const wallQueryOptions = {
     placeholderData: previousData,
   },
   diagnostics: {
-    staleTime: 0,
+    staleTime: 15 * 1000,
     gcTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   },
   liveSnapshot: {
     staleTime: 0,
@@ -35,5 +43,12 @@ export const wallQueryOptions = {
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
     placeholderData: previousLiveSnapshot,
+  },
+  simulation: {
+    staleTime: 15 * 1000,
+    gcTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    placeholderData: previousSimulation,
   },
 } as const;

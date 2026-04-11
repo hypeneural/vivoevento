@@ -46,6 +46,7 @@ apps/web/
 │   │   ├── clients/         # Gestão de clientes
 │   │   ├── dashboard/       # Dashboard principal
 │   │   ├── events/          # CRUD de eventos
+│   │   ├── event-team/      # Acessos e convites por evento
 │   │   ├── gallery/         # Galeria ao vivo
 │   │   ├── hub/             # Página do evento
 │   │   ├── media/           # Mídia recebida
@@ -175,6 +176,10 @@ Variáveis de ambiente com prefixo `VITE_` ficam disponíveis via `import.meta.e
 | `settings` | — | 🟡 UI pronta |
 
 > **Status UI pronta**: interface visual pronta. Alguns modulos ainda usam dados mockados; `partners` ja usa API real para listagem, filtros, detalhe e operacoes administrativas.
+
+Atualizacao:
+
+- `events/:id/access` agora usa o modulo `event-team` com API real para equipe ativa, convites pendentes, reenvio, revogacao e aceite publico por token.
 
 ---
 

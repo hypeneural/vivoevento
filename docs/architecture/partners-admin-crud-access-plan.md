@@ -107,7 +107,7 @@ Observacao de produto:
   - eventos, clientes, staff, grants e activity no detalhe.
 - `/settings` ganhou persistencia real para organizacao e branding.
 - `/settings` ganhou upload real de logo/ativos de branding via `POST /organizations/current/branding/logo`.
-- `/settings` ganhou CRUD funcional de equipe via `organizations/current/team`.
+- `/settings` ganhou fluxo real de equipe com convites pendentes, aceite posterior e remocao segura via `organizations/current/team` e `organizations/current/team/invitations`.
 - `/settings` ganhou persistencia real da aba `Preferencias` via `PATCH /auth/me`.
 - As abas de `/settings` voltaram a alternar visualmente o conteudo ativo no frontend.
 - `Permissoes` e `Integracoes` em `/settings` ficaram restritas a `super-admin`.
@@ -158,7 +158,7 @@ O CRUD deve:
 - [x] Trocar a equipe mockada de `settings` por leitura real via `/organizations/current/team`.
 - [x] Implementar persistencia real dos saves de organizacao e branding em `settings`.
 - [x] Implementar upload real de logo/ativos de branding em `settings`.
-- [x] Implementar CRUD funcional de equipe em `settings`, incluindo convite e remocao segura.
+- [x] Implementar fluxo real de equipe em `settings`, incluindo convite pendente, reenvio/revogacao, aceite posterior e remocao segura.
 - [x] Implementar persistencia real de `Preferencias` em `settings`.
 - [x] Garantir fallback de `/partners` quando `partner_stats` e `partner_profiles` ainda nao existirem no banco local.
 - [x] Corrigir a alternancia visual das abas em `/settings`.
@@ -208,7 +208,7 @@ Status do frontend nesta fase:
 - `/settings` lendo equipe real via `/organizations/current/team`, sem `mockUsers`;
 - `/settings` com persistencia real de organizacao e branding via API;
 - `/settings` com upload real de logo/ativos de branding via API;
-- `/settings` com CRUD funcional de equipe, incluindo convite e remocao de membro nao-owner;
+- `/settings` com fluxo real de equipe, incluindo convite pendente, link manual, reenvio, revogacao e remocao de membro nao-owner;
 - `/settings` com troca real de abas visiveis, usando apenas o conteudo ativo;
 - `/settings` com persistencia real de `Preferencias` via `/auth/me`;
 - `/settings` mostrando `Permissoes` e `Integracoes` apenas para `super-admin`;
@@ -766,7 +766,7 @@ O que essa ultima bateria confirmou:
 - `/partners` nao quebra com `500` em bases sem `partner_stats` ou `partner_profiles`;
 - `/settings` alterna corretamente entre `Perfil`, `Organizacao`, `Branding`, `Equipe`, `Permissoes`, `Integracoes` e `Preferencias`;
 - `/settings` persiste organizacao e branding por API real;
-- `/settings` convida e remove equipe por API real, preservando o owner;
+- `/settings` emite convites pendentes, reenvia, revoga e remove equipe por API real, preservando o owner e sem provisionar acesso imediato;
 - `Permissoes` e `Integracoes` em `/settings` aparecem apenas para `super-admin`;
 - instancias de WhatsApp continuam escopadas para a organizacao atual e nao aceitam vazamento por `organization_id`;
 - o painel de parceiros manteve guardas de permissao e escopo administrativos;
@@ -823,13 +823,35 @@ O que essa regressao ampliada confirmou:
 - o endurecimento do CRUD global de `organizations` continuou preservado;
 - a superficie real de `/organizations/current` esta completa para leitura, escrita, branding/logo e equipe.
 
+Validacao complementar da migracao de `/settings > Equipe` em `2026-04-10 22:40:00 -03:00`:
+
+- `php artisan test tests/Feature/Organizations/OrganizationTeamInvitationContractTest.php tests/Feature/Organizations/OrganizationTeamInvitationCharacterizationTest.php tests/Feature/Organizations/OrganizationTest.php tests/Feature/EventTeam/EventTeamInvitationContractTest.php`
+  - 33 testes passaram, 303 assertions.
+- `npx vitest run src/modules/settings/SettingsPage.test.tsx src/modules/settings/SettingsTeamInvitationFlow.contract.test.tsx src/modules/team-invitations/PublicOrganizationInvitationPage.test.tsx src/modules/event-team/EventAccessPage.test.tsx src/modules/event-invitations/PublicEventInvitationPage.test.tsx src/modules/events/EventDetailPage.test.tsx src/app/layouts/AppSidebar.test.tsx`
+  - 29 testes passaram.
+- `npm run type-check`
+  - ok.
+
+O que esta bateria adicional confirmou:
+
+- `/settings > Equipe` nao cria mais membership ativo no momento do convite;
+- a organizacao agora acompanha membros ativos e convites pendentes em secoes separadas;
+- o fluxo generico nao expõe mais `owner` no formulario de convite;
+- o link manual, o reenvio por WhatsApp e a revogacao ficaram cobertos por teste no frontend;
+- o aceite publico de convite organizacional ficou disponivel em `/convites/equipe/:token` sem criar organizacao nova para o usuario convidado;
+- a semantica organization-scoped ficou alinhada ao slice event-scoped ja entregue em `/events/:eventId/access`.
+
 Atualizacao de dependencia compartilhada em `2026-04-10 14:32:00 -03:00`:
 
 - [x] a base de sessao multi-workspace para acessos event-scoped ja existe em `/auth/me`, com `active_context` e `workspaces.event_accesses`;
 - [x] o frontend ja possui entrada segura `/my-events` para usuarios convidados por evento;
 - [x] o modulo `EventTeam` agora bloqueia mutacao fora do escopo do evento e aceita presets de acesso;
 - [x] convites pendentes por evento ja sao persistidos com reutilizacao de `existing_user_id` quando o usuario da plataforma ja existir;
-- [ ] o aceite publico do convite por evento ainda nao esta pronto, entao delegacao partner -> DJ/noivos segue parcial no backend.
+- [x] o aceite publico do convite por evento ja funciona para usuario novo e para usuario existente autenticado;
+- [x] a rota publica do web `/convites/eventos/:token` ja existe para a jornada do convidado;
+- [x] reenvio/revogacao do convite por evento ja existem com rotacao de token, bloqueio imediato do link revogado e activity log;
+- [x] o envio do convite por WhatsApp ja usa a instancia do evento quando elegivel, com fallback seguro para a organizacao e sem usar instancia global do sistema;
+- [x] a UI administrativa `/events/:eventId/access` ja existe para equipe ativa, convites pendentes, reenvio, revogacao e remocao de acesso, entao a delegacao partner -> DJ/noivos deixou de ser parcial no frontend administrativo.
 
 Cobertura esperada:
 
@@ -851,3 +873,35 @@ Testes ja existentes que validam o contexto comercial atual:
 
 - `tests/Feature/Events/EventCommercialStatusTest.php`;
 - `tests/Unit/Billing/EntitlementResolverServiceTest.php`.
+
+## Atualizacao complementar de `/settings`, ownership e branding em `2026-04-10 23:07:23 -03:00`
+
+Esta rodada fechou o backlog que havia ficado depois da migracao de `/settings > Equipe` para convites pendentes.
+
+Entregue:
+
+- [x] corrigido o `500` local em `GET /api/v1/organizations/current/team/invitations` aplicando a migration pendente `organization_member_invitations`.
+- [x] criado fluxo dedicado de transferencia de ownership por `POST /api/v1/organizations/current/team/ownership-transfer`.
+- [x] `partner-owner` continua fora do convite comum de equipe.
+- [x] `/settings > Equipe` mostra `Tornar titular` com modal de confirmacao para membros ativos nao-owner.
+- [x] branding expandido ganhou upload real de `cover`, `logo_dark`, `favicon` e `watermark` por `POST /api/v1/organizations/current/branding/assets`.
+- [x] dominio proprio e ativos premium passaram a respeitar entitlements vindos do plano ativo.
+- [x] `/auth/me` passou a carregar os novos campos de branding da organizacao e os novos entitlements.
+- [x] eventos passaram a expor `inherit_branding` e `effective_branding`, com fallback da organizacao quando o evento nao tem branding proprio.
+- [x] recursos publicos principais passaram a usar branding efetivo quando aplicavel.
+
+Validacao executada:
+
+- `php artisan test tests/Feature/Organizations/OrganizationTest.php tests/Feature/Organizations/OrganizationOwnershipTransferTest.php tests/Feature/Organizations/OrganizationBrandingEntitlementTest.php tests/Feature/Events/EventBrandingInheritanceTest.php tests/Feature/Events/CreateEventTest.php tests/Feature/Events/EventBrandingUploadTest.php tests/Feature/Auth/MeTest.php tests/Feature/Auth/AccessMatrixTest.php`
+  - `59 passed`, `469 assertions`
+- `npx vitest run src/modules/settings/SettingsPage.test.tsx src/modules/settings/SettingsTeamInvitationFlow.contract.test.tsx src/modules/team-invitations/PublicOrganizationInvitationPage.test.tsx`
+  - `23 passed`
+- `npm run type-check`
+  - `ok`
+
+Pendencias fora desta V1:
+
+- UI explicita no editor de evento para ligar/desligar `inherit_branding`.
+- preview visual do `effective_branding` no detalhe/editor do evento.
+- fluxo operacional completo de DNS/SSL para `custom_domain`.
+- CTA comercial de upgrade para planos sem branding premium.

@@ -3,10 +3,11 @@
 namespace App\Modules\Events\Http\Resources;
 
 use App\Modules\ContentModeration\Http\Resources\EventContentModerationSettingResource;
-use App\Modules\FaceSearch\Http\Resources\EventFaceSearchSettingResource;
 use App\Modules\MediaIntelligence\Http\Resources\EventMediaIntelligenceSettingResource;
 use App\Modules\Events\Support\EventIntakeBlacklistStateBuilder;
+use App\Modules\Events\Support\EventBrandingResolver;
 use App\Modules\Events\Support\EventIntakeChannelsStateBuilder;
+use App\Modules\FaceSearch\Http\Resources\EventFaceSearchSettingResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Storage;
@@ -18,6 +19,7 @@ class EventResource extends JsonResource
         $organizationName = $this->organization?->trade_name
             ?? $this->organization?->legal_name
             ?? $this->organization?->name;
+        $effectiveBranding = app(EventBrandingResolver::class)->resolve($this->resource);
         $intakeState = app(EventIntakeChannelsStateBuilder::class)->build($this->resource);
         $blacklistState = app(EventIntakeBlacklistStateBuilder::class)->build($this->resource);
 
@@ -45,6 +47,8 @@ class EventResource extends JsonResource
             'qr_code_path' => $this->qr_code_path,
             'primary_color' => $this->primary_color,
             'secondary_color' => $this->secondary_color,
+            'inherit_branding' => (bool) ($this->inherit_branding ?? true),
+            'effective_branding' => $effectiveBranding,
             'public_url' => $this->publicHubUrl(),
             'upload_url' => $this->publicUploadUrl(),
             'upload_api_url' => $this->publicUploadApiUrl(),

@@ -268,6 +268,97 @@ O que esta bateria da fase 6 travou:
 - o preview do manager reaproveita o mesmo `LayoutRenderer` e a mesma normalizacao de settings do player, sem depender de estado incompleto do form;
 - salvar `theme_config` em `puzzle` nao volta dirty state infinito nem reabre combinacoes incompativeis apos reconcile local.
 
+### Validacao da Fase 7 - geometria real do palco e downgrade adaptativo - 2026-04-10
+
+Frontend:
+
+- `cd apps/web && npm run test -- src/modules/wall/player/hooks/useStageGeometry.test.ts src/modules/wall/player/themes/puzzle/PuzzleLayout.test.tsx src/modules/wall/components/manager/stage/WallPreviewCanvas.test.tsx src/modules/wall/player/components/WallPlayerRoot.test.tsx`
+  - `4 arquivos`
+  - `11 testes`
+  - `PASS`
+- `cd apps/web && npm run test -- src/modules/wall`
+  - `60 arquivos`
+  - `295 testes`
+  - `PASS`
+- `cd apps/web && npm run type-check`
+  - `PASS`
+
+O que esta bateria da fase 7 travou:
+
+- o palco vivo agora observa geometria real por `ResizeObserver`, em vez de assumir que todo player `puzzle` cabe sempre em `9` pecas;
+- o preview do manager aplica a mesma regra de downgrade adaptativo do player, usando o mesmo hook de geometria e o mesmo ajuste de `theme_config`;
+- `puzzle` desce de `standard` para `compact` quando a area util nao comporta o board com `QR`, branding e credito ativos;
+- a degradacao acontece antes do renderer entrar no board, preservando `usePuzzleBoard` e `PuzzleLayout` no mesmo caminho normal do player;
+- `PlayerShell` passa a expor `contentRef` para medir o palco vivo sem criar um segundo shell paralelo so para puzzle.
+
+### Validacao da Fase 8 - tuning do manager e prefetch de preview - 2026-04-10
+
+Frontend:
+
+- `cd apps/web && npm run test -- src/modules/wall/wall-query-options.test.ts src/modules/wall/pages/EventWallManagerPage.test.tsx src/modules/wall/player/wall-theme-architecture-characterization.test.ts`
+  - `3 arquivos`
+  - `24 testes`
+  - `PASS`
+- `cd apps/web && npm run test -- src/modules/wall`
+  - `60 arquivos`
+  - `295 testes`
+  - `PASS`
+- `cd apps/web && npm run type-check`
+  - `PASS`
+
+O que esta bateria da fase 8 travou:
+
+- o manager passa a usar `prefetchQuery()` para aquecer a simulacao quando layout/preset/controles de palco mudam, em vez de esperar a troca visivel da simulacao para depois buscar;
+- `simulation` ganha `staleTime` e `placeholderData`, entao o prefetch realmente reduz flicker no editor antes do `useQuery` entrar com a key nova;
+- `settings`, `event` e `diagnostics` ficam menos agressivos em `reconnect`, preservando a edicao local e deixando o realtime explicito continuar como fonte principal de atualizacao;
+- `insights` e `liveSnapshot` mantem `placeholderData` porque esses dois pontos continuam sendo os que mais sofrem com piscada visual no manager;
+- o teste de caracterizacao passa a refletir que o manager agora ja usa `prefetchQuery` e hook formal de geometria no palco.
+
+### Validacao da Fase 9 - polimento premium do board - 2026-04-10
+
+Frontend:
+
+- `cd apps/web && npm run test -- src/modules/wall/player/themes/puzzle/premium-motion.test.tsx src/modules/wall/player/themes/puzzle/PuzzleLayout.test.tsx src/modules/wall/player/components/WallPlayerRoot.test.tsx`
+  - `3 arquivos`
+  - `8 testes`
+  - `PASS`
+
+O que esta bateria da fase 9 travou:
+
+- `PuzzleLayout` agora usa `AnimatePresence mode="popLayout"` no board denso, em vez de depender so de fade bruto entre pecas;
+- `PuzzlePiece` passa a usar `forwardRef`, fechando o requisito oficial do Motion para child customizado em `popLayout`;
+- o board fica agrupado por `LayoutGroup` e ganha `layoutId` estavel para o hero destacado, abrindo shared transition controlada sem reabrir o foundation;
+- a fundacao de `BoardSlot` tambem passa a aceitar `forwardRef` e `layout="position"` para proximos board themes;
+- o preset `12` continua bloqueado fora da v1.
+
+### Validacao da Fase 10 - observabilidade e downgrade operacional - 2026-04-10
+
+Frontend:
+
+- `cd apps/web && npm run test -- src/modules/wall/player/hooks/useWallPlayer.test.tsx src/modules/wall/components/manager/diagnostics/WallPlayerRuntimeCard.test.tsx src/modules/wall/player/components/WallPlayerRoot.test.tsx`
+  - `3 arquivos`
+  - `14 testes`
+  - `PASS`
+
+Backend:
+
+- `cd apps/api && php artisan test tests/Feature/Wall/WallDiagnosticsTest.php`
+  - `9 testes`
+  - `101 assertions`
+  - `PASS`
+
+O que esta bateria da fase 10 travou:
+
+- o heartbeat do player agora carrega counters especificos de board:
+  - `board_piece_count`
+  - `board_burst_count`
+  - `board_budget_downgrade_count`
+  - `decode_backlog_count`
+  - `board_reset_count`
+- o diagnostics passa a expor `board_budget_downgrade_reason` com trilha explicita para `small_stage`, `safe_area_pressure` e `runtime_budget`;
+- `WallPlayerRoot` consolida a telemetria operacional do board e envia o downgrade real do puzzle mesmo quando a fila continua viva e o realtime segue ativo;
+- o manager passa a mostrar quando o wall caiu de `9` para `6` pecas, junto de backlog de decode, bursts e resets do board.
+
 ### Leituras oficiais validadas
 
 Motion:
@@ -828,7 +919,8 @@ Regras da v1:
 - sem face detection client-side;
 - sem blur pesado por slot;
 - sem `12` pecas;
-- sem shared transition premium ainda.
+- sem preset `12` na v1;
+- shared transition fica limitada ao hero destacado, sem reabrir o foundation nem puxar video premium por slot.
 
 ### Bateria TDD da fase 5
 
@@ -918,15 +1010,16 @@ Arquivos-alvo:
 
 Subtarefas:
 
-- [ ] adicionar `ResizeObserver` tambem ao palco vivo;
-- [ ] considerar safe areas de QR, branding e caption;
-- [ ] descer de `9` para `6` pecas quando a area util nao comportar;
-- [ ] manter preview e player aplicando a mesma regra.
+- [x] adicionar `ResizeObserver` tambem ao palco vivo;
+- [x] considerar safe areas de QR, branding e caption;
+- [x] descer de `9` para `6` pecas quando a area util nao comportar;
+- [x] manter preview e player aplicando a mesma regra.
 
 ### Bateria TDD da fase 7
 
-- [ ] criar `apps/web/src/modules/wall/player/hooks/useStageGeometry.test.ts`
-- [ ] ampliar `apps/web/src/modules/wall/player/themes/puzzle/PuzzleLayout.test.tsx`
+- [x] criar `apps/web/src/modules/wall/player/hooks/useStageGeometry.test.ts`
+- [x] ampliar `apps/web/src/modules/wall/player/themes/puzzle/PuzzleLayout.test.tsx`
+- [x] manter `apps/web/src/modules/wall/components/manager/stage/WallPreviewCanvas.test.tsx` e `apps/web/src/modules/wall/player/components/WallPlayerRoot.test.tsx` verdes com a nova medicao do palco vivo/preview.
 
 ## Fase 8 - Tuning do manager e prefetch de preview
 
@@ -942,15 +1035,16 @@ Arquivos-alvo:
 
 Subtarefas:
 
-- [ ] adicionar `prefetchQuery` ao trocar tema/preset;
-- [ ] revisar `staleTime` do editor;
-- [ ] manter `placeholderData` onde o ganho visual for real;
-- [ ] evitar refetch agressivo em `focus/reconnect` para o editor.
+- [x] adicionar `prefetchQuery` ao trocar tema/preset;
+- [x] revisar `staleTime` do editor;
+- [x] manter `placeholderData` onde o ganho visual for real;
+- [x] evitar refetch agressivo em `focus/reconnect` para o editor.
 
 ### Bateria TDD da fase 8
 
-- [ ] ampliar `apps/web/src/modules/wall/pages/EventWallManagerPage.test.tsx`
-- [ ] criar `apps/web/src/modules/wall/wall-query-options.test.ts`
+- [x] ampliar `apps/web/src/modules/wall/pages/EventWallManagerPage.test.tsx`
+- [x] criar `apps/web/src/modules/wall/wall-query-options.test.ts`
+- [x] alinhar `apps/web/src/modules/wall/player/wall-theme-architecture-characterization.test.ts` ao manager com `prefetchQuery` e hook de geometria.
 
 ## Fase 9 - Polimento premium do board
 
@@ -966,16 +1060,16 @@ Arquivos-alvo:
 
 Subtarefas:
 
-- [ ] usar `AnimatePresence mode="popLayout"` nas pecas;
-- [ ] aplicar `forwardRef` onde preciso;
-- [ ] garantir pai com `position != static`;
-- [ ] estudar `LayoutGroup` e `layoutId` para featured hero;
+- [x] usar `AnimatePresence mode="popLayout"` nas pecas;
+- [x] aplicar `forwardRef` onde preciso;
+- [x] garantir pai com `position != static`;
+- [x] estudar `LayoutGroup` e `layoutId` para featured hero;
 - [ ] liberar preset `12` somente apos medicao real.
 
 ### Bateria TDD da fase 9
 
-- [ ] ampliar `apps/web/src/modules/wall/player/themes/puzzle/PuzzleLayout.test.tsx`
-- [ ] criar `apps/web/src/modules/wall/player/themes/puzzle/premium-motion.test.tsx`
+- [x] ampliar `apps/web/src/modules/wall/player/themes/puzzle/PuzzleLayout.test.tsx`
+- [x] criar `apps/web/src/modules/wall/player/themes/puzzle/premium-motion.test.tsx`
 
 ## Fase 10 - Observabilidade e downgrade operacional
 
@@ -993,19 +1087,19 @@ Arquivos-alvo:
 
 Subtarefas:
 
-- [ ] adicionar counters especificos:
+- [x] adicionar counters especificos:
   - `board_piece_count`
   - `board_burst_count`
   - `board_budget_downgrade_count`
   - `decode_backlog_count`
   - `board_reset_count`
-- [ ] expor downgrade reason no diagnostics;
-- [ ] mostrar no manager quando o wall caiu de `9` para `6` pecas.
+- [x] expor downgrade reason no diagnostics;
+- [x] mostrar no manager quando o wall caiu de `9` para `6` pecas.
 
 ### Bateria TDD da fase 10
 
-- [ ] ampliar `apps/api/tests/Feature/Wall/WallDiagnosticsTest.php`
-- [ ] ampliar `apps/web/src/modules/wall/components/manager/diagnostics/WallPlayerRuntimeCard.test.tsx`
+- [x] ampliar `apps/api/tests/Feature/Wall/WallDiagnosticsTest.php`
+- [x] ampliar `apps/web/src/modules/wall/components/manager/diagnostics/WallPlayerRuntimeCard.test.tsx`
 
 ## O que fica explicitamente fora do P0/P1
 

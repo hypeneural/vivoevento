@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('events', EventController::class);
     Route::get('events/{event}/journey-builder', [EventJourneyController::class, 'show']);
+    Route::patch('events/{event}/journey-builder', [EventJourneyController::class, 'update']);
     Route::get('events/{event}/commercial-status', [EventController::class, 'commercialStatus']);
 
     // Status actions

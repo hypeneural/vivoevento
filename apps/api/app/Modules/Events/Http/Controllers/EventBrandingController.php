@@ -33,6 +33,7 @@ class EventBrandingController extends BaseController
             'logo_path' => ['nullable', 'string', 'max:255'],
             'primary_color' => ['nullable', 'string', 'max:20'],
             'secondary_color' => ['nullable', 'string', 'max:20'],
+            'inherit_branding' => ['nullable', 'boolean'],
         ]);
 
         $event->update($validated);

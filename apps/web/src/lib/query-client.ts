@@ -37,6 +37,7 @@ export const queryKeys = {
   // Auth
   auth: {
     me: () => ['auth', 'me'] as const,
+    accessPresets: () => ['auth', 'access-presets'] as const,
   },
 
   // Events
@@ -46,6 +47,10 @@ export const queryKeys = {
     list: (filters: Record<string, unknown>) => [...queryKeys.events.lists(), filters] as const,
     details: () => [...queryKeys.events.all(), 'detail'] as const,
     detail: (id: string) => [...queryKeys.events.details(), id] as const,
+    team: (id: string) => [...queryKeys.events.detail(id), 'team'] as const,
+    accessInvitations: (id: string) => [...queryKeys.events.detail(id), 'access-invitations'] as const,
+    journeyBuilders: () => [...queryKeys.events.all(), 'journey-builder'] as const,
+    journeyBuilder: (id: string) => [...queryKeys.events.journeyBuilders(), id] as const,
     telegramOperationalStatus: (id: string) => [...queryKeys.events.detail(id), 'telegram-operational-status'] as const,
   },
 

@@ -39,6 +39,7 @@ const DashboardPage = lazy(routeImports.dashboard);
 const EventsListPage = lazy(routeImports.eventsList);
 const CreateEventPage = lazy(routeImports.eventCreate);
 const EventDetailPage = lazy(routeImports.eventDetail);
+const EventAccessPage = lazy(routeImports.eventAccess);
 const EditEventPage = lazy(routeImports.eventEdit);
 const MediaPage = lazy(routeImports.media);
 const ModerationPage = lazy(routeImports.moderation);
@@ -52,6 +53,8 @@ const HubPage = lazy(routeImports.hub);
 const PublicHubPage = lazy(routeImports.publicHub);
 const PublicFaceSearchPage = lazy(routeImports.publicFaceSearch);
 const PublicEventCheckoutEntryPage = lazy(routeImports.publicEventCheckout);
+const PublicEventInvitationPage = lazy(routeImports.publicEventInvitation);
+const PublicOrganizationInvitationPage = lazy(routeImports.publicOrganizationInvitation);
 const WhatsAppInstancesPage = lazy(routeImports.whatsappInstances);
 const WhatsAppInstanceDetailPage = lazy(routeImports.whatsappInstanceDetail);
 const PartnersPage = lazy(routeImports.partners);
@@ -151,6 +154,8 @@ const router = createBrowserRouter(
       <Route path="/wall/player/:code" element={<WallPlayerPage />} />
       <Route path="/upload/:code" element={<PublicEventUploadPage />} />
       <Route path="/checkout/evento" element={<PublicEventCheckoutEntryPage />} />
+      <Route path="/convites/eventos/:token" element={<PublicEventInvitationPage />} />
+      <Route path="/convites/equipe/:token" element={<PublicOrganizationInvitationPage />} />
       <Route path="/e/:slug" element={<PublicHubPage />} />
       <Route path="/e/:slug/gallery" element={<PublicGalleryPage />} />
       <Route path="/e/:slug/find-me" element={<PublicFaceSearchPage />} />
@@ -171,6 +176,14 @@ const router = createBrowserRouter(
             <Route path="events" element={<EventsListPage />} />
             <Route path="events/create" element={<CreateEventPage />} />
             <Route path="events/:id" element={<EventDetailPage />} />
+            <Route
+              path="events/:id/access"
+              element={(
+                <ModuleGuard moduleKey="events" requiredPermissions={['events.manage_team']}>
+                  <EventAccessPage />
+                </ModuleGuard>
+              )}
+            />
             <Route path="events/:id/wall" element={<WallPage />} />
             <Route path="events/:id/play" element={<PlayPage />} />
             <Route path="events/:id/edit" element={<EditEventPage />} />

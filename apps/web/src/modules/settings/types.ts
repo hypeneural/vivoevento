@@ -20,6 +20,37 @@ export interface OrganizationTeamResponse {
   meta?: Record<string, unknown>;
 }
 
+export interface OrganizationTeamInvitation {
+  id: number;
+  organization_id: number;
+  status: string;
+  role_key: InviteCurrentOrganizationTeamMemberRoleKey;
+  role_label: string;
+  role_description: string;
+  existing_user_id: number | null;
+  invitee: {
+    name: string;
+    email: string | null;
+    phone: string | null;
+  };
+  delivery_channel: string | null;
+  delivery_status: string | null;
+  delivery_error: string | null;
+  invitation_url: string | null;
+  token_expires_at: string | null;
+  last_sent_at: string | null;
+  accepted_at: string | null;
+  revoked_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface OrganizationTeamInvitationResponse {
+  success: boolean;
+  data: OrganizationTeamInvitation[];
+  meta?: Record<string, unknown>;
+}
+
 export interface UpdateCurrentOrganizationPayload {
   name?: string;
   slug?: string;
@@ -37,8 +68,20 @@ export interface CurrentOrganizationLogoUploadResponse {
   logo_url: string;
 }
 
+export type CurrentOrganizationBrandingAssetKind =
+  | 'logo'
+  | 'logo_dark'
+  | 'favicon'
+  | 'watermark'
+  | 'cover';
+
+export interface CurrentOrganizationBrandingAssetUploadResponse {
+  kind: CurrentOrganizationBrandingAssetKind;
+  path: string;
+  url: string;
+}
+
 export type InviteCurrentOrganizationTeamMemberRoleKey =
-  | 'partner-owner'
   | 'partner-manager'
   | 'event-operator'
   | 'financeiro'
@@ -51,7 +94,11 @@ export interface InviteCurrentOrganizationTeamMemberPayload {
     phone: string;
   };
   role_key: InviteCurrentOrganizationTeamMemberRoleKey;
-  is_owner?: boolean;
+  send_via_whatsapp?: boolean;
+}
+
+export interface TransferCurrentOrganizationOwnershipPayload {
+  member_id: number;
 }
 
 export interface UpdateCurrentUserPreferencesPayload {

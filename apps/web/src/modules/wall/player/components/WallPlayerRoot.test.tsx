@@ -196,6 +196,21 @@ function makeBasePlayerReturn() {
     connectionStatus: 'connected' as const,
     lastSyncAt: '2026-04-07T10:00:00Z',
     handleAdFinished: vi.fn(),
+    handleVideoStarting: vi.fn(),
+    handleVideoFirstFrame: vi.fn(),
+    handleVideoPlaybackReady: vi.fn(),
+    handleVideoPlaying: vi.fn(),
+    handleVideoProgress: vi.fn(),
+    handleVideoWaiting: vi.fn(),
+    handleVideoStalled: vi.fn(),
+    handleVideoEnded: vi.fn(),
+    handleVideoFailure: vi.fn(),
+    videoRuntimeConfig: {
+      startupDeadlineMs: 1200,
+      stallBudgetMs: 2500,
+      resumeMode: 'resume_if_same_item_else_restart' as const,
+    },
+    setBoardRuntimeTelemetry: vi.fn(),
   };
 }
 
@@ -206,6 +221,14 @@ describe('WallPlayerRoot', () => {
     usePerformanceModeMock.mockReturnValue({
       reducedEffects: false,
       modeLabel: 'Padrao',
+      performanceTier: 'premium',
+      runtimeBudget: {
+        performanceTier: 'premium',
+        maxBoardPieces: 9,
+        maxConcurrentDecode: 2,
+        maxBurstItems: 2,
+        maxStrongAnimations: 2,
+      },
     });
 
     useSideThumbnailsMock.mockReturnValue({
@@ -258,6 +281,14 @@ describe('WallPlayerRoot', () => {
     usePerformanceModeMock.mockReturnValue({
       reducedEffects: true,
       modeLabel: 'Performance',
+      performanceTier: 'performance',
+      runtimeBudget: {
+        performanceTier: 'performance',
+        maxBoardPieces: 6,
+        maxConcurrentDecode: 1,
+        maxBurstItems: 1,
+        maxStrongAnimations: 1,
+      },
     });
 
     render(<WallPlayerRoot code="ABCD1234" />);

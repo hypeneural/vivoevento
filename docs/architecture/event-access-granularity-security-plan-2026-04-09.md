@@ -1449,10 +1449,13 @@ Esta e a ordem pragmatica para transformar o desenho em produto utilizavel sem a
 - [x] convites pendentes por evento ja existem em `event_team_invitations`.
 - [x] criacao de convite por evento ja reutiliza `existing_user_id` quando o usuario da plataforma ja existe por WhatsApp/e-mail.
 - [x] listagem de convites pendentes por evento ja esta separada da equipe ativa.
-- [ ] aceite publico do convite por evento ainda nao foi implementado.
-- [ ] reenvio/revogacao do convite por evento ainda nao foi implementado.
-- [ ] envio do convite por WhatsApp do evento/organizacao ainda nao foi implementado.
-- [ ] a UI administrativa `/events/:eventId/access` ainda nao foi criada.
+- [x] leitura publica do convite por evento ja existe.
+- [x] aceite publico do convite por evento ja funciona para usuario novo sem criar organizacao.
+- [x] aceite autenticado do convite por evento ja funciona para usuario existente sem duplicar `users`.
+- [x] a rota publica do web `/convites/eventos/:token` ja existe com UX minima para noiva/DJ.
+- [x] reenvio/revogacao do convite por evento ja existe com rotacao de token e bloqueio do link publico revogado.
+- [x] envio do convite por WhatsApp do evento/organizacao ja existe, priorizando a instancia padrao do evento e fallback seguro para a organizacao.
+- [x] a UI administrativa `/events/:eventId/access` ja existe com equipe ativa, convites pendentes, reenvio, revogacao e remocao de acesso.
 
 ### Etapa 1 - `active_context` e `workspaces` em `/auth/me`
 
@@ -1462,34 +1465,34 @@ Objetivo:
 
 Backend:
 
-- [ ] criar um builder de workspaces da sessao;
-- [ ] retornar `workspaces.organizations`;
-- [ ] retornar `workspaces.event_accesses`;
-- [ ] retornar `active_context`;
-- [ ] manter `organization` legado para compatibilidade temporaria;
-- [ ] criar `POST /auth/context/organization`;
-- [ ] opcionalmente criar `POST /auth/context/event`;
-- [ ] garantir que o contexto ativo escolhido pertence ao usuario.
+- [x] criar um builder de workspaces da sessao;
+- [x] retornar `workspaces.organizations`;
+- [x] retornar `workspaces.event_accesses`;
+- [x] retornar `active_context`;
+- [x] manter `organization` legado para compatibilidade temporaria;
+- [x] criar `POST /auth/context/organization`;
+- [x] criar `POST /auth/context/event`;
+- [x] garantir que o contexto ativo escolhido pertence ao usuario.
 
 Frontend:
 
-- [ ] atualizar `MeResponse`;
-- [ ] atualizar `AuthProvider`;
+- [x] atualizar `MeResponse`;
+- [x] atualizar `AuthProvider`;
 - [ ] criar helpers:
   - `isOrganizationContext`;
   - `isEventContext`;
   - `eventCapabilities`;
   - `canInEvent`.
-- [ ] atualizar redirect pos-login:
+- [x] atualizar redirect pos-login:
   - org user -> `/`;
   - event-only user com 1 evento -> `/my-events/{eventId}`;
   - event-only user com varios eventos -> `/my-events`.
 
 Testes:
 
-- [ ] `MultiOrganizationWorkspaceContractTest`;
-- [ ] `workspace-selector.contract.test.tsx`;
-- [ ] type-check.
+- [x] `MultiOrganizationWorkspaceContractTest`;
+- [x] `workspace-selector.contract.test.tsx`;
+- [x] type-check.
 
 ### Etapa 2 - `/my-events` no front
 
@@ -1499,18 +1502,18 @@ Objetivo:
 
 Frontend:
 
-- [ ] criar modulo `apps/web/src/modules/my-events`;
-- [ ] criar `MyEventsPage.tsx`;
-- [ ] criar `MyEventHomePage.tsx`;
-- [ ] criar `EventWorkspaceLayout.tsx`;
-- [ ] registrar rotas:
+- [x] criar modulo `apps/web/src/modules/my-events`;
+- [x] criar `MyEventsPage.tsx`;
+- [x] criar `MyEventHomePage.tsx`;
+- [x] criar `EventWorkspaceLayout.tsx`;
+- [x] registrar rotas:
   - `/my-events`;
   - `/my-events/:eventId`;
   - `/my-events/:eventId/media`;
   - `/my-events/:eventId/moderation`;
   - `/my-events/:eventId/wall`;
   - `/my-events/:eventId/play`.
-- [ ] criar filtros de `/my-events`:
+- [x] criar filtros de `/my-events`:
   - busca;
   - parceiro;
   - status;
@@ -1518,17 +1521,17 @@ Frontend:
   - papel;
   - capacidade;
   - ordenacao.
-- [ ] agrupar cards por parceiro/organizacao.
+- [x] agrupar cards por parceiro/organizacao.
 
 Backend:
 
-- [ ] nenhum endpoint novo obrigatorio se `workspaces.event_accesses` vier completo;
+- [x] nenhum endpoint novo obrigatorio se `workspaces.event_accesses` vier completo;
 - [ ] se volume crescer, criar `GET /auth/workspaces/events`.
 
 Testes:
 
-- [ ] contratos de `workspace-selector`;
-- [ ] teste de pagina para agrupamento, filtros e acoes por capability.
+- [x] contratos de `workspace-selector`;
+- [x] teste de pagina para agrupamento, filtros e acoes por capability.
 
 ### Etapa 3 - `EventAccessService` lendo `event_team_members`
 
@@ -1538,16 +1541,16 @@ Objetivo:
 
 Backend:
 
-- [ ] criar resolver de role/capabilities do evento;
-- [ ] consultar `event_team_members` no `EventAccessService`;
-- [ ] manter org-wide para `organization_members`;
-- [ ] aplicar `Gate::before` ou `Policy::before` para super admin;
-- [ ] corrigir `EventTeamController` com policy;
-- [ ] corrigir `GET /events` sem escopo.
+- [x] criar resolver de role/capabilities do evento;
+- [x] consultar `event_team_members` no `EventAccessService`;
+- [x] manter org-wide para `organization_members`;
+- [x] aplicar bypass para super admin em `EventAccessService`;
+- [x] corrigir `EventTeamController` com policy;
+- [x] corrigir `GET /events` sem escopo.
 
 Testes:
 
-- [ ] tirar TODOs de `EventScopedAccessContractTest`;
+- [x] tirar TODOs centrais de `EventScopedAccessContractTest`;
 - [ ] manter caracterizacao antiga ate o comportamento mudar, depois atualizar/remover.
 
 ### Etapa 4 - Presets backend em `GET /access/presets`
@@ -1558,23 +1561,23 @@ Objetivo:
 
 Backend:
 
-- [ ] criar endpoint `GET /access/presets`;
-- [ ] retornar presets de organizacao;
-- [ ] retornar presets de evento;
-- [ ] incluir label, descricao, scope, role persistida e capabilities;
-- [ ] bloquear presets sensiveis conforme quem esta convidando.
+- [x] criar endpoint `GET /access/presets`;
+- [x] retornar presets de organizacao;
+- [x] retornar presets de evento;
+- [x] incluir label, descricao, scope, role persistida e capabilities;
+- [x] bloquear presets sensiveis conforme quem esta convidando.
 
 Frontend:
 
-- [ ] carregar presets no dialog de convite;
-- [ ] exibir presets simples;
-- [ ] mostrar resumo textual do que a pessoa podera fazer;
+- [x] carregar presets no dialog de convite;
+- [x] exibir presets simples;
+- [x] mostrar resumo textual do que a pessoa podera fazer;
 - [ ] esconder modo avancado para cerimonial.
 
 Testes:
 
-- [ ] tirar TODOs de `EventPermissionPresetContractTest`;
-- [ ] contrato frontend de presets simples.
+- [x] tirar TODOs de `EventPermissionPresetContractTest`;
+- [x] contrato frontend de presets simples.
 
 ### Etapa 5 - Convite por evento usando o mesmo `users.id`
 
@@ -1584,28 +1587,28 @@ Objetivo:
 
 Backend:
 
-- [ ] criar modelo de convite por evento ou generalizar invitation com `scope_type`;
-- [ ] localizar usuario por WhatsApp/e-mail;
-- [ ] se usuario existe, anexar `existing_user_id`;
-- [ ] se usuario nao existe, criar somente no aceite;
-- [ ] criar `event_team_members` somente no aceite;
-- [ ] enviar link por WhatsApp da organizacao/evento quando solicitado;
-- [ ] registrar auditoria.
+- [x] criar modelo de convite por evento ou generalizar invitation com `scope_type`;
+- [x] localizar usuario por WhatsApp/e-mail;
+- [x] se usuario existe, anexar `existing_user_id`;
+- [x] se usuario nao existe, criar somente no aceite;
+- [x] criar `event_team_members` somente no aceite;
+- [x] enviar link por WhatsApp da organizacao/evento quando solicitado;
+- [x] registrar auditoria.
 
 Frontend:
 
-- [ ] criar `/events/:eventId/access`;
-- [ ] criar dialog `Convidar para este evento`;
-- [ ] exigir nome, WhatsApp e preset;
-- [ ] checkbox `Enviar convite pelo WhatsApp`;
-- [ ] mostrar link manual;
-- [ ] listar convites pendentes e acessos ativos.
+- [x] criar `/events/:eventId/access`;
+- [x] criar dialog `Convidar para este evento`;
+- [x] exigir nome, WhatsApp e preset;
+- [x] checkbox `Enviar convite pelo WhatsApp`;
+- [x] mostrar link manual;
+- [x] listar convites pendentes e acessos ativos.
 
 Testes:
 
-- [ ] contratos de convite existentes;
-- [ ] novos testes de evento access invitation;
-- [ ] testes frontend de `/events/:eventId/access`.
+- [x] contratos de convite existentes;
+- [x] novos testes de evento access invitation;
+- [x] testes frontend de `/events/:eventId/access`.
 
 Gate de conclusao da V1:
 
@@ -1749,13 +1752,13 @@ Type-check:
 
 Backend:
 
-- `php artisan test tests/Feature/Auth/EventOnlySessionCharacterizationTest.php tests/Feature/Auth/MeTest.php tests/Feature/Auth/MultiOrganizationWorkspaceContractTest.php tests/Feature/EventTeam/EventPermissionPresetContractTest.php tests/Feature/EventTeam/EventTeamInvitationContractTest.php tests/Feature/Events/EventScopedAccessCharacterizationTest.php tests/Feature/Events/EventScopedAccessContractTest.php tests/Feature/Events/ListEventsTest.php tests/Feature/MediaProcessing/ModerationMediaTest.php`
-- resultado: `56 passed`, `7 todo`, `656 assertions`
+- `php artisan test tests/Feature/Auth/EventOnlySessionCharacterizationTest.php tests/Feature/Auth/MeTest.php tests/Feature/Auth/MultiOrganizationWorkspaceContractTest.php tests/Feature/EventTeam/EventPermissionPresetContractTest.php tests/Feature/EventTeam/EventTeamInvitationContractTest.php tests/Feature/Events/EventScopedAccessCharacterizationTest.php tests/Feature/Events/EventScopedAccessContractTest.php tests/Feature/Events/ListEventsTest.php tests/Feature/MediaProcessing/ModerationMediaTest.php tests/Feature/WhatsApp/WhatsAppOrganizationScopeTest.php`
+- resultado: `67 passed`, `5 todo`, `766 assertions`
 
 Frontend:
 
-- `npx vitest run src/modules/auth/MyEventsPage.test.tsx src/modules/auth/workspace-utils.test.ts src/app/layouts/AppSidebar.test.tsx src/modules/auth/workspace-selector.contract.test.tsx src/modules/auth/my-events-page.contract.test.tsx`
-- resultado: `8 passed`, `19 todo`
+- `npx vitest run src/modules/event-team/EventAccessPage.test.tsx src/modules/event-invitations/PublicEventInvitationPage.test.tsx src/modules/auth/MyEventsPage.test.tsx src/modules/auth/workspace-utils.test.ts src/app/layouts/AppSidebar.test.tsx src/modules/events/EventDetailPage.test.tsx`
+- resultado: `14 passed`
 
 Type-check:
 
@@ -1768,9 +1771,71 @@ O que essa rodada fechou:
 - `EventTeam` deixou de aceitar mutacao fora do escopo do evento;
 - a troca de role por preset agora esta validada por teste;
 - o dominio inicial de convite por evento ja existe sem duplicar usuario da plataforma;
-- o aceite publico ainda segue como proxima slice porque o OTP atual continua acoplado a criacao de organizacao nova.
+- o aceite publico por token ja funciona para usuario novo e para usuario autenticado;
+- criacao de convite com `send_via_whatsapp=true` agora despacha pela instancia do evento ou fallback seguro da organizacao;
+- reenvio agora rotaciona o token do convite e reenfileira o envio quando solicitado;
+- revogacao agora invalida o link publico imediatamente;
+- a UI administrativa `/events/:eventId/access` ja existe no web com equipe ativa, convites pendentes, reenvio, revogacao e remocao de acesso.
+
+Atualizacao de dependencia organizacional em `2026-04-10 22:40:00 -03:00`:
+
+- [x] a aba `Equipe` de `/settings` deixou de provisionar membership imediato e agora segue a mesma semantica de convite pendente.
+- [x] o slice organization-scoped agora tambem reutiliza `users.id` existente, tem aceite publico/autenticado e envio opcional por WhatsApp da propria organizacao.
+- [x] o front administrativo agora fala a mesma linguagem de presets simples tanto em `/events/:eventId/access` quanto em `/settings`.
+
+Validacao complementar desta dependencia:
+
+Backend:
+
+- `php artisan test tests/Feature/Organizations/OrganizationTeamInvitationContractTest.php tests/Feature/Organizations/OrganizationTeamInvitationCharacterizationTest.php tests/Feature/Organizations/OrganizationTest.php tests/Feature/EventTeam/EventTeamInvitationContractTest.php`
+  - `33 passed`, `303 assertions`
+
+Frontend:
+
+- `npx vitest run src/modules/settings/SettingsPage.test.tsx src/modules/settings/SettingsTeamInvitationFlow.contract.test.tsx src/modules/team-invitations/PublicOrganizationInvitationPage.test.tsx src/modules/event-team/EventAccessPage.test.tsx src/modules/event-invitations/PublicEventInvitationPage.test.tsx src/modules/events/EventDetailPage.test.tsx src/app/layouts/AppSidebar.test.tsx`
+  - `29 passed`
+
+Type-check:
+
+- `npm run type-check`
+  - `ok`
 
 Rotas novas confirmadas:
 
 - `GET /api/v1/events/{event}/access/invitations`
 - `POST /api/v1/events/{event}/access/invitations`
+- `POST /api/v1/events/{event}/access/invitations/{invitation}/resend`
+- `POST /api/v1/events/{event}/access/invitations/{invitation}/revoke`
+- `GET /api/v1/public/event-invitations/{token}`
+- `POST /api/v1/public/event-invitations/{token}/accept`
+- `POST /api/v1/event-invitations/{token}/accept`
+- `/convites/eventos/:token`
+- `/events/:eventId/access`
+
+## Atualizacao de fechamento organization-scoped em `2026-04-10 23:07:23 -03:00`
+
+O escopo organizacional de equipe agora tambem ficou separado entre convite comum e transferencia de ownership.
+
+Implementado:
+
+- [x] `POST /api/v1/organizations/current/team/ownership-transfer` para transferencia dedicada de titularidade.
+- [x] apenas owner atual ou admin global pode transferir ownership.
+- [x] alvo precisa ser membro ativo da organizacao atual.
+- [x] o owner anterior deixa de ser titular e fica como `partner-manager`.
+- [x] o novo titular vira `partner-owner`.
+- [x] a UI de `/settings > Equipe` mostra `Tornar titular` como acao separada, com confirmacao.
+- [x] o formulario generico de convite continua sem `partner-owner`, preservando a decisao de nao misturar convite comum com ownership.
+
+Validacao:
+
+- `php artisan test tests/Feature/Organizations/OrganizationOwnershipTransferTest.php`
+  - cobriu transferencia feliz, bloqueio para manager e rejeicao de membro fora da organizacao atual.
+- `npx vitest run src/modules/settings/SettingsPage.test.tsx`
+  - cobriu modal dedicado de confirmacao antes da transferencia.
+
+Leitura de seguranca:
+
+- `OrganizationMember` continua sendo o vinculo organizacional amplo.
+- `EventTeamMember` continua sendo o vinculo event-scoped.
+- ownership nao vira permission dinamica nem role global solta; a titularidade continua no membership da organizacao.
+- para usuarios com acesso apenas por evento, nada desta mudanca libera `/settings`, equipe da organizacao, clientes, financeiro ou billing.

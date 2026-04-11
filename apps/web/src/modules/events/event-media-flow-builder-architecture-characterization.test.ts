@@ -47,4 +47,17 @@ describe('event media flow builder architecture characterization', () => {
     expect(hubPageSource).toContain('applyLayoutPreset');
     expect(hubPageSource).toContain('cloneBuilderConfig');
   });
+
+  it('keeps journey domain types decoupled from React Flow primitives', () => {
+    const journeyTypesSource = fs.readFileSync(
+      path.resolve(__dirname, 'journey/types.ts'),
+      'utf8',
+    );
+
+    expect(journeyTypesSource).toContain('EventJourneyProjection');
+    expect(journeyTypesSource).toContain('EventJourneyUpdatePayload');
+    expect(journeyTypesSource).not.toContain('@xyflow/react');
+    expect(journeyTypesSource).not.toContain('Node<');
+    expect(journeyTypesSource).not.toContain('Edge<');
+  });
 });

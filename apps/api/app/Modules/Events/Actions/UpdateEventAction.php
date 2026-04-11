@@ -49,6 +49,10 @@ class UpdateEventAction
                 if (array_key_exists('logo_path', $branding)) {
                     $data['logo_path'] = $branding['logo_path'];
                 }
+
+                if (array_key_exists('inherit_branding', $branding)) {
+                    $data['inherit_branding'] = (bool) $branding['inherit_branding'];
+                }
             }
 
             if (! empty($privacy)) {

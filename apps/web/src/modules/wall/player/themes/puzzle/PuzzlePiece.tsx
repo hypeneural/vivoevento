@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { motion, useAnimationFrame, useMotionValue, useSpring } from 'framer-motion';
 
 import ThemeMediaSurface from '../shared/ThemeMediaSurface';
@@ -19,9 +20,10 @@ interface PuzzlePieceProps {
   anchorLabel?: string;
   isStrongAnimation?: boolean;
   reducedMotion?: boolean;
+  isHero?: boolean;
 }
 
-export function PuzzlePiece({
+export const PuzzlePiece = forwardRef<HTMLElement, PuzzlePieceProps>(function PuzzlePiece({
   pieceIndex,
   pieceVariant,
   media = null,
@@ -29,7 +31,8 @@ export function PuzzlePiece({
   anchorLabel = 'Evento Vivo',
   isStrongAnimation = false,
   reducedMotion = false,
-}: PuzzlePieceProps) {
+  isHero = false,
+}, ref) {
   const burstMotion = resolvePuzzleBurstMotion(isStrongAnimation, reducedMotion);
   const driftProfile = resolvePuzzleDriftProfile(media?.orientation ?? null, pieceIndex, reducedMotion);
 
@@ -57,10 +60,14 @@ export function PuzzlePiece({
 
   return (
     <motion.article
+      ref={ref}
       data-testid={`puzzle-piece-${pieceIndex}`}
       data-strong-animation={isStrongAnimation ? 'true' : 'false'}
       data-piece-variant={pieceVariant}
+      data-featured-hero={isHero ? 'true' : 'false'}
       className="puzzle-piece-shell"
+      layout={reducedMotion ? false : 'position'}
+      layoutId={isHero && media ? 'puzzle-featured-hero' : undefined}
       initial={burstMotion.initial}
       animate={burstMotion.animate}
       exit={burstMotion.exit}
@@ -91,6 +98,6 @@ export function PuzzlePiece({
       <div className="puzzle-piece-outline" />
     </motion.article>
   );
-}
+});
 
 export default PuzzlePiece;

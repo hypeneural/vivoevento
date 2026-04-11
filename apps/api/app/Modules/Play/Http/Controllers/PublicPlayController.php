@@ -4,6 +4,7 @@ namespace App\Modules\Play\Http\Controllers;
 
 use App\Modules\Analytics\Services\AnalyticsTracker;
 use App\Modules\Events\Models\Event;
+use App\Modules\Events\Support\EventBrandingResolver;
 use App\Modules\Play\Http\Resources\PlayEventGameResource;
 use App\Modules\Play\Models\EventPlaySetting;
 use App\Shared\Http\BaseController;
@@ -15,7 +16,7 @@ class PublicPlayController extends BaseController
 {
     public function manifest(string $event, Request $request, AnalyticsTracker $analytics): JsonResponse
     {
-        $eventModel = Event::with(['modules', 'playGames.gameType'])
+        $eventModel = Event::with(['modules', 'playGames.gameType', 'organization'])
             ->where('slug', $event)
             ->firstOrFail();
 
@@ -37,16 +38,18 @@ class PublicPlayController extends BaseController
             ['surface' => 'play'],
             channel: 'play',
         );
+        $branding = app(EventBrandingResolver::class)->resolve($eventModel);
 
         return $this->success([
             'event' => [
                 'id' => $eventModel->id,
                 'title' => $eventModel->title,
                 'slug' => $eventModel->slug,
-                'cover_image_url' => $this->assetUrl($eventModel->cover_image_path),
-                'logo_url' => $this->assetUrl($eventModel->logo_path),
-                'primary_color' => $eventModel->primary_color,
-                'secondary_color' => $eventModel->secondary_color,
+                'cover_image_url' => $branding['cover_image_url'],
+                'logo_url' => $branding['logo_url'],
+                'primary_color' => $branding['primary_color'],
+                'secondary_color' => $branding['secondary_color'],
+                'effective_branding' => $branding,
             ],
             'settings' => [
                 'is_enabled' => (bool) $settings->is_enabled,

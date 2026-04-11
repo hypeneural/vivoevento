@@ -26,6 +26,12 @@ function makePlayer(overrides: Partial<ApiWallDiagnosticsPlayer> = {}): ApiWallD
     cache_miss_count: 4,
     cache_stale_fallback_count: 0,
     cache_hit_rate: 86,
+    board_piece_count: 0,
+    board_burst_count: 0,
+    board_budget_downgrade_count: 0,
+    decode_backlog_count: 0,
+    board_reset_count: 0,
+    board_budget_downgrade_reason: null,
     last_sync_at: '2026-04-08T22:04:34Z',
     last_seen_at: '2026-04-08T22:04:41Z',
     last_fallback_reason: null,
@@ -68,5 +74,22 @@ describe('WallPlayerRuntimeCard', () => {
     expect(screen.getByText(/Fila pronta/i)).toBeInTheDocument();
     expect(screen.getByText(/Convidado via WhatsApp/i)).toBeInTheDocument();
     expect(screen.getByText(/Tudo esta estavel nesta tela agora/i)).toBeInTheDocument();
+  });
+
+  it('mostra counters do board e o motivo do downgrade quando o puzzle cai de 9 para 6 pecas', () => {
+    render(<WallPlayerRuntimeCard player={makePlayer({
+      board_piece_count: 6,
+      board_burst_count: 8,
+      board_budget_downgrade_count: 2,
+      decode_backlog_count: 1,
+      board_reset_count: 3,
+      board_budget_downgrade_reason: 'small_stage',
+    })} />);
+
+    expect(screen.getByText(/Board 6 pecas/i)).toBeInTheDocument();
+    expect(screen.getByText(/Bursts 8/i)).toBeInTheDocument();
+    expect(screen.getByText(/Backlog decode 1/i)).toBeInTheDocument();
+    expect(screen.getByText(/Reset board 3/i)).toBeInTheDocument();
+    expect(screen.getByText(/Downgrade palco reduzido/i)).toBeInTheDocument();
   });
 });

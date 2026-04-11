@@ -6,6 +6,7 @@
  */
 
 import type { ReactNode } from 'react';
+import type { Ref } from 'react';
 import { cn } from '@/lib/utils';
 import { WALL_OVERLAY_GRADIENT } from '../design/tokens';
 
@@ -13,9 +14,17 @@ interface PlayerShellProps {
   backgroundUrl?: string | null;
   children: ReactNode;
   className?: string;
+  contentRef?: Ref<HTMLDivElement>;
+  contentClassName?: string;
 }
 
-export function PlayerShell({ backgroundUrl, children, className }: PlayerShellProps) {
+export function PlayerShell({
+  backgroundUrl,
+  children,
+  className,
+  contentRef,
+  contentClassName,
+}: PlayerShellProps) {
   return (
     <div className={cn('relative min-h-screen overflow-hidden bg-neutral-950 text-white', className)}>
       {backgroundUrl ? (
@@ -34,7 +43,7 @@ export function PlayerShell({ backgroundUrl, children, className }: PlayerShellP
       )}
 
       <div className={cn('absolute inset-0 bg-black/20', WALL_OVERLAY_GRADIENT)} />
-      <div className="relative min-h-screen">{children}</div>
+      <div ref={contentRef} className={cn('relative min-h-screen', contentClassName)}>{children}</div>
     </div>
   );
 }

@@ -418,9 +418,14 @@ Permitir que um unico usuario opere em multiplas organizacoes e acessos event-sc
 - [x] o layout event-scoped ja esconde a navegacao organizacional.
 - [x] `GET /access/presets` ja existe para evitar hardcode da matriz no frontend.
 - [x] o dominio inicial de convite por evento ja persiste convites pendentes com `existing_user_id` quando houver usuario existente.
-- [ ] aceite publico do convite por evento ainda nao existe.
-- [ ] reenvio/revogacao do convite por evento ainda nao existem.
-- [ ] a UI `/events/:eventId/access` ainda nao existe.
+- [x] leitura publica do convite por evento ja existe.
+- [x] aceite publico do convite por evento ja cria usuario sem gerar organizacao nova quando necessario.
+- [x] aceite autenticado do convite por evento ja reutiliza o mesmo `users.id`.
+- [x] a rota publica do web `/convites/eventos/:token` ja existe para concluir o aceite.
+- [x] reenvio/revogacao do convite por evento ja existem com rotacao de token, refresh de expiracao, activity log e invalidacao imediata do link revogado.
+- [x] o envio do convite por WhatsApp do evento/organizacao ja existe com resolver escopado, priorizando a instancia padrao conectada do evento e fallback seguro para a organizacao.
+- [x] a UI `/events/:eventId/access` ja existe com equipe ativa, convites pendentes, criacao, copia de link, reenvio, revogacao e remocao de acesso.
+- [x] a aba `Equipe` de `/settings` ja foi migrada para o mesmo padrao de convites, com separacao entre membros ativos e convites pendentes.
 
 ### Tasks backend
 
@@ -476,41 +481,41 @@ Trocar o conceito visual de "adicionar membro" por "emitir convite", com rastrea
 
 ### Tasks frontend
 
-- [ ] Renomear CTA principal para `Convidar membro`.
-- [ ] Remover `partner-owner` das opcoes do select generico.
-- [ ] Adicionar checkbox `Enviar convite pelo WhatsApp`.
-- [ ] Enviar payload com preferencia explicita de entrega.
-- [ ] Mostrar `invitation_url` para copia manual.
-- [ ] Mostrar status de entrega:
+- [x] Renomear CTA principal para `Convidar pessoa`.
+- [x] Remover `partner-owner` das opcoes do select generico.
+- [x] Adicionar checkbox `Enviar convite pelo WhatsApp`.
+- [x] Enviar payload com preferencia explicita de entrega.
+- [x] Mostrar `invitation_url` para copia manual.
+- [x] Mostrar status de entrega:
   - `link_gerado`
   - `whatsapp_enviado`
   - `falha_no_envio`
-- [ ] Separar UI em duas secoes:
+- [x] Separar UI em duas secoes:
   - membros ativos
   - convites pendentes
-- [ ] Adicionar acoes em convite pendente:
+- [x] Adicionar acoes em convite pendente:
   - copiar link
   - reenviar
   - revogar
-- [ ] Ajustar textos e labels integralmente para PT-BR.
-- [ ] Manter confirmacao modal para remocao de membro ativo.
+- [x] Ajustar textos e labels integralmente para PT-BR com linguagem mais humana.
+- [x] Manter confirmacao modal para remocao de membro ativo.
 
 ### Tasks de dados
 
-- [ ] Criar queries dedicadas:
+- [x] Criar queries dedicadas:
   - `listCurrentOrganizationTeam`
   - `listCurrentOrganizationTeamInvitations`
-- [ ] Invalidate correto apos criar/reenviar/revogar/aceitar.
-- [ ] Atualizar tipos locais do modulo.
+- [x] Invalidate correto apos criar/reenviar/revogar/aceitar.
+- [x] Atualizar tipos locais do modulo.
 
 ### Testes obrigatorios
 
-- [ ] exibe toggle de envio por WhatsApp.
-- [ ] envia `send_via_whatsapp` no payload.
-- [ ] renderiza convites pendentes separados da equipe ativa.
-- [ ] exibe link manual quando necessario.
-- [ ] revoga convite pendente com feedback visual.
-- [ ] owner nao aparece no fluxo generico de convite.
+- [x] exibe toggle de envio por WhatsApp.
+- [x] envia `send_via_whatsapp` no payload.
+- [x] renderiza convites pendentes separados da equipe ativa.
+- [x] exibe link manual quando necessario.
+- [x] revoga convite pendente com feedback visual.
+- [x] owner nao aparece no fluxo generico de convite.
 
 ### Gate de saida
 
@@ -703,12 +708,12 @@ Type-check:
 Backend:
 
 - `php artisan test tests/Feature/Auth/EventOnlySessionCharacterizationTest.php tests/Feature/Auth/MeTest.php tests/Feature/Auth/MultiOrganizationWorkspaceContractTest.php tests/Feature/EventTeam/EventPermissionPresetContractTest.php tests/Feature/EventTeam/EventTeamInvitationContractTest.php tests/Feature/Events/EventScopedAccessCharacterizationTest.php tests/Feature/Events/EventScopedAccessContractTest.php tests/Feature/Events/ListEventsTest.php tests/Feature/MediaProcessing/ModerationMediaTest.php`
-- resultado: `56 passed`, `7 todo`, `656 assertions`
+- resultado: `59 passed`, `6 todo`, `702 assertions`
 
 Frontend:
 
-- `npx vitest run src/modules/auth/MyEventsPage.test.tsx src/modules/auth/workspace-utils.test.ts src/app/layouts/AppSidebar.test.tsx src/modules/auth/workspace-selector.contract.test.tsx src/modules/auth/my-events-page.contract.test.tsx`
-- resultado: `8 passed`, `19 todo`
+- `npx vitest run src/modules/auth/MyEventsPage.test.tsx src/modules/auth/workspace-utils.test.ts src/app/layouts/AppSidebar.test.tsx src/modules/auth/workspace-selector.contract.test.tsx src/modules/auth/my-events-page.contract.test.tsx src/modules/event-invitations/PublicEventInvitationPage.test.tsx`
+- resultado: `10 passed`, `19 todo`
 
 Type-check:
 
@@ -719,6 +724,13 @@ Rotas novas desta rodada:
 
 - `GET /api/v1/events/{event}/access/invitations`
 - `POST /api/v1/events/{event}/access/invitations`
+- `POST /api/v1/events/{event}/access/invitations/{invitation}/resend`
+- `POST /api/v1/events/{event}/access/invitations/{invitation}/revoke`
+- `GET /api/v1/public/event-invitations/{token}`
+- `POST /api/v1/public/event-invitations/{token}/accept`
+- `POST /api/v1/event-invitations/{token}/accept`
+- `/convites/eventos/:token`
+- `/events/:eventId/access`
 
 ## Ordem Recomendada de Execucao
 
@@ -731,18 +743,100 @@ Rotas novas desta rodada:
 
 ## Leitura Final
 
-O proximo passo correto nao e continuar mexendo no `POST /organizations/current/team` atual.
+O slice organizacional de `/settings > Equipe` deixou de ser CRUD imediato de membership.
 
-O proximo passo correto e:
+Agora a trilha correta esta implementada:
 
-- introduzir `OrganizationMemberInvitation`;
-- mover a aba `Equipe` para um fluxo real de convite;
-- separar ownership;
-- tratar branding em trilha propria, com heranca e entitlement-aware UX.
+- `POST /organizations/current/team` emite `OrganizationMemberInvitation` pendente;
+- a equipe ativa continua em `GET /organizations/current/team`;
+- convites pendentes saem por `GET /organizations/current/team/invitations`;
+- reenvio e revogacao existem com rotacao de token;
+- aceite publico e aceite autenticado reutilizam o mesmo `users.id` quando o usuario ja existe;
+- o onboarding da equipe organizacional nao cria organizacao nova;
+- envio por WhatsApp usa apenas instancia conectada da propria organizacao.
 
-Enquanto isso nao acontecer, o sistema continuara funcionando, mas com semantica errada:
+O backlog real deste plano ficou concentrado em:
 
-- "convite" que na verdade provisiona acesso;
-- onboarding que cria organizacao nova quando deveria apenas aceitar membership;
-- scoping de WhatsApp errado para identidade organizacional;
-- branding ainda insuficiente para governar as superficies do produto.
+- ownership transfer dedicado;
+- branding V1 expandido por entitlement;
+- heranca organizacao -> evento.
+
+Atualizacao de dependencia compartilhada em `2026-04-10 18:25:00 -03:00`:
+
+- [x] o slice event-scoped ja cobre emissao, aceite publico, aceite autenticado, reenvio e revogacao de convite;
+- [x] o slice event-scoped ja cobre envio por WhatsApp do evento/organizacao sem fallback para instancia global do sistema;
+- [x] o slice event-scoped ja cobre a superficie administrativa `/events/:eventId/access` no web;
+- [x] o slice organizacional em `/settings` agora usa a mesma semantica de convite pendente, aceite posterior, reenvio/revogacao e reutilizacao de `users.id`.
+
+Validacao complementar do slice organizacional em `2026-04-10 22:40:00 -03:00`:
+
+Backend:
+
+- `php artisan test tests/Feature/Organizations/OrganizationTeamInvitationContractTest.php tests/Feature/Organizations/OrganizationTeamInvitationCharacterizationTest.php tests/Feature/Organizations/OrganizationTest.php tests/Feature/EventTeam/EventTeamInvitationContractTest.php`
+  - `33 passed`, `303 assertions`
+
+Frontend:
+
+- `npx vitest run src/modules/settings/SettingsPage.test.tsx src/modules/settings/SettingsTeamInvitationFlow.contract.test.tsx src/modules/team-invitations/PublicOrganizationInvitationPage.test.tsx src/modules/event-team/EventAccessPage.test.tsx src/modules/event-invitations/PublicEventInvitationPage.test.tsx src/modules/events/EventDetailPage.test.tsx src/app/layouts/AppSidebar.test.tsx`
+  - `29 passed`
+
+Type-check:
+
+- `npm run type-check`
+  - `ok`
+
+Rotas organizacionais confirmadas nesta rodada:
+
+- `GET /api/v1/organizations/current/team/invitations`
+- `POST /api/v1/organizations/current/team`
+- `POST /api/v1/organizations/current/team/invitations/{invitation}/resend`
+- `POST /api/v1/organizations/current/team/invitations/{invitation}/revoke`
+- `GET /api/v1/public/organization-invitations/{token}`
+- `POST /api/v1/public/organization-invitations/{token}/accept`
+- `POST /api/v1/organization-invitations/{token}/accept`
+- `/convites/equipe/:token`
+
+Atualizacao de fechamento em `2026-04-10 23:07:23 -03:00`:
+
+- [x] erro real `SQLSTATE[42P01] relation "organization_member_invitations" does not exist` corrigido aplicando as migrations pendentes no banco local.
+- [x] ownership saiu definitivamente do convite generico e ganhou endpoint dedicado `POST /api/v1/organizations/current/team/ownership-transfer`.
+- [x] transferencia de titularidade exige owner atual ou admin global, rebaixa o owner anterior para `partner-manager`, promove o novo titular para `partner-owner` e registra activity log.
+- [x] `/settings > Equipe` ganhou acao separada `Tornar titular` com modal de confirmacao; o fluxo comum de convite continua sem expor `partner-owner`.
+- [x] branding V1 expandido ganhou colunas de organizacao: `logo_dark_path`, `favicon_path`, `watermark_path`, `cover_path`.
+- [x] branding V1 expandido ganhou endpoint dedicado `POST /api/v1/organizations/current/branding/assets`, sem sobrecarregar o endpoint legado de logo.
+- [x] dominio proprio passou a respeitar entitlement `branding.custom_domain`.
+- [x] assets premium passaram a respeitar entitlement `branding.expanded_assets` e `branding.watermark`, derivados do plano ativo.
+- [x] `/auth/me` e access matrix agora expõem os novos entitlements e URLs de ativos de branding da organizacao.
+- [x] eventos ganharam `inherit_branding = true` por padrao e `effective_branding` nos resources.
+- [x] `EventBrandingResolver` aplica fallback organizacao -> evento sem copiar dados desnecessariamente para cada evento.
+- [x] superficies publicas principais de upload, busca facial publica e Play passam a usar o branding efetivo quando o evento nao tiver asset proprio.
+- [x] foi corrigido um bug antigo em `GET /events?organization_id=...`: a query string vinha como string e era comparada estritamente com `currentOrganizationId` inteiro, gerando `403` indevido.
+
+Validacao executada nesta rodada:
+
+Backend:
+
+- `php artisan test tests/Feature/Organizations/OrganizationTest.php tests/Feature/Organizations/OrganizationOwnershipTransferTest.php tests/Feature/Organizations/OrganizationBrandingEntitlementTest.php tests/Feature/Events/EventBrandingInheritanceTest.php tests/Feature/Events/CreateEventTest.php tests/Feature/Events/EventBrandingUploadTest.php tests/Feature/Auth/MeTest.php tests/Feature/Auth/AccessMatrixTest.php`
+  - `59 passed`, `469 assertions`
+
+Frontend:
+
+- `npx vitest run src/modules/settings/SettingsPage.test.tsx src/modules/settings/SettingsTeamInvitationFlow.contract.test.tsx src/modules/team-invitations/PublicOrganizationInvitationPage.test.tsx`
+  - `23 passed`
+
+Type-check:
+
+- `npm run type-check`
+  - `ok`
+
+Rotas novas confirmadas nesta rodada:
+
+- `POST /api/v1/organizations/current/team/ownership-transfer`
+- `POST /api/v1/organizations/current/branding/assets`
+
+Pendencias reais para fechar 100% da trilha visual:
+
+- [ ] adicionar no editor de evento a opcao explicita `Herdar branding da organizacao`.
+- [ ] mostrar preview do `effective_branding` no editor/detalhe do evento, nao apenas no payload.
+- [ ] criar CTA comercial de upgrade quando o usuario tenta usar dominio proprio ou asset premium sem entitlement.
+- [ ] definir operacao completa de DNS/SSL para `custom_domain`, fora do escopo desta V1.

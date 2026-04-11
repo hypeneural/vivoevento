@@ -8,20 +8,63 @@ class CurrentOrganizationAccess
 {
     public static function canManageSettings(?User $user): bool
     {
-        return self::hasCurrentOrganization($user)
-            && self::hasPermissionOrGlobalAdmin($user, 'settings.manage');
+        if (! self::hasCurrentOrganization($user)) {
+            return false;
+        }
+
+        if (self::isGlobalAdmin($user)) {
+            return true;
+        }
+
+        $membership = self::currentMembership($user);
+
+        return in_array((string) $membership?->role_key, ['partner-owner', 'partner-manager'], true);
     }
 
     public static function canManageBranding(?User $user): bool
     {
-        return self::hasCurrentOrganization($user)
-            && self::hasPermissionOrGlobalAdmin($user, 'branding.manage');
+        if (! self::hasCurrentOrganization($user)) {
+            return false;
+        }
+
+        if (self::isGlobalAdmin($user)) {
+            return true;
+        }
+
+        $membership = self::currentMembership($user);
+
+        return (string) $membership?->role_key === 'partner-owner';
     }
 
     public static function canManageTeam(?User $user): bool
     {
-        return self::hasCurrentOrganization($user)
-            && self::hasPermissionOrGlobalAdmin($user, 'team.manage');
+        if (! self::hasCurrentOrganization($user)) {
+            return false;
+        }
+
+        if (self::isGlobalAdmin($user)) {
+            return true;
+        }
+
+        $membership = self::currentMembership($user);
+
+        return in_array((string) $membership?->role_key, ['partner-owner', 'partner-manager'], true);
+    }
+
+    public static function canTransferOwnership(?User $user): bool
+    {
+        if (! self::hasCurrentOrganization($user)) {
+            return false;
+        }
+
+        if (self::isGlobalAdmin($user)) {
+            return true;
+        }
+
+        $membership = self::currentMembership($user);
+
+        return (bool) $membership?->is_owner
+            && (string) $membership?->role_key === 'partner-owner';
     }
 
     private static function hasCurrentOrganization(?User $user): bool
@@ -29,13 +72,26 @@ class CurrentOrganizationAccess
         return $user !== null && $user->currentOrganization() !== null;
     }
 
-    private static function hasPermissionOrGlobalAdmin(?User $user, string $permission): bool
+    private static function isGlobalAdmin(?User $user): bool
     {
         if ($user === null) {
             return false;
         }
 
-        return $user->can($permission)
-            || $user->hasAnyRole(['super-admin', 'platform-admin']);
+        return $user->hasAnyRole(['super-admin', 'platform-admin']);
+    }
+
+    private static function currentMembership(?User $user): ?\App\Modules\Organizations\Models\OrganizationMember
+    {
+        $organization = $user?->currentOrganization();
+
+        if (! $user || ! $organization) {
+            return null;
+        }
+
+        return $user->organizationMembers()
+            ->active()
+            ->where('organization_id', $organization->id)
+            ->first();
     }
 }

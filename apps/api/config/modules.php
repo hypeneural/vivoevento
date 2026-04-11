@@ -37,6 +37,7 @@ return [
         'MediaProcessing' => App\Modules\MediaProcessing\Providers\MediaProcessingServiceProvider::class,
         'ContentModeration' => App\Modules\ContentModeration\Providers\ContentModerationServiceProvider::class,
         'FaceSearch' => App\Modules\FaceSearch\Providers\FaceSearchServiceProvider::class,
+        'EventPeople' => App\Modules\EventPeople\Providers\EventPeopleServiceProvider::class,
         'MediaIntelligence' => App\Modules\MediaIntelligence\Providers\MediaIntelligenceServiceProvider::class,
 
         // Etapa 3 — Experiência

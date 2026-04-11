@@ -4,6 +4,7 @@ namespace App\Modules\InboundMedia\Http\Controllers;
 
 use App\Modules\Analytics\Services\AnalyticsTracker;
 use App\Modules\Events\Models\Event;
+use App\Modules\Events\Support\EventBrandingResolver;
 use App\Modules\MediaProcessing\Jobs\GenerateMediaVariantsJob;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Services\MediaToolingStatusService;
@@ -26,7 +27,7 @@ class PublicUploadController extends BaseController
 
     public function show(string $uploadSlug, Request $request, AnalyticsTracker $analytics): JsonResponse
     {
-        $event = Event::with(['modules', 'faceSearchSettings', 'wallSettings'])
+        $event = Event::with(['modules', 'faceSearchSettings', 'wallSettings', 'organization'])
             ->where('upload_slug', $uploadSlug)
             ->firstOrFail();
 
@@ -48,7 +49,7 @@ class PublicUploadController extends BaseController
      */
     public function upload(Request $request, string $uploadSlug, AnalyticsTracker $analytics): JsonResponse
     {
-        $event = Event::with(['modules', 'faceSearchSettings', 'wallSettings'])
+        $event = Event::with(['modules', 'faceSearchSettings', 'wallSettings', 'organization'])
             ->where('upload_slug', $uploadSlug)
             ->firstOrFail();
 
@@ -113,6 +114,7 @@ class PublicUploadController extends BaseController
         $availability = $this->availabilityFor($event);
         $acceptsVideo = $this->publicUploadVideoEnabled($event);
         $videoMaxDurationSeconds = $acceptsVideo ? $this->publicUploadVideoMaxDurationSeconds($event) : null;
+        $branding = app(EventBrandingResolver::class)->resolve($event);
 
         return [
             'event' => [
@@ -120,12 +122,13 @@ class PublicUploadController extends BaseController
                 'title' => $event->title,
                 'slug' => $event->slug,
                 'upload_slug' => $event->upload_slug,
-                'cover_image_path' => $event->cover_image_path,
-                'cover_image_url' => $this->publicAssetUrl($event->cover_image_path),
-                'logo_path' => $event->logo_path,
-                'logo_url' => $this->publicAssetUrl($event->logo_path),
-                'primary_color' => $event->primary_color,
-                'secondary_color' => $event->secondary_color,
+                'cover_image_path' => $branding['cover_image_path'],
+                'cover_image_url' => $branding['cover_image_url'],
+                'logo_path' => $branding['logo_path'],
+                'logo_url' => $branding['logo_url'],
+                'primary_color' => $branding['primary_color'],
+                'secondary_color' => $branding['secondary_color'],
+                'effective_branding' => $branding,
                 'starts_at' => $event->starts_at?->toISOString(),
                 'location_name' => $event->location_name,
             ],

@@ -61,7 +61,6 @@ it('updates current organization details', function () {
         'name' => 'Novo Nome',
         'billing_email' => 'finance@test.com',
         'slug' => 'novo-nome',
-        'custom_domain' => 'eventos.novonome.com',
     ]);
 
     $this->assertApiSuccess($response);
@@ -70,7 +69,6 @@ it('updates current organization details', function () {
     expect($organization->trade_name)->toBe('Novo Nome');
     expect($organization->billing_email)->toBe('finance@test.com');
     expect($organization->slug)->toBe('novo-nome');
-    expect($organization->custom_domain)->toBe('eventos.novonome.com');
 });
 
 it('lists organization team', function () {
@@ -82,7 +80,7 @@ it('lists organization team', function () {
     expect($response->json('data'))->toBeArray();
 });
 
-it('invites and removes organization team members through current organization settings', function () {
+it('creates pending team invitations and still removes active team members through current organization settings', function () {
     [$user, $organization] = $this->actingAsOwner();
 
     $inviteResponse = $this->apiPost('/organizations/current/team', [
@@ -92,30 +90,40 @@ it('invites and removes organization team members through current organization s
             'phone' => '11999998888',
         ],
         'role_key' => 'partner-manager',
-        'is_owner' => false,
+        'send_via_whatsapp' => false,
     ]);
 
     $this->assertApiSuccess($inviteResponse, 201);
-    $memberId = $inviteResponse->json('data.id');
 
-    $this->assertDatabaseHas('users', [
-        'email' => 'equipe-nova@eventovivo.test',
-        'name' => 'Equipe Nova',
+    $this->assertDatabaseHas('organization_member_invitations', [
+        'id' => $inviteResponse->json('data.id'),
+        'organization_id' => $organization->id,
+        'role_key' => 'partner-manager',
+        'status' => 'pending',
+    ]);
+
+    $member = \App\Modules\Organizations\Models\OrganizationMember::query()->create([
+        'organization_id' => $organization->id,
+        'user_id' => \App\Modules\Users\Models\User::factory()->create([
+            'email' => 'equipe-ativa@eventovivo.test',
+            'phone' => '5511999990001',
+        ])->id,
+        'role_key' => 'partner-manager',
+        'is_owner' => false,
+        'status' => 'active',
+        'joined_at' => now(),
     ]);
 
     $this->assertDatabaseHas('organization_members', [
-        'id' => $memberId,
-        'organization_id' => $organization->id,
-        'role_key' => 'partner-manager',
-        'status' => 'active',
+        'id' => $member->id,
     ]);
 
-    $deleteResponse = $this->apiDelete("/organizations/current/team/{$memberId}");
+    $deleteResponse = $this->apiDelete("/organizations/current/team/{$member->id}");
 
     $deleteResponse->assertNoContent();
 
     $this->assertDatabaseMissing('organization_members', [
-        'id' => $memberId,
+        'id' => $member->id,
     ]);
 });
 
@@ -170,8 +178,10 @@ it('forbids viewers from managing current organization settings and team', funct
                 'email' => 'nao-pode@eventovivo.test',
             ],
             'role_key' => 'viewer',
+            'send_via_whatsapp' => false,
         ]),
     );
+    $this->assertApiForbidden($this->apiGet('/organizations/current/team/invitations'));
 });
 
 it('allows super admins to manage current organization settings and team even when legacy settings permissions are missing', function () {

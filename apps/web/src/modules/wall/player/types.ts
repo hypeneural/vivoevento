@@ -70,6 +70,19 @@ export type WallAssetStatus = 'idle' | 'loading' | 'ready' | 'stale' | 'error';
 export type WallLayoutKind = 'single' | 'board';
 export type WallReducedMotionSetting = 'always' | 'never' | 'user';
 export type WallPerformanceTier = 'performance' | 'premium' | 'preview';
+export type WallBoardBudgetDowngradeReason =
+  | 'small_stage'
+  | 'safe_area_pressure'
+  | 'runtime_budget';
+
+export interface WallBoardRuntimeTelemetry {
+  boardPieceCount: number;
+  boardBurstCount: number;
+  boardBudgetDowngradeCount: number;
+  decodeBacklogCount: number;
+  boardResetCount: number;
+  boardBudgetDowngradeReason: WallBoardBudgetDowngradeReason | null;
+}
 
 export type WallVideoPlaybackPhase =
   | 'idle'

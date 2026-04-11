@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 import { fallbackOptions } from '../manager-config';
+import { wallQueryOptions } from '../wall-query-options';
 import EventWallManagerPage from './EventWallManagerPage';
 
 const getEventDetailMock = vi.fn();
@@ -844,6 +845,20 @@ describe('EventWallManagerPage', () => {
 
     await waitFor(() => {
       expect(screen.getAllByText(/^Tudo salvo$/i).length).toBeGreaterThan(0);
+    });
+  }, 15000);
+
+  it('prefetches the simulation preview query for the active theme fingerprint before the visible simulation swaps', async () => {
+    const prefetchQuerySpy = vi.spyOn(QueryClient.prototype, 'prefetchQuery');
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(prefetchQuerySpy).toHaveBeenCalledWith(expect.objectContaining({
+        queryKey: expect.arrayContaining(['wall', '1', 'simulation']),
+        staleTime: wallQueryOptions.simulation.staleTime,
+        refetchOnReconnect: false,
+      }));
     });
   }, 15000);
 });

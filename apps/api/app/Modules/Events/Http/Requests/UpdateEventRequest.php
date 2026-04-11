@@ -31,6 +31,7 @@ class UpdateEventRequest extends FormRequest
             'secondary_color' => ['nullable', 'string', 'max:20'],
             'cover_image_path' => ['nullable', 'string', 'max:255'],
             'logo_path' => ['nullable', 'string', 'max:255'],
+            'inherit_branding' => ['nullable', 'boolean'],
             'retention_days' => ['nullable', 'integer', 'min:1', 'max:365'],
             'moderation_mode' => ['nullable', 'string', 'in:none,manual,ai'],
 
@@ -39,6 +40,7 @@ class UpdateEventRequest extends FormRequest
             'branding.secondary_color' => ['nullable', 'string', 'max:20'],
             'branding.cover_image_path' => ['nullable', 'string', 'max:255'],
             'branding.logo_path' => ['nullable', 'string', 'max:255'],
+            'branding.inherit_branding' => ['nullable', 'boolean'],
 
             'modules' => ['nullable', 'array'],
             'modules.live' => ['nullable', 'boolean'],

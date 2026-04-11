@@ -174,6 +174,7 @@ export default function EventWallManagerPage() {
   const [activeStageTab, setActiveStageTab] = useState<'live' | 'upcoming'>('live');
   const [activeInspectorTab, setActiveInspectorTab] = useState<'queue' | 'appearance' | 'ads'>('queue');
   const adFileInputRef = useRef<HTMLInputElement | null>(null);
+  const lastPreviewPrefetchSignatureRef = useRef('');
   const realtimeState = useWallRealtimeSync(eventId);
   const pollingFallback = useWallPollingFallback(realtimeState);
 
@@ -333,6 +334,22 @@ export default function EventWallManagerPage() {
     () => (normalizedWallSettings ? JSON.stringify(normalizedWallSettings) : ''),
     [normalizedWallSettings],
   );
+  const previewPrefetchSignature = useMemo(() => {
+    if (!managedWallSettings) {
+      return '';
+    }
+
+    return JSON.stringify({
+      layout: managedWallSettings.layout,
+      preset: managedWallSettings.theme_config?.preset ?? null,
+      anchor_mode: managedWallSettings.theme_config?.anchor_mode ?? null,
+      burst_intensity: managedWallSettings.theme_config?.burst_intensity ?? null,
+      hero_enabled: managedWallSettings.theme_config?.hero_enabled ?? null,
+      show_qr: managedWallSettings.show_qr ?? true,
+      show_branding: managedWallSettings.show_branding ?? true,
+      show_sender_credit: managedWallSettings.show_sender_credit ?? false,
+    });
+  }, [managedWallSettings]);
 
   useEffect(() => {
     if (!normalizedWallSettings || !liveSimulationFingerprint) {
@@ -349,10 +366,37 @@ export default function EventWallManagerPage() {
     return () => window.clearTimeout(timer);
   }, [liveSimulationFingerprint, normalizedWallSettings]);
 
+  useEffect(() => {
+    if (
+      eventId === ''
+      || !normalizedWallSettings
+      || !liveSimulationFingerprint
+      || !previewPrefetchSignature
+      || lastPreviewPrefetchSignatureRef.current === previewPrefetchSignature
+    ) {
+      return;
+    }
+
+    lastPreviewPrefetchSignatureRef.current = previewPrefetchSignature;
+
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.wall.simulation(eventId, liveSimulationFingerprint),
+      queryFn: () => simulateEventWall(eventId, normalizedWallSettings),
+      ...wallQueryOptions.simulation,
+    });
+  }, [
+    eventId,
+    liveSimulationFingerprint,
+    normalizedWallSettings,
+    previewPrefetchSignature,
+    queryClient,
+  ]);
+
   const simulationQuery = useQuery({
     queryKey: queryKeys.wall.simulation(eventId, simulationFingerprint || 'draft'),
     enabled: eventId !== '' && simulationDraft !== null && simulationFingerprint !== '',
     queryFn: () => simulateEventWall(eventId, simulationDraft as ApiWallSettings),
+    ...wallQueryOptions.simulation,
   });
 
   const diagnosticsSummary = diagnosticsQuery.data?.summary ?? settings?.diagnostics_summary ?? null;

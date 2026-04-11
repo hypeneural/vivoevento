@@ -47,6 +47,7 @@ class Event extends Model
         'qr_code_path',
         'primary_color',
         'secondary_color',
+        'inherit_branding',
         'public_url',
         'upload_url',
         'retention_days',
@@ -64,6 +65,7 @@ class Event extends Model
         'starts_at' => 'datetime',
         'ends_at' => 'datetime',
         'retention_days' => 'integer',
+        'inherit_branding' => 'boolean',
         'current_entitlements_json' => 'array',
         'purchased_plan_snapshot_json' => 'array',
         'default_whatsapp_instance_id' => 'integer',
@@ -191,6 +193,11 @@ class Event extends Model
     public function faceSearchSettings(): HasOne
     {
         return $this->hasOne(\App\Modules\FaceSearch\Models\EventFaceSearchSetting::class);
+    }
+
+    public function people(): HasMany
+    {
+        return $this->hasMany(\App\Modules\EventPeople\Models\EventPerson::class);
     }
 
     public function mediaIntelligenceSettings(): HasOne

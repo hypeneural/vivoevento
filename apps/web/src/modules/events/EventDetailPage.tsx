@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Save,
   Settings,
+  Users,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -425,6 +426,14 @@ export default function EventDetailPage() {
                 Editar dados
               </Link>
             </Button>
+            {can('events.manage_team') ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link to={`/events/${event.id}/access`}>
+                  <Users className="mr-1.5 h-3.5 w-3.5" />
+                  Gerenciar acessos
+                </Link>
+              </Button>
+            ) : null}
             {event.public_links.gallery.enabled && event.public_links.gallery.url ? (
               <Button variant="outline" size="sm" onClick={() => window.open(event.public_links.gallery.url!, '_blank', 'noopener,noreferrer')}>
                 <Link2 className="mr-1.5 h-3.5 w-3.5" />

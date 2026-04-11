@@ -225,6 +225,12 @@ export interface WallHeartbeatPayload {
   cache_hit_count: number;
   cache_miss_count: number;
   cache_stale_fallback_count: number;
+  board_piece_count?: number;
+  board_burst_count?: number;
+  board_budget_downgrade_count?: number;
+  decode_backlog_count?: number;
+  board_reset_count?: number;
+  board_budget_downgrade_reason?: 'small_stage' | 'safe_area_pressure' | 'runtime_budget' | null;
   last_sync_at?: string | null;
   last_fallback_reason?: string | null;
 }
@@ -290,6 +296,12 @@ export interface WallDiagnosticsPlayer {
   cache_miss_count: number;
   cache_stale_fallback_count: number;
   cache_hit_rate: number;
+  board_piece_count?: number | null;
+  board_burst_count?: number | null;
+  board_budget_downgrade_count?: number | null;
+  decode_backlog_count?: number | null;
+  board_reset_count?: number | null;
+  board_budget_downgrade_reason?: WallHeartbeatPayload['board_budget_downgrade_reason'];
   last_sync_at?: string | null;
   last_seen_at?: string | null;
   last_fallback_reason?: string | null;

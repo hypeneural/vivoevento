@@ -99,6 +99,9 @@ return [
     'waits' => [
         'redis:broadcasts' => (int) env('HORIZON_WAIT_BROADCASTS', 10),
         'redis:face-index' => (int) env('HORIZON_WAIT_FACE_INDEX', 180),
+        'redis:event-people-high' => (int) env('HORIZON_WAIT_EVENT_PEOPLE_HIGH', 20),
+        'redis:event-people-medium' => (int) env('HORIZON_WAIT_EVENT_PEOPLE_MEDIUM', 60),
+        'redis:event-people-low' => (int) env('HORIZON_WAIT_EVENT_PEOPLE_LOW', 180),
         'redis:media-variants' => (int) env('HORIZON_WAIT_MEDIA_VARIANTS', 45),
         'redis:media-audit' => (int) env('HORIZON_WAIT_MEDIA_AUDIT', 45),
         'redis:media-process' => (int) env('HORIZON_WAIT_MEDIA_PROCESS', 90),
@@ -317,6 +320,22 @@ return [
             'balanceMaxShift' => 1,
             'balanceCooldown' => 5,
         ],
+        'supervisor-event-people' => [
+            'connection' => 'redis',
+            'queue' => ['event-people-high', 'event-people-medium', 'event-people-low'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'maxProcesses' => 1,
+            'maxTime' => 1200,
+            'maxJobs' => 500,
+            'memory' => 256,
+            'tries' => 3,
+            'timeout' => 180,
+            'nice' => 0,
+            'backoff' => 15,
+            'balanceMaxShift' => 1,
+            'balanceCooldown' => 5,
+        ],
         'supervisor-media-safety' => [
             'connection' => 'redis',
             'queue' => ['media-safety'],
@@ -488,6 +507,10 @@ return [
                 'minProcesses' => (int) env('HORIZON_FACE_INDEX_MIN_PROCESSES', 1),
                 'maxProcesses' => (int) env('HORIZON_FACE_INDEX_MAX_PROCESSES', 2),
             ],
+            'supervisor-event-people' => [
+                'minProcesses' => (int) env('HORIZON_EVENT_PEOPLE_MIN_PROCESSES', 1),
+                'maxProcesses' => (int) env('HORIZON_EVENT_PEOPLE_MAX_PROCESSES', 2),
+            ],
             'supervisor-media-process' => [
                 'minProcesses' => (int) env('HORIZON_MEDIA_PROCESS_MIN_PROCESSES', 1),
                 'maxProcesses' => (int) env('HORIZON_MEDIA_PROCESS_MAX_PROCESSES', 3),
@@ -547,6 +570,9 @@ return [
                 'maxProcesses' => 1,
             ],
             'supervisor-face-index' => [
+                'maxProcesses' => 1,
+            ],
+            'supervisor-event-people' => [
                 'maxProcesses' => 1,
             ],
             'supervisor-media-process' => [

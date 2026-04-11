@@ -20,6 +20,9 @@ class OrganizationEntitlementResolverService
             ? ($subscription->plan?->features?->pluck('feature_value', 'feature_key')->all() ?? [])
             : [];
         $whiteLabel = $this->toBoolean($planFeatures['white_label.enabled'] ?? false);
+        $expandedBranding = $whiteLabel || $this->toBoolean($planFeatures['branding.expanded_assets'] ?? false);
+        $watermark = $expandedBranding
+            || $this->toBoolean($planFeatures['branding.watermark'] ?? $planFeatures['watermark'] ?? false);
 
         return [
             'version' => 1,
@@ -39,6 +42,8 @@ class OrganizationEntitlementResolverService
             'branding' => [
                 'white_label' => $whiteLabel,
                 'custom_domain' => $whiteLabel || $this->toBoolean($planFeatures['custom_domain'] ?? false),
+                'expanded_assets' => $expandedBranding,
+                'watermark' => $watermark,
             ],
             'source_summary' => array_values(array_filter([
                 $this->buildSubscriptionSummary($subscription),
@@ -66,6 +71,8 @@ class OrganizationEntitlementResolverService
             'branding' => [
                 'white_label' => false,
                 'custom_domain' => false,
+                'expanded_assets' => false,
+                'watermark' => false,
             ],
             'source_summary' => [],
         ];

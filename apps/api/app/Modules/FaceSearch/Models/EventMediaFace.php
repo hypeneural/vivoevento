@@ -73,6 +73,11 @@ class EventMediaFace extends Model
         return $this->belongsTo(\App\Modules\MediaProcessing\Models\EventMedia::class, 'event_media_id');
     }
 
+    public function personAssignments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Modules\EventPeople\Models\EventPersonFaceAssignment::class, 'event_media_face_id');
+    }
+
     public function scopeForEvent($query, int $eventId)
     {
         return $query->where('event_id', $eventId);

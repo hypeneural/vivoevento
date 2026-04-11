@@ -77,6 +77,8 @@ class AccessStateBuilderService
             'play_puzzle' => (bool) ($modules['play'] ?? false),
             'hub' => (bool) ($modules['hub'] ?? true),
             'white_label' => (bool) ($branding['white_label'] ?? false),
+            'branding_expanded_assets' => (bool) ($branding['expanded_assets'] ?? false),
+            'branding_watermark' => (bool) ($branding['watermark'] ?? false),
             'whatsapp_ingestion' => (bool) ($modules['whatsapp_ingestion'] ?? false),
             'analytics_advanced' => (bool) ($modules['analytics_advanced'] ?? false),
             'custom_domain' => (bool) ($branding['custom_domain'] ?? false),

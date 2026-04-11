@@ -5,15 +5,15 @@ const ROLE_LABELS: Record<string, string> = {
   platform_admin: 'Administrador da plataforma',
   'partner-owner': 'Proprietario',
   partner_owner: 'Proprietario',
-  'partner-manager': 'Gerente da organizacao',
-  partner_manager: 'Gerente da organizacao',
-  'event-operator': 'Operador de evento',
-  event_operator: 'Operador de evento',
+  'partner-manager': 'Gerente / Secretaria',
+  partner_manager: 'Gerente / Secretaria',
+  'event-operator': 'Operar eventos',
+  event_operator: 'Operar eventos',
   financial: 'Financeiro',
   financeiro: 'Financeiro',
   partner: 'Parceiro',
   client: 'Cliente',
-  viewer: 'Visualizador',
+  viewer: 'Acompanhar em leitura',
 };
 
 const ROLE_NAME_FALLBACKS: Record<string, string> = {
@@ -22,10 +22,10 @@ const ROLE_NAME_FALLBACKS: Record<string, string> = {
   'owner da organizacao': 'Proprietario',
   'owner da organização': 'Proprietario',
   owner: 'Proprietario',
-  'gerente da organizacao': 'Gerente',
+  'gerente da organizacao': 'Gerente / Secretaria',
   'gerente da organização': 'Gerente',
-  manager: 'Gerente',
-  'event operator': 'Operador de evento',
+  manager: 'Gerente / Secretaria',
+  'event operator': 'Operar eventos',
   'admin da plataforma': 'Administrador da plataforma',
 };
 
@@ -57,7 +57,7 @@ export function formatRoleLabel(roleKey?: string | null, fallbackName?: string |
     return fallbackName;
   }
 
-  return 'Visualizador';
+  return 'Acompanhar em leitura';
 }
 
 export function formatUserStatusLabel(status?: string | null): string {

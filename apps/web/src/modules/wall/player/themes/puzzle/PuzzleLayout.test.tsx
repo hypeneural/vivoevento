@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { PuzzleLayout } from './PuzzleLayout';
 import type { WallRuntimeItem, WallSettings } from '../../types';
+import { applyStageGeometryToWallSettings, resolveWallStageGeometry } from '../../hooks/useStageGeometry';
 
 function makeItem(id: string): WallRuntimeItem {
   return {
@@ -112,5 +113,32 @@ describe('PuzzleLayout', () => {
       screen.getAllByTestId(/puzzle-piece-/)
         .filter((piece) => piece.getAttribute('data-strong-animation') === 'true'),
     ).toHaveLength(1);
+  });
+
+  it('honors the stage-aware downgrade and renders the compact preset when safe area pressure shrinks the board', () => {
+    const stageAwareSettings = applyStageGeometryToWallSettings(
+      makeSettings({ preset: 'standard' }),
+      resolveWallStageGeometry({
+        width: 1024,
+        height: 576,
+        showQr: true,
+        showBranding: true,
+        showSenderCredit: true,
+        preferredPreset: 'standard',
+      }),
+    );
+
+    render(
+      <PuzzleLayout
+        media={makeItem('current')}
+        settings={stageAwareSettings}
+        slots={['a', 'b', 'c', 'd', 'e', 'f'].map((id) => makeItem(id))}
+        activeSlotIndexes={[0, 1]}
+        maxStrongAnimations={1}
+      />,
+    );
+
+    expect(screen.getByTestId('puzzle-board')).toHaveAttribute('data-preset', 'compact');
+    expect(screen.getByTestId('puzzle-board')).toHaveAttribute('data-piece-count', '6');
   });
 });

@@ -53,6 +53,10 @@ class CreateEventAction
                 $data['logo_path'] = $branding['logo_path'] ?? null;
             }
 
+            $data['inherit_branding'] = array_key_exists('inherit_branding', $branding)
+                ? (bool) $branding['inherit_branding']
+                : (bool) ($data['inherit_branding'] ?? true);
+
             // Apply privacy
             $data['visibility'] = $privacy['visibility'] ?? 'public';
             $data['moderation_mode'] = $privacy['moderation_mode'] ?? 'manual';

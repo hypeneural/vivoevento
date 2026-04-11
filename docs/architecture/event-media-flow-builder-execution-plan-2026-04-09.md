@@ -1168,12 +1168,18 @@ Status em `2026-04-10`:
 - [x] `EventJourneyController` criado;
 - [x] `EventJourneyResource` criado;
 - [x] rota `GET /api/v1/events/{event}/journey-builder` registrada no modulo `Events`;
+- [x] rota `PATCH /api/v1/events/{event}/journey-builder` registrada no modulo `Events`;
 - [x] leitura usa `authorize('view', $event)` e envelope padrao do `BaseController`;
+- [x] escrita usa `UpdateEventJourneyRequest`, `authorize('update', $event)` e envelope padrao do `BaseController`;
 - [x] o endpoint retorna a projection read-only completa com `meta.request_id`;
 - [x] `GET` autorizado validado;
 - [x] `GET` cross-organization validado com `403`;
+- [x] `PATCH` autorizado validado;
+- [x] `PATCH` invalido validado com `422`;
+- [x] `PATCH` sem permissao validado com `403`;
+- [x] o payload final do `PATCH` preserva o mesmo shape da projection de leitura;
 - [x] budget do endpoint protegido com `expectsDatabaseQueryCount(14)` no cenario read-only completo;
-- [ ] `PATCH /events/{event}/journey-builder` continua pendente e depende das `Tarefas 1.5` e `1.6`.
+- [x] o `PATCH /events/{event}/journey-builder` ficou fechado depois da `Tarefa 1.6`.
 
 Bateria validada em `2026-04-10`:
 
@@ -1198,6 +1204,18 @@ Resultado:
 
 - `44` testes passaram;
 - `349` assertions passaram.
+
+Revalidacao do `PATCH` em `2026-04-10`:
+
+```bash
+cd apps/api
+php artisan test tests/Unit/Events/UpdateEventJourneyActionTest.php tests/Feature/Events/EventJourneyControllerTest.php
+```
+
+Resultado:
+
+- `11` testes passaram;
+- `125` assertions passaram.
 
 ### Tarefa 1.5 - Criar `UpdateEventJourneyRequest`
 
@@ -1291,6 +1309,34 @@ Casos obrigatorios:
 - reply fixed_random persiste templates;
 - reply ai persiste preset/override.
 
+Status em `2026-04-10`:
+
+- [x] `UpdateEventJourneyAction` criado no modulo `Events`;
+- [x] a action abre transacao externa para orquestrar o save agregado;
+- [x] `UpdateEventAction` foi reutilizada para `moderation_mode`, `modules`, `intake_defaults` e `intake_channels`;
+- [x] `UpsertEventContentModerationSettingsAction` foi ligada ao save agregado;
+- [x] `UpsertEventMediaIntelligenceSettingsAction` foi ligada ao save agregado;
+- [x] a action retorna a projection revalidada apos commit;
+- [x] o save ficou atomico para `Event`, intake, Safety e VLM;
+- [x] falhas de entitlement em intake continuam revertendo alteracoes;
+- [x] `gate + skip` passou a falhar tambem dentro do orquestrador, protegendo rollback real;
+- [x] `reply_text_mode=fixed_random` persiste templates no save agregado;
+- [x] `reply_text_mode=ai` persiste `reply_prompt_preset_id` e `reply_prompt_override`;
+- [x] o `PATCH` do controller passou a usar a action transacional e devolver a projection final.
+
+Bateria validada em `2026-04-10`:
+
+```bash
+cd apps/api
+php artisan test tests/Unit/Events/UpdateEventJourneyActionTest.php tests/Feature/Events/EventJourneyControllerTest.php
+php artisan test tests/Unit/Events/UpdateEventJourneyActionTest.php tests/Unit/Events/UpdateEventJourneyRequestTest.php tests/Feature/Events/EventJourneyControllerTest.php tests/Unit/Events/EventJourneyProjectionDataTest.php tests/Unit/Events/BuildEventJourneySummaryActionTest.php tests/Unit/Events/BuildEventJourneyProjectionActionTest.php tests/Feature/Events/EventJourneyArchitectureCharacterizationTest.php tests/Feature/Events/EventIntakeChannelsTest.php tests/Feature/Events/EventIntakeChannelsTelegramPrivateTest.php tests/Feature/ContentModeration/ContentModerationSettingsTest.php tests/Feature/MediaIntelligence/MediaIntelligenceSettingsTest.php
+```
+
+Resultado:
+
+- bateria focada da action/controlador passou com `11` testes e `125` assertions;
+- regressao ampliada passou com `62` testes e `442` assertions.
+
 ---
 
 ## Fase 2 - Frontend data layer e adapters
@@ -1321,6 +1367,27 @@ cd apps/web
 npm run type-check
 ```
 
+Status em `2026-04-10`:
+
+- [x] `apps/web/src/modules/events/journey/types.ts` criado;
+- [x] stages, nodes, branches, capabilities, scenarios e summary receberam types dedicados;
+- [x] a projection e o payload de update foram tipados com os conceitos reais do backend;
+- [x] os types de dominio continuam desacoplados de `Node` e `Edge` de `@xyflow/react`;
+- [x] a caracterizacao do modulo agora protege esse desacoplamento.
+
+Bateria validada em `2026-04-10`:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/event-media-flow-builder-architecture-characterization.test.ts
+npm run type-check
+```
+
+Resultado:
+
+- teste de caracterizacao do modulo passou com `4` testes;
+- `type-check` passou sem erros.
+
 ### Tarefa 2.2 - Criar API client e query keys
 
 Subtarefas:
@@ -1345,6 +1412,29 @@ Testes:
 cd apps/web
 npm run test -- src/modules/events/journey/__tests__/api.test.ts
 ```
+
+Status em `2026-04-10`:
+
+- [x] `apps/web/src/modules/events/journey/api.ts` criado;
+- [x] `getEventJourneyBuilder` e `updateEventJourneyBuilder` ligados ao endpoint agregador;
+- [x] `queryKeys.events.journeyBuilder(id)` adicionado em `apps/web/src/lib/query-client.ts`;
+- [x] a invalidacao apos save cobre a projection, os detalhes do evento e as settings relacionadas hoje consumidas por chaves legadas;
+- [x] a mutation helper aguarda o fim das invalidacoes relevantes antes de encerrar `onSuccess`;
+- [x] a tela futura continua livre de optimistic patch global da projection.
+
+Bateria validada em `2026-04-10`:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/api.test.ts src/modules/events/event-media-flow-builder-architecture-characterization.test.ts
+npm run type-check
+```
+
+Resultado:
+
+- `5` testes passaram na bateria de API do builder;
+- `4` testes passaram na caracterizacao do modulo;
+- `type-check` passou sem erros.
 
 ### Tarefa 2.3 - Criar `buildJourneyGraph`
 
@@ -1380,6 +1470,31 @@ Casos obrigatorios:
 - VLM gate cria branch de review/rejected;
 - wall desligado marca output wall como inativo.
 
+Status em `2026-04-10`:
+
+- [x] `apps/web/src/modules/events/journey/buildJourneyGraph.ts` criado;
+- [x] a projection agora vira `stages`, `nodes` e `edges` em uma camada pura e desacoplada do renderer;
+- [x] os IDs de edge seguem o padrao estavel `source:branch->target`;
+- [x] os handles de saida seguem o padrao estavel `branch:<branchId>`;
+- [x] as posicoes do canvas usam mapa deterministico por node conhecido, com fallback previsivel por stage;
+- [x] nodes e edges inativos continuam representados com classes semanticas, em vez de sumirem do fluxo.
+
+Bateria validada em `2026-04-10`:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/buildJourneyGraph.test.ts src/modules/events/journey/__tests__/api.test.ts src/modules/events/event-media-flow-builder-architecture-characterization.test.ts
+npm run test -- src/modules/events
+npm run type-check
+```
+
+Resultado:
+
+- `6` testes passaram na bateria do graph adapter;
+- `15` testes passaram na bateria combinada do builder inicial;
+- `47` testes passaram na regressao do modulo `events`;
+- `type-check` passou sem erros.
+
 ### Tarefa 2.4 - Criar resumo e simulador local
 
 Subtarefas:
@@ -1413,6 +1528,31 @@ Testes:
 cd apps/web
 npm run test -- src/modules/events/journey/__tests__/buildJourneyScenarios.test.ts
 ```
+
+Status em `2026-04-10`:
+
+- [x] `apps/web/src/modules/events/journey/buildJourneySummary.ts` criado;
+- [x] `apps/web/src/modules/events/journey/buildJourneyScenarios.ts` criado;
+- [x] `simulateJourneyScenario` passou a operar sobre `node IDs` e `edge IDs` estaveis do graph adapter;
+- [x] os nove cenarios curados da V1 foram fixados em uma catalogacao local guiada;
+- [x] o resumo humano agora aceita o estado base da projection ou a explicacao especifica de um cenario simulado;
+- [x] cenarios indisponiveis continuam explicados com `unavailableReason`, sem inventar IA nem mutacao de estado.
+
+Bateria validada em `2026-04-10`:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/buildJourneyScenarios.test.ts src/modules/events/journey/__tests__/buildJourneyGraph.test.ts src/modules/events/journey/__tests__/api.test.ts src/modules/events/event-media-flow-builder-architecture-characterization.test.ts
+npm run test -- src/modules/events
+npm run type-check
+```
+
+Resultado:
+
+- `6` testes passaram na bateria do simulador e resumo local;
+- `21` testes passaram na bateria combinada do builder inicial;
+- `53` testes passaram na regressao do modulo `events`;
+- `type-check` passou sem erros.
 
 ### Tarefa 2.5 - Criar `toJourneyUpdatePayload`
 

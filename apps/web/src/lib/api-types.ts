@@ -796,6 +796,16 @@ export interface MeOrganization {
 }
 
 export interface MeOrgBranding {
+  logo_path?: string | null;
+  logo_url?: string | null;
+  logo_dark_path?: string | null;
+  logo_dark_url?: string | null;
+  favicon_path?: string | null;
+  favicon_url?: string | null;
+  watermark_path?: string | null;
+  watermark_url?: string | null;
+  cover_path?: string | null;
+  cover_url?: string | null;
   primary_color: string | null;
   secondary_color: string | null;
   subdomain: string | null;
@@ -827,6 +837,8 @@ export interface MeResolvedEntitlements {
   branding: {
     white_label: boolean;
     custom_domain: boolean;
+    expanded_assets?: boolean;
+    watermark?: boolean;
   };
   source_summary: Array<{
     source_type: 'subscription';
@@ -1759,6 +1771,12 @@ export interface ApiWallHeartbeatPayload {
   cache_hit_count: number;
   cache_miss_count: number;
   cache_stale_fallback_count: number;
+  board_piece_count?: number;
+  board_burst_count?: number;
+  board_budget_downgrade_count?: number;
+  decode_backlog_count?: number;
+  board_reset_count?: number;
+  board_budget_downgrade_reason?: 'small_stage' | 'safe_area_pressure' | 'runtime_budget' | null;
   last_sync_at?: string | null;
   last_fallback_reason?: string | null;
 }
@@ -1825,6 +1843,12 @@ export interface ApiWallDiagnosticsPlayer {
   cache_miss_count: number;
   cache_stale_fallback_count: number;
   cache_hit_rate: number;
+  board_piece_count?: number | null;
+  board_burst_count?: number | null;
+  board_budget_downgrade_count?: number | null;
+  decode_backlog_count?: number | null;
+  board_reset_count?: number | null;
+  board_budget_downgrade_reason?: ApiWallHeartbeatPayload['board_budget_downgrade_reason'];
   last_sync_at?: string | null;
   last_seen_at?: string | null;
   last_fallback_reason?: string | null;

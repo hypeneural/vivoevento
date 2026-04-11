@@ -358,6 +358,36 @@ describe('useWallPlayer', () => {
     }));
   });
 
+  it('includes board runtime telemetry counters in the heartbeat payload', async () => {
+    const { result } = renderHook(() => useWallPlayer('ABCD1234'));
+
+    await flushAsyncWork();
+
+    act(() => {
+      result.current.setBoardRuntimeTelemetry({
+        boardPieceCount: 6,
+        boardBurstCount: 4,
+        boardBudgetDowngradeCount: 2,
+        decodeBacklogCount: 1,
+        boardResetCount: 3,
+        boardBudgetDowngradeReason: 'runtime_budget',
+      });
+    });
+
+    await flushAsyncWork();
+
+    const payload = sendWallHeartbeatMock.mock.calls.at(-1)?.[1];
+
+    expect(payload).toEqual(expect.objectContaining({
+      board_piece_count: 6,
+      board_burst_count: 4,
+      board_budget_downgrade_count: 2,
+      decode_backlog_count: 1,
+      board_reset_count: 3,
+      board_budget_downgrade_reason: 'runtime_budget',
+    }));
+  });
+
   it('handles a clear-cache player command from realtime', async () => {
     renderHook(() => useWallPlayer('ABCD1234'));
 

@@ -1352,6 +1352,16 @@ Resultado:
 - `bash -n` dos scripts de ops/deploy relevantes (`bootstrap-host`, `verify-host`, `homologate-wall-video`, `healthcheck`, `deploy`, `smoke-test`) -> `PASS`
 - `WallVideoOpsRunbookCharacterizationTest + MediaToolingStatusCommandTest + PublicUploadTest + InboundMediaPipelineTest + WallVideoAnalyticsTrackingTest + WallDiagnosticsTest` -> `PASS`, `32` testes, `310` assertions
 - testes frontend focados em manager/diagnostics/heartbeat -> `PASS`, `4` arquivos, `11` testes
+- validacao remota na VPS Ubuntu `24.04`:
+  - `apt-get install -y ffmpeg jq` -> `PASS`
+  - `php artisan media:tooling-status` em `/var/www/eventovivo/current/apps/api` -> `Status: ready`
+  - `bash /var/www/eventovivo/scripts/healthcheck.sh /var/www/eventovivo/current` -> `release ok`
+  - `bash /var/www/eventovivo/scripts/verify-host.sh --require-shared-env --no-sudo` -> `Host verification completed`
+  - `bash /var/www/eventovivo/scripts/homologate-wall-video.sh ...` -> relatorio salvo em `/var/www/eventovivo/shared/wall-video-homologation/20260410T220918Z-wall-live-xdq0pubs-vps-ubuntu-24-04-saudavel-server-curl.md`
+  - inventario real no momento da rodada:
+    - `publishedApprovedVideos = 0`
+    - `liveWalls = 1`
+    - `wall_player_runtime_statuses = 0`
 
 Observacao importante:
 
@@ -1582,6 +1592,8 @@ Para video, o estado atual ja saiu da zona de "slide com tag `<video>`" e entrou
 
 O que ainda falta para chamar a trilha de video de premium e previsivel ponta a ponta e:
 
-1. executar o provisionamento de `ffmpeg` / `ffprobe` nos workers reais e ambientes remotos usando o runbook/scripts agora presentes no repo;
+1. replicar esse provisionamento de `ffmpeg` / `ffprobe` em qualquer worker/host adicional que ainda nao tenha passado por `media:tooling-status`;
 2. rodar a homologacao real por classe de device e rede com a nova telemetria de heartbeat;
+   - a VPS principal Ubuntu `24.04` ja foi provisionada e validada;
+   - o fechamento da matriz ainda depende de wall com video publicado/aprovado e de player real conectado enviando heartbeat;
 3. melhorar a estrategia de cache/preload para cenarios degradados sem depender cedo de `Service Worker`.

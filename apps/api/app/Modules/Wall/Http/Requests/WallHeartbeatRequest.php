@@ -53,6 +53,12 @@ class WallHeartbeatRequest extends FormRequest
             'cache_hit_count' => ['required', 'integer', 'min:0', 'max:1000000'],
             'cache_miss_count' => ['required', 'integer', 'min:0', 'max:1000000'],
             'cache_stale_fallback_count' => ['required', 'integer', 'min:0', 'max:1000000'],
+            'board_piece_count' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'board_burst_count' => ['nullable', 'integer', 'min:0', 'max:1000000'],
+            'board_budget_downgrade_count' => ['nullable', 'integer', 'min:0', 'max:1000000'],
+            'decode_backlog_count' => ['nullable', 'integer', 'min:0', 'max:1000'],
+            'board_reset_count' => ['nullable', 'integer', 'min:0', 'max:1000000'],
+            'board_budget_downgrade_reason' => ['nullable', Rule::in(['small_stage', 'safe_area_pressure', 'runtime_budget'])],
             'last_sync_at' => ['nullable', 'date'],
             'last_fallback_reason' => ['nullable', 'string', 'max:120'],
         ];

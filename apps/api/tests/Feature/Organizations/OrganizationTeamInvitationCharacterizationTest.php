@@ -2,12 +2,13 @@
 
 use App\Modules\Organizations\Models\Organization;
 use App\Modules\Organizations\Models\OrganizationMember;
+use App\Modules\Organizations\Models\OrganizationMemberInvitation;
 use App\Modules\Users\Models\User;
 use App\Modules\WhatsApp\Jobs\SendWhatsAppMessageJob;
 use App\Modules\WhatsApp\Models\WhatsAppInstance;
 use Illuminate\Support\Facades\Queue;
 
-it('characterizes that the current team add flow immediately creates an active membership', function () {
+it('characterizes that the current team add flow now creates a pending invitation instead of immediate active membership', function () {
     [$owner, $organization] = $this->actingAsOwner();
 
     $response = $this->apiPost('/organizations/current/team', [
@@ -17,20 +18,20 @@ it('characterizes that the current team add flow immediately creates an active m
             'phone' => '11999990001',
         ],
         'role_key' => 'partner-manager',
-        'is_owner' => false,
+        'send_via_whatsapp' => false,
     ]);
 
     $this->assertApiSuccess($response, 201);
 
-    $membership = OrganizationMember::query()->findOrFail($response->json('data.id'));
+    $invitation = OrganizationMemberInvitation::query()->findOrFail($response->json('data.id'));
 
-    expect($membership->organization_id)->toBe($organization->id);
-    expect($membership->status)->toBe('active');
-    expect($membership->invited_at)->not->toBeNull();
-    expect($membership->joined_at)->not->toBeNull();
+    expect($invitation->organization_id)->toBe($organization->id);
+    expect($invitation->status)->toBe('pending');
+    expect($invitation->token)->not->toBe('');
+    expect(OrganizationMember::query()->where('organization_id', $organization->id)->count())->toBe(1);
 });
 
-it('characterizes that the current generic team flow can create an additional owner directly', function () {
+it('characterizes that the current generic team flow no longer allows creating an additional owner directly', function () {
     [$owner, $organization] = $this->actingAsOwner();
 
     $response = $this->apiPost('/organizations/current/team', [
@@ -40,17 +41,10 @@ it('characterizes that the current generic team flow can create an additional ow
             'phone' => '11999990002',
         ],
         'role_key' => 'partner-owner',
-        'is_owner' => true,
+        'send_via_whatsapp' => false,
     ]);
 
-    $this->assertApiSuccess($response, 201);
-
-    expect(
-        OrganizationMember::query()
-            ->where('organization_id', $organization->id)
-            ->where('is_owner', true)
-            ->count()
-    )->toBeGreaterThanOrEqual(2);
+    $this->assertApiValidationError($response, ['role_key']);
 });
 
 it('characterizes that signup otp verification creates a brand new organization today', function () {
@@ -135,6 +129,7 @@ it('characterizes that inviting an existing platform user by whatsapp reuses the
             'phone' => '(11) 99912-3456',
         ],
         'role_key' => 'event-operator',
+        'send_via_whatsapp' => false,
     ]);
 
     $this->assertApiSuccess($responseA, 201);
@@ -148,6 +143,7 @@ it('characterizes that inviting an existing platform user by whatsapp reuses the
             'phone' => '(11) 99912-3456',
         ],
         'role_key' => 'event-operator',
+        'send_via_whatsapp' => false,
     ]);
 
     $this->assertApiSuccess($responseB, 201);
@@ -157,7 +153,8 @@ it('characterizes that inviting an existing platform user by whatsapp reuses the
     $existingUser->refresh();
 
     expect(
-        $existingUser->organizationMembers()
+        OrganizationMemberInvitation::query()
+            ->where('existing_user_id', $existingUser->id)
             ->whereIn('organization_id', [$organizationA->id, $organizationB->id])
             ->count()
     )->toBe(2);

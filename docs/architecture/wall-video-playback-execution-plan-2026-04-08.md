@@ -134,6 +134,16 @@ Backend:
   - `4 arquivos`
   - `11 testes`
   - `PASS`
+- validacao na VPS real Ubuntu `24.04`:
+  - `apt-get install -y ffmpeg jq` -> `PASS`
+  - `cd /var/www/eventovivo/current/apps/api && php artisan media:tooling-status` -> `Status: ready`
+  - `bash /var/www/eventovivo/scripts/healthcheck.sh /var/www/eventovivo/current` -> `release ok`
+  - `bash /var/www/eventovivo/scripts/verify-host.sh --require-shared-env --no-sudo` -> `Host verification completed`
+  - `bash /var/www/eventovivo/scripts/homologate-wall-video.sh ...` -> relatorio salvo em `/var/www/eventovivo/shared/wall-video-homologation/20260410T220918Z-wall-live-xdq0pubs-vps-ubuntu-24-04-saudavel-server-curl.md`
+  - inventario no momento da rodada:
+    - `publishedApprovedVideos = 0`
+    - `liveWalls = 1`
+    - `wall_player_runtime_statuses = 0`
 - `cd apps/api && php artisan test tests/Feature/Wall/PublicWallBootTest.php`
   - `4 testes`
   - `61 assertions`
@@ -259,7 +269,8 @@ Leitura de produto derivada dessas limitacoes:
 - [x] rollout oficial por evento/wall/canal no manager e no backend (`public_upload_video_enabled` / `private_inbound_video_enabled`)
 - [x] scripts e comando operacional para replicar provisionamento de `ffmpeg` / `ffprobe` fora do repositorio
 - [x] automacao de host Ubuntu e runbook versionado para homologacao real do wall video
-- [ ] provisionar `ffmpeg` / `ffprobe` nos workers reais e ambientes remotos
+- [x] provisionar `ffmpeg` / `ffprobe` em pelo menos um host remoto Ubuntu `24.04` e validar por `media:tooling-status`, `healthcheck` e `verify-host`
+- [ ] replicar esse provisionamento em qualquer worker/host adicional do rollout
 - [ ] executar a matriz real de homologacao por classe de device e rede em ambiente controlado
 
 ## Escopo da primeira entrega
@@ -1094,6 +1105,7 @@ Criterio de aceite:
 - video premium so sobe quando o comportamento esta previsivel em runtime, nao apenas bonito em laboratorio;
 - pelo menos um ambiente remoto Windows ou Ubuntu precisa fechar `media:tooling-status` como `ready`;
 - a matriz de homologacao precisa produzir heartbeat com perfil de hardware/rede e confirmar pelo menos um caso de `video_start`, `video_first_frame` e `video_complete` ou `video_interrupted_by_cap` sem ambiguidade operacional.
+- nesta rodada, o host remoto Ubuntu `24.04` ja fechou tooling e release health, mas a matriz real continuou bloqueada por falta de video publicado/aprovado e de player real conectado.
 
 ## Mapa de arquivos a tocar
 

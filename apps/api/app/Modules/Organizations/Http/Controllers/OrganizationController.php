@@ -3,13 +3,15 @@
 namespace App\Modules\Organizations\Http\Controllers;
 
 use App\Modules\Organizations\Actions\CreateOrganizationAction;
-use App\Modules\Organizations\Actions\InviteCurrentOrganizationTeamMemberAction;
 use App\Modules\Organizations\Actions\RemoveCurrentOrganizationTeamMemberAction;
+use App\Modules\Organizations\Actions\TransferCurrentOrganizationOwnershipAction;
+use App\Modules\Organizations\Actions\UploadCurrentOrganizationBrandingAssetAction;
 use App\Modules\Organizations\Actions\UploadCurrentOrganizationLogoAction;
 use App\Modules\Organizations\Actions\UpdateOrganizationAction;
 use App\Modules\Organizations\Enums\OrganizationType;
-use App\Modules\Organizations\Http\Requests\InviteCurrentOrganizationTeamMemberRequest;
 use App\Modules\Organizations\Http\Requests\StoreOrganizationRequest;
+use App\Modules\Organizations\Http\Requests\TransferCurrentOrganizationOwnershipRequest;
+use App\Modules\Organizations\Http\Requests\UploadCurrentOrganizationBrandingAssetRequest;
 use App\Modules\Organizations\Http\Requests\UploadCurrentOrganizationLogoRequest;
 use App\Modules\Organizations\Http\Requests\UpdateCurrentOrganizationBrandingRequest;
 use App\Modules\Organizations\Http\Requests\UpdateCurrentOrganizationRequest;
@@ -107,6 +109,24 @@ class OrganizationController extends BaseController
     }
 
     /**
+     * POST /api/v1/organizations/current/branding/assets
+     */
+    public function uploadBrandingAsset(
+        UploadCurrentOrganizationBrandingAssetRequest $request,
+        UploadCurrentOrganizationBrandingAssetAction $action,
+    ): JsonResponse {
+        $org = $request->user()->currentOrganization();
+
+        if (! $org) {
+            return $this->error('Nenhuma organizacao encontrada', 404);
+        }
+
+        return $this->success(
+            $action->execute($org, $request->user(), (string) $request->string('kind'), $request->file('asset')),
+        );
+    }
+
+    /**
      * GET /api/v1/organizations/current/team
      */
     public function team(Request $request): JsonResponse
@@ -129,24 +149,6 @@ class OrganizationController extends BaseController
     }
 
     /**
-     * POST /api/v1/organizations/current/team
-     */
-    public function inviteTeamMember(
-        InviteCurrentOrganizationTeamMemberRequest $request,
-        InviteCurrentOrganizationTeamMemberAction $action,
-    ): JsonResponse {
-        $org = $request->user()->currentOrganization();
-
-        if (! $org) {
-            return $this->error('Nenhuma organizacao encontrada', 404);
-        }
-
-        $member = $action->execute($org, $request->validated(), $request->user());
-
-        return $this->created(new OrganizationMemberResource($member));
-    }
-
-    /**
      * DELETE /api/v1/organizations/current/team/{member}
      */
     public function removeTeamMember(
@@ -165,6 +167,26 @@ class OrganizationController extends BaseController
         $action->execute($org, $member, $request->user());
 
         return $this->noContent();
+    }
+
+    /**
+     * POST /api/v1/organizations/current/team/ownership-transfer
+     */
+    public function transferOwnership(
+        TransferCurrentOrganizationOwnershipRequest $request,
+        TransferCurrentOrganizationOwnershipAction $action,
+    ): JsonResponse {
+        $org = $request->user()->currentOrganization();
+
+        if (! $org) {
+            return $this->error('Nenhuma organizacao encontrada', 404);
+        }
+
+        $member = OrganizationMember::query()->findOrFail((int) $request->integer('member_id'));
+
+        return $this->success(
+            new OrganizationMemberResource($action->execute($org, $member, $request->user())),
+        );
     }
 
     public function index(Request $request): JsonResponse

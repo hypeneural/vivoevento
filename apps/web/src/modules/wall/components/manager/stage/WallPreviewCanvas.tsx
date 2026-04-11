@@ -12,6 +12,7 @@ import {
   WALL_TEXT_PRIMARY,
 } from '../../../player/design/tokens';
 import { isMultiItemLayout, resolveRenderableLayout, shouldRenderFloatingCaption } from '../../../player/engine/layoutStrategy';
+import { applyStageGeometryToWallSettings, useStageGeometry } from '../../../player/hooks/useStageGeometry';
 import type { WallRuntimeItem, WallSettings } from '../../../player/types';
 import { resolveManagedWallSettings } from '../../../wall-settings';
 
@@ -46,6 +47,7 @@ export function WallPreviewCanvas({
   upcomingItems,
 }: WallPreviewCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [sceneSize, setSceneSize] = useState(() => ({
     width: typeof window === 'undefined' ? DEFAULT_SCENE_WIDTH : window.innerWidth || DEFAULT_SCENE_WIDTH,
@@ -123,11 +125,31 @@ export function WallPreviewCanvas({
     () => (currentItem ? [currentItem, ...queueRuntimeItems] : queueRuntimeItems),
     [currentItem, queueRuntimeItems],
   );
-  const resolvedLayout = currentItem
+  const previewLayout = currentItem
     ? resolveRenderableLayout(previewSettings.layout, currentItem)
     : null;
+  const captionText = currentItem && previewLayout && shouldRenderFloatingCaption(previewLayout)
+    ? currentItem.caption
+    : null;
+  const stageGeometry = useStageGeometry(stageRef, {
+    enabled: previewSettings.layout === 'puzzle',
+    showQr: previewSettings.show_qr ?? true,
+    showBranding: previewSettings.show_branding ?? true,
+    showSenderCredit: previewSettings.show_sender_credit ?? false,
+    showFloatingCaption: Boolean(captionText),
+    preferredPreset: previewSettings.theme_config?.preset ?? 'standard',
+    width: sceneSize.width,
+    height: sceneSize.height,
+  });
+  const stageAwarePreviewSettings = useMemo(
+    () => applyStageGeometryToWallSettings(previewSettings, stageGeometry) as WallSettings,
+    [previewSettings, stageGeometry],
+  );
+  const resolvedLayout = currentItem
+    ? resolveRenderableLayout(stageAwarePreviewSettings.layout, currentItem)
+    : null;
   const isMultiLayout = resolvedLayout ? isMultiItemLayout(resolvedLayout) : false;
-  const captionText = currentItem && resolvedLayout && shouldRenderFloatingCaption(resolvedLayout)
+  const stageAwareCaptionText = currentItem && resolvedLayout && shouldRenderFloatingCaption(resolvedLayout)
     ? currentItem.caption
     : null;
 
@@ -177,12 +199,12 @@ export function WallPreviewCanvas({
               transform: `scale(${scale || 1})`,
             }}
           >
-            <div className="relative h-full w-full overflow-hidden bg-neutral-950 text-white">
-              {previewSettings.background_url ? (
+            <div ref={stageRef} className="relative h-full w-full overflow-hidden bg-neutral-950 text-white">
+              {stageAwarePreviewSettings.background_url ? (
                 <>
                   <div
                     className="absolute inset-0 bg-cover bg-center opacity-40"
-                    style={{ backgroundImage: `url(${previewSettings.background_url})` }}
+                    style={{ backgroundImage: `url(${stageAwarePreviewSettings.background_url})` }}
                   />
                   <div className="absolute inset-0 bg-neutral-950/70 backdrop-blur-sm" />
                 </>
@@ -199,7 +221,7 @@ export function WallPreviewCanvas({
                 <>
                   <LayoutRenderer
                     media={currentItem}
-                    settings={previewSettings}
+                    settings={stageAwarePreviewSettings}
                     reducedMotion={true}
                     allItems={allItems}
                     eventId="preview"
@@ -207,20 +229,20 @@ export function WallPreviewCanvas({
                   />
 
                   <BrandingOverlay
-                    showBranding={previewSettings.show_branding ?? true}
-                    showQr={previewSettings.show_qr ?? true}
+                    showBranding={stageAwarePreviewSettings.show_branding ?? true}
+                    showQr={stageAwarePreviewSettings.show_qr ?? true}
                     qrUrl={PREVIEW_QR_URL}
-                    showNeon={previewSettings.show_neon ?? false}
-                    neonText={previewSettings.neon_text}
-                    neonColor={previewSettings.neon_color}
-                    partnerLogoUrl={previewSettings.partner_logo_url}
-                    showSenderCredit={previewSettings.show_sender_credit ?? false}
+                    showNeon={stageAwarePreviewSettings.show_neon ?? false}
+                    neonText={stageAwarePreviewSettings.neon_text}
+                    neonColor={stageAwarePreviewSettings.neon_color}
+                    partnerLogoUrl={stageAwarePreviewSettings.partner_logo_url}
+                    showSenderCredit={stageAwarePreviewSettings.show_sender_credit ?? false}
                     senderCredit={currentItem.sender_name}
                     syncLabel="Previa"
                     reducedMotion={true}
                   />
 
-                  {!isMultiLayout && previewSettings.show_side_thumbnails ? (
+                  {!isMultiLayout && stageAwarePreviewSettings.show_side_thumbnails ? (
                     <SideThumbnails
                       leftItems={thumbnailColumns.leftItems}
                       rightItems={thumbnailColumns.rightItems}
@@ -229,10 +251,10 @@ export function WallPreviewCanvas({
 
                   <FeaturedBadge isFeatured={Boolean(currentItem.is_featured)} reducedMotion={true} />
 
-                  {captionText ? (
+                  {stageAwareCaptionText ? (
                     <div className="pointer-events-none absolute bottom-[max(88px,10vh)] left-1/2 z-20 w-[min(90vw,880px)] -translate-x-1/2">
                       <div className={`${WALL_CAPTION_PANEL} px-6 py-5`}>
-                        <p className={WALL_TEXT_PRIMARY}>{captionText}</p>
+                        <p className={WALL_TEXT_PRIMARY}>{stageAwareCaptionText}</p>
                       </div>
                     </div>
                   ) : null}

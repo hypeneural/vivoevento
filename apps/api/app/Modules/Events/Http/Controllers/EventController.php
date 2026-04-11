@@ -14,6 +14,7 @@ use App\Modules\Events\Http\Resources\EventResource;
 use App\Modules\Events\Models\Event;
 use App\Modules\Events\Queries\ListEventsQuery;
 use App\Modules\Events\Support\EventCommercialStatusService;
+use App\Modules\Events\Support\EventBrandingResolver;
 use App\Modules\Events\Support\EventIntakeBlacklistStateBuilder;
 use App\Modules\Events\Support\EventIntakeChannelsStateBuilder;
 use App\Modules\Events\Support\EventPublicLinksService;
@@ -30,7 +31,9 @@ class EventController extends BaseController
         $validated = $request->validated();
         $user = $request->user();
         $isGlobalAdmin = $user?->hasAnyRole(['super-admin', 'platform-admin']) ?? false;
-        $requestedOrganizationId = $validated['organization_id'] ?? null;
+        $requestedOrganizationId = isset($validated['organization_id'])
+            ? (int) $validated['organization_id']
+            : null;
         $currentOrganizationId = $user?->currentOrganization()?->id;
         $organizationId = $isGlobalAdmin
             ? $requestedOrganizationId
@@ -86,6 +89,7 @@ class EventController extends BaseController
         $payload = $links->links($event);
         $intakeState = $intakeStateBuilder->build($event);
         $blacklistState = $blacklistStateBuilder->build($event);
+        $effectiveBranding = app(EventBrandingResolver::class)->resolve($event);
 
         return $this->success([
             'id' => $event->id,
@@ -117,6 +121,8 @@ class EventController extends BaseController
             ] : null,
             'slug' => $event->slug,
             'upload_slug' => $event->upload_slug,
+            'inherit_branding' => (bool) ($event->inherit_branding ?? true),
+            'effective_branding' => $effectiveBranding,
             'public_url' => $event->publicHubUrl(),
             'upload_url' => $event->publicUploadUrl(),
             'upload_api_url' => $event->publicUploadApiUrl(),

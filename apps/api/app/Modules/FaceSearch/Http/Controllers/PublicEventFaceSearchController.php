@@ -4,6 +4,7 @@ namespace App\Modules\FaceSearch\Http\Controllers;
 
 use App\Modules\Analytics\Services\AnalyticsTracker;
 use App\Modules\Events\Models\Event;
+use App\Modules\Events\Support\EventBrandingResolver;
 use App\Modules\FaceSearch\Actions\SearchFacesBySelfieAction;
 use App\Modules\FaceSearch\Http\Requests\SearchPublicEventFaceSearchRequest;
 use App\Modules\FaceSearch\Http\Resources\EventFaceSearchRequestResource;
@@ -16,7 +17,7 @@ class PublicEventFaceSearchController extends BaseController
 {
     public function show(string $event, Request $request, AnalyticsTracker $analytics): JsonResponse
     {
-        $eventModel = Event::with(['modules', 'faceSearchSettings'])
+        $eventModel = Event::with(['modules', 'faceSearchSettings', 'organization'])
             ->where('slug', $event)
             ->firstOrFail();
 
@@ -29,18 +30,20 @@ class PublicEventFaceSearchController extends BaseController
         );
 
         $availability = $this->availabilityFor($eventModel);
+        $branding = app(EventBrandingResolver::class)->resolve($eventModel);
 
         return $this->success([
             'event' => [
                 'id' => $eventModel->id,
                 'title' => $eventModel->title,
                 'slug' => $eventModel->slug,
-                'cover_image_path' => $eventModel->cover_image_path,
-                'cover_image_url' => $this->publicAssetUrl($eventModel->cover_image_path),
-                'logo_path' => $eventModel->logo_path,
-                'logo_url' => $this->publicAssetUrl($eventModel->logo_path),
-                'primary_color' => $eventModel->primary_color,
-                'secondary_color' => $eventModel->secondary_color,
+                'cover_image_path' => $branding['cover_image_path'],
+                'cover_image_url' => $branding['cover_image_url'],
+                'logo_path' => $branding['logo_path'],
+                'logo_url' => $branding['logo_url'],
+                'primary_color' => $branding['primary_color'],
+                'secondary_color' => $branding['secondary_color'],
+                'effective_branding' => $branding,
                 'starts_at' => $eventModel->starts_at?->toISOString(),
                 'location_name' => $eventModel->location_name,
             ],
@@ -70,7 +73,7 @@ class PublicEventFaceSearchController extends BaseController
         SearchFacesBySelfieAction $action,
         AnalyticsTracker $analytics,
     ): JsonResponse {
-        $eventModel = Event::with(['modules', 'faceSearchSettings'])
+        $eventModel = Event::with(['modules', 'faceSearchSettings', 'organization'])
             ->where('slug', $event)
             ->firstOrFail();
 

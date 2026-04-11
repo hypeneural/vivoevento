@@ -2,6 +2,7 @@
 
 namespace App\Modules\Events\Http\Resources;
 
+use App\Modules\Events\Support\EventBrandingResolver;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Storage;
@@ -13,6 +14,7 @@ class EventListResource extends JsonResource
         $organizationName = $this->organization?->trade_name
             ?? $this->organization?->legal_name
             ?? $this->organization?->name;
+        $effectiveBranding = app(EventBrandingResolver::class)->resolve($this->resource);
 
         return [
             'id' => $this->id,
@@ -34,6 +36,8 @@ class EventListResource extends JsonResource
             'cover_image_url' => $this->assetUrl($this->cover_image_path),
             'primary_color' => $this->primary_color,
             'secondary_color' => $this->secondary_color,
+            'inherit_branding' => (bool) ($this->inherit_branding ?? true),
+            'effective_branding' => $effectiveBranding,
             'public_url' => $this->publicHubUrl(),
             'upload_url' => $this->publicUploadUrl(),
             'created_at' => $this->created_at?->toISOString(),

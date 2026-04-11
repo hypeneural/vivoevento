@@ -14,12 +14,15 @@
 
 import { MotionConfig } from 'framer-motion';
 import { AlertTriangle, Loader2 } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { useWallPlayer } from '../hooks/useWallPlayer';
 import { usePerformanceMode } from '../hooks/usePerformanceMode';
 import { resolveRenderableLayout, shouldRenderFloatingCaption } from '../engine/layoutStrategy';
 import { WALL_CAPTION_PANEL, WALL_TEXT_PRIMARY } from '../design/tokens';
 import { resolveWallMotionConfig } from '../themes/motion';
 import { getWallLayoutDefinition } from '../themes/registry';
+import { createBoardInstanceKey } from '../themes/board/types';
+import { resolvePuzzlePieceCount } from '../themes/puzzle/usePuzzleBoard';
 import AdOverlay from './AdOverlay';
 import BrandingOverlay from './BrandingOverlay';
 import ConnectionOverlay from './ConnectionOverlay';
@@ -33,6 +36,9 @@ import SideThumbnails from './SideThumbnails';
 import type { WallConnectionStatus } from '../types';
 import type { MediaSurfaceVideoControlProps } from './MediaSurface';
 import { useSideThumbnails } from '../hooks/useSideThumbnails';
+import { applyStageGeometryToWallSettings, useStageGeometry } from '../hooks/useStageGeometry';
+
+const DEFAULT_BOARD_SLOT_COUNT = 3;
 
 function FloatingCaption({ layout, text }: { layout: string; text?: string | null }) {
   if (!shouldRenderFloatingCaption(layout as any) || !text) return null;
@@ -70,25 +76,98 @@ export function WallPlayerRoot({ code }: { code: string }) {
     handleVideoEnded,
     handleVideoFailure,
     videoRuntimeConfig,
+    setBoardRuntimeTelemetry,
   } = useWallPlayer(code);
+  const stageContentRef = useRef<HTMLDivElement | null>(null);
+  const lastBoardMediaIdRef = useRef<string | null>(null);
+  const boardBurstCountRef = useRef(0);
+  const lastBoardIdentityKeyRef = useRef<string | null>(null);
+  const boardResetCountRef = useRef(0);
+  const lastBoardDowngradeSignatureRef = useRef<string | null>(null);
+  const boardBudgetDowngradeCountRef = useRef(0);
 
-  const { reducedEffects, modeLabel, performanceTier } = usePerformanceMode();
+  const { reducedEffects, modeLabel, performanceTier, runtimeBudget } = usePerformanceMode();
   const { visible: toastVisible, message: toastMessage } = useNewPhotoToast();
   const isAdShowing = Boolean(state.currentAd);
+  const captionVisible = Boolean(
+    currentItem
+    && state.settings
+    && !isAdShowing
+    && shouldRenderFloatingCaption(
+      resolveRenderableLayout(
+        state.settings.layout,
+        currentItem,
+        state.settings.video_multi_layout_policy ?? 'disallow',
+      ),
+    )
+    && currentItem.caption,
+  );
+  const stageGeometry = useStageGeometry(stageContentRef, {
+    enabled: state.settings?.layout === 'puzzle',
+    showQr:
+      (state.settings?.show_qr ?? true)
+      && state.status !== 'expired'
+      && state.status !== 'stopped'
+      && state.status !== 'error',
+    showBranding: state.settings?.show_branding ?? true,
+    showSenderCredit: !isAdShowing && (state.settings?.show_sender_credit ?? false),
+    showFloatingCaption: captionVisible,
+    preferredPreset: state.settings?.theme_config?.preset ?? 'standard',
+    width: typeof window === 'undefined' ? 1365 : window.innerWidth || 1365,
+    height: typeof window === 'undefined' ? 768 : window.innerHeight || 768,
+  });
+  const stageAwareSettings = state.settings
+    ? applyStageGeometryToWallSettings(state.settings, stageGeometry)
+    : null;
 
-  const activeLayout = currentItem && state.settings
+  const activeLayout = currentItem && stageAwareSettings
     ? resolveRenderableLayout(
-      state.settings.layout,
+      stageAwareSettings.layout,
       currentItem,
-      state.settings.video_multi_layout_policy ?? 'disallow',
+      stageAwareSettings.video_multi_layout_policy ?? 'disallow',
     )
     : null;
 
   const activeLayoutDefinition = getWallLayoutDefinition(
-    activeLayout ?? state.settings?.layout ?? 'fullscreen',
+    activeLayout ?? stageAwareSettings?.layout ?? 'fullscreen',
   );
   const motionConfig = resolveWallMotionConfig(activeLayoutDefinition.motion, reducedEffects);
   const isBoardLayout = activeLayoutDefinition.kind === 'board';
+  const effectivePuzzlePreset = stageAwareSettings?.theme_config?.preset ?? 'standard';
+  const preferredPuzzlePreset = state.settings?.theme_config?.preset ?? 'standard';
+  const isBoardRuntime = Boolean(currentItem && stageAwareSettings && isBoardLayout && !isAdShowing);
+  const boardPieceCount = !isBoardRuntime
+    ? 0
+    : activeLayout === 'puzzle'
+      ? resolvePuzzlePieceCount(effectivePuzzlePreset, runtimeBudget.maxBoardPieces)
+      : DEFAULT_BOARD_SLOT_COUNT;
+  const boardMediaSlotCount = !isBoardRuntime
+    ? 0
+    : activeLayout === 'puzzle' && (stageAwareSettings?.theme_config?.anchor_mode ?? 'none') !== 'none'
+      ? Math.max(0, boardPieceCount - 1)
+      : boardPieceCount;
+  const decodeBacklogCount = !isBoardRuntime
+    ? 0
+    : state.items
+      .filter((item) => (activeLayout === 'puzzle' ? item.type === 'image' : true))
+      .slice(0, boardMediaSlotCount)
+      .filter((item) => item.assetStatus === 'loading')
+      .length;
+  const preferredPuzzlePieceCount = preferredPuzzlePreset === 'compact' ? 6 : 9;
+  const boardBudgetDowngradeReason = !isBoardRuntime || activeLayout !== 'puzzle'
+    ? null
+    : stageGeometry.downgradeReason
+      ?? (boardPieceCount < preferredPuzzlePieceCount ? 'runtime_budget' : null);
+  const boardIdentityKey = !isBoardRuntime || !stageAwareSettings
+    ? null
+    : createBoardInstanceKey({
+      eventId: state.event?.id ?? code,
+      layout: activeLayout ?? stageAwareSettings.layout,
+      preset: stageAwareSettings.theme_config?.preset ?? null,
+      themeVersion: activeLayoutDefinition.version,
+      performanceTier,
+      reducedMotion: reducedEffects,
+    });
 
   const sideThumbs = useSideThumbnails(
     state.items,
@@ -96,7 +175,7 @@ export function WallPlayerRoot({ code }: { code: string }) {
     {
       enabled:
         state.status === 'playing'
-        && (state.settings?.show_side_thumbnails ?? false)
+        && (stageAwareSettings?.show_side_thumbnails ?? false)
         && !isBoardLayout
         && !isAdShowing,
     },
@@ -120,26 +199,81 @@ export function WallPlayerRoot({ code }: { code: string }) {
       }
     : null;
 
+  useEffect(() => {
+    if (!isBoardRuntime || !currentItem) {
+      return;
+    }
+
+    if (lastBoardMediaIdRef.current && lastBoardMediaIdRef.current !== currentItem.id) {
+      boardBurstCountRef.current += 1;
+    }
+
+    lastBoardMediaIdRef.current = currentItem.id;
+  }, [currentItem?.id, isBoardRuntime, currentItem]);
+
+  useEffect(() => {
+    if (!boardIdentityKey) {
+      return;
+    }
+
+    if (lastBoardIdentityKeyRef.current && lastBoardIdentityKeyRef.current !== boardIdentityKey) {
+      boardResetCountRef.current += 1;
+    }
+
+    lastBoardIdentityKeyRef.current = boardIdentityKey;
+  }, [boardIdentityKey]);
+
+  useEffect(() => {
+    if (!boardBudgetDowngradeReason) {
+      return;
+    }
+
+    const downgradeSignature = `${boardIdentityKey ?? activeLayout ?? 'board'}:${boardPieceCount}:${boardBudgetDowngradeReason}`;
+
+    if (lastBoardDowngradeSignatureRef.current !== downgradeSignature) {
+      boardBudgetDowngradeCountRef.current += 1;
+      lastBoardDowngradeSignatureRef.current = downgradeSignature;
+    }
+  }, [activeLayout, boardBudgetDowngradeReason, boardIdentityKey, boardPieceCount]);
+
+  useEffect(() => {
+    setBoardRuntimeTelemetry({
+      boardPieceCount: isBoardRuntime ? boardPieceCount : 0,
+      boardBurstCount: isBoardRuntime ? boardBurstCountRef.current : 0,
+      boardBudgetDowngradeCount: isBoardRuntime ? boardBudgetDowngradeCountRef.current : 0,
+      decodeBacklogCount: isBoardRuntime ? decodeBacklogCount : 0,
+      boardResetCount: isBoardRuntime ? boardResetCountRef.current : 0,
+      boardBudgetDowngradeReason: isBoardRuntime ? boardBudgetDowngradeReason : null,
+    });
+  }, [
+    boardBudgetDowngradeReason,
+    boardPieceCount,
+    currentItem?.id,
+    decodeBacklogCount,
+    isBoardRuntime,
+    setBoardRuntimeTelemetry,
+  ]);
+
   return (
     <MotionConfig
       reducedMotion={motionConfig.reducedMotion}
       transition={motionConfig.transition}
     >
-      <PlayerShell backgroundUrl={state.settings?.background_url}>
+      <PlayerShell backgroundUrl={stageAwareSettings?.background_url} contentRef={stageContentRef}>
       <BrandingOverlay
-        showBranding={state.settings?.show_branding ?? true}
+        showBranding={stageAwareSettings?.show_branding ?? true}
         showQr={
-          (state.settings?.show_qr ?? true)
+          (stageAwareSettings?.show_qr ?? true)
           && state.status !== 'expired'
           && state.status !== 'stopped'
           && state.status !== 'error'
         }
         qrUrl={state.event?.upload_url}
-        showNeon={state.settings?.show_neon ?? false}
-        neonText={state.settings?.neon_text}
-        neonColor={state.settings?.neon_color}
-        partnerLogoUrl={state.settings?.partner_logo_url}
-        showSenderCredit={!isAdShowing && (state.settings?.show_sender_credit ?? false)}
+        showNeon={stageAwareSettings?.show_neon ?? false}
+        neonText={stageAwareSettings?.neon_text}
+        neonColor={stageAwareSettings?.neon_color}
+        partnerLogoUrl={stageAwareSettings?.partner_logo_url}
+        showSenderCredit={!isAdShowing && (stageAwareSettings?.show_sender_credit ?? false)}
         senderCredit={isAdShowing ? null : currentItem?.sender_name}
         syncLabel={resolveSyncLabel(isSyncing, connectionStatus, modeLabel)}
         reducedMotion={reducedEffects}
@@ -181,7 +315,7 @@ export function WallPlayerRoot({ code }: { code: string }) {
           title="Telão pausado"
           message="O operador pausou temporariamente a exibição. As novas fotos continuam sendo sincronizadas e entram na fila quando o player voltar para ativo."
         />
-      ) : currentItem && state.settings ? (
+      ) : currentItem && stageAwareSettings ? (
         <>
           {state.currentAd ? (
             <AdOverlay
@@ -192,7 +326,7 @@ export function WallPlayerRoot({ code }: { code: string }) {
           ) : (
             <LayoutRenderer
               media={currentItem}
-              settings={state.settings}
+              settings={stageAwareSettings}
               reducedMotion={reducedEffects}
               allItems={state.items}
               videoControl={videoControl}
@@ -237,7 +371,7 @@ export function WallPlayerRoot({ code }: { code: string }) {
         <IdleScreen
           title={state.event?.title}
           code={state.event?.wall_code || code}
-          instructions={state.settings?.instructions_text}
+          instructions={stageAwareSettings?.instructions_text}
         />
       )}
       </PlayerShell>

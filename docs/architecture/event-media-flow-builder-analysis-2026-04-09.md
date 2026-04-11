@@ -356,6 +356,226 @@ Resultado:
 
 ---
 
+## Escrita transacional da jornada em `2026-04-10`
+
+A `Tarefa 1.6` foi concluida com `UpdateEventJourneyAction` e com a abertura final do `PATCH /api/v1/events/{event}/journey-builder`.
+
+O que entrou:
+
+- `UpdateEventJourneyAction` no modulo `Events`;
+- transacao externa para orquestrar `Event`, intake, Safety e VLM;
+- reuso de `UpdateEventAction` para estado base do evento;
+- reuso de `UpsertEventContentModerationSettingsAction` e `UpsertEventMediaIntelligenceSettingsAction`;
+- `EventJourneyController@update` usando `UpdateEventJourneyRequest`;
+- rota `PATCH /api/v1/events/{event}/journey-builder` no mesmo ownership do `GET`.
+
+Guardas criticos adicionados no orquestrador:
+
+- `modules.wall=true` continua protegido por entitlement;
+- `media_intelligence.mode=gate` rejeita `fallback_mode=skip` mesmo dentro da action;
+- `reply_text_mode=fixed_random` exige templates tambem no save agregado;
+- `provider_key=openrouter` continua validado contra o catalogo homologado local.
+
+Leitura pratica:
+
+- a jornada agora tem leitura e escrita coesas no modulo `Events`;
+- o frontend ja pode trabalhar com rascunho local e um unico CTA de salvar;
+- o retorno do `PATCH` ja volta em formato de projection revalidada, sem precisar compor varias respostas;
+- o rollback ficou real para os casos em que parte do estado ja teria sido escrita antes da falha.
+
+Bateria validada:
+
+```bash
+cd apps/api
+php artisan test tests/Unit/Events/UpdateEventJourneyActionTest.php tests/Feature/Events/EventJourneyControllerTest.php
+php artisan test tests/Unit/Events/UpdateEventJourneyActionTest.php tests/Unit/Events/UpdateEventJourneyRequestTest.php tests/Feature/Events/EventJourneyControllerTest.php tests/Unit/Events/EventJourneyProjectionDataTest.php tests/Unit/Events/BuildEventJourneySummaryActionTest.php tests/Unit/Events/BuildEventJourneyProjectionActionTest.php tests/Feature/Events/EventJourneyArchitectureCharacterizationTest.php tests/Feature/Events/EventIntakeChannelsTest.php tests/Feature/Events/EventIntakeChannelsTelegramPrivateTest.php tests/Feature/ContentModeration/ContentModerationSettingsTest.php tests/Feature/MediaIntelligence/MediaIntelligenceSettingsTest.php
+```
+
+Resultado:
+
+- `11` testes passaram na bateria focada de action + controller;
+- `125` assertions passaram na bateria focada;
+- `62` testes passaram na regressao ampliada;
+- `442` assertions passaram na regressao ampliada.
+
+## Types de dominio do frontend em `2026-04-10`
+
+A `Tarefa 2.1` tambem foi concluida para preparar o adapter do canvas sem acoplar a regra de negocio ao renderer visual.
+
+O que entrou:
+
+- `apps/web/src/modules/events/journey/types.ts`;
+- tipos para projection, stages, nodes, branches, capabilities, scenarios e summary;
+- tipo dedicado para `EventJourneyUpdatePayload`;
+- imports restritos aos tipos reais de `events`, `intake` e `ApiEnvelope`.
+
+Leitura pratica:
+
+- o dominio da jornada ja esta tipado antes da entrada do `@xyflow/react`;
+- o futuro graph adapter tera um contrato claro para transformar projection em `nodes/edges`;
+- o payload de update continua espelhando o backend real, sem introduzir DSL nova.
+
+Teste de protecao adicionado:
+
+- a caracterizacao `event-media-flow-builder-architecture-characterization.test.ts` agora garante que `journey/types.ts` nao importa `@xyflow/react` nem tipos `Node`/`Edge`.
+
+Bateria validada:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/event-media-flow-builder-architecture-characterization.test.ts
+npm run type-check
+```
+
+Resultado:
+
+- `4` testes passaram na caracterizacao do modulo;
+- `type-check` passou sem erros.
+
+## API client e query keys da jornada em `2026-04-10`
+
+A `Tarefa 2.2` foi concluida para ligar o frontend ao endpoint agregador sem espalhar fetch/mutation pela pagina.
+
+O que entrou:
+
+- `apps/web/src/modules/events/journey/api.ts`;
+- `getEventJourneyBuilder(eventId)`;
+- `updateEventJourneyBuilder(eventId, payload)`;
+- `eventJourneyBuilderQueryOptions(eventId)`;
+- `invalidateEventJourneyBuilderQueries(queryClient, eventId)`;
+- `eventJourneyBuilderMutationOptions(queryClient, eventId)`;
+- `queryKeys.events.journeyBuilder(id)` em `apps/web/src/lib/query-client.ts`.
+
+Decisoes de implementacao importantes:
+
+- a projection da jornada usa query key dedicada sob o namespace `events`;
+- o save continua agregado em um unico `PATCH`, sem chamadas paralelas para Safety, VLM e intake;
+- a mutation helper nao faz optimistic patch global da projection;
+- o `onSuccess` aguarda o fim das invalidacoes relevantes antes de encerrar, alinhado com a documentacao oficial do `TanStack Query`;
+- a invalidacao cobre tanto as novas keys da jornada quanto as superfices legadas que ainda usam chaves literais, como `event-detail`, `event-content-moderation-settings` e `event-media-intelligence-settings`.
+
+Leitura pratica:
+
+- o builder ja pode nascer com `useQuery` e `useMutation` sem inventar outra camada de cache;
+- o save do inspector pode depender de uma unica mutation;
+- depois do `PATCH`, a UI reidrata a partir da projection revalidada e nao de um remendo manual no client;
+- a convivência com telas antigas do modulo `events` continua segura durante a migracao.
+
+Referencias oficiais consideradas:
+
+- `TanStack Query - Query Keys`: https://tanstack.com/query/latest/docs/framework/react/guides/query-keys
+- `TanStack Query - Invalidations from Mutations`: https://tanstack.com/query/latest/docs/framework/react/guides/invalidations-from-mutations
+- `TanStack Query - useMutation`: https://tanstack.com/query/latest/docs/framework/react/reference/useMutation
+
+Bateria validada:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/api.test.ts src/modules/events/event-media-flow-builder-architecture-characterization.test.ts
+npm run type-check
+```
+
+Resultado:
+
+- `5` testes passaram na bateria de API do builder;
+- `4` testes passaram na caracterizacao do modulo;
+- `type-check` passou sem erros.
+
+## Graph adapter puro em `2026-04-10`
+
+A `Tarefa 2.3` tambem foi concluida para transformar a projection tipada em uma estrutura de grafo estavel antes da entrada do renderer visual.
+
+O que entrou:
+
+- `apps/web/src/modules/events/journey/buildJourneyGraph.ts`;
+- tipos locais de `JourneyGraphStageBand`, `JourneyGraphNode` e `JourneyGraphEdge`;
+- mapa de posicoes deterministico para os nodes reais da V1;
+- fallback previsivel por stage para nodes novos ou ainda nao mapeados;
+- class names semanticas por `kind`, `stage`, `status`, `active` e `editable`.
+
+Decisoes de implementacao importantes:
+
+- a camada continua desacoplada de `@xyflow/react`;
+- cada branch vira um source handle estavel no formato `branch:<branchId>`;
+- cada edge vira um ID estavel no formato `source:branch->target`;
+- branches inativas continuam representadas quando ajudam o usuario a entender por que um caminho nao esta operando;
+- nodes de output ou capability desligada continuam visiveis com `status-inactive` ou `status-locked`, em vez de sumirem.
+
+Leitura pratica:
+
+- o canvas futuro podera ser um renderer relativamente fino sobre esse adapter;
+- a simulacao de cenarios podera destacar nodes e edges por ID sem depender do DOM;
+- mudar o renderer visual no futuro nao exigira reescrever a logica de branching nem as regras de posicionamento.
+
+Bateria validada:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/buildJourneyGraph.test.ts src/modules/events/journey/__tests__/api.test.ts src/modules/events/event-media-flow-builder-architecture-characterization.test.ts
+npm run test -- src/modules/events
+npm run type-check
+```
+
+Resultado:
+
+- `6` testes passaram na bateria do graph adapter;
+- `15` testes passaram na bateria combinada do builder inicial;
+- `47` testes passaram na regressao do modulo `events`;
+- `type-check` passou sem erros.
+
+## Resumo e simulador local em `2026-04-10`
+
+A `Tarefa 2.4` foi concluida para fechar a camada de explicacao viva da jornada sem depender do canvas real nem de IA.
+
+O que entrou:
+
+- `apps/web/src/modules/events/journey/buildJourneySummary.ts`;
+- `apps/web/src/modules/events/journey/buildJourneyScenarios.ts`;
+- tipo local `EventJourneyBuiltScenario` em `journey/types.ts`;
+- `buildJourneyScenarios(projection, graph)`;
+- `simulateJourneyScenario(projection, graph, scenarioId)`;
+- `buildJourneySummary(projection, simulation?)`.
+
+Decisoes de implementacao importantes:
+
+- o resumo base continua vindo da projection revalidada do backend;
+- quando um cenario e simulado, o resumo local troca para a explicacao especifica daquele caminho;
+- a simulacao usa apenas `node IDs` e `edge IDs` estaveis do graph adapter;
+- a V1 fecha com nove cenarios curados:
+  - foto com legenda por WhatsApp privado
+  - foto sem legenda por grupo
+  - video por Telegram
+  - remetente bloqueado
+  - Safety bloqueou
+  - Safety pediu revisao
+  - VLM gate pediu revisao
+  - aprovado e publicado
+  - rejeitado com resposta
+- quando um cenario nao faz sentido na configuracao atual, ele continua visivel com `available=false` e `unavailableReason`, em vez de sumir.
+
+Leitura pratica:
+
+- o simulador da pagina ja pode destacar caminho sem tocar em DOM, timers do canvas ou renderer visual;
+- a explicacao humana muda por cenario sem precisar chamar IA;
+- a UX pode mostrar ao usuario tanto o comportamento geral do evento quanto o comportamento pontual de um caso de teste;
+- a tela continua sendo projection + simulacao local, nao um motor novo de regras.
+
+Bateria validada:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/buildJourneyScenarios.test.ts src/modules/events/journey/__tests__/buildJourneyGraph.test.ts src/modules/events/journey/__tests__/api.test.ts src/modules/events/event-media-flow-builder-architecture-characterization.test.ts
+npm run test -- src/modules/events
+npm run type-check
+```
+
+Resultado:
+
+- `6` testes passaram na bateria do simulador e resumo local;
+- `21` testes passaram na bateria combinada do builder inicial;
+- `53` testes passaram na regressao do modulo `events`;
+- `type-check` passou sem erros.
+
 ## Leitura real da stack atual
 
 ## Frontend auditado hoje

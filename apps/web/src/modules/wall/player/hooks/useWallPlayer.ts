@@ -11,13 +11,26 @@ import {
 } from '../heartbeat-storage';
 import { resolveWallRuntimeProfile } from '../runtime-profile';
 import { resolveWallCacheEnabled } from '../runtime-capabilities';
-import type { WallConnectionStatus, WallPlayerCommandPayload, WallRuntimeItem } from '../types';
+import type {
+  WallBoardRuntimeTelemetry,
+  WallConnectionStatus,
+  WallPlayerCommandPayload,
+  WallRuntimeItem,
+} from '../types';
 import { useWallEngine } from './useWallEngine';
 import { useWallRealtime } from './useWallRealtime';
 
 const RESYNC_INTERVAL_CONNECTED = 120_000;
 const RESYNC_INTERVAL_DEGRADED = 20_000;
 const HEARTBEAT_INTERVAL_MS = 20_000;
+const DEFAULT_BOARD_RUNTIME_TELEMETRY: WallBoardRuntimeTelemetry = {
+  boardPieceCount: 0,
+  boardBurstCount: 0,
+  boardBudgetDowngradeCount: 0,
+  decodeBacklogCount: 0,
+  boardResetCount: 0,
+  boardBudgetDowngradeReason: null,
+};
 
 function countAssetsByStatus(items: WallRuntimeItem[]) {
   return items.reduce((counts, item) => {
@@ -39,6 +52,9 @@ export function useWallPlayer(code: string) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(() => readWallHeartbeatMeta(code)?.lastSyncAt ?? null);
   const [syncVersion, setSyncVersion] = useState(0);
+  const [boardRuntimeTelemetry, setBoardRuntimeTelemetryState] = useState<WallBoardRuntimeTelemetry>(
+    DEFAULT_BOARD_RUNTIME_TELEMETRY,
+  );
 
   const engineRef = useRef(engine);
   useEffect(() => {
@@ -47,6 +63,7 @@ export function useWallPlayer(code: string) {
 
   const playerInstanceIdRef = useRef(getOrCreateWallPlayerInstanceId(code));
   const lastSyncAtRef = useRef<string | null>(lastSyncAt);
+  const boardRuntimeTelemetryRef = useRef<WallBoardRuntimeTelemetry>(DEFAULT_BOARD_RUNTIME_TELEMETRY);
 
   useEffect(() => {
     playerInstanceIdRef.current = getOrCreateWallPlayerInstanceId(code);
@@ -57,6 +74,23 @@ export function useWallPlayer(code: string) {
   useEffect(() => {
     lastSyncAtRef.current = lastSyncAt;
   }, [lastSyncAt]);
+
+  useEffect(() => {
+    boardRuntimeTelemetryRef.current = boardRuntimeTelemetry;
+  }, [boardRuntimeTelemetry]);
+
+  const setBoardRuntimeTelemetry = useCallback((nextTelemetry: WallBoardRuntimeTelemetry) => {
+    setBoardRuntimeTelemetryState((current) => (
+      current.boardPieceCount === nextTelemetry.boardPieceCount
+      && current.boardBurstCount === nextTelemetry.boardBurstCount
+      && current.boardBudgetDowngradeCount === nextTelemetry.boardBudgetDowngradeCount
+      && current.decodeBacklogCount === nextTelemetry.decodeBacklogCount
+      && current.boardResetCount === nextTelemetry.boardResetCount
+      && current.boardBudgetDowngradeReason === nextTelemetry.boardBudgetDowngradeReason
+        ? current
+        : nextTelemetry
+    ));
+  }, []);
 
   const sync = useCallback(async () => {
     setIsSyncing(true);
@@ -125,6 +159,12 @@ export function useWallPlayer(code: string) {
         cache_hit_count: cacheDiagnostics.hitCount,
         cache_miss_count: cacheDiagnostics.missCount,
         cache_stale_fallback_count: cacheDiagnostics.staleFallbackCount,
+        board_piece_count: boardRuntimeTelemetryRef.current.boardPieceCount,
+        board_burst_count: boardRuntimeTelemetryRef.current.boardBurstCount,
+        board_budget_downgrade_count: boardRuntimeTelemetryRef.current.boardBudgetDowngradeCount,
+        decode_backlog_count: boardRuntimeTelemetryRef.current.decodeBacklogCount,
+        board_reset_count: boardRuntimeTelemetryRef.current.boardResetCount,
+        board_budget_downgrade_reason: boardRuntimeTelemetryRef.current.boardBudgetDowngradeReason,
         ...runtimeProfile,
         last_sync_at: lastSyncAtRef.current,
         last_fallback_reason: snapshot.errorMessage ?? null,
@@ -284,6 +324,14 @@ export function useWallPlayer(code: string) {
   }, [engine.state.status, sendHeartbeatSafe]);
 
   useEffect(() => {
+    if (syncVersion === 0) {
+      return;
+    }
+
+    void sendHeartbeatSafe();
+  }, [boardRuntimeTelemetry, sendHeartbeatSafe, syncVersion]);
+
+  useEffect(() => {
     void sendHeartbeatSafe();
   }, [connectionStatus, sendHeartbeatSafe]);
 
@@ -314,6 +362,7 @@ export function useWallPlayer(code: string) {
     handleVideoFailure: engine.handleVideoFailure,
     videoRuntimeConfig: engine.videoRuntimeConfig,
     resync: sync,
+    setBoardRuntimeTelemetry,
   };
 }
 

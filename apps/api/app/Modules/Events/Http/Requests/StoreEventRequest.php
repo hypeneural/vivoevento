@@ -34,6 +34,7 @@ class StoreEventRequest extends FormRequest
             'branding.cover_image_path' => ['nullable', 'string', 'max:255'],
             'branding.cover_media_id' => ['nullable', 'integer'],
             'branding.logo_path' => ['nullable', 'string', 'max:255'],
+            'branding.inherit_branding' => ['nullable', 'boolean'],
 
             // Modules (inline)
             'modules' => ['nullable', 'array'],

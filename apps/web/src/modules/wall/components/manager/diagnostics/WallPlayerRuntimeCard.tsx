@@ -23,6 +23,19 @@ import {
   shortPlayerId,
 } from './wall-player-runtime-copy';
 
+function formatBoardDowngradeReason(reason?: ApiWallDiagnosticsPlayer['board_budget_downgrade_reason']) {
+  switch (reason) {
+    case 'small_stage':
+      return 'palco reduzido';
+    case 'safe_area_pressure':
+      return 'safe area pressionada';
+    case 'runtime_budget':
+      return 'budget do runtime';
+    default:
+      return 'sem downgrade';
+  }
+}
+
 export function WallPlayerRuntimeCard({
   player,
   onOpenDetails,
@@ -91,6 +104,32 @@ export function WallPlayerRuntimeCard({
         <span className="rounded-full border border-border/60 bg-background px-3 py-1">
           Erros {player.error_count} | Em cache {player.stale_count}
         </span>
+        {player.board_piece_count ? (
+          <span className="rounded-full border border-border/60 bg-background px-3 py-1">
+            Board {player.board_piece_count} pecas
+          </span>
+        ) : null}
+        {player.board_piece_count ? (
+          <span className="rounded-full border border-border/60 bg-background px-3 py-1">
+            Bursts {player.board_burst_count ?? 0}
+          </span>
+        ) : null}
+        {player.board_piece_count ? (
+          <span className="rounded-full border border-border/60 bg-background px-3 py-1">
+            Backlog decode {player.decode_backlog_count ?? 0}
+          </span>
+        ) : null}
+        {player.board_piece_count ? (
+          <span className="rounded-full border border-border/60 bg-background px-3 py-1">
+            Reset board {player.board_reset_count ?? 0}
+          </span>
+        ) : null}
+        {player.board_piece_count && player.board_budget_downgrade_reason ? (
+          <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-amber-700">
+            Downgrade {formatBoardDowngradeReason(player.board_budget_downgrade_reason)}
+            {player.board_budget_downgrade_count ? ` | ${player.board_budget_downgrade_count}x` : ''}
+          </span>
+        ) : null}
         {player.last_sync_at ? (
           <span className="rounded-full border border-border/60 bg-background px-3 py-1">
             Ultima atualizacao {formatTimestampLabel(player.last_sync_at)}
