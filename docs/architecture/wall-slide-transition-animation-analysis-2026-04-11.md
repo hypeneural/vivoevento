@@ -60,6 +60,10 @@ As referencias abaixo foram revalidadas em `2026-04-11`.
   - `https://motion.dev/docs/react-use-animation-frame`
 - LayoutGroup:
   - `https://motion.dev/docs/react-layout-group`
+- Accessibility / reduced motion:
+  - `https://motion.dev/docs/react-accessibility`
+- Upgrade guide:
+  - `https://motion.dev/docs/react-upgrade-guide`
 
 ### React
 
@@ -67,6 +71,8 @@ As referencias abaixo foram revalidadas em `2026-04-11`.
   - `https://react.dev/learn/preserving-and-resetting-state`
 - useTransition:
   - `https://react.dev/reference/react/useTransition`
+- startTransition:
+  - `https://react.dev/reference/react/startTransition`
 
 ---
 
@@ -167,6 +173,41 @@ Leitura pratica para o wall:
 - a escolha da transicao tem que ser resolvida por advance e ficar estavel para aquele slide;
 - preview e player precisam compartilhar a mesma regra, senao a UX fica inconsistente.
 
+### 7. `useTransition` nao substitui a engine visual do slide
+
+A documentacao oficial do React valida que `useTransition` e `startTransition`:
+
+- marcam updates como nao bloqueantes;
+- permitem que updates urgentes interrompam trabalho nao urgente;
+- nao servem para controlar input de texto;
+- operam na camada de scheduling/render, nao na camada de motion declarativo.
+
+Leitura pratica:
+
+- `useTransition` pode ser util no manager, preview e trocas pesadas de configuracao;
+- ele **nao** deve virar a solucao para a troca visual do slide;
+- a animacao do slideshow continua pertencendo ao Motion.
+
+### 8. Motion continua recomendando animacoes em `transform` e `opacity`
+
+A documentacao oficial de accessibility e MotionConfig reforca que, quando `reducedMotion` esta ativo:
+
+- transform animations e layout animations devem ser reduzidas ou desativadas;
+- animacoes simples como `opacity` continuam adequadas.
+
+Leitura pratica:
+
+- para o wall, os efeitos mais seguros continuam sendo os que vivem majoritariamente em:
+  - `opacity`
+  - `transform`
+- efeitos pesados em:
+  - `filter`
+  - blur grande
+  - layout shift
+  - 3D muito agressivo
+
+devem entrar apenas com capability e budget claros.
+
 ---
 
 ## Bateria de validacao executada
@@ -177,13 +218,13 @@ Executado:
 
 ```bash
 cd apps/web
-npm run test -- src/modules/wall/player/engine/motion.test.ts src/modules/wall/player/wall-theme-architecture-characterization.test.ts
+npm run test -- src/modules/wall/player/engine/motion.test.ts src/modules/wall/player/components/LayoutRenderer.transition-characterization.test.tsx src/modules/wall/player/wall-theme-architecture-characterization.test.ts src/modules/wall/player/components/WallPlayerRoot.test.tsx
 ```
 
 Resultado:
 
-- `2 arquivos`
-- `15 testes`
+- `4 arquivos`
+- `20 testes`
 - `PASS`
 
 ### Backend
@@ -197,15 +238,36 @@ php artisan test tests/Feature/Wall/WallOptionsCharacterizationTest.php
 
 Resultado:
 
-- `1 teste`
-- `13 assertions`
+- `2 testes`
+- `21 assertions`
 - `PASS`
 
 Leitura:
 
 - o contrato atual de transicao continua refletido em `/wall/options`;
 - a arquitetura atual de Motion/registry/layout renderer segue verde;
+- o fluxo `single-item` segue centralizado em `AnimatePresence mode="wait"` + `resolveLayoutTransition()`;
+- os layouts `board` continuam com semantica propria e nao passam pelo `transition_effect` principal;
 - a analise abaixo parte de comportamento real do codigo e de testes atuais.
+
+### Duvidas fechadas nesta rodada
+
+Os testes automatizados novos validaram tres pontos que antes estavam como leitura de codigo:
+
+1. `LayoutRenderer.transition-characterization.test.tsx`
+   - prova que layouts `single-item` usam `AnimatePresence mode="wait"` e chamam `resolveLayoutTransition()`;
+   - prova que layouts `board` bypassam esse caminho e renderizam sua propria trilha.
+2. `WallPlayerRoot.test.tsx`
+   - continua validando `MotionConfig` como ponto global de policy para motion e reduced motion.
+3. `WallOptionsCharacterizationTest.php`
+   - agora trava explicitamente o contrato atual de transicoes em `/wall/options`;
+   - valida que hoje o sistema expoe apenas:
+     - `fade`
+     - `slide`
+     - `zoom`
+     - `flip`
+     - `none`
+   - valida que `rand` e `random` ainda nao existem no contrato publico.
 
 ---
 
@@ -224,7 +286,13 @@ Obs. importante:
 
 - a documentacao oficial atual da Motion ja enfatiza imports via `motion/react`;
 - o nosso codigo hoje ainda usa `framer-motion`;
-- para este caso, o caminho de menor risco e **continuar no pacote atual** e nao misturar estilos de import no meio da feature.
+- o guia oficial de upgrade trata a linha 12 como migracao de baixo atrito;
+- para este caso, o caminho de menor risco e **nao misturar estilos de import no meio da feature**.
+
+Conclusao pratica:
+
+- nao existe urgencia tecnica para migrar agora so por causa do slideshow;
+- mas a doc deve deixar claro que o alvo futuro e uma migracao limpa e unica para `motion/react`, e nao permanencia indefinida em `framer-motion`.
 
 ## Backend
 
@@ -426,6 +494,23 @@ Mas nao edita ainda:
 - pool permitida;
 - efeitos por tema;
 - exclusoes por capability.
+
+## L6. A doc ainda nao explicita a fronteira entre slideshow e React scheduling
+
+Hoje a doc fala corretamente de Motion, mas ainda pode ficar mais dura em um ponto:
+
+- `useTransition` e `startTransition` ajudam a responsividade do editor;
+- eles nao sao o mecanismo da troca visual do slide.
+
+Sem essa frase explicita, existe risco de o time tentar misturar concerns.
+
+## L7. A doc ainda nao fecha uma politica forte de propriedades seguras
+
+O texto atual fala em evitar blur pesado, mas pode ficar mais executivo:
+
+- priorizar `transform` + `opacity`;
+- tratar `filter`, `backdrop-filter`, `top/left/width/height` animados e 3D forte como custos premium;
+- atrelar esses custos a capability/runtime budget.
 
 ---
 
@@ -664,7 +749,8 @@ Isso ajuda a medir:
 3. adicionar `lift-fade`, `cross-zoom` e `swipe-up`;
 4. adicionar `transition_mode = fixed | random`;
 5. fazer `rand` apenas para layouts `single-item`;
-6. usar shuffle bag deterministico.
+6. usar shuffle bag deterministico;
+7. manter `framer-motion` consistente nesta entrega e deixar migracao para `motion/react` como tarefa separada.
 
 ## P1
 
@@ -684,11 +770,65 @@ Isso ajuda a medir:
 ## O que eu nao recomendaria agora
 
 - adicionar uma segunda lib de animacao;
+- misturar `framer-motion` e `motion/react` na mesma feature;
 - usar `Math.random()` no render;
 - colocar `random` dentro de `transition_effect` como unico campo;
 - fazer board e single-slide compartilharem a mesma semantica a forca;
 - liberar `rand` para board denso antes de medir;
 - criar dez animacoes novas de uma vez.
+
+---
+
+## Bateria TDD recomendada antes da implementacao
+
+## Frontend - contrato e runtime
+
+Arquivos recomendados:
+
+- novo `apps/web/src/modules/wall/player/engine/transition-registry.test.ts`
+- ampliar `apps/web/src/modules/wall/player/engine/motion.test.ts`
+- ampliar `apps/web/src/modules/wall/player/components/LayoutRenderer.test.tsx`
+- ampliar `apps/web/src/modules/wall/player/hooks/useWallPlayer.test.tsx`
+- ampliar `apps/web/src/modules/wall/player/wall-theme-architecture-characterization.test.ts`
+- ampliar `apps/web/src/modules/wall/components/manager/inspector/WallAppearanceTab.test.tsx`
+- ampliar `apps/web/src/modules/wall/components/manager/stage/WallPreviewCanvas.test.tsx`
+
+Cenarios obrigatorios:
+
+- `transition_mode=fixed` usa exatamente o efeito configurado;
+- `transition_mode=random` escolhe efeito no advance e nao no render;
+- o mesmo slide nao troca de efeito em re-render sem advance;
+- `rand` evita repetir o ultimo efeito quando houver alternativa;
+- preview e player resolvem o mesmo efeito para o mesmo advance;
+- reduced motion cai para `none` ou fallback seguro;
+- layout `board` nao passa a obedecer por acidente a semantica do `single-item`;
+- efeitos caros podem ser bloqueados por capability tier quando a policy mandar.
+
+## Backend - contrato
+
+Arquivos recomendados:
+
+- novo `apps/api/tests/Feature/Wall/WallTransitionOptionsTest.php`
+- ampliar `apps/api/tests/Feature/Wall/WallOptionsCharacterizationTest.php`
+- ampliar `apps/api/tests/Feature/Wall/WallSettingsThemeConfigTest.php` ou criar suite propria para transition settings
+
+Cenarios obrigatorios:
+
+- `/wall/options` expõe `transition_mode` e `transition_pool` quando o contrato nascer;
+- `transition_pool` invalido falha em validacao;
+- `transition_mode=random` sem pool explicita usa pool default segura;
+- layouts que nao suportarem algum efeito podem receber fallback validado pelo backend, se essa regra entrar no contrato.
+
+## Bateria de validacao minima para esta analise
+
+Ja executada nesta rodada:
+
+- `cd apps/web && npm run test -- src/modules/wall/player/engine/motion.test.ts src/modules/wall/player/components/LayoutRenderer.transition-characterization.test.tsx src/modules/wall/player/wall-theme-architecture-characterization.test.ts src/modules/wall/player/components/WallPlayerRoot.test.tsx`
+  - `20 testes`
+  - `PASS`
+- `cd apps/api && php artisan test tests/Feature/Wall/WallOptionsCharacterizationTest.php`
+  - `21 assertions`
+  - `PASS`
 
 ---
 
@@ -705,4 +845,3 @@ Se a meta e evoluir a animacao de troca do wall com seguranca, a melhor decisao 
 Em uma frase:
 
 **novas animacoes devem entrar como extensao da engine atual de Motion, e o modo `rand` deve ser um scheduler deterministico de efeitos por advance, nao um sorteio improvisado dentro do JSX.**
-

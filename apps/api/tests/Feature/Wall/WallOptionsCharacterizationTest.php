@@ -22,3 +22,24 @@ it('returns wall options with per-layout capability metadata while puzzle stays 
         ->and($response->json('data.layouts.0.capabilities.max_simultaneous_videos'))->toBe(1)
         ->and($response->json('data.layouts.0'))->toHaveKey('defaults');
 });
+
+it('returns the current wall transition contract without random mode', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $response = $this->apiGet('/wall/options');
+
+    $this->assertApiSuccess($response);
+
+    $transitions = collect($response->json('data.transitions'));
+
+    expect($transitions->pluck('value')->all())->toBe([
+        'fade',
+        'slide',
+        'zoom',
+        'flip',
+        'none',
+    ])->not->toContain('rand')
+        ->not->toContain('random');
+
+    expect($transitions)->toHaveCount(5);
+});
