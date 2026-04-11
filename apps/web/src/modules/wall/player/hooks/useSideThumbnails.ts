@@ -6,7 +6,7 @@
  * - Splits 4 left + 4 right
  * - Refreshes every 20 seconds (configurable)
  * - Returns empty arrays when < 2 items available
- * - Uses thumbnail_url when available for lower bandwidth
+ * - Uses image asset URLs and video poster URLs for safe rendering
  *
  * Inspired by Kululu's smallMediaList pattern.
  */
@@ -21,6 +21,14 @@ export interface SideThumbnailItem {
   id: string;
   url: string;
   sender_name?: string | null;
+}
+
+function resolveThumbnailUrl(item: WallRuntimeItem): string | null {
+  if (item.type === 'video') {
+    return item.preview_url ?? null;
+  }
+
+  return item.url ?? null;
 }
 
 export interface SideThumbnailsResult {
@@ -40,7 +48,9 @@ function selectThumbnails(
   offset: number,
 ): SideThumbnailItem[] {
   const candidates = items.filter(
-    (item) => item.id !== currentItemId && item.assetStatus === 'ready',
+    (item) => item.id !== currentItemId
+      && item.assetStatus === 'ready'
+      && resolveThumbnailUrl(item) !== null,
   );
 
   if (candidates.length < 2) return [];
@@ -51,9 +61,15 @@ function selectThumbnails(
   for (let i = 0; i < Math.min(count, total); i++) {
     const idx = (offset + i) % total;
     const item = candidates[idx];
+    const thumbnailUrl = resolveThumbnailUrl(item);
+
+    if (!thumbnailUrl) {
+      continue;
+    }
+
     result.push({
       id: item.id,
-      url: item.url,
+      url: thumbnailUrl,
       sender_name: item.sender_name,
     });
   }

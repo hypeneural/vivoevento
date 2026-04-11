@@ -8,6 +8,8 @@ import EventJourneyBuilderPage from '@/modules/events/pages/EventJourneyBuilderP
 import type { EventJourneyProjection } from '../types';
 
 const getEventJourneyBuilderMock = vi.fn();
+const updateEventJourneyBuilderMock = vi.fn();
+const invalidateEventJourneyBuilderQueriesMock = vi.fn();
 const fitViewMock = vi.fn();
 const journeyFlowCanvasPropsSpy = vi.fn();
 
@@ -17,6 +19,8 @@ vi.mock('@/modules/events/journey/api', () => {
       queryKey: ['events', 'journey-builder', String(eventId)] as const,
       queryFn: () => getEventJourneyBuilderMock(String(eventId)),
     }),
+    updateEventJourneyBuilder: (...args: unknown[]) => updateEventJourneyBuilderMock(...args),
+    invalidateEventJourneyBuilderQueries: (...args: unknown[]) => invalidateEventJourneyBuilderQueriesMock(...args),
   };
 });
 
@@ -489,6 +493,8 @@ function renderJourneyBuilderPage(initialEntry = '/events/42/flow') {
 describe('EventJourneyBuilderPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    updateEventJourneyBuilderMock.mockResolvedValue(makeProjection());
+    invalidateEventJourneyBuilderQueriesMock.mockResolvedValue(undefined);
   });
 
   it('keeps a stable loading state while the projection is pending', async () => {
@@ -511,6 +517,7 @@ describe('EventJourneyBuilderPage', () => {
     expect(await screen.findByRole('heading', { name: 'Jornada da midia' })).toBeInTheDocument();
     expect(screen.getByText('Como o evento trata cada foto ou video recebido')).toBeInTheDocument();
     expect(screen.getByText('Resumo humano da jornada')).toBeInTheDocument();
+    expect(screen.getByText('Templates guiados')).toBeInTheDocument();
     expect(screen.getByText(/Quando uma foto chega pelo WhatsApp/i)).toBeInTheDocument();
     expect(screen.getByText('Centralizar fluxo')).toBeInTheDocument();
     expect(screen.getByText('Ver detalhes tecnicos')).toBeInTheDocument();
@@ -534,7 +541,7 @@ describe('EventJourneyBuilderPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Selecionar no' }));
 
-    expect(await screen.findByText('Modo de moderacao do evento')).toBeInTheDocument();
+    expect(await screen.findByText('Modo de moderacao')).toBeInTheDocument();
     expect(screen.getByText('Moderacao por IA ativa.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Registrar canvas' }));
@@ -545,7 +552,39 @@ describe('EventJourneyBuilderPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ver detalhes tecnicos' }));
 
     expect(await screen.findByText('Detalhes tecnicos da projection')).toBeInTheDocument();
-    expect(screen.getByText('Warnings ativos')).toBeInTheDocument();
+    expect(screen.getByText('Warnings')).toBeInTheDocument();
+  });
+
+  it('applies a guided template locally before the real save', async () => {
+    getEventJourneyBuilderMock.mockResolvedValue(makeProjection());
+
+    renderJourneyBuilderPage();
+
+    expect(await screen.findByRole('heading', { name: 'Jornada da midia' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Aprovacao direta' }));
+    expect(screen.getByText(/Publica sem fila manual nem analises de IA/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar ao rascunho' }));
+
+    expect(await screen.findByText('Rascunho local ativo')).toBeInTheDocument();
+    expect(screen.getByText(/aprova automaticamente/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar template' }));
+
+    await waitFor(() => {
+      expect(updateEventJourneyBuilderMock).toHaveBeenCalledWith('42', {
+        moderation_mode: 'none',
+        content_moderation: {
+          enabled: false,
+        },
+        media_intelligence: {
+          enabled: false,
+          reply_text_enabled: false,
+          reply_text_mode: 'disabled',
+        },
+      });
+    });
   });
 
   it('renders a permission-oriented error when the projection returns 403', async () => {

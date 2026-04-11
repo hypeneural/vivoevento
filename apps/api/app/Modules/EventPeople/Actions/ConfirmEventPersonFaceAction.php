@@ -45,6 +45,7 @@ class ConfirmEventPersonFaceAction
         }
 
         return DB::transaction(function () use ($event, $face, $user, $payload, $reviewItem): array {
+            $previousPersonId = null;
             $person = $this->resolveTargetPerson($event, $user, $payload);
 
             $confirmedAssignment = EventPersonFaceAssignment::query()
@@ -53,6 +54,8 @@ class ConfirmEventPersonFaceAction
                 ->where('status', EventPersonAssignmentStatus::Confirmed->value)
                 ->lockForUpdate()
                 ->first();
+
+            $previousPersonId = $confirmedAssignment?->event_person_id;
 
             $source = $confirmedAssignment && (int) $confirmedAssignment->event_person_id !== (int) $person->id
                 ? EventPersonAssignmentSource::ManualCorrected
@@ -133,6 +136,10 @@ class ConfirmEventPersonFaceAction
             ProjectEventPeopleOperationalCountersJob::dispatch($event->id);
             ProjectEventPeopleReviewQueueJob::dispatch($event->id, $face->id);
             SyncEventPersonRepresentativeFacesJob::dispatch($event->id, $person->id);
+
+            if ($previousPersonId !== null && (int) $previousPersonId !== (int) $person->id) {
+                SyncEventPersonRepresentativeFacesJob::dispatch($event->id, (int) $previousPersonId);
+            }
 
             return [
                 'person' => $person->fresh(['mediaStats']),

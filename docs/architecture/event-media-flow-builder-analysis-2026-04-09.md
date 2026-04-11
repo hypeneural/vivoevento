@@ -2280,6 +2280,131 @@ Resultado:
 - `74` testes passaram na regressao ampliada do modulo `events`;
 - `type-check` passou sem erros.
 
+## Extracao das edges e redistribuicao do grafo em `2026-04-11`
+
+A `Tarefa 3.4` foi concluida com dois ajustes em conjunto:
+
+- a edge saiu do wrapper do canvas;
+- a geometria deterministica do grafo foi reorganizada para reduzir sobreposicao visual.
+
+Entrega realizada:
+
+- `apps/web/src/modules/events/journey/JourneyEdgeLabel.tsx` passou a concentrar o label visual da edge;
+- `apps/web/src/modules/events/journey/JourneyFlowEdges.tsx` passou a concentrar o custom edge, `edgeTypes` e o mapper para `React Flow`;
+- `JourneyFlowCanvas.tsx` ficou responsavel apenas por wiring de `nodes`, `edges`, callbacks e viewport;
+- `buildJourneyGraph.ts` ganhou uma distribuicao mais aberta entre faixas e rows, com coordenadas novas e mais espaco vertical;
+- `buildJourneyGraph.test.ts` passou a proteger explicitamente que nos da mesma faixa nao se sobrepoem;
+- a page e o canvas passaram a abrir com mais altura util e `fitView` menos agressivo para reduzir o efeito de tudo "empilhado" na viewport inicial.
+
+Leitura pratica:
+
+- o canvas ficou totalmente modular: node module, edge module e wrapper separados;
+- o fluxo inicial fica mais legivel sem depender de auto-layout externo;
+- a V1 continua fiel ao plano: layout deterministico, sem `Dagre`, sem `ELK` e sem canvas livre.
+
+## Validacao oficial usada nesta etapa em `2026-04-11`
+
+### React Flow custom edges e edge labels
+
+Foi revalidado na documentacao oficial que:
+
+- custom edges continuam sendo o caminho certo para labels proprios e estados visuais por branch;
+- `EdgeProps` e o contrato certo para os componentes de edge customizada;
+- labels de edge podem ser renderizados por camada propria sem misturar semantica com o `BaseEdge`.
+
+Fontes:
+
+- https://reactflow.dev/learn/customization/edge-labels
+- https://reactflow.dev/api-reference/types/edge-props
+
+## Bateria adicional validada nesta etapa
+
+Comandos executados:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/JourneyEdgeLabel.test.tsx src/modules/events/journey/__tests__/buildJourneyGraph.test.ts src/modules/events/journey/__tests__/JourneyFlowCanvas.test.tsx src/modules/events/journey/__tests__/EventJourneyBuilderPage.test.tsx
+npm run test -- src/modules/events
+npm run type-check
+```
+
+Resultado:
+
+- `1` teste passou na bateria de `JourneyEdgeLabel`;
+- `7` testes passaram na bateria de `buildJourneyGraph`;
+- `15` testes passaram na bateria focada `edge + graph + canvas + page`;
+- `76` testes passaram na regressao ampliada do modulo `events`;
+- `type-check` passou sem erros.
+
+## Inspector editavel responsivo em `2026-04-11`
+
+A `Tarefa 3.5` entrou na primeira fatia realmente editavel do builder.
+
+Entrega realizada:
+
+- `apps/web/src/modules/events/journey/JourneyInspector.tsx` passou a concentrar a experiencia de inspector da jornada;
+- o desktop ficou como painel lateral direito nao modal, em vez de forcar `Sheet`, para preservar o fluxo continuo de leitura e edicao ao lado do canvas;
+- o mobile passou a usar `Drawer` com cabecalho formal e copy curta;
+- `apps/web/src/modules/events/journey/buildJourneyInspectorDraft.ts` passou a montar o draft local minimo dos formularios leves;
+- o inspector agora resolve `node.id -> section` e abre formularios proprios para:
+  - `decision_event_moderation_mode`;
+  - `entry_whatsapp_direct`;
+  - `entry_whatsapp_groups`;
+  - `entry_telegram`;
+  - `entry_public_upload`;
+  - `processing_safety_ai` / `decision_safety_result`;
+  - `processing_media_intelligence` / `decision_context_gate` / `output_reply_text`;
+- Safety reaproveitou `EventContentModerationSettingsForm`;
+- MediaIntelligence reaproveitou `EventMediaIntelligenceSettingsForm`;
+- o save continua centralizado em `PATCH /events/{event}/journey-builder`, sem reabrir a arquitetura em mutacoes separadas por card;
+- o inspector agora assume explicitamente o modelo `rascunho local -> save -> invalidateQueries -> projection revalidada`;
+- nodes ainda fora da primeira fatia ficam em modo read-only com CTA para o editor completo.
+
+Tradeoff tecnico que precisa ficar explicito:
+
+- a projection agregada ainda nao expoe todos os campos detalhados necessarios para hidratar os formularios completos de Safety e MediaIntelligence;
+- por isso, a leitura dessas duas secoes ainda usa os endpoints detalhados existentes;
+- isso nao quebrou a decisao arquitetural principal porque a persistencia continua centralizada no endpoint agregado da jornada;
+- a proxima rodada pode reduzir essa ponte quando a projection carregar thresholds, prompt versions e outros campos de configuracao detalhada.
+
+Leitura pratica:
+
+- o builder deixou de ser apenas visual; ele ja salva configuracoes reais nos primeiros caminhos de maior valor;
+- a noiva, cerimonial ou operador conseguem editar entrada, moderacao e automacao sem cair imediatamente no editor tecnico completo;
+- a page ainda evita prometer liberdade total: cada node continua preso ao que o backend realmente suporta.
+
+## Validacao oficial usada nesta etapa em `2026-04-11`
+
+### shadcn/ui drawer e sheet
+
+Foi revalidado na documentacao oficial que:
+
+- `Drawer` continua sendo o componente certo para o inspector mobile com `DrawerHeader`, `DrawerTitle` e `DrawerDescription`;
+- `Sheet` continua sendo a referencia oficial para superficies complementares baseadas em `Dialog`, mas o desktop da V1 ficou propositalmente como painel lateral nao modal por ser mais coerente com a leitura continua do fluxo.
+
+Fontes:
+
+- https://ui.shadcn.com/docs/components/radix/drawer
+- https://ui.shadcn.com/docs/components/radix/sheet
+
+## Bateria adicional validada nesta etapa
+
+Comandos executados:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/JourneyInspector.test.tsx src/modules/events/journey/__tests__/EventJourneyBuilderPage.test.tsx
+npm run test -- src/modules/events
+npm run type-check
+```
+
+Resultado:
+
+- `6` testes passaram na bateria de `JourneyInspector`;
+- `10` testes passaram na bateria focada `inspector + page`;
+- `82` testes passaram na regressao ampliada do modulo `events`;
+- `type-check` passou sem erros.
+
 ## Validacao oficial usada nesta etapa em `2026-04-11`
 
 ### React Flow API Reference

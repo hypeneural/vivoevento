@@ -71,6 +71,16 @@ class EventPerson extends Model
         return $this->hasMany(EventPersonRepresentativeFace::class);
     }
 
+    public function outgoingRelations(): HasMany
+    {
+        return $this->hasMany(EventPersonRelation::class, 'person_a_id');
+    }
+
+    public function incomingRelations(): HasMany
+    {
+        return $this->hasMany(EventPersonRelation::class, 'person_b_id');
+    }
+
     public function scopeForEvent($query, int $eventId)
     {
         return $query->where('event_id', $eventId);

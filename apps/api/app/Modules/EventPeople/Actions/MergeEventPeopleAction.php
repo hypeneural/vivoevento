@@ -115,6 +115,7 @@ class MergeEventPeopleAction
 
             ProjectEventPeopleOperationalCountersJob::dispatch($event->id);
             SyncEventPersonRepresentativeFacesJob::dispatch($event->id, $targetPerson->id);
+            SyncEventPersonRepresentativeFacesJob::dispatch($event->id, $sourcePerson->id);
 
             return [
                 'source_person' => $sourcePerson->fresh(),

@@ -1639,22 +1639,22 @@ npx.cmd vitest run src/modules/event-people/components/CerimonialistaFlow.test.t
 - [x] criar o modulo `EventPeople`
 - [x] criar tabelas transacionais do dominio
 - [x] criar tabelas projetadas da V1
-- [ ] criar CRUD minimo de pessoa
+- [x] criar CRUD minimo de pessoa
 - [x] criar atribuicao `rosto -> pessoa`
 - [x] criar inbox de revisao
 - [x] criar overlay de rostos na foto
-- [ ] criar pagina de pessoas
+- [x] criar pagina de pessoas
 - [x] criar detalhe da pessoa
 - [x] criar filtro local por pessoa
-- [ ] criar relacoes manuais
-- [ ] criar presets por tipo de evento
+- [x] criar relacoes manuais
+- [x] criar presets por tipo de evento
 - [ ] criar grupos sociais do evento
 - [ ] criar coverage targets e alerts
 - [x] criar coocorrencia por evento
 - [x] criar pair scores locais
 - [ ] criar colecoes e momentos por relacao
-- [ ] criar representatives curados para AWS
-- [ ] criar sync AWS assíncrono por job
+- [x] criar representatives curados para AWS
+- [x] criar sync AWS assíncrono por job
 - [x] criar observabilidade minima
 - [x] configurar tags Horizon e thresholds das filas `event-people-*`
 - [x] definir partial indexes e unique partial indexes da V1
@@ -1754,6 +1754,36 @@ Pendente apos esta rodada:
 - representatives curados e sync AWS assincrono completo;
 - governanca de retention/limpeza AWS e runbook operacional;
 - endurecimento adicional das projecoes incrementais e fases seguintes de grupos, coverage e momentos.
+
+---
+
+### 2026-04-11 - Fases 2, 3 e 5 base operacional concluida
+
+Concluido:
+
+- pagina dedicada `events/:id/people` entregue como entrada operacional para o dominio `EventPeople`;
+- CRUD manual minimo de pessoa implementado fora do fluxo guiado, com criacao e ajuste local de cadastro;
+- integracao do detalhe do evento com CTA `Organizar pessoas`, sem desviar a UX para superfícies tecnicas;
+- presets por tipo de evento expostos no backend e consumidos pela pagina dedicada para criacao rapida de pessoas importantes;
+- CRUD manual de relacoes implementado no backend e no frontend, separado visualmente da trilha de coocorrencia;
+- detalhe da pessoa ampliado na pagina dedicada com stats locais, representatives e relacoes declaradas;
+- selecao curada de `representative_faces` implementada localmente com deduplicacao e ranking de qualidade;
+- sync AWS assincrono completado por job, mantendo gravacao local como hot path e registrando estados `pending`, `synced`, `failed` e `skipped`;
+- redispatch de sync para merge, move e split implementado para manter a pessoa impactada consistente sem roundtrip sincrono;
+- README do modulo e rota frontend atualizados para refletir a nova superficie dedicada.
+
+Bateria executada:
+
+- `cd apps/web && npx.cmd vitest run src/modules/event-people/EventPeoplePage.test.tsx src/modules/media/MediaPage.test.tsx src/modules/event-people/components/EventPeopleFaceOverlay.test.tsx src/modules/event-people/components/EventPeopleIdentitySheet.test.tsx src/modules/events/EventDetailPage.test.tsx src/modules/face-search/components/FaceSearchSearchPanel.test.tsx src/modules/face-search/components/EventFaceSearchSearchCard.test.tsx src/modules/face-search/PublicFaceSearchPage.test.tsx src/modules/events/face-search-status.test.ts src/modules/events/components/face-search/EventFaceSearchSettingsForm.test.tsx src/modules/events/components/face-search/EventFaceSearchSettingsCard.test.tsx` -> `11 files passed`, `28 tests passed`
+- `cd apps/web && npm run type-check` -> `tsc --noEmit` verde
+- `cd apps/api && php artisan test tests/Feature/EventPeople tests/Unit/EventPeople tests/Feature/FaceSearch tests/Unit/FaceSearch` -> `188 passed`, `7 skipped`, `1403 assertions`
+
+Pendente apos esta rodada:
+
+- explicitar governanca de retention e limpeza AWS em documento operacional;
+- documentar runbook de reprocessamento, ressync, fallback e limpeza de evento;
+- seguir para grupos sociais, coverage intelligence, momentos e entregas por relacao;
+- endurecer a camada guest-facing e a trilha de produto emocional acima do dominio local ja entregue.
 
 ---
 

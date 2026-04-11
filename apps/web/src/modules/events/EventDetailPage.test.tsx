@@ -263,5 +263,6 @@ describe('EventDetailPage', () => {
     expect(screen.getAllByText('Usando visual da organizacao').length).toBeGreaterThan(0);
     expect(screen.getByText('#112233')).toBeInTheDocument();
     expect(screen.getByText('#445566')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /organizar pessoas/i })).toHaveAttribute('href', '/events/42/people');
   });
 });

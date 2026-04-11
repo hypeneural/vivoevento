@@ -2,7 +2,11 @@
 
 namespace App\Modules\EventPeople\Http\Controllers;
 
+use App\Modules\EventPeople\Actions\CreateEventPersonAction;
+use App\Modules\EventPeople\Actions\UpdateEventPersonAction;
 use App\Modules\EventPeople\Http\Requests\ListEventPeopleRequest;
+use App\Modules\EventPeople\Http\Requests\StoreEventPersonRequest;
+use App\Modules\EventPeople\Http\Requests\UpdateEventPersonRequest;
 use App\Modules\EventPeople\Http\Resources\EventPersonResource;
 use App\Modules\EventPeople\Models\EventPerson;
 use App\Modules\Events\Models\Event;
@@ -13,6 +17,20 @@ use Illuminate\Http\Request;
 
 class EventPeopleController extends BaseController
 {
+    public function store(
+        StoreEventPersonRequest $request,
+        Event $event,
+        EventAccessService $eventAccess,
+        CreateEventPersonAction $action,
+    ): JsonResponse {
+        abort_unless($eventAccess->can($request->user(), $event, 'events.update'), 403);
+
+        $person = $action->execute($event, $request->user(), $request->validated())
+            ->load(['mediaStats', 'representativeFaces.face', 'outgoingRelations.personA', 'outgoingRelations.personB', 'incomingRelations.personA', 'incomingRelations.personB']);
+
+        return $this->created(new EventPersonResource($person));
+    }
+
     public function index(
         ListEventPeopleRequest $request,
         Event $event,
@@ -49,6 +67,22 @@ class EventPeopleController extends BaseController
         return $this->paginated(EventPersonResource::collection($query->paginate($perPage)));
     }
 
+    public function update(
+        UpdateEventPersonRequest $request,
+        Event $event,
+        EventPerson $person,
+        EventAccessService $eventAccess,
+        UpdateEventPersonAction $action,
+    ): JsonResponse {
+        abort_unless($eventAccess->can($request->user(), $event, 'events.update'), 403);
+        abort_unless((int) $person->event_id === (int) $event->id, 404);
+
+        $updated = $action->execute($person, $request->user(), $request->validated())
+            ->load(['mediaStats', 'representativeFaces.face', 'outgoingRelations.personA', 'outgoingRelations.personB', 'incomingRelations.personA', 'incomingRelations.personB']);
+
+        return $this->success(new EventPersonResource($updated));
+    }
+
     public function show(
         Request $request,
         Event $event,
@@ -62,6 +96,10 @@ class EventPeopleController extends BaseController
             'mediaStats',
             'assignments.face.media',
             'representativeFaces.face',
+            'outgoingRelations.personA',
+            'outgoingRelations.personB',
+            'incomingRelations.personA',
+            'incomingRelations.personB',
         ]);
 
         return $this->success(new EventPersonResource($person));

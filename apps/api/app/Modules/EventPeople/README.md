@@ -40,14 +40,27 @@ Filas dedicadas:
 
 Jobs do modulo devem usar `redis`, `afterCommit`, tags por `event_id` e, quando carregarem dados de pessoa/rosto, `ShouldBeEncrypted`.
 
-## Rotas iniciais
+## Rotas atuais
 
 - `GET /api/v1/events/{event}/people`
+- `POST /api/v1/events/{event}/people`
 - `GET /api/v1/events/{event}/people/{person}`
+- `PATCH /api/v1/events/{event}/people/{person}`
+- `GET /api/v1/events/{event}/people/presets`
 - `GET /api/v1/events/{event}/people/review-queue`
 - `POST /api/v1/events/{event}/people/review-queue/{reviewItem}/confirm`
 - `POST /api/v1/events/{event}/people/review-queue/{reviewItem}/ignore`
 - `POST /api/v1/events/{event}/people/review-queue/{reviewItem}/reject`
 - `POST /api/v1/events/{event}/people/review-queue/{reviewItem}/merge`
 - `POST /api/v1/events/{event}/people/review-queue/{reviewItem}/split`
+- `POST /api/v1/events/{event}/people/relations`
+- `PATCH /api/v1/events/{event}/people/relations/{relation}`
+- `DELETE /api/v1/events/{event}/people/relations/{relation}`
 - `GET /api/v1/events/{event}/media/{media}/people`
+
+## Representatives AWS
+
+- a selecao de faces representativas acontece localmente no modulo;
+- o sync com AWS roda em fila dedicada e nunca bloqueia a confirmacao humana;
+- merge, move e split de pessoas reencaminham o sync apenas para as identidades impactadas;
+- o status de cada representative fica registrado em `event_person_representative_faces`.

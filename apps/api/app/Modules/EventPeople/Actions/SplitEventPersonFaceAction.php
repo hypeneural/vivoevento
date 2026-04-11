@@ -6,6 +6,7 @@ use App\Modules\EventPeople\Enums\EventPersonAssignmentSource;
 use App\Modules\EventPeople\Enums\EventPersonAssignmentStatus;
 use App\Modules\EventPeople\Jobs\ProjectEventPeopleOperationalCountersJob;
 use App\Modules\EventPeople\Jobs\ProjectEventPeopleReviewQueueJob;
+use App\Modules\EventPeople\Jobs\SyncEventPersonRepresentativeFacesJob;
 use App\Modules\EventPeople\Models\EventPersonFaceAssignment;
 use App\Modules\EventPeople\Models\EventPersonReviewQueueItem;
 use App\Modules\Events\Models\Event;
@@ -66,6 +67,10 @@ class SplitEventPersonFaceAction
 
             ProjectEventPeopleOperationalCountersJob::dispatch($event->id);
             ProjectEventPeopleReviewQueueJob::dispatch($event->id, $face->id);
+
+            if ($assignment?->event_person_id) {
+                SyncEventPersonRepresentativeFacesJob::dispatch($event->id, (int) $assignment->event_person_id);
+            }
 
             return [
                 'review_item' => $projectedItem?->fresh(['person', 'face']),

@@ -50,6 +50,143 @@ Decisao igualmente importante:
 
 ---
 
+## Revalidacao oficial e automatizada em 2026-04-11
+
+Antes de aprofundar a proposta, a baseline foi revalidada no estado atual do workspace e contra as fontes oficiais que influenciam diretamente a arquitetura.
+
+## Fontes oficiais revalidadas em 2026-04-11
+
+- `qr-code-styling`:
+  - a demo oficial continua organizada em `Main Options`, `Dots Options`, `Corners Square Options`, `Corners Dot Options`, `Background Options`, `Image Options`, `QR Options` e `Export`;
+  - o site oficial ainda exibe `npm v1.8.3`;
+  - o repositorio oficial no GitHub expõe `v1.9.2` como `Latest`, em `April 11, 2025`;
+  - o README oficial confirma `append`, `update`, `download`, `getRawData`, `applyExtension`, `nodeCanvas`, `jsDom`, `crossOrigin`, `saveAsBlob` e o limite recomendado de `imageSize <= 0.5`.
+- React:
+  - `lazy` continua sendo a trilha oficial para carregar componentes sob demanda;
+  - `Suspense` continua sendo a trilha oficial para fallback enquanto o chunk ou conteudo lazy carrega;
+  - `useTransition` continua sendo a trilha oficial para updates nao bloqueantes;
+  - a propria doc oficial reforca que Transitions nao devem controlar o valor do input em si;
+  - `useDeferredValue` continua sendo a trilha oficial para deixar parte derivada da UI "atrasar" sem travar a digitacao.
+- TanStack Query:
+  - `prefetchQuery` continua sendo a trilha oficial para aquecer dados antes da interacao real;
+  - `staleTime` continua sendo a alavanca central para evitar refetch agressivo;
+  - os `Important Defaults` oficiais continuam lembrando que queries sao `stale` por padrao;
+  - a documentacao oficial de optimistic updates continua recomendando `onMutate`, contexto de rollback e invalidacao posterior.
+- QR Code / leitura:
+  - a especificacao oficial em `qrcode.com` continua exigindo quiet zone minima;
+  - a referencia oficial de correcao de erro continua sendo `L/M/Q/H` com robustez crescente.
+- Web platform:
+  - a MDN continua marcando `Barcode Detection API` como experimental;
+  - a mesma documentacao lista `qr_code` como formato suportado;
+  - a MDN confirma que `OffscreenCanvas` pode rodar em `worker`, tirando trabalho pesado da main thread.
+- Observabilidade React:
+  - a doc oficial de `React Performance tracks` hoje esta em `react.dev` sob `react@19.2`;
+  - ela confirma que os tracks aparecem em builds de desenvolvimento e profiling;
+  - isso importa porque o repo atual usa `react 18.3.1` em `apps/web/package.json`, entao esse trilho nao deve virar dependencia da V1.
+
+## Testes executados nesta rodada
+
+## Frontend
+
+Comando:
+
+```bash
+cd apps/web
+npm run type-check
+```
+
+Resultado:
+
+- `type-check` passou.
+
+Comando:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/EventDetailPage.test.tsx src/modules/events/branding.test.ts src/modules/events/intake.test.ts src/modules/events/components/TelegramOperationalStatusCard.test.tsx
+```
+
+Resultado:
+
+- `4` arquivos passaram;
+- `12` testes passaram;
+- cobertura validada:
+  - detalhe do evento;
+  - branding efetivo;
+  - intake do evento;
+  - card operacional de Telegram.
+
+Comando:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events
+```
+
+Resultado:
+
+- `17` arquivos passaram;
+- `2` arquivos falharam;
+- `73` testes passaram;
+- `2` testes falharam.
+
+Falhas confirmadas:
+
+- `src/modules/events/journey/__tests__/JourneyFlowCanvas.test.tsx`
+  - o teste espera `fitView({ padding: 0.2, duration: 250 })`;
+  - o runtime atual chamou `fitView({ padding: 0.1, duration: 250 })`.
+- `src/modules/events/journey/__tests__/buildJourneyGraph.test.ts`
+  - o layout atual ainda permite overlap entre `decision_event_moderation_mode` e `decision_media_type`.
+
+Leitura pratica:
+
+- a trilha diretamente ligada ao detalhe do evento, branding e links publicos esta verde;
+- existe uma regressao residual no subdominio `journey/*`;
+- ela nao bloqueia a analise do QR editor, mas precisa ficar registrada para nao ser confundida com defeito da futura implementacao do QR.
+
+## Backend
+
+Comando:
+
+```bash
+cd apps/api
+php artisan test tests/Feature/Events/EventDetailAndLinksTest.php tests/Feature/Events/CreateEventTest.php
+```
+
+Resultado:
+
+- `18` testes passaram;
+- `169` assertions passaram;
+- cobertura validada:
+  - payload de detalhe do evento;
+  - links publicos;
+  - update/regenerate de identificadores;
+  - criacao completa do agregado do evento.
+
+Comando:
+
+```bash
+cd apps/api
+php artisan test tests/Feature/Events/EventBrandingInheritanceTest.php tests/Feature/Events/EventBrandingUploadTest.php
+```
+
+Resultado:
+
+- `5` testes passaram;
+- `42` assertions passaram;
+- cobertura validada:
+  - heranca de branding da organizacao;
+  - override parcial do evento;
+  - upload e substituicao de assets de branding.
+
+Leitura pratica:
+
+- a base de `Events` e `branding` que o QR editor vai reutilizar esta verde;
+- a cascata `organizacao -> evento` ja existe como fato do sistema;
+- o proximo nivel coerente e `organizacao -> evento -> preset de uso do link -> override local`.
+
+---
+
 ## Leitura real da stack atual
 
 ## Frontend
@@ -226,8 +363,34 @@ Inferencia a partir das fontes oficiais:
 Isso nao invalida a escolha da lib, mas recomenda:
 
 - travar uma versao especifica no `package.json`;
+- encapsular a dependencia em um wrapper local minimo;
 - fazer um spike rapido antes da implementacao final;
 - evitar depender de exemplos antigos do README sem testar no Vite atual.
+
+## Wrapper local minimo recomendado
+
+Para reduzir acoplamento operacional com a lib, vale criar uma fronteira pequena desde o inicio.
+
+Exemplo de ownership:
+
+- `QrCodeStylingDriver`
+- `qrOptionsBuilder`
+- `qrExport`
+
+Responsabilidades dessa camada:
+
+- centralizar `new QRCodeStyling(...)`;
+- encapsular `append`, `update`, `download`, `getRawData` e `applyExtension`;
+- isolar a escolha de versao da dependencia;
+- evitar imports soltos de `qr-code-styling` espalhados pelo produto.
+
+Essa camada nao precisa ser sofisticada.
+
+Ela precisa apenas:
+
+- blindar o contrato do produto;
+- facilitar testes puros;
+- reduzir custo de migracao futura.
 
 ---
 
@@ -463,24 +626,125 @@ Controles tecnicos:
 
 ## Presets recomendados
 
-Os presets devem existir para acelerar a decisao, nao como gimmick visual.
+Os presets nao devem nascer apenas como "skins" esteticas.
+
+Depois da revalidacao de branding e performance, o desenho mais robusto passa a ser uma cascata:
+
+1. template da organizacao;
+2. branding efetivo do evento;
+3. preset de uso por tipo de link;
+4. override local salvo naquele link.
+
+Essa cascata conversa melhor com o que o produto ja faz hoje:
+
+- o backend ja resolve branding herdado da organizacao;
+- o frontend ja sabe calcular `effective_branding`;
+- o QR do `wall` e o QR de `upload` nao tem o mesmo contexto de uso.
+
+## Presets por cenario de uso
 
 Sugestao inicial:
 
+- `Telao`
+  - contraste maximo;
+  - logo pequena ou opcional;
+  - area silenciosa reforcada;
+  - export default em `png` 1024 ou 2048.
+- `Upload rapido`
+  - leitura imediata;
+  - CTA visual simples;
+  - margem segura;
+  - export default em `png` 1024.
+- `Galeria premium`
+  - usa branding efetivo do evento;
+  - permite acabamento visual mais refinado;
+  - default em `svg`.
+- `Impresso pequeno`
+  - prioriza robustez;
+  - reduz logo;
+  - evita gradiente agressivo;
+  - reforca `H`.
+- `Convite / WhatsApp`
+  - leitura em tela pequena;
+  - fundo solido;
+  - contraste alto;
+  - export default em `png`.
+
+## Fluxo guiado acima do painel tecnico
+
+A ordem de interacao mais correta para usuario leigo nao e `dots -> corners -> ECC`.
+
+A ordem recomendada e:
+
+1. para onde esse QR vai ser usado;
+2. qual visual base ele deve seguir;
+3. se deve usar a logo do evento;
+4. se precisa exportar para tela ou impressao;
+5. so entao abrir o avancado.
+
+Traducao pratica para o modal:
+
+- primeiro `preset de uso`;
+- depois `skin visual`;
+- depois `logo`, cor principal e fundo;
+- por ultimo `Avancado`.
+
+## Variantes esteticas
+
+As variantes esteticas ainda fazem sentido, mas devem ficar abaixo do preset de uso:
+
 - `Classico`
-  - dots escuros, fundo branco, sem logo, margem segura
 - `Premium`
-  - usa branding do evento, logo pequena, olhos personalizados, `H`
 - `Minimalista`
-  - monocromatico, alto contraste, poucos enfeites
 - `Escuro`
-  - card e moldura escuros, mas mantendo area util do QR em alto contraste seguro
 
 Observacao importante:
 
 - o preset `Escuro` nao deve inverter o QR por padrao;
 - o simbolo em si deve continuar com contraste robusto para leitura;
 - o "escuro" pode vir da moldura e do preview, nao do miolo do simbolo.
+
+## Explicabilidade da cascata
+
+A cascata fica muito mais usavel quando o editor explica de onde veio cada decisao importante.
+
+Recomendacao pragmatica:
+
+- mostrar origem ao menos para:
+  - cor principal;
+  - fundo;
+  - logo;
+  - preset de uso;
+  - formato/tamanho default de exportacao.
+
+Estados sugeridos:
+
+- `Veio do evento`
+- `Veio do preset`
+- `Personalizado aqui`
+
+Isso pode ser implementado sem transformar o editor em painel de debug.
+
+A estrategia mais simples e o resolvedor da cascata devolver:
+
+- `value`
+- `source`
+- `is_overridden`
+
+## Thumbnails e microcopy dos presets
+
+Os presets devem aparecer como cards pequenos com preview, nao apenas como nomes em `select`.
+
+Cada card deve trazer:
+
+- miniatura do QR;
+- nome curto;
+- microcopy curta, por exemplo:
+  - `Melhor para telao`
+  - `Melhor para impressao`
+  - `Melhor para compartilhamento rapido`
+
+Isso reduz carga cognitiva e ajuda o usuario leigo a tomar decisao sem entender parametros tecnicos.
 
 ## Badge de leitura
 
@@ -506,6 +770,38 @@ Se o time quiser uma camada extra de seguranca depois, vale adicionar:
 
 - tentativa automatica de decodificar o preview gerado antes de confirmar o save.
 
+Recomendacao refinada apos revalidacao:
+
+- manter heuristica como camada obrigatoria da V1;
+- tratar decode real como melhoria progressiva;
+- usar `BarcodeDetector` apenas quando disponivel;
+- nao bloquear a feature se a API nao existir, porque a propria MDN a trata como experimental.
+
+## Base objetiva para o score de contraste
+
+Pelas fontes oficiais do W3C:
+
+- `WCAG 1.4.3` trata `4.5:1` como piso para texto normal;
+- `WCAG 1.4.11` trata `3:1` como piso para componentes visuais e informacao nao textual.
+
+Isso nao resolve sozinho a escaneabilidade de QR.
+
+Mas e uma base objetiva util para o editor:
+
+- usar WCAG como piso minimo para cromia de elementos de UI e indicadores do proprio editor;
+- usar um criterio interno mais conservador para o simbolo do QR;
+- tratar combinacoes que so "passam no papel" como insuficientes quando houver:
+  - gradiente suave demais;
+  - transparencia;
+  - linhas decorativas finas;
+  - `shape` muito ornamentado.
+
+Inferencia recomendada para produto:
+
+- `Arriscada` quando a combinacao cai abaixo do piso interno;
+- `Boa` quando passa com folga moderada;
+- `Otima` apenas quando houver contraste alto e composicao simples.
+
 ---
 
 ## Regras automaticas de seguranca
@@ -528,6 +824,20 @@ Estas regras sao obrigatorias para o produto:
    - sugerir preset seguro.
 6. Se a combinacao de `shape` + logo + gradiente reduzir demais a confiabilidade:
    - o editor volta para um preset seguro com confirmacao explicita.
+
+## Segunda camada opcional de validacao
+
+Se o time decidir subir a confiabilidade alem da heuristica:
+
+- gerar uma imagem temporaria do preview;
+- tentar decodificar essa imagem antes de salvar ou baixar;
+- se o decode falhar, mostrar alerta e sugerir preset seguro.
+
+Trilha recomendada:
+
+- browser com `BarcodeDetector` quando existir;
+- fallback silencioso para heuristica quando nao existir;
+- se isso ficar pesado em devices mais fracos, mover a rasterizacao temporaria para `OffscreenCanvas` em `worker`.
 
 Sugestao pratica de guardrails:
 
@@ -646,20 +956,51 @@ Indices:
 
 ## JSON recomendado
 
-O JSON salvo nao deve guardar o `data` final como fonte de verdade.
+O ponto mais importante da persistencia e separar:
+
+- schema do produto;
+- schema da lib.
+
+Em outras palavras:
+
+- o banco nao deve salvar o objeto bruto de `QRCodeStylingOptions`;
+- o banco deve salvar um schema semantico do Evento Vivo;
+- um adapter dedicado, por exemplo `qrOptionsBuilder`, converte esse schema semantico em `QRCodeStylingOptions` apenas no runtime.
+
+Motivos:
+
+- reduz acoplamento com drift entre `site`, `README`, `npm` e `releases` da lib;
+- protege o produto se a API do `qr-code-styling` mudar;
+- preserva liberdade para trocar de motor depois;
+- facilita preset inteligente, migracoes e validacoes de negocio.
+
+O JSON salvo tambem nao deve guardar o `data` final como fonte de verdade.
 
 O `data` deve ser reconstruido no read model usando o link publico atual.
+
+## Fronteira recomendada entre schema do produto e schema da lib
+
+| Conceito do produto | Campo salvo | Conversao no adapter |
+|---|---|---|
+| tipo de uso | `usage_preset` | escolhe defaults de `type`, tamanho, ECC e margens |
+| visual dos modulos | `style.dots` | vira `dotsOptions` |
+| visual dos olhos | `style.corners_square` / `style.corners_dot` | vira `cornersSquareOptions` / `cornersDotOptions` |
+| fundo | `style.background` | vira `backgroundOptions` |
+| logo | `logo.*` | vira `image` + `imageOptions` |
+| robustez | `advanced.error_correction_level` | vira `qrOptions.errorCorrectionLevel` |
+| export default | `export_defaults.*` | vira `download()` / `getRawData()` on demand |
+| conteudo encoded | nao salvar | vem de `EventPublicLinksService` |
 
 Exemplo:
 
 ```json
 {
-  "version": "event-public-link-qr.v1",
-  "preset": "premium",
+  "config_version": "event-public-link-qr.v1",
+  "usage_preset": "upload_rapido",
+  "skin_preset": "premium",
   "render": {
-    "type": "svg",
-    "width": 1024,
-    "height": 1024,
+    "preview_type": "svg",
+    "preview_size": 320,
     "margin_modules": 4,
     "background_mode": "solid"
   },
@@ -702,6 +1043,7 @@ Exemplo:
   },
   "export_defaults": {
     "extension": "svg",
+    "size": 1024,
     "download_name_pattern": "evento-{event_id}-{link_key}"
   }
 }
@@ -719,10 +1061,43 @@ Salvar no banco:
 Nao salvar como fonte de verdade:
 
 - URL encoded do link publico;
+- objeto bruto de `QRCodeStylingOptions`;
 - output de preview temporario;
 - estado do badge de leitura.
 
 O badge pode ser recalculado sempre.
+
+## Versionamento, normalizacao e migracao do schema
+
+O schema salvo deve nascer com trilha formal de evolucao.
+
+Recomendacao:
+
+- usar `config_version` como campo obrigatorio;
+- normalizar payload antes de salvar;
+- normalizar payload ao ler configuracoes antigas;
+- migrar em memoria no read path;
+- persistir ja na versao mais nova no proximo `save`.
+
+Desenho recomendado:
+
+- `qrSchemaNormalizer.ts`
+- `qrSchemaMigrator.ts`
+- `EventPublicLinkQrConfigNormalizer.php`
+
+Responsabilidades:
+
+- preencher defaults ausentes;
+- renomear campos antigos quando houver drift;
+- remover chaves obsoletas;
+- proteger a aplicacao contra JSON legado ou parcial.
+
+Regra importante:
+
+- `migracao de schema` e responsabilidade do produto;
+- `mapeamento para QRCodeStylingOptions` e responsabilidade do adapter.
+
+Sao problemas diferentes e nao devem ficar misturados.
 
 ---
 
@@ -813,6 +1188,115 @@ Sugestao pratica:
 - resetar/restaurar padrao: `events.update`.
 
 Isso evita divergencia entre modulo `Events`, `Wall`, `Hub` e `Play` para um artefato que continua sendo do evento.
+
+---
+
+## Carregamento e performance do editor
+
+## Lazy-load do editor e da lib
+
+O editor nao deve entrar no bundle inicial de `EventDetailPage`.
+
+Recomendacao:
+
+- carregar `QrCodeEditor` com `React.lazy`;
+- deixar `qr-code-styling` dentro desse chunk lazy;
+- usar `Suspense` com fallback pequeno;
+- abrir o chunk apenas quando o usuario realmente tocar no QR.
+
+Isso e coerente com a trilha oficial do React e tambem com o estado atual do repo:
+
+- o admin ja usa `Suspense` em layout;
+- o repo ja tem preload de chunks por `onMouseEnter` e `onFocus` em `AppSidebar`;
+- o modulo `play` ja tem precedente de `lazy(...)` para UI secundaria carregada sob demanda.
+
+## Prefetch de query e chunk
+
+Para dar sensacao de instantaneidade:
+
+- o trigger clicavel do QR deve fazer prefetch no `onMouseEnter` e `onFocus`;
+- o prefetch precisa aquecer:
+  - o chunk lazy do editor;
+  - a query `GET /events/{event}/qr-codes/{linkKey}`.
+
+No stack atual isso combina bem com o que ja existe:
+
+- `queryClient.prefetchQuery(...)` ja aparece em `ModerationPage`, `EventWallManagerPage`, `play` e `ai`;
+- o repo ja usa warmup de rotas provaveis com `route-preload.ts`.
+
+Configuracao recomendada da query do editor:
+
+- `staleTime`: mais generoso, por exemplo `60_000` ou `300_000`;
+- `refetchOnWindowFocus`: `false` enquanto o editor estiver aberto;
+- `refetchOnReconnect`: `false` enquanto existir draft local nao salvo;
+- invalidacao explicita apos `save` e `reset`.
+
+Motivo:
+
+- a doc oficial do TanStack continua lembrando que cached data e `stale` por padrao;
+- sem ajuste, o editor pode refetchar no momento errado e "piscar" o draft durante a edicao.
+
+## Formulario com subscriptions finas
+
+O formulario do editor deve seguir o mesmo principio que o repo ja usa em checkout:
+
+- `useForm` + `FormProvider`;
+- paineis pequenos;
+- `useWatch` apenas para os campos que realmente dirigem UI dinamica;
+- evitar `watch()` no nivel raiz do editor.
+
+Leitura pratica:
+
+- `Conteudo`, `Estilo`, `Logo`, `Exportacao` e `Avancado` devem assinar apenas os campos que precisam;
+- o preview nao deve depender de um objeto gigante recriado a cada keypress;
+- validacao global agressiva em `onChange` nao faz sentido para sliders e cores.
+
+Configuracao recomendada:
+
+- `mode: 'onBlur'`;
+- `reValidateMode: 'onChange'`;
+- guardrails de leitura avaliados em hook separado;
+- validacao estrutural do schema no submit e em mudancas realmente sensiveis.
+
+## Preview barato, export pesado
+
+O preview deve ser tratado como caminho barato:
+
+- instancia unica de `QRCodeStyling`;
+- `append()` uma vez;
+- `update()` nas mudancas posteriores;
+- preview pequeno em `svg`, por exemplo `256` ou `320`.
+
+O export deve ser tratado como caminho pesado:
+
+- `download()` ou `getRawData()` apenas quando o usuario clicar em baixar;
+- tamanhos maiores `1024` e `2048` somente sob demanda;
+- persistencia de asset final so quando a fase server-side entrar.
+
+## `useDeferredValue` e `useTransition` no lugar certo
+
+Depois da revalidacao oficial, a orientacao fica mais precisa:
+
+- `useDeferredValue` faz sentido para deixar o preview reagir a um valor derivado que pode "atrasar";
+- `useTransition` faz sentido para updates nao urgentes como troca de preset, aba ou estado pesado do editor;
+- o input controlado em si continua sincrono.
+
+Em termos praticos:
+
+- cor, gradiente, margem e logo podem alimentar um objeto derivado diferido para o preview;
+- aplicacao de preset completo pode rodar em `startTransition`;
+- o campo do formulario continua responsivo e fiel ao toque do usuario.
+
+## Save otimista
+
+No save, a melhor experiencia e:
+
+- `useMutation`;
+- `onMutate` com update otimista local;
+- rollback em erro;
+- invalidacao no `onSettled`.
+
+Isso ja conversa com o padrao real usado em `ModerationPage`, `MediaPage`, `Play` e outras superficies do repo.
 
 ---
 
@@ -920,6 +1404,42 @@ Melhoria de acessibilidade:
 - `aria-label` com o nome do link;
 - foco retorna ao trigger quando o modal fecha.
 
+## Acoes de produtividade recomendadas
+
+Algumas acoes pequenas melhoram muito a usabilidade sem aumentar o risco tecnico:
+
+- `Usar logo do evento` como CTA principal na aba `Logo`;
+- `Duplicar estilo para outro link`;
+- `Restaurar esta secao`;
+- `Restaurar tudo`.
+
+Essas acoes tem ROI alto porque reduzem retrabalho e deixam o editor menos intimidante.
+
+## Acessibilidade do trigger e do modal
+
+Seguindo o padrao APG da WAI para dialog modal:
+
+- foco entra no dialog ao abrir;
+- `Tab` e `Shift + Tab` ficam presos dentro do dialog;
+- `Escape` fecha;
+- foco retorna ao elemento que abriu o dialog;
+- o trigger do QR deve ser `button` real, nao `div` clicavel.
+
+No stack atual, isso encaixa bem com os componentes baseados em Radix ja usados no repo.
+
+## Mobile como editor de tarefa
+
+No mobile, o editor nao deve parecer popup pequeno.
+
+Ele deve parecer uma tarefa dedicada:
+
+- `Drawer` alto ou quase full-screen;
+- preview no topo;
+- secoes em `Accordion`;
+- CTA fixa no rodape.
+
+Esse desenho e coerente com os precedentes atuais do repo em `ModerationPage`, `wall` e checkout mobile.
+
 ## Estado do editor
 
 Sugestao de state local:
@@ -965,6 +1485,7 @@ useEffect(() => {
 - `useQrCodeReadability()`
 - `useEventPublicLinkQrConfig(linkKey)`
 - `useSaveEventPublicLinkQrConfig(linkKey)`
+- `useQrCodeCascadeExplanation()`
 
 ## Presets e defaults
 
@@ -1032,7 +1553,107 @@ O que muda e so o `linkKey`.
 
 ---
 
+## Observabilidade e metricas
+
+O editor deve nascer com medicao minima.
+
+As tres metricas de V1 com melhor ROI sao:
+
+1. tempo do clique no QR ate o preview aparecer;
+2. tempo medio de update do preview durante sliders e trocas de preset;
+3. tempo de save da configuracao.
+
+## Como medir na stack atual
+
+Como o repo hoje usa `react 18.3.1`, a trilha mais pragmatica para a V1 e:
+
+- `performance.mark()` / `performance.measure()`;
+- logging local em dev;
+- eventos opcionais para telemetria interna se o time quiser comparar antes/depois.
+
+## Telemetria de UX recomendada
+
+Além das metricas de performance, vale registrar alguns eventos de uso:
+
+- preset de uso selecionado;
+- skin visual selecionada;
+- toggle de avancado aberto;
+- alerta de leitura exibido;
+- `Duplicar estilo` acionado;
+- `Restaurar esta secao` acionado;
+- fallback para heuristica quando `BarcodeDetector` nao existir.
+
+Esses eventos ajudam a descobrir:
+
+- se o usuario realmente usa o avancado;
+- quais presets entregam mais valor;
+- em que pontos o editor gera friccao.
+
+## React Performance Tracks: o que faz sentido agora
+
+Os `React Performance tracks` oficiais fazem sentido como trilha de profiling, mas com uma ressalva importante:
+
+- a doc atual deles esta em `react@19.2`;
+- o repo ainda esta em React 18;
+- portanto eles entram como trilha de observabilidade futura, nao como dependencia de implementacao do editor.
+
+Decisao recomendada:
+
+- medir a V1 com Performance API e profiling local normal;
+- avaliar `React Performance tracks` depois de uma trilha separada de upgrade para React 19+ ou de profiling dedicado.
+
+## O que e realmente obrigatorio na V1
+
+Depois da revalidacao das fontes oficiais e do estado do repo, o pacote minimo que mais altera a qualidade da entrega e:
+
+- schema semantico versionado;
+- normalizacao e migracao por `config_version`;
+- wrapper local minimo da dependencia;
+- fluxo guiado por `preset de uso` antes do avancado;
+- preview barato com instancia unica em `svg`;
+- lazy-load + prefetch de chunk/query;
+- `useWatch` + valor derivado diferido para preview;
+- guardrails fortes de leitura;
+- save otimista;
+- trigger/modal acessiveis;
+- metricas basicas de performance.
+
+Itens de alto valor, mas que podem entrar logo depois se a V1 precisar ser mais curta:
+
+- explicabilidade visual da cascata;
+- `Duplicar estilo`;
+- `Restaurar esta secao`;
+- decode real com `BarcodeDetector`;
+- extensoes SVG curadas com `applyExtension`.
+
+## Uso curado de `applyExtension`
+
+`applyExtension` faz sentido no roadmap, mas nao como superficie livre de edicao na V1.
+
+O melhor uso inicial e interno e curado:
+
+- moldura pronta para impresso;
+- badge `Escaneie aqui`;
+- selo visual do evento;
+- CTA visual de compartilhamento.
+
+Regra recomendada:
+
+- extensao SVG entra vinculada a preset ou template;
+- nunca como editor vetorial irrestrito;
+- cada extensao precisa de teste visual e de leitura.
+
+---
+
 ## Recomendacao de rollout
+
+Depois da revalidacao, a ordem de ROI ficou mais clara:
+
+1. schema semantico + adapter;
+2. lazy-load + prefetch de chunk/query;
+3. formulario com subscriptions finas + preview diferido;
+4. presets por cenario de uso;
+5. decode real opcional.
 
 ## Fase 0 - Spike tecnico curto
 
@@ -1244,3 +1865,18 @@ Para o time tecnico, o ponto mais importante e:
 - QR Code Styling no npm: https://www.npmjs.com/package/qr-code-styling
 - DENSO WAVE, quiet zone / code area: https://www.qrcode.com/en/howto/code.html
 - DENSO WAVE, error correction levels: https://www.qrcode.com/en/about/error_correction.html
+- W3C WCAG 1.4.3, contrast minimum: https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum
+- W3C WCAG 1.4.11, non-text contrast: https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html
+- WAI-ARIA APG, modal dialog pattern: https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/
+- React `lazy`: https://react.dev/reference/react/lazy
+- React `Suspense`: https://react.dev/reference/react/Suspense
+- React `useDeferredValue`: https://react.dev/reference/react/useDeferredValue
+- React `useTransition`: https://react.dev/reference/react/useTransition
+- React Performance Tracks: https://react.dev/reference/dev-tools/react-performance-tracks
+- React 19.2 blog: https://react.dev/blog/2025/10/01/react-19-2
+- TanStack Query prefetching: https://tanstack.com/query/latest/docs/framework/react/guides/prefetching
+- TanStack Query important defaults: https://tanstack.com/query/v5/docs/framework/react/guides/important-defaults
+- TanStack Query optimistic updates: https://tanstack.com/query/v5/docs/framework/react/guides/optimistic-updates
+- React Hook Form official site: https://react-hook-form.com/
+- MDN Barcode Detection API: https://developer.mozilla.org/en-US/docs/Web/API/Barcode_Detection_API
+- MDN OffscreenCanvas: https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas

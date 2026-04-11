@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import {
-  AlertTriangle,
   GitBranch,
   Info,
   Loader2,
@@ -24,18 +23,29 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/shared/components/PageHeader';
 
-import { eventJourneyBuilderQueryOptions } from '../journey/api';
-import type { JourneyGraphNode } from '../journey/buildJourneyGraph';
+import {
+  eventJourneyBuilderQueryOptions,
+  invalidateEventJourneyBuilderQueries,
+  updateEventJourneyBuilder,
+} from '../journey/api';
 import { buildJourneyGraph } from '../journey/buildJourneyGraph';
 import { buildJourneyScenarios } from '../journey/buildJourneyScenarios';
 import { buildJourneySummary } from '../journey/buildJourneySummary';
 import {
+  buildJourneyTemplatePreview,
+  type JourneyTemplateId,
+} from '../journey/buildJourneyTemplatePreview';
+import {
   JourneyFlowCanvas,
   type JourneyFlowCanvasControls,
 } from '../journey/JourneyFlowCanvas';
+import { JourneyInspector } from '../journey/JourneyInspector';
+import { JourneyTemplateRail } from '../journey/JourneyTemplateRail';
 import type {
   EventJourneyBuiltScenario,
   EventJourneyProjection,
@@ -150,125 +160,16 @@ function JourneySummaryCard({
   );
 }
 
-function JourneyInspectorShell({
-  projection,
-  selectedNode,
-  scenarios,
-  technicalDetailsOpen,
-}: {
-  projection: EventJourneyProjection;
-  selectedNode: JourneyGraphNode | null;
-  scenarios: EventJourneyBuiltScenario[];
-  technicalDetailsOpen: boolean;
-}) {
-  return (
-    <div className="flex h-full flex-col gap-4">
-      {selectedNode ? (
-        <Card className="border-white/70 bg-white/90 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">{selectedNode.data.node.label}</CardTitle>
-            <CardDescription>
-              {selectedNode.data.node.description}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm">
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">{selectedNode.data.stage.label}</Badge>
-              <Badge variant="outline">{selectedNode.data.node.editable ? 'Editavel' : 'Tecnico'}</Badge>
-              <Badge variant="outline">{selectedNode.data.node.status}</Badge>
-            </div>
-
-            <p className="leading-6 text-foreground/90">{selectedNode.data.node.summary}</p>
-
-            <div className="grid gap-3">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Branches</p>
-                <p className="mt-2">{selectedNode.data.node.branches.length} saida(s) configurada(s).</p>
-              </div>
-
-              {selectedNode.data.node.warnings.length > 0 ? (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3">
-                  <p className="text-xs font-medium uppercase tracking-[0.16em] text-amber-800">Warnings</p>
-                  <ul className="mt-2 space-y-2 text-sm text-amber-900">
-                    {selectedNode.data.node.warnings.map((warning) => (
-                      <li key={warning} className="flex gap-2">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                        <span>{warning}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="border-dashed border-muted-foreground/30 bg-background/60 shadow-none">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Nenhuma etapa selecionada</CardTitle>
-            <CardDescription>
-              Selecione um no no fluxo para abrir o inspector lateral e revisar o resumo dessa etapa.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      )}
-
-      {technicalDetailsOpen ? (
-        <Card className="border-white/70 bg-white/90 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Detalhes tecnicos da projection</CardTitle>
-            <CardDescription>
-              Dados de apoio para QA e para o encaixe futuro do inspector editavel.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Versao</p>
-                <p className="mt-2 font-mono text-sm">{projection.version}</p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Resumo</p>
-                <p className="mt-2">{projection.summary.human_text}</p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Warnings</p>
-                <p className="mt-2 font-mono text-sm">{projection.warnings.length}</p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Cenarios prontos</p>
-                <p className="mt-2 font-mono text-sm">{scenarios.length}</p>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Warnings ativos</p>
-              {projection.warnings.length > 0 ? (
-                <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
-                  {projection.warnings.map((warning) => (
-                    <li key={warning} className="flex gap-2">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                      <span>{warning}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-2 text-muted-foreground">Nenhum warning ativo nesta projection.</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-    </div>
-  );
-}
-
 export default function EventJourneyBuilderPage() {
   const { id } = useParams<{ id: string }>();
   const canvasControlsRef = useRef<JourneyFlowCanvasControls | null>(null);
+  const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
+  const { toast } = useToast();
   const [technicalDetailsOpen, setTechnicalDetailsOpen] = useState(false);
   const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [activeTemplateId, setActiveTemplateId] = useState<JourneyTemplateId | null>(null);
 
   const journeyQuery = useQuery({
     ...eventJourneyBuilderQueryOptions(id ?? 'missing-event'),
@@ -276,13 +177,45 @@ export default function EventJourneyBuilderPage() {
   });
 
   const projection = journeyQuery.data ?? null;
+  const activeTemplatePreview = useMemo(
+    () => (projection && activeTemplateId ? buildJourneyTemplatePreview(projection, activeTemplateId) : null),
+    [activeTemplateId, projection],
+  );
+  const effectiveProjection = activeTemplatePreview?.previewProjection ?? projection;
+  const templateSaveMutation = useMutation({
+    mutationFn: async () => {
+      if (!activeTemplatePreview) {
+        throw new Error('Nenhum template foi aplicado ao rascunho local.');
+      }
+
+      return updateEventJourneyBuilder(id, activeTemplatePreview.payload);
+    },
+    onSuccess: async (updatedProjection) => {
+      queryClient.setQueryData(eventJourneyBuilderQueryOptions(id).queryKey, updatedProjection);
+      await invalidateEventJourneyBuilderQueries(queryClient, id);
+      setActiveTemplateId(null);
+      toast({
+        title: 'Template salvo',
+        description: 'A jornada foi atualizada com o template guiado.',
+      });
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : 'Nao foi possivel salvar o template da jornada.';
+
+      toast({
+        title: 'Falha ao salvar template',
+        description: message,
+        variant: 'destructive',
+      });
+    },
+  });
   const graph = useMemo(
-    () => (projection ? buildJourneyGraph(projection) : EMPTY_GRAPH),
-    [projection],
+    () => (effectiveProjection ? buildJourneyGraph(effectiveProjection) : EMPTY_GRAPH),
+    [effectiveProjection],
   );
   const scenarios = useMemo(
-    () => (projection ? buildJourneyScenarios(projection, graph) : []),
-    [projection, graph],
+    () => (effectiveProjection ? buildJourneyScenarios(effectiveProjection, graph) : []),
+    [effectiveProjection, graph],
   );
   const selectedScenario = useMemo(
     () => scenarios.find((scenario) => scenario.id === selectedScenarioId) ?? null,
@@ -386,10 +319,19 @@ export default function EventJourneyBuilderPage() {
       />
 
       <JourneySummaryCard
-        projection={projection}
+        projection={effectiveProjection}
         scenarios={scenarios}
         selectedScenario={selectedScenario}
         onScenarioSelect={(scenario) => setSelectedScenarioId(scenario?.id ?? null)}
+      />
+
+      <JourneyTemplateRail
+        projection={projection}
+        activeTemplatePreview={activeTemplatePreview}
+        isPending={templateSaveMutation.isPending}
+        onApplyTemplate={(templateId) => setActiveTemplateId(templateId)}
+        onDiscardTemplate={() => setActiveTemplateId(null)}
+        onSaveTemplate={() => templateSaveMutation.mutate()}
       />
 
       <Card className="border-white/70 bg-white/90 shadow-sm">
@@ -413,45 +355,89 @@ export default function EventJourneyBuilderPage() {
         </CardContent>
       </Card>
 
-      <div className="overflow-hidden rounded-3xl border border-white/70 bg-white/90 shadow-sm">
-        <ResizablePanelGroup direction="horizontal" className="min-h-[920px]">
-          <ResizablePanel defaultSize={68} minSize={55}>
-            <div className="h-full p-5">
-              <div className="mb-4 flex items-center gap-2">
-                <GitBranch className="h-4 w-4 text-primary" />
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">Fluxo visual guiado</h2>
-                  <p className="text-sm text-muted-foreground">
-                    O renderer agora usa React Flow com canvas travado, mantendo a projection como fonte de verdade.
-                  </p>
-                </div>
+      {isMobile ? (
+        <div className="overflow-hidden rounded-3xl border border-white/70 bg-white/90 shadow-sm">
+          <div className="p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <GitBranch className="h-4 w-4 text-primary" />
+              <div>
+                <h2 className="text-base font-semibold text-foreground">Fluxo visual guiado</h2>
+                <p className="text-sm text-muted-foreground">
+                  O renderer agora usa React Flow com canvas travado, mantendo a projection como fonte de verdade.
+                </p>
               </div>
-
-              <JourneyFlowCanvas
-                graph={graph}
-                selectedNodeId={selectedNodeId}
-                highlightedNodeIds={selectedScenario?.highlightedNodeIds ?? []}
-                highlightedEdgeIds={selectedScenario?.highlightedEdgeIds ?? []}
-                onSelectedNodeIdChange={setSelectedNodeId}
-                onReady={(controls) => {
-                  canvasControlsRef.current = controls;
-                }}
-              />
             </div>
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={32} minSize={25}>
-            <div className="h-full bg-slate-50/80 p-5">
-              <JourneyInspectorShell
-                projection={projection}
+
+            <JourneyFlowCanvas
+              graph={graph}
+              selectedNodeId={selectedNodeId}
+              highlightedNodeIds={selectedScenario?.highlightedNodeIds ?? []}
+              highlightedEdgeIds={selectedScenario?.highlightedEdgeIds ?? []}
+              onSelectedNodeIdChange={setSelectedNodeId}
+              onReady={(controls) => {
+                canvasControlsRef.current = controls;
+              }}
+            />
+          </div>
+
+          <JourneyInspector
+            mode="drawer"
+            open={Boolean(selectedNode)}
+            onOpenChange={(open) => {
+              if (!open) {
+                setSelectedNodeId(null);
+              }
+            }}
+            eventId={id}
+            projection={effectiveProjection}
+            selectedNode={selectedNode}
+            scenarios={scenarios}
+            technicalDetailsOpen={technicalDetailsOpen}
+            templateDraftPreview={activeTemplatePreview}
+          />
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-3xl border border-white/70 bg-white/90 shadow-sm">
+          <ResizablePanelGroup direction="horizontal" className="min-h-[920px]">
+            <ResizablePanel defaultSize={68} minSize={55}>
+              <div className="h-full p-5">
+                <div className="mb-4 flex items-center gap-2">
+                  <GitBranch className="h-4 w-4 text-primary" />
+                  <div>
+                    <h2 className="text-base font-semibold text-foreground">Fluxo visual guiado</h2>
+                    <p className="text-sm text-muted-foreground">
+                      O renderer agora usa React Flow com canvas travado, mantendo a projection como fonte de verdade.
+                    </p>
+                  </div>
+                </div>
+
+                <JourneyFlowCanvas
+                  graph={graph}
+                  selectedNodeId={selectedNodeId}
+                  highlightedNodeIds={selectedScenario?.highlightedNodeIds ?? []}
+                  highlightedEdgeIds={selectedScenario?.highlightedEdgeIds ?? []}
+                  onSelectedNodeIdChange={setSelectedNodeId}
+                  onReady={(controls) => {
+                    canvasControlsRef.current = controls;
+                  }}
+                />
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={32} minSize={25}>
+              <JourneyInspector
+                mode="panel"
+                eventId={id}
+                projection={effectiveProjection}
                 selectedNode={selectedNode}
                 scenarios={scenarios}
                 technicalDetailsOpen={technicalDetailsOpen}
+                templateDraftPreview={activeTemplatePreview}
               />
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
+      )}
     </div>
   );
 }

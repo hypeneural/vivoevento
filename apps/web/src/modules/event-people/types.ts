@@ -21,11 +21,79 @@ export type EventPersonReviewQueueStatus = 'pending' | 'conflict' | 'resolved' |
 export type EventPersonReviewQueueType = 'unknown_person' | 'cluster_suggestion' | 'identity_conflict' | 'coverage_gap';
 
 export interface EventPersonMediaStat {
-  total_media: number;
-  total_solo_media: number;
-  total_group_media: number;
-  total_published_media: number;
-  total_pending_media: number;
+  media_count: number;
+  solo_media_count: number;
+  with_others_media_count: number;
+  published_media_count: number;
+  pending_media_count: number;
+  best_media_id?: number | null;
+  latest_media_id?: number | null;
+  projected_at?: string | null;
+}
+
+export interface EventPersonRepresentativeFace {
+  id: number;
+  event_media_face_id: number;
+  rank_score: number;
+  quality_score: number | null;
+  pose_bucket: string | null;
+  context_hash: string | null;
+  sync_status: string;
+  last_synced_at: string | null;
+  sync_payload: Record<string, unknown> | null;
+  face?: {
+    id: number | null;
+    event_media_id: number | null;
+    face_index: number | null;
+    quality_score: number | null;
+    quality_tier: string | null;
+  };
+}
+
+export interface EventPersonRelationPersonSummary {
+  id: number;
+  display_name: string;
+  type: string | null;
+  side: string | null;
+  status: string | null;
+}
+
+export interface EventPersonRelation {
+  id: number;
+  event_id: number;
+  person_pair_key: string;
+  relation_type: string;
+  directionality: string;
+  source: string;
+  confidence: number | null;
+  strength: number | null;
+  is_primary: boolean;
+  notes: string | null;
+  person_a?: EventPersonRelationPersonSummary | null;
+  person_b?: EventPersonRelationPersonSummary | null;
+  other_person?: EventPersonRelationPersonSummary | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface EventPeoplePresetPerson {
+  key: string;
+  label: string;
+  type: string;
+  side: string;
+  importance_rank: number;
+}
+
+export interface EventPeoplePresetRelation {
+  type: string;
+  label: string;
+  directionality: string;
+}
+
+export interface EventPeoplePresetsResponse {
+  event_type: string | null;
+  people: EventPeoplePresetPerson[];
+  relations: EventPeoplePresetRelation[];
 }
 
 export interface EventPerson {
@@ -41,6 +109,8 @@ export interface EventPerson {
   notes: string | null;
   status: EventPersonStatus | string;
   stats?: EventPersonMediaStat[];
+  representative_faces?: EventPersonRepresentativeFace[];
+  relations?: EventPersonRelation[];
   created_at: string | null;
   updated_at: string | null;
 }
@@ -167,6 +237,20 @@ export interface EventPeopleCreatePayload {
   type?: EventPersonType | string;
   side?: EventPersonSide | string;
   importance_rank?: number;
+  notes?: string | null;
+  status?: EventPersonStatus | string;
+}
+
+export interface EventPeopleUpdatePayload extends Partial<EventPeopleCreatePayload> {}
+
+export interface EventPeopleRelationPayload {
+  person_a_id: number;
+  person_b_id: number;
+  relation_type: string;
+  directionality?: string;
+  confidence?: number | null;
+  strength?: number | null;
+  is_primary?: boolean;
   notes?: string | null;
 }
 

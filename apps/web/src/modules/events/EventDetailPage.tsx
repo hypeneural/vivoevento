@@ -452,6 +452,12 @@ export default function EventDetailPage() {
                 Editar dados
               </Link>
             </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link to={`/events/${event.id}/people`}>
+                <Users className="mr-1.5 h-3.5 w-3.5" />
+                Organizar pessoas
+              </Link>
+            </Button>
             {can('events.manage_team') ? (
               <Button variant="outline" size="sm" asChild>
                 <Link to={`/events/${event.id}/access`}>

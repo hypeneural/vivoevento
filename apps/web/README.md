@@ -163,7 +163,7 @@ Variáveis de ambiente com prefixo `VITE_` ficam disponíveis via `import.meta.e
 |----------------|---------------|--------|
 | `auth` | Auth | 🟡 UI pronta |
 | `dashboard` | Analytics/Events | 🟡 UI pronta |
-| `event-people` | EventPeople | Fase 1 interna em execucao |
+| `event-people` | EventPeople | Pagina dedicada, inbox guiada e sync AWS assincrono |
 | `events` | Events | 🟡 UI pronta |
 | `face-search` | FaceSearch | 🟡 UI pronta |
 | `media` | InboundMedia | 🟡 UI pronta |
@@ -184,6 +184,7 @@ Variáveis de ambiente com prefixo `VITE_` ficam disponíveis via `import.meta.e
 Atualizacao:
 
 - `events/:id/access` agora usa o modulo `event-team` com API real para equipe ativa, convites pendentes, reenvio, revogacao e aceite publico por token.
+- `events/:id/people` agora usa o modulo `event-people` com inbox guiada, pagina dedicada, CRUD manual, relacoes e estado local de representatives AWS.
 
 ---
 

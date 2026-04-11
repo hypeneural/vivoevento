@@ -3,11 +3,14 @@
 namespace App\Modules\EventPeople\Models;
 
 use App\Modules\EventPeople\Enums\EventPersonRepresentativeSyncStatus;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EventPersonRepresentativeFace extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'event_id',
         'event_person_id',
@@ -28,6 +31,11 @@ class EventPersonRepresentativeFace extends Model
         'last_synced_at' => 'datetime',
         'sync_payload' => 'array',
     ];
+
+    protected static function newFactory(): \Database\Factories\EventPersonRepresentativeFaceFactory
+    {
+        return \Database\Factories\EventPersonRepresentativeFaceFactory::new();
+    }
 
     public function person(): BelongsTo
     {

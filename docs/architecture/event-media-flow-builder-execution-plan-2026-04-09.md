@@ -1808,6 +1808,34 @@ cd apps/web
 npm run test -- src/modules/events/journey/__tests__/JourneyEdgeLabel.test.tsx
 ```
 
+Status em `2026-04-11`:
+
+- [x] `apps/web/src/modules/events/journey/JourneyEdgeLabel.tsx` foi criado como camada pura para o label da edge;
+- [x] `apps/web/src/modules/events/journey/JourneyFlowEdges.tsx` passou a concentrar o custom edge, o `edgeTypes` estavel e o mapper `toJourneyFlowEdge`;
+- [x] `JourneyFlowCanvas.tsx` deixou de carregar a edge inline e passou a consumir o modulo proprio;
+- [x] a edge customizada passou a usar `getBezierPath`, alinhando o path com a API oficial do `React Flow`;
+- [x] a cor do stroke e o chip da label continuam reagindo a `active`, `inactive`, `locked`, `unavailable` e `highlighted`;
+- [x] o adapter `buildJourneyGraph.ts` foi redistribuido para reduzir sobreposicao visual entre nos, com novas coordenadas deterministicas por faixa;
+- [x] a bateria agora protege explicitamente que nos da mesma faixa nao se sobrepoem;
+- [x] o viewport da page foi aberto com mais altura util (`min-h` maior e `fitView` com padding menor) para reduzir a compressao inicial do canvas.
+
+Bateria validada em `2026-04-11`:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/JourneyEdgeLabel.test.tsx src/modules/events/journey/__tests__/buildJourneyGraph.test.ts src/modules/events/journey/__tests__/JourneyFlowCanvas.test.tsx src/modules/events/journey/__tests__/EventJourneyBuilderPage.test.tsx
+npm run test -- src/modules/events
+npm run type-check
+```
+
+Resultado:
+
+- `1` teste passou na bateria de `JourneyEdgeLabel`;
+- `7` testes passaram na bateria de `buildJourneyGraph`, incluindo a protecao de nao sobreposicao por faixa;
+- `15` testes passaram na bateria focada `edge + graph + canvas + page`;
+- `76` testes passaram na regressao ampliada do modulo `events`;
+- `type-check` passou sem erros.
+
 ### Tarefa 3.5 - Criar inspector lateral
 
 Subtarefas:
@@ -1841,6 +1869,38 @@ Testes:
 cd apps/web
 npm run test -- src/modules/events/journey/__tests__/JourneyInspector.test.tsx
 ```
+
+Status em `2026-04-11`:
+
+- [x] `apps/web/src/modules/events/journey/JourneyInspector.tsx` foi criado como inspector responsivo da jornada;
+- [x] o desktop manteve painel lateral direito nao modal, coerente com o split `canvas + inspector` da V1;
+- [x] o mobile passou a abrir drawer inferior com `DrawerTitle` e `DrawerDescription` explicitos;
+- [x] cada `node.id` relevante agora resolve uma `inspector section` propria;
+- [x] formularios leves entraram para `modo de moderacao`, `WhatsApp privado`, `WhatsApp grupos`, `Telegram` e `Link de envio`;
+- [x] `EventContentModerationSettingsForm` foi reaproveitado para Safety;
+- [x] `EventMediaIntelligenceSettingsForm` foi reaproveitado para VLM, gate de contexto e resposta automatica;
+- [x] o save continua centralizado em `updateEventJourneyBuilder`, sem mutation paralela por form;
+- [x] `buildJourneyInspectorDraft.ts` passou a gerar o draft minimo dos formularios leves antes do patch agregado;
+- [x] `toJourneyUpdatePayload` continua sendo usado para patch minimo dos canais e do modo de moderacao;
+- [x] Safety e MediaIntelligence usam leitura detalhada temporaria pelos endpoints existentes para hidratar os formularios reaproveitados, mas persistem pelo endpoint agregado da jornada;
+- [x] o inspector ja cobre a primeira fatia editavel do builder: moderacao, canais, Safety e MediaIntelligence;
+- [x] nodes ainda fora dessa primeira fatia continuam em modo read-only com CTA explicito para o editor completo do evento.
+
+Bateria validada em `2026-04-11`:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/JourneyInspector.test.tsx src/modules/events/journey/__tests__/EventJourneyBuilderPage.test.tsx
+npm run test -- src/modules/events
+npm run type-check
+```
+
+Resultado:
+
+- `6` testes passaram na bateria de `JourneyInspector`;
+- `10` testes passaram na bateria focada `inspector + page`;
+- `82` testes passaram na regressao ampliada do modulo `events`;
+- `type-check` passou sem erros.
 
 ### Tarefa 3.6 - Criar templates guiados
 

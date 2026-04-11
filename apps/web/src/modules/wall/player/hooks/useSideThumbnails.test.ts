@@ -23,6 +23,35 @@ function makeItem(id: string, status: 'ready' | 'loading' = 'ready'): WallRuntim
   };
 }
 
+function makeVideoItem(
+  id: string,
+  options: {
+    status?: 'ready' | 'loading';
+    previewUrl?: string | null;
+  } = {},
+): WallRuntimeItem {
+  const previewUrl = Object.prototype.hasOwnProperty.call(options, 'previewUrl')
+    ? options.previewUrl
+    : `https://cdn.example.com/${id}-poster.jpg`;
+
+  return {
+    id,
+    url: `https://cdn.example.com/${id}.mp4`,
+    preview_url: previewUrl,
+    type: 'video',
+    sender_name: `Sender-${id}`,
+    is_featured: false,
+    caption: null,
+    orientation: 'vertical',
+    senderKey: `sender-${id}`,
+    assetStatus: options.status ?? 'ready',
+    playCount: 0,
+    width: 720,
+    height: 1280,
+    duration_seconds: 8,
+  };
+}
+
 describe('selectThumbnails', () => {
   it('returns empty array when fewer than 2 candidates', () => {
     const items = [makeItem('1')];
@@ -52,6 +81,21 @@ describe('selectThumbnails', () => {
     const items = [makeItem('a'), makeItem('b', 'loading'), makeItem('c'), makeItem('d')];
     const result = selectThumbnails(items, null, 8, 0);
     expect(result.every((t) => t.id !== 'b')).toBe(true);
+  });
+
+  it('uses video poster urls instead of playback assets for thumbnails', () => {
+    const items = [makeItem('a'), makeVideoItem('video-1'), makeItem('b')];
+    const result = selectThumbnails(items, null, 8, 0);
+    const videoThumb = result.find((item) => item.id === 'video-1');
+
+    expect(videoThumb?.url).toBe('https://cdn.example.com/video-1-poster.jpg');
+  });
+
+  it('skips ready videos without preview posters to avoid broken img rendering', () => {
+    const items = [makeItem('a'), makeVideoItem('video-1', { previewUrl: null }), makeItem('b')];
+    const result = selectThumbnails(items, null, 8, 0);
+
+    expect(result.find((item) => item.id === 'video-1')).toBeUndefined();
   });
 });
 
