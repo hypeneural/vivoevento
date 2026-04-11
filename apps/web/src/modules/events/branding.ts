@@ -132,7 +132,7 @@ export function resolveEffectiveBrandingSourceDescription(
     case 'mixed':
       return `Este evento combina ajustes proprios com itens herdados da ${organizationLabel}.`;
     default:
-      return 'Este evento usa apenas o branding proprio salvo nele.';
+      return 'Este evento usa apenas a identidade visual salva nele.';
   }
 }
 

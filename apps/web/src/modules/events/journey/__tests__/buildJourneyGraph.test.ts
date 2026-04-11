@@ -528,15 +528,41 @@ function makeProjection(): EventJourneyProjection {
 }
 
 describe('buildJourneyGraph', () => {
-  it('keeps the four stage bands with deterministic y positions', () => {
+  it('keeps the four stage bands with deterministic y positions and wider visual spacing', () => {
     const graph = buildJourneyGraph(makeProjection());
 
     expect(graph.stages.map((stage) => stage.id)).toEqual(['entry', 'processing', 'decision', 'output']);
-    expect(graph.stages.map((stage) => stage.y)).toEqual([0, 320, 640, 960]);
+    expect(graph.stages.map((stage) => stage.y)).toEqual([0, 272, 544, 816]);
     expect(graph.nodes.find((node) => node.id === 'decision_context_gate')?.position).toEqual({
-      x: 660,
-      y: 640,
+      x: 700,
+      y: 544,
     });
+  });
+
+  it('keeps nodes in the same stage without rectangle overlap in the deterministic layout', () => {
+    const graph = buildJourneyGraph(makeProjection());
+
+    for (const stageId of ['entry', 'processing', 'decision', 'output'] as const) {
+      const stageNodes = graph.nodes.filter((node) => node.stage === stageId);
+
+      for (let leftIndex = 0; leftIndex < stageNodes.length; leftIndex += 1) {
+        for (let rightIndex = leftIndex + 1; rightIndex < stageNodes.length; rightIndex += 1) {
+          const leftNode = stageNodes[leftIndex];
+          const rightNode = stageNodes[rightIndex];
+          const overlapsHorizontally =
+            leftNode.position.x < rightNode.position.x + rightNode.width
+            && leftNode.position.x + leftNode.width > rightNode.position.x;
+          const overlapsVertically =
+            leftNode.position.y < rightNode.position.y + rightNode.height
+            && leftNode.position.y + leftNode.height > rightNode.position.y;
+
+          expect(
+            overlapsHorizontally && overlapsVertically,
+            `${leftNode.id} overlaps ${rightNode.id} in stage ${stageId}`,
+          ).toBe(false);
+        }
+      }
+    }
   });
 
   it('creates stable handles and labeled edges for decision branches, including default', () => {

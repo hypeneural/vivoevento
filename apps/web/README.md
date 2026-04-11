@@ -45,8 +45,10 @@ apps/web/
 │   │   ├── auth/            # Login, autenticação
 │   │   ├── clients/         # Gestão de clientes
 │   │   ├── dashboard/       # Dashboard principal
+│   │   ├── event-people/    # Identidade, inbox e relacoes de pessoas no evento
 │   │   ├── events/          # CRUD de eventos
 │   │   ├── event-team/      # Acessos e convites por evento
+│   │   ├── face-search/     # Busca por selfie e reconhecimento facial
 │   │   ├── gallery/         # Galeria ao vivo
 │   │   ├── hub/             # Página do evento
 │   │   ├── media/           # Mídia recebida
@@ -161,7 +163,9 @@ Variáveis de ambiente com prefixo `VITE_` ficam disponíveis via `import.meta.e
 |----------------|---------------|--------|
 | `auth` | Auth | 🟡 UI pronta |
 | `dashboard` | Analytics/Events | 🟡 UI pronta |
+| `event-people` | EventPeople | Fase 1 interna em execucao |
 | `events` | Events | 🟡 UI pronta |
+| `face-search` | FaceSearch | 🟡 UI pronta |
 | `media` | InboundMedia | 🟡 UI pronta |
 | `moderation` | MediaProcessing | 🟡 UI pronta |
 | `gallery` | Gallery | 🟡 UI pronta |

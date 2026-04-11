@@ -414,7 +414,7 @@ export default function EventJourneyBuilderPage() {
       </Card>
 
       <div className="overflow-hidden rounded-3xl border border-white/70 bg-white/90 shadow-sm">
-        <ResizablePanelGroup direction="horizontal" className="min-h-[720px]">
+        <ResizablePanelGroup direction="horizontal" className="min-h-[920px]">
           <ResizablePanel defaultSize={68} minSize={55}>
             <div className="h-full p-5">
               <div className="mb-4 flex items-center gap-2">

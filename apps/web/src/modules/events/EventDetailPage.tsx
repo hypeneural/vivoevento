@@ -505,7 +505,7 @@ export default function EventDetailPage() {
                 {EVENT_COMMERCIAL_MODE_LABELS[event.commercial_mode || 'none']}
               </Badge>
               <Badge variant="outline" className="border-white/20 bg-white/10 text-white">
-                Branding {effectiveBrandingSourceLabel}
+                Visual {effectiveBrandingSourceLabel}
               </Badge>
             </div>
 
@@ -603,7 +603,7 @@ export default function EventDetailPage() {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
               <Palette className="h-4 w-4 text-primary" />
-              Branding aplicado
+              Visual aplicado
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -625,7 +625,7 @@ export default function EventDetailPage() {
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary">{effectiveBrandingSourceLabel}</Badge>
               <Badge variant="outline">
-                {effectiveBranding.inherits_from_organization ? 'Herdando da organizacao' : 'Branding proprio do evento'}
+                {effectiveBranding.inherits_from_organization ? 'Usando visual da organizacao' : 'Visual proprio do evento'}
               </Badge>
             </div>
 
@@ -647,10 +647,10 @@ export default function EventDetailPage() {
                 </div>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Logo efetiva</p>
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Logo aplicada</p>
                 <div className="mt-2 flex min-h-12 items-center justify-center rounded-2xl bg-white p-2">
                   {effectiveBranding.logo_url ? (
-                    <img src={effectiveBranding.logo_url} alt={`Logo efetiva de ${event.title}`} className="max-h-12 w-auto object-contain" />
+                    <img src={effectiveBranding.logo_url} alt={`Logo aplicada de ${event.title}`} className="max-h-12 w-auto object-contain" />
                   ) : (
                     <span className="text-xs text-muted-foreground">Sem logo aplicada</span>
                   )}
@@ -664,7 +664,7 @@ export default function EventDetailPage() {
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
               <Building2 className="h-4 w-4 text-primary" />
-              Regra de heranca
+              Como o visual e montado
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -674,7 +674,7 @@ export default function EventDetailPage() {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-sm font-medium">Herdando da organizacao</p>
+              <p className="text-sm font-medium">Usando visual da organizacao</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {effectiveBranding.inherits_from_organization
                   ? 'Sim, o evento pode aproveitar automaticamente os ativos da organizacao.'
@@ -683,7 +683,7 @@ export default function EventDetailPage() {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              O preview considera exatamente o `effective_branding` devolvido pela API, sem depender de leitura tecnica de `logo_path` ou `cover_image_path`.
+              Este resumo mostra exatamente o visual que a plataforma aplicou ao evento, sem depender de leitura manual de campos tecnicos.
             </p>
           </CardContent>
         </Card>

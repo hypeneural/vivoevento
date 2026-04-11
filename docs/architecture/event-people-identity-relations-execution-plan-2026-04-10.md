@@ -1660,7 +1660,7 @@ npx.cmd vitest run src/modules/event-people/components/CerimonialistaFlow.test.t
 - [x] definir partial indexes e unique partial indexes da V1
 - [ ] explicitar governanca de retention e limpeza AWS
 - [x] garantir `afterCommit`, jobs unicos e jobs criptografados onde couber
-- [ ] explicitar regras de `useDeferredValue` e `useTransition` nas telas quentes
+- [x] explicitar regras de `useDeferredValue` e `useTransition` nas telas quentes
 - [ ] documentar runbook operacional
 
 ---
@@ -1717,13 +1717,43 @@ Bateria executada:
 - `php artisan test tests/Feature/EventPeople tests/Unit/EventPeople` -> `26 passed`, `184 assertions`
 - `php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch` -> `156 passed`, `7 skipped`, `1141 assertions`
 
-Ainda pendente na Fase 1:
+Naquele ponto ainda pendente na Fase 1:
 
 - UI do inbox de revisao no frontend;
 - fluxo visual do overlay com CTA `Quem e esta pessoa?`;
 - feedback local no frontend antes do sync remoto;
 - conflito projetado automaticamente para `merge/split` sem precisar item manual de teste;
 - endurecer projecoes incrementais para evitar qualquer recomputacao desnecessaria em leitura.
+
+---
+
+### 2026-04-11 - Fase 1 frontend guiado concluida
+
+Concluido:
+
+- card visual da inbox de revisao integrado na pagina `/media`, com priorizacao local, contadores e CTA humano `Quem e esta pessoa?`;
+- overlay clicavel de rostos em fotos do catalogo implementado sobre o detalhe da midia, com destaque de identidade atual e rostos pendentes;
+- drawer de identidade implementado para confirmacao em pessoa existente, criacao inline, tratamento de conflito e reabertura local;
+- feedback local imediato antes do sync remoto implementado com atualizacao de cache TanStack Query e mensagens explicitas de fila assincrona;
+- projecao automatica de conflito `identity_conflict` validada ponta a ponta sem depender de item manual de teste;
+- `useDeferredValue` aplicado na busca local de pessoas e `useTransition` aplicado em troca de rosto, abertura do drawer e mudancas de aba do fluxo guiado;
+- `MediaPage` passa a consumir `EventPeople` como camada local de leitura e escrita guiada, preservando `FaceSearch` apenas na trilha de selfie search.
+
+Bateria executada:
+
+- `cd apps/web && npx.cmd vitest run src/modules/media/MediaPage.test.tsx src/modules/event-people/components/EventPeopleFaceOverlay.test.tsx src/modules/event-people/components/EventPeopleIdentitySheet.test.tsx src/modules/face-search/components/FaceSearchSearchPanel.test.tsx src/modules/face-search/components/EventFaceSearchSearchCard.test.tsx src/modules/face-search/PublicFaceSearchPage.test.tsx src/modules/events/face-search-status.test.ts src/modules/events/components/face-search/EventFaceSearchSettingsForm.test.tsx src/modules/events/components/face-search/EventFaceSearchSettingsCard.test.tsx src/modules/events/EventDetailPage.test.tsx` -> `10 files passed`, `26 tests passed`
+- `cd apps/web && npm run type-check` -> `tsc --noEmit` verde
+- `cd apps/api && php artisan test tests/Feature/EventPeople tests/Unit/EventPeople` -> `27 passed`, `202 assertions`
+- `cd apps/api && php artisan test tests/Feature/FaceSearch tests/Unit/FaceSearch` -> `156 passed`, `7 skipped`, `1141 assertions`
+
+Pendente apos esta rodada:
+
+- pagina dedicada de pessoas do evento;
+- CRUD manual minimo de pessoa fora do fluxo guiado;
+- relacoes manuais e presets por tipo de evento;
+- representatives curados e sync AWS assincrono completo;
+- governanca de retention/limpeza AWS e runbook operacional;
+- endurecimento adicional das projecoes incrementais e fases seguintes de grupos, coverage e momentos.
 
 ---
 

@@ -1,5 +1,5 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
+import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   CalendarRange,
@@ -22,9 +22,20 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from '@/hooks/use-toast';
 import type { ApiEventMediaDetail, ApiEventMediaItem, ApiFaceSearchResponse } from '@/lib/api-types';
 import { ApiError } from '@/lib/api';
 import { queryKeys } from '@/lib/query-client';
+import { eventPeopleApi } from '@/modules/event-people/api';
+import { EventPeopleFaceOverlay } from '@/modules/event-people/components/EventPeopleFaceOverlay';
+import { EventPeopleIdentitySheet } from '@/modules/event-people/components/EventPeopleIdentitySheet';
+import { EventPeopleReviewInboxCard } from '@/modules/event-people/components/EventPeopleReviewInboxCard';
+import type {
+  EventMediaFacePeople,
+  EventPerson,
+  EventPersonReviewQueueItem,
+  PaginatedApiResponse,
+} from '@/modules/event-people/types';
 import { eventsService } from '@/modules/events/services/events.service';
 import type { EventListItem } from '@/modules/events/types';
 import { searchEventFaces } from '@/modules/face-search/api';
@@ -61,6 +72,8 @@ const EMPTY_STATS = {
   duplicates: 0,
   face_indexed: 0,
 };
+
+type IdentityAction = 'confirm' | 'create' | 'ignore' | 'split' | 'merge' | null;
 
 function formatDateTime(value?: string | null) {
   if (!value) return 'Nao disponivel';
@@ -108,6 +121,42 @@ function renderMediaSurface(media: ApiEventMediaItem | ApiEventMediaDetail, clas
   }
 
   return <img src={surfaceUrl} alt={media.caption || media.event_title || media.sender_name} className={className} loading="lazy" decoding="async" />;
+}
+
+function sortReviewItems(items: EventPersonReviewQueueItem[]) {
+  return [...items].sort((left, right) => {
+    if (right.priority !== left.priority) return right.priority - left.priority;
+
+    const leftSignal = left.last_signal_at ? new Date(left.last_signal_at).getTime() : 0;
+    const rightSignal = right.last_signal_at ? new Date(right.last_signal_at).getTime() : 0;
+
+    return rightSignal - leftSignal;
+  });
+}
+
+function upsertReviewQueueItem(
+  response: PaginatedApiResponse<EventPersonReviewQueueItem> | undefined,
+  item: EventPersonReviewQueueItem,
+) {
+  if (!response) return response;
+
+  const nextItems = sortReviewItems([
+    ...response.data.filter((entry) => entry.id !== item.id),
+    item,
+  ]);
+
+  return {
+    ...response,
+    data: nextItems,
+  };
+}
+
+function upsertFaceInCollection(current: EventMediaFacePeople[] | undefined, nextFace: EventMediaFacePeople) {
+  if (!current) return current;
+
+  return current
+    .map((face) => (face.id === nextFace.id ? nextFace : face))
+    .sort((left, right) => left.face_index - right.face_index);
 }
 
 function MediaCard({ media, onOpen }: { media: ApiEventMediaItem; onOpen: () => void }) {
@@ -175,6 +224,8 @@ function MediaListRow({ media, onOpen }: { media: ApiEventMediaItem; onOpen: () 
 }
 
 export default function MediaPage() {
+  const queryClient = useQueryClient();
+  const [isUiTransitionPending, startUiTransition] = useTransition();
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [perPage, setPerPage] = useState(36);
@@ -196,6 +247,9 @@ export default function MediaPage() {
   const [faceSearchErrorMessage, setFaceSearchErrorMessage] = useState<string | null>(null);
   const [faceSearchResponse, setFaceSearchResponse] = useState<ApiFaceSearchResponse | null>(null);
   const [selectedMediaId, setSelectedMediaId] = useState<number | null>(null);
+  const [selectedFaceId, setSelectedFaceId] = useState<number | null>(null);
+  const [identitySheetOpen, setIdentitySheetOpen] = useState(false);
+  const [pendingIdentityAction, setPendingIdentityAction] = useState<IdentityAction>(null);
 
   const deferredSearch = useDeferredValue(search);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -237,6 +291,12 @@ export default function MediaPage() {
     queryFn: () => eventsService.list({ per_page: 100, sort_by: 'starts_at', sort_direction: 'desc' }),
   });
 
+  const workbenchEventId = useMemo(() => {
+    if (eventFilter !== 'all') return eventFilter;
+
+    return eventsQuery.data?.data?.[0]?.id ? String(eventsQuery.data.data[0].id) : '';
+  }, [eventFilter, eventsQuery.data?.data]);
+
   const mediaQuery = useInfiniteQuery({
     queryKey: queryKeys.media.list(filters),
     initialPageParam: 1,
@@ -249,6 +309,15 @@ export default function MediaPage() {
     queryKey: queryKeys.media.detail(String(selectedMediaId ?? '')),
     queryFn: () => mediaService.show(selectedMediaId as number),
     enabled: selectedMediaId !== null,
+  });
+
+  const reviewQueueFilters = useMemo(() => ({ per_page: 24 }), []);
+
+  const reviewQueueQuery = useQuery({
+    queryKey: queryKeys.eventPeople.reviewQueue(workbenchEventId || 'none', reviewQueueFilters),
+    queryFn: () => eventPeopleApi.listReviewQueue(workbenchEventId, reviewQueueFilters),
+    enabled: workbenchEventId !== '',
+    staleTime: 15_000,
   });
 
   const faceSearchMutation = useMutation({
@@ -269,6 +338,177 @@ export default function MediaPage() {
     },
   });
 
+  function patchReviewQueueCache(eventId: number | string, reviewItem: EventPersonReviewQueueItem | null) {
+    if (!reviewItem) return;
+
+    queryClient.setQueriesData<PaginatedApiResponse<EventPersonReviewQueueItem> | undefined>(
+      { queryKey: queryKeys.eventPeople.reviewQueues(eventId) },
+      (current) => upsertReviewQueueItem(current, reviewItem),
+    );
+  }
+
+  function patchMediaFacesCache(eventId: number | string, mediaId: number | string, face: EventMediaFacePeople) {
+    queryClient.setQueryData<EventMediaFacePeople[] | undefined>(
+      queryKeys.eventPeople.mediaFaces(eventId, mediaId),
+      (current) => upsertFaceInCollection(current, face),
+    );
+  }
+
+  function openFaceIdentity(face: EventMediaFacePeople) {
+    startUiTransition(() => {
+      setSelectedFaceId(face.id);
+      setIdentitySheetOpen(true);
+    });
+  }
+
+  function openReviewItem(item: EventPersonReviewQueueItem) {
+    if (!item.face) return;
+
+    startUiTransition(() => {
+      if (eventFilter !== String(item.event_id)) {
+        setEventFilter(String(item.event_id));
+      }
+
+      setSelectedMediaId(item.face.event_media_id);
+      setSelectedFaceId(item.face.id);
+      setIdentitySheetOpen(true);
+    });
+  }
+
+  const confirmReviewMutation = useMutation({
+    mutationFn: ({ eventId, reviewItemId, payload }: { eventId: number | string; reviewItemId: number; payload: { person_id?: number; person?: { display_name: string; type?: string; side?: string } } }) =>
+      eventPeopleApi.confirmReviewItem(eventId, reviewItemId, payload),
+    onMutate: ({ payload }) => {
+      setPendingIdentityAction(payload.person ? 'create' : 'confirm');
+    },
+    onSuccess: (response, variables) => {
+      patchMediaFacesCache(variables.eventId, response.face.event_media_id, response.face);
+      patchReviewQueueCache(variables.eventId, response.review_item);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.eventPeople.peopleLists(variables.eventId) });
+      setSelectedFaceId(response.face.id);
+
+      toast({
+        title: variables.payload.person ? 'Pessoa criada localmente' : 'Confirmacao salva localmente',
+        description: 'A mudanca ja refletiu no painel. O sync remoto segue na fila assíncrona.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Falha ao confirmar identidade',
+        description: error instanceof ApiError ? error.message : 'Nao foi possivel confirmar essa pessoa agora.',
+        variant: 'destructive',
+      });
+    },
+    onSettled: () => {
+      setPendingIdentityAction(null);
+    },
+  });
+
+  const ignoreReviewMutation = useMutation({
+    mutationFn: ({ eventId, reviewItemId }: { eventId: number | string; reviewItemId: number }) =>
+      eventPeopleApi.ignoreReviewItem(eventId, reviewItemId),
+    onMutate: () => {
+      setPendingIdentityAction('ignore');
+    },
+    onSuccess: (response, variables) => {
+      patchReviewQueueCache(variables.eventId, response.review_item);
+      if (selectedMediaPreview) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.eventPeople.mediaFaces(selectedMediaPreview.event_id, selectedMediaPreview.id),
+        });
+      }
+
+      toast({
+        title: 'Item tratado localmente',
+        description: 'A inbox foi atualizada sem depender do sync remoto.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Falha ao ignorar item',
+        description: error instanceof ApiError ? error.message : 'Nao foi possivel atualizar a inbox agora.',
+        variant: 'destructive',
+      });
+    },
+    onSettled: () => {
+      setPendingIdentityAction(null);
+    },
+  });
+
+  const splitReviewMutation = useMutation({
+    mutationFn: ({ eventId, reviewItemId }: { eventId: number | string; reviewItemId: number }) =>
+      eventPeopleApi.splitReviewItem(eventId, reviewItemId),
+    onMutate: () => {
+      setPendingIdentityAction('split');
+    },
+    onSuccess: (response, variables) => {
+      patchMediaFacesCache(variables.eventId, response.face.event_media_id, response.face);
+      patchReviewQueueCache(variables.eventId, response.review_item);
+      setSelectedFaceId(response.face.id);
+
+      toast({
+        title: 'Identidade reaberta localmente',
+        description: 'O rosto voltou para revisao e o sync remoto continua fora do hot path.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Falha ao reabrir identidade',
+        description: error instanceof ApiError ? error.message : 'Nao foi possivel separar esse rosto agora.',
+        variant: 'destructive',
+      });
+    },
+    onSettled: () => {
+      setPendingIdentityAction(null);
+    },
+  });
+
+  const mergeReviewMutation = useMutation({
+    mutationFn: ({
+      eventId,
+      reviewItemId,
+      sourcePersonId,
+      targetPersonId,
+    }: {
+      eventId: number | string;
+      reviewItemId: number;
+      sourcePersonId: number;
+      targetPersonId: number;
+    }) => eventPeopleApi.mergeReviewItem(eventId, reviewItemId, {
+      source_person_id: sourcePersonId,
+      target_person_id: targetPersonId,
+    }),
+    onMutate: () => {
+      setPendingIdentityAction('merge');
+    },
+    onSuccess: (response, variables) => {
+      patchReviewQueueCache(variables.eventId, response.review_item);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.eventPeople.peopleLists(variables.eventId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.eventPeople.reviewQueues(variables.eventId) });
+
+      if (selectedMediaPreview) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.eventPeople.mediaFaces(selectedMediaPreview.event_id, selectedMediaPreview.id),
+        });
+      }
+
+      toast({
+        title: 'Merge aplicado localmente',
+        description: 'As pessoas foram consolidadas no banco local. A reconciliacao remota segue em fila.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Falha ao mesclar pessoas',
+        description: error instanceof ApiError ? error.message : 'Nao foi possivel concluir o merge agora.',
+        variant: 'destructive',
+      });
+    },
+    onSettled: () => {
+      setPendingIdentityAction(null);
+    },
+  });
+
   const events = (eventsQuery.data?.data ?? []) as EventListItem[];
   const pages = mediaQuery.data?.pages ?? [];
   const items = useMemo(() => pages.flatMap((page) => page.data), [pages]);
@@ -276,6 +516,29 @@ export default function MediaPage() {
   const stats = pages[0]?.meta.stats ?? EMPTY_STATS;
   const selectedMediaPreview = detailQuery.data ?? items.find((item) => item.id === selectedMediaId) ?? null;
   const selectedFaceSearchEvent = events.find((eventItem) => String(eventItem.id) === faceSearchEventId);
+  const workbenchEvent = events.find((eventItem) => String(eventItem.id) === workbenchEventId) ?? null;
+
+  const mediaFacesQuery = useQuery({
+    queryKey: queryKeys.eventPeople.mediaFaces(selectedMediaPreview?.event_id ?? 'none', selectedMediaPreview?.id ?? 'none'),
+    queryFn: () => eventPeopleApi.listMediaFaces(
+      selectedMediaPreview?.event_id ?? '',
+      selectedMediaPreview?.id ?? '',
+    ),
+    enabled: selectedMediaPreview !== null && selectedMediaPreview.media_type === 'image',
+    staleTime: 5_000,
+  });
+
+  const reviewQueueItems = useMemo(
+    () => sortReviewItems((reviewQueueQuery.data?.data ?? []).filter((item) => item.status === 'pending' || item.status === 'conflict')).slice(0, 8),
+    [reviewQueueQuery.data?.data],
+  );
+
+  const selectedFace = useMemo(
+    () => mediaFacesQuery.data?.find((face) => face.id === selectedFaceId) ?? null,
+    [mediaFacesQuery.data, selectedFaceId],
+  );
+
+  const isIdentityMutationPending = pendingIdentityAction !== null;
 
   useEffect(() => {
     const node = loadMoreRef.current;
@@ -294,6 +557,21 @@ export default function MediaPage() {
 
     setFaceSearchEventId(eventFilter !== 'all' ? eventFilter : String(events[0].id));
   }, [eventFilter, events, faceSearchDialogOpen, faceSearchEventId]);
+
+  useEffect(() => {
+    if (selectedMediaId !== null) return;
+
+    setSelectedFaceId(null);
+    setIdentitySheetOpen(false);
+  }, [selectedMediaId]);
+
+  useEffect(() => {
+    if (!identitySheetOpen || !selectedFaceId || !mediaFacesQuery.data?.length) return;
+
+    if (mediaFacesQuery.data.some((face) => face.id === selectedFaceId)) return;
+
+    setSelectedFaceId(mediaFacesQuery.data[0]?.id ?? null);
+  }, [identitySheetOpen, mediaFacesQuery.data, selectedFaceId]);
 
   function clearFilters() {
     setSearch('');
@@ -325,6 +603,14 @@ export default function MediaPage() {
     }
   }
 
+  function openMediaDetails(mediaId: number) {
+    startUiTransition(() => {
+      setSelectedMediaId(mediaId);
+      setSelectedFaceId(null);
+      setIdentitySheetOpen(false);
+    });
+  }
+
   return (
     <>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -337,6 +623,15 @@ export default function MediaPage() {
           <StatsCard title="Duplicadas" value={stats.duplicates} icon={Layers3} />
           <StatsCard title="Rosto Indexado" value={stats.face_indexed} icon={ScanFace} />
         </div>
+
+        <EventPeopleReviewInboxCard
+          eventName={workbenchEvent?.title ?? null}
+          items={reviewQueueItems}
+          isLoading={reviewQueueQuery.isLoading}
+          isError={reviewQueueQuery.isError}
+          isPendingUi={isUiTransitionPending || isIdentityMutationPending}
+          onOpenItem={openReviewItem}
+        />
 
         <section className="glass rounded-3xl border border-border/60 p-4 sm:p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -445,7 +740,7 @@ export default function MediaPage() {
 
         {!mediaQuery.isLoading && !mediaQuery.isError && items.length > 0 ? (
           <>
-            <MediaVirtualFeed items={items} view={view} loadMoreRef={loadMoreRef} renderItem={(item) => view === 'grid' ? <MediaCard key={item.id} media={item} onOpen={() => setSelectedMediaId(item.id)} /> : <MediaListRow key={item.id} media={item} onOpen={() => setSelectedMediaId(item.id)} />} />
+            <MediaVirtualFeed items={items} view={view} loadMoreRef={loadMoreRef} renderItem={(item) => view === 'grid' ? <MediaCard key={item.id} media={item} onOpen={() => openMediaDetails(item.id)} /> : <MediaListRow key={item.id} media={item} onOpen={() => openMediaDetails(item.id)} />} />
             <div className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-background/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm text-muted-foreground">{items.length} de {total} itens carregados</div>
               <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -467,7 +762,80 @@ export default function MediaPage() {
             <div className="flex h-72 items-center justify-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin" /></div>
           ) : (
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-              <div className="overflow-hidden rounded-3xl border border-border/60 bg-muted">{renderMediaSurface(selectedMediaPreview, 'max-h-[70vh] w-full object-contain')}</div>
+              <div className="space-y-4">
+                {selectedMediaPreview.media_type === 'image' ? (
+                  <EventPeopleFaceOverlay
+                    mediaType={selectedMediaPreview.media_type}
+                    surfaceUrl={selectedMediaPreview.preview_url || selectedMediaPreview.thumbnail_url || selectedMediaPreview.original_url}
+                    alt={selectedMediaPreview.caption || selectedMediaPreview.event_title || selectedMediaPreview.sender_name || 'Midia selecionada'}
+                    faces={mediaFacesQuery.data ?? []}
+                    selectedFaceId={selectedFaceId}
+                    onSelectFace={openFaceIdentity}
+                  />
+                ) : (
+                  <div className="overflow-hidden rounded-3xl border border-border/60 bg-muted">
+                    {renderMediaSurface(selectedMediaPreview, 'max-h-[70vh] w-full object-contain')}
+                  </div>
+                )}
+
+                {selectedMediaPreview.media_type === 'image' ? (
+                  <div className="rounded-3xl border border-border/60 bg-background/80 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold">Rostos detectados</p>
+                        <p className="text-xs text-muted-foreground">Clique no overlay ou selecione um rosto abaixo para abrir o fluxo “Quem e esta pessoa?”.</p>
+                      </div>
+                      {isIdentityMutationPending ? <Badge variant="secondary">Atualizacao local em andamento</Badge> : null}
+                    </div>
+
+                    {mediaFacesQuery.isLoading ? (
+                      <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Carregando overlay de rostos...
+                      </div>
+                    ) : null}
+
+                    {mediaFacesQuery.isError ? (
+                      <div className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm text-destructive">
+                        Nao foi possivel carregar o overlay de rostos desta midia.
+                      </div>
+                    ) : null}
+
+                    {!mediaFacesQuery.isLoading && !mediaFacesQuery.isError ? (
+                      <div className="mt-4 grid gap-3 md:grid-cols-2">
+                        {(mediaFacesQuery.data ?? []).map((face) => (
+                          <button
+                            key={face.id}
+                            type="button"
+                            className={`rounded-2xl border px-3 py-3 text-left transition ${
+                              selectedFaceId === face.id
+                                ? 'border-primary bg-primary/10'
+                                : 'border-border/50 bg-background hover:border-primary/40 hover:bg-primary/5'
+                            }`}
+                            onClick={() => openFaceIdentity(face)}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <p className="font-medium">
+                                  {face.current_assignment?.person?.display_name || `Rosto #${face.face_index + 1}`}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {face.current_assignment?.person
+                                    ? 'Identidade confirmada'
+                                    : face.review_item?.payload.question || 'Quem e esta pessoa?'}
+                                </p>
+                              </div>
+                              <Badge variant={face.review_item?.status === 'conflict' ? 'destructive' : 'outline'}>
+                                {face.review_item?.status || 'overlay'}
+                              </Badge>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-2">
                   <MediaStatusBadge status={selectedMediaPreview.status as never} />
@@ -513,6 +881,26 @@ export default function MediaPage() {
                     </div>
                   </div>
                 ) : null}
+                {selectedFace ? (
+                  <div className="rounded-3xl border border-primary/20 bg-primary/5 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Rosto selecionado</p>
+                        <p className="mt-1 font-medium">
+                          {selectedFace.current_assignment?.person?.display_name || selectedFace.review_item?.payload.question || `Rosto #${selectedFace.face_index + 1}`}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {selectedFace.current_assignment?.person
+                            ? 'Use o drawer para corrigir, reabrir ou consolidar a identidade.'
+                          : 'Abra o drawer para confirmar a pessoa ou criar uma nova entrada.'}
+                        </p>
+                      </div>
+                      <Button type="button" size="sm" onClick={() => openFaceIdentity(selectedFace)}>
+                        {selectedFace.current_assignment?.person ? 'Ajustar identidade' : 'Quem e esta pessoa?'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
                 <div className="flex flex-wrap gap-2">
                   {selectedMediaPreview.original_url ? <Button asChild><a href={selectedMediaPreview.original_url} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" />Abrir original</a></Button> : null}
                   <Button asChild variant="outline"><Link to={`/events/${selectedMediaPreview.event_id}`}>Abrir evento</Link></Button>
@@ -522,6 +910,67 @@ export default function MediaPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <EventPeopleIdentitySheet
+        open={identitySheetOpen}
+        onOpenChange={setIdentitySheetOpen}
+        eventId={selectedMediaPreview?.event_id ?? (selectedFace?.review_item?.event_id ?? null)}
+        face={selectedFace}
+        pendingAction={pendingIdentityAction}
+        onConfirmExisting={(personId) => {
+          const reviewItemId = selectedFace?.review_item?.id;
+          const eventId = selectedMediaPreview?.event_id ?? selectedFace?.review_item?.event_id;
+
+          if (!reviewItemId || !eventId) return;
+
+          confirmReviewMutation.mutate({
+            eventId,
+            reviewItemId,
+            payload: { person_id: personId },
+          });
+        }}
+        onCreatePerson={(payload) => {
+          const reviewItemId = selectedFace?.review_item?.id;
+          const eventId = selectedMediaPreview?.event_id ?? selectedFace?.review_item?.event_id;
+
+          if (!reviewItemId || !eventId) return;
+
+          confirmReviewMutation.mutate({
+            eventId,
+            reviewItemId,
+            payload: { person: payload },
+          });
+        }}
+        onIgnore={() => {
+          const reviewItemId = selectedFace?.review_item?.id;
+          const eventId = selectedMediaPreview?.event_id ?? selectedFace?.review_item?.event_id;
+
+          if (!reviewItemId || !eventId) return;
+
+          ignoreReviewMutation.mutate({ eventId, reviewItemId });
+        }}
+        onSplit={() => {
+          const reviewItemId = selectedFace?.review_item?.id;
+          const eventId = selectedMediaPreview?.event_id ?? selectedFace?.review_item?.event_id;
+
+          if (!reviewItemId || !eventId) return;
+
+          splitReviewMutation.mutate({ eventId, reviewItemId });
+        }}
+        onMerge={(sourcePersonId, targetPersonId) => {
+          const reviewItemId = selectedFace?.review_item?.id;
+          const eventId = selectedMediaPreview?.event_id ?? selectedFace?.review_item?.event_id;
+
+          if (!reviewItemId || !eventId) return;
+
+          mergeReviewMutation.mutate({
+            eventId,
+            reviewItemId,
+            sourcePersonId,
+            targetPersonId,
+          });
+        }}
+      />
 
       <Dialog open={faceSearchDialogOpen} onOpenChange={setFaceSearchDialogOpen}>
         <DialogContent className="max-w-5xl">

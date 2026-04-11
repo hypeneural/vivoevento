@@ -257,10 +257,10 @@ describe('EventDetailPage', () => {
 
     renderEventDetailPage();
 
-    expect(await screen.findByText('Branding aplicado')).toBeInTheDocument();
+    expect(await screen.findByText('Visual aplicado')).toBeInTheDocument();
     expect(screen.getAllByText('Organizacao').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Este evento aproveita automaticamente a identidade visual da Studio Aurora/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Herdando da organizacao').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Usando visual da organizacao').length).toBeGreaterThan(0);
     expect(screen.getByText('#112233')).toBeInTheDocument();
     expect(screen.getByText('#445566')).toBeInTheDocument();
   });

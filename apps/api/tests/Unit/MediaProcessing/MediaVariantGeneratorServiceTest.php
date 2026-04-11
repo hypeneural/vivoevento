@@ -26,8 +26,8 @@ it('generates fast preview alongside canonical image variants', function () {
 
     $summary = app(MediaVariantGeneratorService::class)->generate($media);
 
-    expect($summary['generated_count'])->toBe(4)
-        ->and($summary['variant_keys'])->toBe(['fast_preview', 'thumb', 'gallery', 'wall'])
+    expect($summary['generated_count'])->toBe(6)
+        ->and($summary['variant_keys'])->toBe(['fast_preview', 'thumb', 'moderation_thumb', 'moderation_preview', 'gallery', 'wall'])
         ->and($summary['perceptual_hash'])->not->toBeNull();
 
     $fastPreview = EventMediaVariant::query()
@@ -40,8 +40,61 @@ it('generates fast preview alongside canonical image variants', function () {
         ->and($fastPreview?->width)->toBeLessThanOrEqual(512)
         ->and($fastPreview?->height)->toBeLessThanOrEqual(512);
 
-    Storage::disk('public')->assertExists("events/{$event->id}/variants/{$media->id}/fast_preview.webp");
-    Storage::disk('public')->assertExists("events/{$event->id}/variants/{$media->id}/thumb.webp");
-    Storage::disk('public')->assertExists("events/{$event->id}/variants/{$media->id}/gallery.webp");
-    Storage::disk('public')->assertExists("events/{$event->id}/variants/{$media->id}/wall.webp");
+    expect(
+        EventMediaVariant::query()
+            ->where('event_media_id', $media->id)
+            ->orderBy('variant_key')
+            ->get(['variant_key', 'disk', 'path', 'size_bytes'])
+            ->map(fn (EventMediaVariant $variant) => [
+                'variant_key' => $variant->variant_key,
+                'disk' => $variant->disk,
+                'path' => $variant->path,
+                'size_bytes' => $variant->size_bytes,
+            ])
+            ->all()
+    )->toBe([
+        [
+            'variant_key' => 'fast_preview',
+            'disk' => 'public',
+            'path' => "events/{$event->id}/variants/{$media->id}/fast_preview.webp",
+            'size_bytes' => EventMediaVariant::query()->where('event_media_id', $media->id)->where('variant_key', 'fast_preview')->value('size_bytes'),
+        ],
+        [
+            'variant_key' => 'gallery',
+            'disk' => 'public',
+            'path' => "events/{$event->id}/variants/{$media->id}/gallery.webp",
+            'size_bytes' => EventMediaVariant::query()->where('event_media_id', $media->id)->where('variant_key', 'gallery')->value('size_bytes'),
+        ],
+        [
+            'variant_key' => 'moderation_preview',
+            'disk' => 'public',
+            'path' => "events/{$event->id}/variants/{$media->id}/moderation_preview.webp",
+            'size_bytes' => EventMediaVariant::query()->where('event_media_id', $media->id)->where('variant_key', 'moderation_preview')->value('size_bytes'),
+        ],
+        [
+            'variant_key' => 'moderation_thumb',
+            'disk' => 'public',
+            'path' => "events/{$event->id}/variants/{$media->id}/moderation_thumb.webp",
+            'size_bytes' => EventMediaVariant::query()->where('event_media_id', $media->id)->where('variant_key', 'moderation_thumb')->value('size_bytes'),
+        ],
+        [
+            'variant_key' => 'thumb',
+            'disk' => 'public',
+            'path' => "events/{$event->id}/variants/{$media->id}/thumb.webp",
+            'size_bytes' => EventMediaVariant::query()->where('event_media_id', $media->id)->where('variant_key', 'thumb')->value('size_bytes'),
+        ],
+        [
+            'variant_key' => 'wall',
+            'disk' => 'public',
+            'path' => "events/{$event->id}/variants/{$media->id}/wall.webp",
+            'size_bytes' => EventMediaVariant::query()->where('event_media_id', $media->id)->where('variant_key', 'wall')->value('size_bytes'),
+        ],
+    ]);
+
+    expect(
+        EventMediaVariant::query()
+            ->where('event_media_id', $media->id)
+            ->pluck('size_bytes')
+            ->every(fn ($size) => is_int($size) && $size > 0)
+    )->toBeTrue();
 });

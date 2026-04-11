@@ -872,3 +872,36 @@ Pendencias reais apos esta rodada:
 - [x] mostrar preview do `effective_branding` no editor/detalhe do evento, nao apenas no payload.
 - [ ] criar CTA comercial de upgrade quando o usuario tenta usar dominio proprio ou asset premium sem entitlement.
 - [ ] definir operacao completa de DNS/SSL para `custom_domain`, fora do escopo desta V1.
+
+Atualizacao de UX/UI e linguagem guiada em `2026-04-11 00:37:52 -03:00`:
+
+- [x] a aba `Branding` de `/settings` passou a se apresentar como `Identidade visual`, reduzindo jargao em ingles para usuario iniciante.
+- [x] o bloco organizacional de dominio proprio agora usa linguagem mais simples (`Dominio da sua marca`) e explica o bloqueio sem CTA comercial.
+- [x] o bloco de assets premium foi reescrito como `Arquivos extras da sua marca`, removendo `white-label`, `depende do plano` e outros termos tecnicos do front.
+- [x] os estados bloqueados de branding premium continuam visiveis, mas agora com texto neutro e explicativo; o CTA comercial ficou pausado por decisao desta rodada.
+- [x] a secao de branding recebeu polida visual com icones mais claros, textos de apoio curtos e tooltips posicionados nos pontos de maior duvida.
+- [x] o editor de evento passou a falar em `Identidade visual do evento`, `Usar visual da organizacao` e `Preview do visual aplicado`.
+- [x] o detalhe do evento passou a exibir `Visual aplicado` e `Como o visual e montado`, removendo referencia tecnica literal a `effective_branding`, `logo_path` e `cover_image_path`.
+- [x] o fluxo de DNS/SSL de `custom_domain` continua deliberadamente fora do escopo desta etapa.
+
+Validacao executada nesta rodada:
+
+Backend:
+
+- `php artisan test tests/Feature/Events/EventBrandingInheritanceTest.php tests/Feature/Events/CreateEventTest.php tests/Feature/Organizations/OrganizationBrandingEntitlementTest.php tests/Feature/Organizations/OrganizationTest.php`
+  - `33 passed`, `252 assertions`
+
+Frontend:
+
+- `npx vitest run src/modules/settings/SettingsPage.test.tsx src/modules/settings/SettingsTeamInvitationFlow.contract.test.tsx src/modules/team-invitations/PublicOrganizationInvitationPage.test.tsx src/modules/events/branding.test.ts src/modules/events/EventDetailPage.test.tsx`
+  - `29 passed`
+
+Type-check:
+
+- `npm run type-check`
+  - `ok`
+
+Pendencias reais apos esta rodada:
+
+- [ ] CTA comercial de upgrade para branding premium permanece pausado nesta iteracao.
+- [ ] operacao completa de DNS/SSL para `custom_domain` permanece fora do escopo atual.

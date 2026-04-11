@@ -17,6 +17,7 @@ vi.mock('@xyflow/react', () => {
     Handle: ({ id, type, position }: { id?: string; type: string; position: string }) => (
       <div data-testid={`journey-handle-${id ?? type}-${position}`} />
     ),
+    getBezierPath: () => ['M 0,0 C 0,0 0,0 0,0', 120, 180],
     MarkerType: {
       ArrowClosed: 'arrow-closed',
     },
@@ -342,7 +343,7 @@ describe('JourneyFlowCanvas', () => {
 
     expect(fitViewMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        padding: 0.2,
+        padding: 0.1,
         duration: 250,
       }),
     );

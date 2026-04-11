@@ -1862,3 +1862,32 @@ Validacao:
   - `6 passed`
 - `npm run type-check`
   - `ok`
+
+## Atualizacao de UX e linguagem segura em `2026-04-11 00:37:52 -03:00`
+
+Esta rodada nao mudou a matriz de acesso, mas refinou a forma como ela aparece para usuario nao tecnico:
+
+- [x] o front deixou de priorizar termos como `Branding`, `white-label` e referencias tecnicas diretas a payloads na jornada administrativa principal.
+- [x] o editor e o detalhe do evento agora falam em `visual aplicado`, `usar visual da organizacao` e `como o visual e montado`.
+- [x] os estados bloqueados por entitlement continuam obedecendo a seguranca existente, mas sem CTA comercial nesta iteracao.
+- [x] o detalhe do evento removeu explicacao literal de campos como `effective_branding`, `logo_path` e `cover_image_path`, trocando por resumo funcional do resultado efetivo.
+
+Leitura de seguranca:
+
+- a simplificacao da linguagem nao alterou permissoes nem expandiu escopo de leitura;
+- usuario event-scoped continua vendo apenas o resultado visual aplicavel ao proprio evento;
+- bloqueio comercial continua sendo decidido por entitlement no backend, nao por affordance visual do frontend.
+
+Validacao desta rodada:
+
+- `php artisan test tests/Feature/Events/EventBrandingInheritanceTest.php tests/Feature/Events/CreateEventTest.php tests/Feature/Organizations/OrganizationBrandingEntitlementTest.php tests/Feature/Organizations/OrganizationTest.php`
+  - `33 passed`, `252 assertions`
+- `npx vitest run src/modules/settings/SettingsPage.test.tsx src/modules/settings/SettingsTeamInvitationFlow.contract.test.tsx src/modules/team-invitations/PublicOrganizationInvitationPage.test.tsx src/modules/events/branding.test.ts src/modules/events/EventDetailPage.test.tsx`
+  - `29 passed`
+- `npm run type-check`
+  - `ok`
+
+Itens deliberadamente pausados:
+
+- CTA comercial de upgrade para branding premium.
+- operacao completa de `custom_domain` com DNS/SSL.

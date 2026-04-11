@@ -323,3 +323,51 @@ it('rejects resume after the resume window expires', function () {
     $resumeResponse->assertStatus(410)
         ->assertJsonPath('success', false);
 });
+
+it('accepts browser boolean query strings when loading a public play game', function () {
+    $event = Event::factory()->active()->create();
+
+    EventModule::query()->create([
+        'event_id' => $event->id,
+        'module_key' => 'play',
+        'is_enabled' => true,
+    ]);
+
+    EventPlaySetting::query()->create([
+        'event_id' => $event->id,
+        'is_enabled' => true,
+        'ranking_enabled' => true,
+    ]);
+
+    $gameType = PlayGameType::factory()->create([
+        'key' => 'memory',
+        'name' => 'Jogo da Memoria',
+    ]);
+
+    $game = PlayEventGame::factory()->create([
+        'event_id' => $event->id,
+        'game_type_id' => $gameType->id,
+        'slug' => 'memoria-browser-params',
+        'settings_json' => [
+            'pairsCount' => 6,
+            'difficulty' => 'normal',
+        ],
+    ]);
+
+    $mediaItems = EventMedia::factory()->published()->count(6)->create([
+        'event_id' => $event->id,
+    ]);
+    $mediaItems->each(fn (EventMedia $media) => attachPlayVariants($media));
+
+    $falseResponse = $this->apiGet("/public/events/{$event->slug}/play/{$game->slug}?platform=Win32&viewport_width=796&viewport_height=953&pixel_ratio=1&save_data=false&effective_type=4g&downlink=10");
+
+    $this->assertApiSuccess($falseResponse);
+    $falseResponse->assertJsonPath('data.game.slug', 'memoria-browser-params')
+        ->assertJsonPath('data.runtime.assets.0.deliveryProfile', 'rich');
+
+    $trueResponse = $this->apiGet("/public/events/{$event->slug}/play/{$game->slug}?platform=Win32&viewportWidth=796&viewportHeight=953&pixelRatio=1&saveData=true&effectiveType=4g&downlink=10");
+
+    $this->assertApiSuccess($trueResponse);
+    $trueResponse->assertJsonPath('data.runtime.assets.0.variantKey', 'fast_preview')
+        ->assertJsonPath('data.runtime.assets.0.deliveryProfile', 'constrained');
+});

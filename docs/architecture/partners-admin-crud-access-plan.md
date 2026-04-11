@@ -928,3 +928,32 @@ Pendencias restantes fora desta rodada:
 
 - CTA comercial de upgrade para entitlements de branding premium.
 - operacao completa de `custom_domain` com DNS/SSL.
+
+## Atualizacao de UX operacional em `2026-04-11 00:37:52 -03:00`
+
+Escopo desta rodada:
+
+- [x] `/settings` deixou de expor `Branding`, `white-label` e outros termos tecnicos como linguagem principal para partner-owner.
+- [x] a area visual foi reescrita para `Identidade visual`, `Arquivos extras da sua marca` e `Dominio da sua marca`.
+- [x] os bloqueios por entitlement continuam seguros, mas agora sem CTA comercial nesta iteracao e com mensagens de apoio mais legiveis.
+- [x] o preview de branding em evento tambem foi polido para linguagem menos tecnica, preservando a semantica de heranca organizacao -> evento.
+
+Leitura pratica para o CRUD/admin de parceiros:
+
+- a governanca comercial continua no backend via entitlement;
+- o front agora explica melhor o que esta bloqueado sem induzir usuario iniciante a interpretar isso como erro tecnico;
+- a ausencia proposital de CTA nesta rodada evita abrir trilha comercial antes de estabilizar a UX base.
+
+Validacao desta rodada:
+
+- `php artisan test tests/Feature/Events/EventBrandingInheritanceTest.php tests/Feature/Events/CreateEventTest.php tests/Feature/Organizations/OrganizationBrandingEntitlementTest.php tests/Feature/Organizations/OrganizationTest.php`
+  - `33 passed`, `252 assertions`
+- `npx vitest run src/modules/settings/SettingsPage.test.tsx src/modules/settings/SettingsTeamInvitationFlow.contract.test.tsx src/modules/team-invitations/PublicOrganizationInvitationPage.test.tsx src/modules/events/branding.test.ts src/modules/events/EventDetailPage.test.tsx`
+  - `29 passed`
+- `npm run type-check`
+  - `ok`
+
+Pendencias que continuam fora desta fase:
+
+- CTA comercial de upgrade para branding premium.
+- fluxo operacional completo de `custom_domain` com DNS/SSL.

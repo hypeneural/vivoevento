@@ -58,33 +58,35 @@ export interface JourneyGraph {
   edges: JourneyGraphEdge[];
 }
 
-const STAGE_HEIGHT = 224;
-const NODE_WIDTH = 260;
+const STAGE_HEIGHT = 252;
+const STAGE_VERTICAL_SPACING = 272;
+const NODE_ROW_GAP = 136;
+const NODE_WIDTH = 248;
 const NODE_HEIGHT = 132;
-const DEFAULT_STAGE_COLUMNS = [180, 480, 780] as const;
+const DEFAULT_STAGE_COLUMNS = [80, 360, 640, 920] as const;
 
-const NODE_LAYOUT: Record<string, { x: number; yOffset: number }> = {
-  entry_whatsapp_direct: { x: 120, yOffset: 0 },
-  entry_whatsapp_groups: { x: 360, yOffset: 0 },
-  entry_telegram: { x: 600, yOffset: 0 },
-  entry_public_upload: { x: 840, yOffset: 0 },
-  entry_sender_blacklist: { x: 480, yOffset: 144 },
-  processing_receive_feedback: { x: 180, yOffset: 0 },
-  processing_download_media: { x: 420, yOffset: 0 },
-  processing_prepare_variants: { x: 660, yOffset: 0 },
-  processing_safety_ai: { x: 300, yOffset: 144 },
-  processing_media_intelligence: { x: 660, yOffset: 144 },
-  decision_event_moderation_mode: { x: 180, yOffset: 0 },
-  decision_safety_result: { x: 420, yOffset: 0 },
-  decision_context_gate: { x: 660, yOffset: 0 },
-  decision_media_type: { x: 300, yOffset: 144 },
-  decision_caption_presence: { x: 660, yOffset: 144 },
-  output_reaction_final: { x: 120, yOffset: 0 },
-  output_reply_text: { x: 360, yOffset: 0 },
-  output_gallery: { x: 600, yOffset: 0 },
-  output_wall: { x: 840, yOffset: 0 },
-  output_print: { x: 360, yOffset: 144 },
-  output_silence: { x: 600, yOffset: 144 },
+const NODE_LAYOUT: Record<string, { x: number; row: 0 | 1 }> = {
+  entry_whatsapp_direct: { x: 60, row: 0 },
+  entry_whatsapp_groups: { x: 340, row: 0 },
+  entry_telegram: { x: 620, row: 0 },
+  entry_public_upload: { x: 900, row: 0 },
+  entry_sender_blacklist: { x: 480, row: 1 },
+  processing_receive_feedback: { x: 120, row: 0 },
+  processing_download_media: { x: 400, row: 0 },
+  processing_prepare_variants: { x: 680, row: 0 },
+  processing_safety_ai: { x: 250, row: 1 },
+  processing_media_intelligence: { x: 570, row: 1 },
+  decision_event_moderation_mode: { x: 100, row: 0 },
+  decision_safety_result: { x: 400, row: 0 },
+  decision_context_gate: { x: 700, row: 0 },
+  decision_media_type: { x: 250, row: 1 },
+  decision_caption_presence: { x: 570, row: 1 },
+  output_reaction_final: { x: 40, row: 0 },
+  output_reply_text: { x: 320, row: 0 },
+  output_gallery: { x: 600, row: 0 },
+  output_wall: { x: 880, row: 0 },
+  output_print: { x: 320, row: 1 },
+  output_silence: { x: 600, row: 1 },
 };
 
 const STAGE_CLASSNAME_BY_ID: Record<EventJourneyStageId, string> = {
@@ -113,32 +115,36 @@ function edgeClassName(status: EventJourneyBranchStatus, active: boolean) {
   ].join(' ');
 }
 
-function fallbackNodePosition(stage: EventJourneyStage, index: number) {
+function stageY(index: number) {
+  return index * STAGE_VERTICAL_SPACING;
+}
+
+function fallbackNodePosition(stageIndex: number, index: number) {
   const column = DEFAULT_STAGE_COLUMNS[index % DEFAULT_STAGE_COLUMNS.length];
   const row = Math.floor(index / DEFAULT_STAGE_COLUMNS.length);
 
   return {
     x: column,
-    y: stage.position + (row * 144),
+    y: stageY(stageIndex) + (row * NODE_ROW_GAP),
   };
 }
 
-function stageBand(stage: EventJourneyStage): JourneyGraphStageBand {
+function stageBand(stage: EventJourneyStage, stageIndex: number): JourneyGraphStageBand {
   return {
     id: stage.id,
     label: stage.label,
     description: stage.description,
-    y: stage.position,
+    y: stageY(stageIndex),
     height: STAGE_HEIGHT,
     className: STAGE_CLASSNAME_BY_ID[stage.id],
   };
 }
 
-function graphNode(stage: EventJourneyStage, node: EventJourneyNode, index: number): JourneyGraphNode {
+function graphNode(stage: EventJourneyStage, stageIndex: number, node: EventJourneyNode, index: number): JourneyGraphNode {
   const knownLayout = NODE_LAYOUT[node.id];
   const position = knownLayout
-    ? { x: knownLayout.x, y: stage.position + knownLayout.yOffset }
-    : fallbackNodePosition(stage, index);
+    ? { x: knownLayout.x, y: stageY(stageIndex) + (knownLayout.row * NODE_ROW_GAP) }
+    : fallbackNodePosition(stageIndex, index);
 
   return {
     id: node.id,
@@ -188,9 +194,9 @@ function graphEdge(
 }
 
 export function buildJourneyGraph(projection: EventJourneyProjection): JourneyGraph {
-  const stages = projection.stages.map(stageBand);
-  const nodes = projection.stages.flatMap((stage) =>
-    stage.nodes.map((node, index) => graphNode(stage, node, index)),
+  const stages = projection.stages.map((stage, stageIndex) => stageBand(stage, stageIndex));
+  const nodes = projection.stages.flatMap((stage, stageIndex) =>
+    stage.nodes.map((node, index) => graphNode(stage, stageIndex, node, index)),
   );
   const nodeStageById = new Map<string, EventJourneyStageId>(
     projection.stages.flatMap((stage) => stage.nodes.map((node) => [node.id, stage.id] as const)),

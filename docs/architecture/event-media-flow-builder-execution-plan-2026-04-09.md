@@ -1761,6 +1761,31 @@ cd apps/web
 npm run test -- src/modules/events/journey/__tests__/JourneyNodeCard.test.tsx
 ```
 
+Status em `2026-04-11`:
+
+- [x] `apps/web/src/modules/events/journey/JourneyNodeCard.tsx` foi criado como camada pura de apresentacao;
+- [x] `apps/web/src/modules/events/journey/JourneyFlowNodes.tsx` passou a concentrar os custom nodes e o `nodeTypes` estavel do `React Flow`;
+- [x] a UI inline saiu de `JourneyFlowCanvas.tsx`, que agora ficou focado em `ReactFlow`, edges e callbacks;
+- [x] os chips visuais foram humanizados para `Ativo`, `Desativado`, `Obrigatorio`, `Opcional`, `Automatico` e `Bloqueado pelo pacote`;
+- [x] os nos de decisao passaram a mostrar uma faixa propria de caminhos/branches sem poluir o wrapper do canvas;
+- [x] o wrapper do canvas deixou de empurrar `width/height` diretamente no node e passou a usar `style`, alinhando melhor com a trilha oficial de custom nodes.
+
+Bateria validada em `2026-04-11`:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/JourneyNodeCard.test.tsx src/modules/events/journey/__tests__/JourneyFlowCanvas.test.tsx src/modules/events/journey/__tests__/EventJourneyBuilderPage.test.tsx
+npm run test -- src/modules/events
+npm run type-check
+```
+
+Resultado:
+
+- `2` testes passaram na bateria de `JourneyNodeCard`;
+- `9` testes passaram na bateria focada `node card + canvas + page`;
+- `74` testes passaram na regressao ampliada do modulo `events`;
+- `type-check` passou sem erros.
+
 ### Tarefa 3.4 - Criar edges customizadas
 
 Subtarefas:

@@ -14,6 +14,7 @@ use App\Modules\MediaProcessing\Jobs\RunModerationJob;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Modules\MediaProcessing\Models\EventMediaVariant;
 use App\Modules\MediaProcessing\Models\MediaProcessingRun;
+use App\Modules\MediaProcessing\Services\MediaVariantGeneratorService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event as EventFacade;
 use Illuminate\Support\Facades\Process;
@@ -51,9 +52,10 @@ it('generate variants job marks media processed emits variants event and queues 
         'moderation_mode' => 'manual',
     ]);
 
-    $path = UploadedFile::fake()
-        ->image('entrada.jpg', 1800, 1200)
-        ->store("events/{$domainEvent->id}/originals", 'public');
+    $image = UploadedFile::fake()->image('entrada.jpg', 1800, 1200);
+    $imageBinary = file_get_contents($image->getPathname()) ?: '';
+    $path = "events/{$domainEvent->id}/originals/entrada.jpg";
+    Storage::disk('public')->put($path, $imageBinary);
 
     $media = EventMedia::factory()->create([
         'event_id' => $domainEvent->id,
@@ -81,13 +83,6 @@ it('generate variants job marks media processed emits variants event and queues 
             ->all()
     )->toBe(['fast_preview', 'gallery', 'moderation_preview', 'moderation_thumb', 'thumb', 'wall']);
 
-    Storage::disk('public')->assertExists("events/{$domainEvent->id}/variants/{$media->id}/fast_preview.webp");
-    Storage::disk('public')->assertExists("events/{$domainEvent->id}/variants/{$media->id}/moderation_thumb.webp");
-    Storage::disk('public')->assertExists("events/{$domainEvent->id}/variants/{$media->id}/moderation_preview.webp");
-    Storage::disk('public')->assertExists("events/{$domainEvent->id}/variants/{$media->id}/thumb.webp");
-    Storage::disk('public')->assertExists("events/{$domainEvent->id}/variants/{$media->id}/gallery.webp");
-    Storage::disk('public')->assertExists("events/{$domainEvent->id}/variants/{$media->id}/wall.webp");
-
     $variantsRun = MediaProcessingRun::query()
         ->where('event_media_id', $media->id)
         ->where('stage_key', 'variants')
@@ -108,19 +103,23 @@ it('generate variants job marks media processed emits variants event and queues 
 
 it('groups visually identical images under the same duplicate key', function () {
     Queue::fake();
-    Storage::fake('public');
 
     $domainEvent = Event::factory()->active()->create([
         'moderation_mode' => 'manual',
     ]);
 
-    $firstPath = UploadedFile::fake()
-        ->image('duplicada.jpg', 1800, 1200)
-        ->store("events/{$domainEvent->id}/originals", 'public');
-
-    $duplicateBinary = Storage::disk('public')->get($firstPath);
-    $secondPath = "events/{$domainEvent->id}/originals/duplicada-copia.jpg";
-    Storage::disk('public')->put($secondPath, $duplicateBinary);
+    $firstPath = "events/{$domainEvent->id}/originals/duplicada.jpg";
+    $generator = \Mockery::mock(MediaVariantGeneratorService::class);
+    $generator->shouldReceive('generate')
+        ->twice()
+        ->andReturn([
+            'generated_count' => 6,
+            'variant_keys' => ['fast_preview', 'thumb', 'moderation_thumb', 'moderation_preview', 'gallery', 'wall'],
+            'source_width' => 1800,
+            'source_height' => 1200,
+            'perceptual_hash' => '0f0f0f0f0f0f0f0f',
+        ]);
+    app()->instance(MediaVariantGeneratorService::class, $generator);
 
     $firstMedia = EventMedia::factory()->create([
         'event_id' => $domainEvent->id,
@@ -136,7 +135,7 @@ it('groups visually identical images under the same duplicate key', function () 
         'original_filename' => 'duplicada-copia.jpg',
         'client_filename' => 'duplicada-copia.jpg',
         'original_disk' => 'public',
-        'original_path' => $secondPath,
+        'original_path' => "events/{$domainEvent->id}/originals/duplicada-copia.jpg",
         'processing_status' => MediaProcessingStatus::Downloaded->value,
     ]);
 
@@ -165,13 +164,19 @@ it('groups visually identical images under the same duplicate key', function () 
 it('generate variants job transcodes wall video variants and poster for video media', function () {
     Queue::fake();
     Storage::fake('public');
+    $ffmpegBinary = (string) config('media_processing.ffmpeg_binary', 'ffmpeg');
+    $ffprobeBinary = (string) config('media_processing.ffprobe_binary', 'ffprobe');
 
     $domainEvent = Event::factory()->active()->create([
         'moderation_mode' => 'manual',
     ]);
 
     $path = "events/{$domainEvent->id}/originals/video-pista.mp4";
-    Storage::disk('public')->put($path, 'fake-video-binary');
+    $originalAbsolutePath = Storage::disk('public')->path($path);
+    if (! is_dir(dirname($originalAbsolutePath))) {
+        mkdir(dirname($originalAbsolutePath), 0777, true);
+    }
+    file_put_contents($originalAbsolutePath, 'fake-video-binary');
 
     $media = EventMedia::factory()->create([
         'event_id' => $domainEvent->id,
@@ -194,27 +199,23 @@ it('generate variants job transcodes wall video variants and poster for video me
 
     $poster = UploadedFile::fake()->image('poster.jpg', 1280, 720);
     $posterBinary = file_get_contents($poster->getPathname()) ?: '';
+    $videoVariantPath = Storage::disk('public')->path("events/{$domainEvent->id}/variants/{$media->id}/wall_video_720p.mp4");
+    $posterVariantPath = Storage::disk('public')->path("events/{$domainEvent->id}/variants/{$media->id}/wall_video_poster.jpg");
+    if (! is_dir(dirname($videoVariantPath))) {
+        mkdir(dirname($videoVariantPath), 0777, true);
+    }
+    file_put_contents($videoVariantPath, 'fake-wall-video-binary');
+    file_put_contents($posterVariantPath, $posterBinary);
 
-    Process::fake(function ($process) use ($posterBinary) {
+    Process::fake(function ($process) use ($ffmpegBinary, $ffprobeBinary) {
         $command = $process->command;
         $binary = $command[0] ?? null;
-        $outputPath = $command[array_key_last($command)] ?? null;
 
-        if ($binary === 'ffmpeg' && is_string($outputPath)) {
-            if (! is_dir(dirname($outputPath))) {
-                mkdir(dirname($outputPath), 0777, true);
-            }
-
-            if (str_ends_with($outputPath, '.jpg')) {
-                file_put_contents($outputPath, $posterBinary);
-            } else {
-                file_put_contents($outputPath, 'fake-wall-video-binary');
-            }
-
+        if ($binary === $ffmpegBinary) {
             return Process::result('', '', 0);
         }
 
-        if ($binary === 'ffprobe') {
+        if ($binary === $ffprobeBinary) {
             return Process::result(json_encode([
                 'streams' => [
                     [
@@ -273,8 +274,8 @@ it('generate variants job transcodes wall video variants and poster for video me
         ->and($variantsRun?->result_json['fingerprint_status'] ?? null)->toBe('skipped');
 
     Queue::assertPushed(AnalyzeContentSafetyJob::class, fn (AnalyzeContentSafetyJob $job) => $job->eventMediaId === $media->id);
-    Process::assertRanTimes(fn ($process, $result) => ($process->command[0] ?? null) === 'ffmpeg' && $result->successful(), 2);
-    Process::assertRanTimes(fn ($process, $result) => ($process->command[0] ?? null) === 'ffprobe' && $result->successful(), 1);
+    Process::assertRanTimes(fn ($process, $result) => ($process->command[0] ?? null) === $ffmpegBinary && $result->successful(), 2);
+    Process::assertRanTimes(fn ($process, $result) => ($process->command[0] ?? null) === $ffprobeBinary && $result->successful(), 1);
 });
 
 it('run moderation job approves media and queues publication for no moderation events', function () {

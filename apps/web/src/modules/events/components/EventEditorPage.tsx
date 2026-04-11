@@ -2067,9 +2067,9 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
 
             <section className="glass rounded-3xl border border-border/60 p-4 sm:p-6">
               <div className="mb-5">
-                <h2 className="text-sm font-semibold">Branding e ativos</h2>
+                <h2 className="text-sm font-semibold">Identidade visual do evento</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Capa e logo sao enviados pelo painel, salvos no storage e persistidos no evento ao salvar.
+                  Defina capa, logo e cores do evento. Se preferir, o evento pode aproveitar automaticamente o visual da organizacao.
                 </p>
               </div>
 
@@ -2086,9 +2086,9 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                               <Building2 className="h-4 w-4 text-primary" />
                             </div>
                             <div>
-                              <FormLabel>Herdar branding da organizacao</FormLabel>
+                              <FormLabel>Usar visual da organizacao</FormLabel>
                               <FormDescription>
-                                Quando ligado, o evento aproveita capa, logo e cores da conta sempre que este formulario estiver sem um item proprio.
+                                Quando ligado, o evento aproveita capa, logo e cores da organizacao sempre que este formulario estiver sem um item proprio.
                               </FormDescription>
                             </div>
                             <Badge variant="secondary">{effectiveBrandingSourceLabel}</Badge>
@@ -2097,9 +2097,9 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                           <p className="text-xs text-muted-foreground">
                             {field.value
                               ? organizationHasBranding
-                                ? 'Deixe campos vazios para reutilizar automaticamente os ativos da organizacao.'
-                                : 'A heranca esta ligada, mas a organizacao ainda nao possui capa, logo ou cores suficientes para servir como fallback.'
-                              : 'Com a heranca desligada, este evento usa apenas o que voce preencher aqui.'}
+                                ? 'Deixe campos vazios para reutilizar automaticamente o que ja estiver configurado na organizacao.'
+                                : 'A organizacao ainda nao tem capa, logo ou cores suficientes para servir de apoio neste evento.'
+                              : 'Com esta opcao desligada, o evento usa apenas o que voce preencher aqui.'}
                           </p>
                         </div>
                         <FormControl>
@@ -2215,9 +2215,9 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <FormLabel>Imagem de capa</FormLabel>
-                            <FormDescription>Recomendado para banners 16:9 do evento.</FormDescription>
+                            <FormDescription>Imagem principal usada na capa do evento.</FormDescription>
                           </div>
-                          <Badge variant="outline">Storage</Badge>
+                          <Badge variant="outline">Arquivo do evento</Badge>
                         </div>
 
                         <div className="mt-4 overflow-hidden rounded-2xl border border-border/60">
@@ -2271,12 +2271,10 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                         </div>
 
                         {field.value ? (
-                          <p className="mt-3 break-all text-xs text-muted-foreground">
-                            Caminho salvo: {field.value}
-                          </p>
+                          <p className="mt-3 text-xs text-muted-foreground">Capa enviada e vinculada a este evento.</p>
                         ) : watchedInheritBranding && effectiveBrandingPreview.cover_image_url ? (
                           <p className="mt-3 text-xs text-muted-foreground">
-                            Sem capa propria. A capa herdada da organizacao sera aplicada na experiencia publica.
+                            Sem capa propria. A capa da organizacao sera usada automaticamente nas paginas do evento.
                           </p>
                         ) : null}
 
@@ -2293,9 +2291,9 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <FormLabel>Logo do evento</FormLabel>
-                            <FormDescription>Ideal para uso no hub, uploads e assinatura visual.</FormDescription>
+                            <FormDescription>Logo usado nas paginas e nos materiais visuais do evento.</FormDescription>
                           </div>
-                          <Badge variant="outline">Storage</Badge>
+                          <Badge variant="outline">Arquivo do evento</Badge>
                         </div>
 
                         <div className="mt-4 flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/20 p-6">
@@ -2345,12 +2343,10 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                         </div>
 
                         {field.value ? (
-                          <p className="mt-3 break-all text-xs text-muted-foreground">
-                            Caminho salvo: {field.value}
-                          </p>
+                          <p className="mt-3 text-xs text-muted-foreground">Logo enviada e vinculada a este evento.</p>
                         ) : watchedInheritBranding && effectiveBrandingPreview.logo_url ? (
                           <p className="mt-3 text-xs text-muted-foreground">
-                            Sem logo propria. A logo resolvida da organizacao sera usada no hub e nas experiencias publicas.
+                            Sem logo propria. A logo da organizacao sera usada automaticamente nas paginas do evento.
                           </p>
                         ) : null}
 
@@ -2580,7 +2576,7 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
           <div className="glass rounded-3xl border border-border/60 p-4 sm:p-5 xl:sticky xl:top-20">
             <div className="mb-4 flex items-center gap-2">
               <Eye className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold">Preview com branding aplicado</h2>
+              <h2 className="text-sm font-semibold">Preview do visual aplicado</h2>
             </div>
 
             <div className="overflow-hidden rounded-3xl border border-border/60 bg-background/70">
@@ -2638,7 +2634,7 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
                   </p>
                   <p className="flex items-center gap-2">
                     <Building2 className="h-4 w-4" />
-                    Branding {watchedInheritBranding ? 'herdando da organizacao' : 'proprio do evento'}
+                    Visual {watchedInheritBranding ? 'aproveitando a organizacao' : 'proprio do evento'}
                   </p>
                   <p className="flex items-center gap-2">
                     <Users className="h-4 w-4" />
@@ -2669,9 +2665,9 @@ export function EventEditorPage({ mode }: EventEditorPageProps) {
             <div className="mt-4 rounded-3xl border border-border/60 bg-background/70 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-semibold">Fonte do branding</h3>
+                  <h3 className="text-sm font-semibold">Origem do visual</h3>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Esta e a identidade visual que realmente sera aplicada no hub, no upload e nas paginas publicas.
+                    Este e o visual que as pessoas realmente vao ver nas paginas publicas do evento.
                   </p>
                 </div>
                 <Badge variant="secondary">{effectiveBrandingSourceLabel}</Badge>

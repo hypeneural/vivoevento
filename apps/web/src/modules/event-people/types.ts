@@ -164,7 +164,7 @@ export interface EventPeopleReviewQueueFilters {
 
 export interface EventPeopleCreatePayload {
   display_name: string;
-  type?: EventPersonType | EventPersonType[] | string;
+  type?: EventPersonType | string;
   side?: EventPersonSide | string;
   importance_rank?: number;
   notes?: string | null;

@@ -2229,6 +2229,57 @@ Leitura pratica:
 - ainda nao houve necessidade tecnica de `ReactFlowProvider`, `MiniMap`, `NodeToolbar` ou `onlyRenderVisibleElements`;
 - a proxima etapa pode focar em nodes customizados e inspector editavel sem reabrir a discussao de renderer.
 
+## Extracao dos custom nodes em `2026-04-11`
+
+A `Tarefa 3.3` foi concluida logo depois do renderer real.
+
+Entrega realizada:
+
+- `apps/web/src/modules/events/journey/JourneyNodeCard.tsx` passou a concentrar a apresentacao dos cards;
+- `apps/web/src/modules/events/journey/JourneyFlowNodes.tsx` passou a concentrar os wrappers de `NodeProps` e o `nodeTypes` estavel;
+- `JourneyFlowCanvas.tsx` deixou de carregar a UI inline dos nos;
+- os nos de decisao ganharam uma variacao visual propria para expor caminhos de branch;
+- os chips do card foram humanizados para a linguagem operacional da jornada.
+
+Leitura pratica:
+
+- o wrapper do canvas ficou menor, mais testavel e mais perto do papel correto de adapter;
+- a apresentacao dos nos agora pode evoluir sem reabrir o wiring do `React Flow`;
+- o inspector editavel fica mais barato de acoplar porque a hierarquia visual do node nao mora mais dentro do renderer.
+
+## Validacao oficial usada nesta etapa em `2026-04-11`
+
+### React Flow custom nodes e NodeProps
+
+Foi revalidado na documentacao oficial que:
+
+- `NodeTypes` deve mapear tipo para um componente React proprio;
+- `NodeProps` e o contrato certo para componentes de node customizado;
+- `selected`, `dragging`, `selectable` e `isConnectable` continuam vindo por props no custom node.
+
+Fontes:
+
+- https://reactflow.dev/learn/customization/custom-nodes
+- https://reactflow.dev/api-reference/types/node-props
+
+## Bateria adicional validada nesta etapa
+
+Comandos executados:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey/__tests__/JourneyNodeCard.test.tsx src/modules/events/journey/__tests__/JourneyFlowCanvas.test.tsx src/modules/events/journey/__tests__/EventJourneyBuilderPage.test.tsx
+npm run test -- src/modules/events
+npm run type-check
+```
+
+Resultado:
+
+- `2` testes passaram na bateria de `JourneyNodeCard`;
+- `9` testes passaram na bateria focada `node card + canvas + page`;
+- `74` testes passaram na regressao ampliada do modulo `events`;
+- `type-check` passou sem erros.
+
 ## Validacao oficial usada nesta etapa em `2026-04-11`
 
 ### React Flow API Reference

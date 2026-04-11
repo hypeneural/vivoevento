@@ -447,7 +447,7 @@ describe('SettingsPage', () => {
 
     renderPage();
 
-    activateTab(/branding/i);
+    activateTab(/identidade visual/i);
     const colorInputs = await screen.findAllByDisplayValue(/#(7c3aed|3b82f6)/i);
     fireEvent.change(colorInputs[0], { target: { value: '#111111' } });
     fireEvent.change(colorInputs[1], { target: { value: '#222222' } });
@@ -485,10 +485,10 @@ describe('SettingsPage', () => {
 
     renderPage();
 
-    activateTab(/branding/i);
+    activateTab(/identidade visual/i);
 
     const file = new File(['logo'], 'logo.png', { type: 'image/png' });
-    fireEvent.change(await screen.findByLabelText(/logo da organizacao/i), {
+    fireEvent.change(await screen.findByLabelText(/logo principal da organizacao/i), {
       target: { files: [file] },
     });
     fireEvent.click(screen.getByRole('button', { name: /enviar logo/i }));
@@ -502,10 +502,11 @@ describe('SettingsPage', () => {
   it('shows premium branding assets as locked when the plan does not include white-label', async () => {
     renderPage();
 
-    activateTab(/branding/i);
+    activateTab(/identidade visual/i);
 
-    expect(await screen.findByText(/ativos premium da marca/i)).toBeInTheDocument();
-    expect(screen.getByText(/depende do plano/i)).toBeInTheDocument();
+    expect(await screen.findByText(/arquivos extras da sua marca/i)).toBeInTheDocument();
+    expect(screen.getByText(/bloqueado no momento/i)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /ver planos/i })).not.toBeInTheDocument();
     expect(screen.getByLabelText(/enviar capa padrao/i)).toBeDisabled();
     expect(screen.getByLabelText(/enviar logo para fundo escuro/i)).toBeDisabled();
   });
@@ -530,7 +531,7 @@ describe('SettingsPage', () => {
 
     renderPage();
 
-    activateTab(/branding/i);
+    activateTab(/identidade visual/i);
 
     const file = new File(['cover'], 'cover.png', { type: 'image/png' });
     fireEvent.change(await screen.findByLabelText(/enviar capa padrao/i), {

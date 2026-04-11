@@ -14,7 +14,7 @@ class ShowPublicPlayGameRequest extends FormRequest
             'viewport_width' => $this->query('viewport_width', $this->query('viewportWidth')),
             'viewport_height' => $this->query('viewport_height', $this->query('viewportHeight')),
             'pixel_ratio' => $this->query('pixel_ratio', $this->query('pixelRatio')),
-            'save_data' => $this->query('save_data', $this->query('saveData')),
+            'save_data' => $this->normalizeBooleanQueryValue('save_data', 'saveData'),
             'effective_type' => $this->query('effective_type', $this->query('effectiveType')),
             'downlink' => $this->query('downlink'),
         ]);
@@ -41,5 +41,22 @@ class ShowPublicPlayGameRequest extends FormRequest
     public function assetProfile(): ?RuntimeAssetProfile
     {
         return RuntimeAssetProfile::fromQuery($this->validated());
+    }
+
+    private function normalizeBooleanQueryValue(string $key, ?string $fallbackKey = null): mixed
+    {
+        $value = $this->query($key, $fallbackKey ? $this->query($fallbackKey) : null);
+
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_bool($value) || $value === 0 || $value === 1 || $value === '0' || $value === '1') {
+            return $value;
+        }
+
+        $normalized = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+
+        return $normalized ?? $value;
     }
 }
