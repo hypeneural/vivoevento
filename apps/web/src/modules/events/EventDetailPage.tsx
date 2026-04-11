@@ -733,7 +733,13 @@ export default function EventDetailPage() {
             <CardContent className="grid gap-4">
               {shareLinks.length > 0 ? (
                 shareLinks.map((link) => (
-                  <PublicLinkCard key={link.key} link={link} onCopy={copyToClipboard} />
+                  <PublicLinkCard
+                    key={link.key}
+                    eventId={event.id}
+                    effectiveBranding={effectiveBranding}
+                    link={link}
+                    onCopy={copyToClipboard}
+                  />
                 ))
               ) : (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-muted-foreground">
@@ -1018,7 +1024,12 @@ export default function EventDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {event.public_links.gallery.enabled ? (
-                <PublicLinkCard link={event.public_links.gallery} onCopy={copyToClipboard} />
+                <PublicLinkCard
+                  eventId={event.id}
+                  effectiveBranding={effectiveBranding}
+                  link={event.public_links.gallery}
+                  onCopy={copyToClipboard}
+                />
               ) : null}
 
               {publishedMedia.length > 0 ? (
@@ -1044,7 +1055,12 @@ export default function EventDetailPage() {
           <Card className="border-white/70 bg-white/90 shadow-sm">
             <CardContent className="space-y-4 p-6">
               {event.public_links.wall.enabled ? (
-                <PublicLinkCard link={event.public_links.wall} onCopy={copyToClipboard} />
+                <PublicLinkCard
+                  eventId={event.id}
+                  effectiveBranding={effectiveBranding}
+                  link={event.public_links.wall}
+                  onCopy={copyToClipboard}
+                />
               ) : (
                 <p className="text-sm text-muted-foreground">O telao ainda nao esta disponivel para este evento.</p>
               )}
@@ -1082,7 +1098,12 @@ export default function EventDetailPage() {
               </div>
 
               {event.public_links.play.enabled ? (
-                <PublicLinkCard link={event.public_links.play} onCopy={copyToClipboard} />
+                <PublicLinkCard
+                  eventId={event.id}
+                  effectiveBranding={effectiveBranding}
+                  link={event.public_links.play}
+                  onCopy={copyToClipboard}
+                />
               ) : null}
 
               <div className="flex flex-wrap gap-2">

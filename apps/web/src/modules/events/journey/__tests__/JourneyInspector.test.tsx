@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildJourneyGraph } from '../buildJourneyGraph';
 import { JourneyInspector } from '../JourneyInspector';
-import type { EventJourneyProjection } from '../types';
+import type { EventJourneyBuiltScenario, EventJourneyProjection } from '../types';
 
 const getEventContentModerationSettingsMock = vi.fn();
 const getEventMediaIntelligenceSettingsMock = vi.fn();
@@ -292,7 +292,34 @@ function makeMediaIntelligenceSettings() {
   };
 }
 
-function renderInspector(nodeId: string | null, mode: 'panel' | 'drawer' = 'panel') {
+function makeScenario(): EventJourneyBuiltScenario {
+  return {
+    id: 'photo_whatsapp_private_with_caption',
+    label: 'Foto com legenda',
+    description: 'Simula uma foto recebida pelo WhatsApp privado com legenda.',
+    input: {},
+    available: true,
+    unavailableReason: null,
+    highlightedNodeIds: [
+      'entry_whatsapp_direct',
+      'processing_safety_ai',
+      'decision_event_moderation_mode',
+      'output_reply_text',
+    ],
+    highlightedEdgeIds: [],
+    humanText: 'Neste cenario, uma foto chega por WhatsApp privado com legenda. A jornada aprova a midia e encerra com mensagem automatica.',
+    outcome: 'approved',
+  };
+}
+
+function renderInspector(
+  nodeId: string | null,
+  mode: 'panel' | 'drawer' = 'panel',
+  options: {
+    selectedScenario?: EventJourneyBuiltScenario | null;
+    onClearScenario?: () => void;
+  } = {},
+) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -312,6 +339,8 @@ function renderInspector(nodeId: string | null, mode: 'panel' | 'drawer' = 'pane
           eventId={42}
           projection={projection}
           selectedNode={selectedNode}
+          selectedScenario={options.selectedScenario ?? null}
+          onClearScenario={options.onClearScenario}
           scenarios={[]}
           technicalDetailsOpen={false}
         />
@@ -335,6 +364,23 @@ describe('JourneyInspector', () => {
     renderInspector(null);
 
     expect(screen.getByText('Nenhuma etapa selecionada')).toBeInTheDocument();
+  });
+
+  it('renders the active scenario explanation and clears it through the callback', () => {
+    const onClearScenario = vi.fn();
+
+    renderInspector(null, 'panel', {
+      selectedScenario: makeScenario(),
+      onClearScenario,
+    });
+
+    expect(screen.getByText('Simulacao ativa')).toBeInTheDocument();
+    expect(screen.getByText('Foto com legenda')).toBeInTheDocument();
+    expect(screen.getByText(/Entrada: WhatsApp privado/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar simulacao' }));
+
+    expect(onClearScenario).toHaveBeenCalledTimes(1);
   });
 
   it('saves the moderation mode through the aggregated journey patch', async () => {

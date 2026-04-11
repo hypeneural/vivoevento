@@ -1,12 +1,14 @@
-import { Copy, ExternalLink, QrCode } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
+import { Copy, ExternalLink } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import type { ApiEventPublicLink } from '@/lib/api-types';
+import type { ApiEventEffectiveBranding, ApiEventPublicLink } from '@/lib/api-types';
+import { EventPublicLinkQrTrigger } from '@/modules/events/qr/EventPublicLinkQrTrigger';
 
 interface PublicLinkCardProps {
+  eventId: string | number;
+  effectiveBranding?: ApiEventEffectiveBranding | null;
   link: ApiEventPublicLink;
   onCopy: (value: string, label: string) => void;
 }
@@ -17,7 +19,7 @@ const IDENTIFIER_LABELS: Record<ApiEventPublicLink['identifier_type'], string> =
   wall_code: 'Codigo do telao',
 };
 
-export function PublicLinkCard({ link, onCopy }: PublicLinkCardProps) {
+export function PublicLinkCard({ eventId, effectiveBranding, link, onCopy }: PublicLinkCardProps) {
   const canOpen = !!link.url;
   const canCopy = !!link.url;
 
@@ -65,20 +67,12 @@ export function PublicLinkCard({ link, onCopy }: PublicLinkCardProps) {
           </div>
         </div>
 
-        <div className="flex min-w-[150px] flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5">
-          {link.qr_value ? (
-            <>
-              <QRCodeSVG value={link.qr_value} size={112} bgColor="#ffffff" fgColor="#0f172a" />
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <QrCode className="h-3.5 w-3.5" />
-                QR pronto para uso
-              </div>
-            </>
-          ) : (
-            <div className="text-center text-xs text-muted-foreground">
-              QR indisponivel enquanto o link nao estiver ativo.
-            </div>
-          )}
+        <div className="flex min-w-[150px] flex-col items-center justify-center">
+          <EventPublicLinkQrTrigger
+            eventId={eventId}
+            link={link}
+            effectiveBranding={effectiveBranding}
+          />
         </div>
       </CardContent>
     </Card>

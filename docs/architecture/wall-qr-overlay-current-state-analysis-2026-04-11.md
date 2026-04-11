@@ -13,6 +13,10 @@ Este documento consolida o estado real do QR Code exibido no telao do modulo `Wa
 
 Esta analise foi feita por leitura direta do codigo e por testes locais do frontend.
 
+Plano derivado desta analise:
+
+- `docs/architecture/wall-qr-overlay-execution-plan-2026-04-11.md`
+
 ---
 
 ## Veredito executivo

@@ -20,6 +20,7 @@ Este plano responde 10 perguntas:
 Documento base:
 
 - `docs/architecture/event-people-identity-relations-aws-strategy-2026-04-10.md`
+- `docs/architecture/event-people-governance-groups-coverage-moments-execution-plan-2026-04-11.md`
 
 ---
 
@@ -1810,6 +1811,30 @@ Pendente apos esta rodada:
 - manter essa diretriz de linguagem nas proximas fases de grupos, coverage, momentos e guest-facing;
 - explicitar retention/limpeza AWS e runbook operacional fora da superficie do operador;
 - continuar a evolucao do produto em cobertura e entregas emocionais, sem reintroduzir copy tecnica no frontend.
+
+---
+
+### 2026-04-11 - Doc complementar do backlog pos-V1 criada
+
+Concluido:
+
+- backlog pendente de retention AWS, limpeza, runbook operacional, grupos, coverage intelligence, momentos e entregas por relacao consolidado em documento proprio;
+- a nova doc detalha logica, tarefas, sequenciamento, criterios de aceite e bateria de testes por milestone;
+- a leitura foi amarrada ao estado real atual do codigo, inclusive ao gap de cleanup de `UserId` remoto quando uma pessoa fica sem representatives;
+- a nova doc tambem consolida as referencias oficiais da AWS necessarias para governanca de collection, users, storage, quotas, auditoria e monitoramento.
+
+Documento criado:
+
+- `docs/architecture/event-people-governance-groups-coverage-moments-execution-plan-2026-04-11.md`
+
+Bateria executada:
+
+- nao houve execucao de testes nesta rodada, porque a entrega foi documental e nao alterou codigo de producao.
+
+Pendente apos esta rodada:
+
+- implementar a frente de retention/limpeza AWS e o runbook operacional;
+- depois seguir para grupos, coverage intelligence, momentos e entregas por relacao.
 
 ---
 

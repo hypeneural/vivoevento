@@ -2449,6 +2449,64 @@ Resultado:
 - `89` testes passaram na regressao ampliada do modulo `events`;
 - `type-check` passou sem erros.
 
+## Simulador de cenarios fechado em `2026-04-11`
+
+A `Tarefa 3.7` completou a parte que faltava para a V1 parecer um mapa operacional, e nao so um fluxograma bonito.
+
+Entrega realizada:
+
+- `apps/web/src/modules/events/journey/JourneyScenarioSimulator.tsx` passou a concentrar a UX do simulador;
+- os botoes de cenario continuam usando os IDs estaveis vindos de `buildJourneyScenarios.ts`;
+- o simulador agora mostra estado ativo, outcome e CTA explicito de `Limpar simulacao`;
+- o resumo humano troca para `scenario.humanText` sem tocar em draft nem em save;
+- o canvas continua destacando o caminho pela projection efetiva atual, incluindo templates locais ainda nao persistidos;
+- o inspector passou a receber `selectedScenario` e agora explica lateralmente:
+  - nome do cenario;
+  - descricao;
+  - outcome;
+  - caminho destacado em ordem;
+  - CTA de limpar;
+- no mobile, o drawer do inspector passou a abrir tambem quando ha simulacao ativa, nao apenas quando existe node selecionado.
+
+Leitura pratica:
+
+- a pessoa nao precisa mais "adivinhar" o que o destaque no canvas quer dizer;
+- o fluxo aprovado, bloqueado ou em revisao agora ganha explicacao lateral legivel;
+- a simulacao continua sendo uma ferramenta de entendimento, nao um estado escondido do formulario.
+
+Decisao importante preservada:
+
+- simular nao altera formulario;
+- simular nao dispara request;
+- simular nao salva nada;
+- o unico estado que muda e a projection local exibida na tela.
+
+Isso reforca a tese central do produto:
+
+- configuracao continua guiada;
+- a explicacao vem junto com o fluxo;
+- a V1 nao vira um builder livre onde o usuario precisa pensar como automacao.
+
+## Bateria adicional validada nesta etapa
+
+Comandos executados:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey
+npm run type-check
+```
+
+Resultado:
+
+- `52` testes passaram na bateria completa de `journey`;
+- `type-check` passou sem erros.
+
+Observacao de regressao ampla:
+
+- ao rodar `npm run test -- src/modules/events`, apareceram falhas externas em `src/modules/events/qr/*` por imports para arquivos ainda inexistentes no worktree atual;
+- esse bloqueio nao pertence ao escopo da jornada da midia e nao foi introduzido pelos arquivos de `journey/*`.
+
 ## Validacao oficial usada nesta etapa em `2026-04-11`
 
 ### shadcn/ui drawer e sheet

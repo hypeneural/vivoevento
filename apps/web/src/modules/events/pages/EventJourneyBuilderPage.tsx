@@ -45,6 +45,7 @@ import {
   type JourneyFlowCanvasControls,
 } from '../journey/JourneyFlowCanvas';
 import { JourneyInspector } from '../journey/JourneyInspector';
+import { JourneyScenarioSimulator } from '../journey/JourneyScenarioSimulator';
 import { JourneyTemplateRail } from '../journey/JourneyTemplateRail';
 import type {
   EventJourneyBuiltScenario,
@@ -128,32 +129,11 @@ function JourneySummaryCard({
         <p className="text-sm leading-6 text-foreground">{summaryText}</p>
 
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <GitBranch className="h-4 w-4 text-primary" />
-            Cenarios prontos
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {scenarios.map((scenario) => {
-              const isActive = selectedScenario?.id === scenario.id;
-
-              return (
-                <Button
-                  key={scenario.id}
-                  type="button"
-                  size="sm"
-                  variant={isActive ? 'default' : 'outline'}
-                  disabled={!scenario.available}
-                  title={scenario.available ? scenario.description : scenario.unavailableReason ?? undefined}
-                  onClick={() => onScenarioSelect(isActive ? null : scenario)}
-                >
-                  {scenario.label}
-                </Button>
-              );
-            })}
-          </div>
-          {selectedScenario?.unavailableReason ? (
-            <p className="text-xs text-muted-foreground">{selectedScenario.unavailableReason}</p>
-          ) : null}
+          <JourneyScenarioSimulator
+            scenarios={scenarios}
+            selectedScenario={selectedScenario}
+            onScenarioSelect={onScenarioSelect}
+          />
         </div>
       </CardContent>
     </Card>
@@ -382,15 +362,18 @@ export default function EventJourneyBuilderPage() {
 
           <JourneyInspector
             mode="drawer"
-            open={Boolean(selectedNode)}
+            open={Boolean(selectedNode || selectedScenario)}
             onOpenChange={(open) => {
               if (!open) {
                 setSelectedNodeId(null);
+                setSelectedScenarioId(null);
               }
             }}
             eventId={id}
             projection={effectiveProjection}
             selectedNode={selectedNode}
+            selectedScenario={selectedScenario}
+            onClearScenario={() => setSelectedScenarioId(null)}
             scenarios={scenarios}
             technicalDetailsOpen={technicalDetailsOpen}
             templateDraftPreview={activeTemplatePreview}
@@ -430,6 +413,8 @@ export default function EventJourneyBuilderPage() {
                 eventId={id}
                 projection={effectiveProjection}
                 selectedNode={selectedNode}
+                selectedScenario={selectedScenario}
+                onClearScenario={() => setSelectedScenarioId(null)}
                 scenarios={scenarios}
                 technicalDetailsOpen={technicalDetailsOpen}
                 templateDraftPreview={activeTemplatePreview}

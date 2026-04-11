@@ -20,7 +20,7 @@ Documento base:
 
 ---
 
-## Status da execucao inicial em 2026-04-11
+## Status da execucao em 2026-04-11
 
 ### Fase 0
 
@@ -40,8 +40,23 @@ Documento base:
 - [x] criar `qrGuardrails.ts`
 - [x] criar `qrOptionsBuilder.ts`
 - [x] cobrir schema/adapter/wrapper com testes puros
-- [ ] integrar essa camada ao editor lazy-load
+- [x] integrar essa camada ao editor lazy-load
 - [ ] conectar persistencia backend
+
+### Fase 2
+
+- [x] criar `EventPublicLinkQrTrigger.tsx`
+- [x] transformar o QR de `PublicLinkCard` em trigger clicavel
+- [x] criar `EventPublicLinkQrEditor.tsx` com `React.lazy` + `Suspense`
+- [x] criar `QrCodeEditorDialog.tsx`
+- [x] criar `QrCodeEditorDrawer.tsx`
+- [x] criar helper de preload para chunk + query local
+- [x] disparar warmup em `onMouseEnter` e `onFocus`
+- [x] devolver foco ao trigger ao fechar editor
+- [x] rodar testes focados de `src/modules/events/qr`
+- [ ] conectar prefetch/query a endpoint real de persistencia
+- [ ] fechar suite dedicada de acessibilidade do modal
+- [ ] trocar preview da shell pelo preview vivo com `qr-code-styling`
 
 ### Resultado automatizado desta rodada
 
@@ -58,6 +73,23 @@ Resultado:
 - `6` arquivos de teste passaram;
 - `12` testes passaram;
 - `type-check` passou.
+
+Comandos adicionais executados na entrega da shell lazy-load:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/qr
+npm run test -- src/modules/qr-code/support src/modules/events/qr src/modules/events/EventDetailPage.test.tsx
+npm run type-check
+```
+
+Resultado:
+
+- `3` arquivos de teste de `events/qr` passaram;
+- `6` testes de `events/qr` passaram;
+- `10` arquivos passaram na bateria focada combinada;
+- `20` testes passaram na bateria focada combinada;
+- `type-check` permaneceu verde.
 
 ---
 
@@ -449,6 +481,16 @@ Subtarefas:
 ## Objetivo
 
 Entregar a casca de interacao do editor sem ainda depender de persistencia completa.
+
+## Status atual da fase em 2026-04-11
+
+- `T2.1` concluida.
+- `T2.2` concluida para shell responsiva `Dialog/Drawer`.
+- `T2.3` concluida com query local derivada e warmup deduplicado.
+- `T2.4` parcialmente concluida:
+  - foco de retorno ao trigger implementado;
+  - `Dialog` e `Drawer` herdados das primitives do projeto;
+  - ainda falta fechar a bateria dedicada de caracterizacao para foco inicial, trap completo e `Escape`.
 
 ## Tarefas
 

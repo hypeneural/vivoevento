@@ -518,6 +518,7 @@ describe('EventJourneyBuilderPage', () => {
     expect(screen.getByText('Como o evento trata cada foto ou video recebido')).toBeInTheDocument();
     expect(screen.getByText('Resumo humano da jornada')).toBeInTheDocument();
     expect(screen.getByText('Templates guiados')).toBeInTheDocument();
+    expect(screen.getByText('Simulador de cenarios')).toBeInTheDocument();
     expect(screen.getByText(/Quando uma foto chega pelo WhatsApp/i)).toBeInTheDocument();
     expect(screen.getByText('Centralizar fluxo')).toBeInTheDocument();
     expect(screen.getByText('Ver detalhes tecnicos')).toBeInTheDocument();
@@ -528,7 +529,13 @@ describe('EventJourneyBuilderPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Foto com legenda' }));
 
-    expect(await screen.findByText(/Neste cenario, uma foto chega por WhatsApp privado com legenda\./i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getAllByText(/Neste cenario, uma foto chega por WhatsApp privado com legenda\./i).length,
+      ).toBeGreaterThan(0);
+    });
+    expect(screen.getAllByText('Simulacao ativa').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Foto com legenda').length).toBeGreaterThan(0);
     expect(
       journeyFlowCanvasPropsSpy.mock.calls.at(-1)?.[0].highlightedNodeIds,
     ).toEqual(
@@ -538,6 +545,7 @@ describe('EventJourneyBuilderPage', () => {
         'output_gallery',
       ]),
     );
+    expect(screen.getAllByText(/Caminho destacado/i).length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole('button', { name: 'Selecionar no' }));
 
@@ -553,6 +561,11 @@ describe('EventJourneyBuilderPage', () => {
 
     expect(await screen.findByText('Detalhes tecnicos da projection')).toBeInTheDocument();
     expect(screen.getByText('Warnings')).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Limpar simulacao' })[0]);
+
+    expect(await screen.findByText(/Quando uma foto chega pelo WhatsApp/i)).toBeInTheDocument();
+    expect(updateEventJourneyBuilderMock).not.toHaveBeenCalled();
   });
 
   it('applies a guided template locally before the real save', async () => {

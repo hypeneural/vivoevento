@@ -185,6 +185,66 @@ Leitura pratica:
 - a cascata `organizacao -> evento` ja existe como fato do sistema;
 - o proximo nivel coerente e `organizacao -> evento -> preset de uso do link -> override local`.
 
+## Status de execucao da shell lazy-load em 2026-04-11
+
+Depois da blindagem do schema e do adapter, a casca inicial do editor ja foi aberta no frontend.
+
+Entregue nesta etapa:
+
+- o QR de `PublicLinkCard` agora funciona como trigger acessivel de edicao, via `EventPublicLinkQrTrigger`;
+- o editor abre por `React.lazy` + `Suspense`, sem entrar no bundle inicial de `EventDetailPage`;
+- o warmup do editor acontece em `onMouseEnter` e `onFocus`, aquecendo:
+  - o chunk lazy do editor;
+  - a query local derivada da configuracao do link;
+- a shell ja e responsiva:
+  - desktop usa `Dialog`;
+  - mobile usa `Drawer` alto, no formato de tarefa;
+- a shell ja reutiliza a camada semantica criada na Fase 1 para:
+  - normalizar configuracao;
+  - derivar defaults por `link_key`;
+  - aplicar branding efetivo do evento como base;
+- o foco retorna ao trigger ao fechar.
+
+Limites intencionais desta etapa:
+
+- a query ainda e local e derivada, nao ligada a endpoint real de persistencia;
+- o preview dentro da shell ainda usa `qrcode.react` como placeholder barato;
+- o preview ao vivo com instancia unica de `qr-code-styling` fica para a Fase 3;
+- a suite dedicada de acessibilidade do modal ainda precisa fechar foco inicial, trap completo e `Escape`.
+
+## Testes executados para a shell lazy-load
+
+Comandos:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/qr
+npm run test -- src/modules/qr-code/support src/modules/events/qr src/modules/events/EventDetailPage.test.tsx
+npm run type-check
+```
+
+Resultado:
+
+- `3` arquivos de teste de `events/qr` passaram;
+- `6` testes de `events/qr` passaram;
+- `10` arquivos passaram na bateria focada combinada;
+- `20` testes passaram na bateria focada combinada;
+- `type-check` passou.
+
+Cobertura pratica desta etapa:
+
+- `preload.test.ts`
+  - warmup deduplicado por `eventId + linkKey`;
+  - sem preload quando `qr_value` nao existe.
+- `EventPublicLinkQrTrigger.test.tsx`
+  - QR vira `button`;
+  - `aria-label` e gatilhos de warmup em `hover` e `focus`;
+  - fallback de `Suspense`;
+  - foco retorna ao trigger ao fechar.
+- `EventPublicLinkQrEditorShell.test.tsx`
+  - desktop usa `Dialog`;
+  - mobile usa `Drawer`.
+
 ---
 
 ## Leitura real da stack atual

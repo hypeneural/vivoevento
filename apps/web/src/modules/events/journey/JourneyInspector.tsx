@@ -99,6 +99,8 @@ interface JourneyInspectorProps {
   eventId: number | string;
   projection: EventJourneyProjection;
   selectedNode: JourneyGraphNode | null;
+  selectedScenario?: EventJourneyBuiltScenario | null;
+  onClearScenario?: () => void;
   scenarios: EventJourneyBuiltScenario[];
   technicalDetailsOpen: boolean;
   templateDraftPreview?: JourneyTemplatePreview | null;
@@ -318,6 +320,108 @@ function InspectorDraftHint() {
         As alteracoes ficam apenas neste inspector ate voce salvar. O canvas continua lendo a projection revalidada do backend.
       </p>
     </div>
+  );
+}
+
+function scenarioOutcomeMeta(outcome: EventJourneyBuiltScenario['outcome']) {
+  switch (outcome) {
+    case 'approved':
+      return {
+        label: 'Aprovado',
+        className: 'border-emerald-200 bg-emerald-100 text-emerald-800',
+      };
+    case 'review':
+      return {
+        label: 'Revisao',
+        className: 'border-amber-200 bg-amber-100 text-amber-800',
+      };
+    case 'blocked':
+      return {
+        label: 'Bloqueado',
+        className: 'border-rose-200 bg-rose-100 text-rose-800',
+      };
+    default:
+      return {
+        label: 'Inativo',
+        className: 'border-slate-200 bg-slate-100 text-slate-700',
+      };
+  }
+}
+
+function buildScenarioPathLabels(
+  projection: EventJourneyProjection,
+  scenario: EventJourneyBuiltScenario,
+) {
+  const nodeById = new Map(
+    projection.stages.flatMap((stage) =>
+      stage.nodes.map((node) => [node.id, { stageLabel: stage.label, nodeLabel: node.label }] as const),
+    ),
+  );
+
+  return scenario.highlightedNodeIds
+    .map((nodeId) => {
+      const node = nodeById.get(nodeId);
+
+      if (!node) {
+        return null;
+      }
+
+      return `${node.stageLabel}: ${node.nodeLabel}`;
+    })
+    .filter((value): value is string => value !== null);
+}
+
+function JourneyScenarioInspectorCard({
+  projection,
+  scenario,
+  onClear,
+}: {
+  projection: EventJourneyProjection;
+  scenario: EventJourneyBuiltScenario;
+  onClear?: () => void;
+}) {
+  const outcome = scenarioOutcomeMeta(scenario.outcome);
+  const pathLabels = buildScenarioPathLabels(projection, scenario);
+
+  return (
+    <Card className="border-sky-200 bg-sky-50 shadow-none">
+      <CardHeader className="space-y-3 pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <CardTitle className="text-base">Simulacao ativa</CardTitle>
+            <CardDescription>{scenario.description}</CardDescription>
+          </div>
+          <Badge className={outcome.className}>{outcome.label}</Badge>
+        </div>
+        <p className="text-sm font-medium text-foreground">{scenario.label}</p>
+      </CardHeader>
+      <CardContent className="space-y-4 text-sm">
+        <p className="leading-6 text-foreground/90">{scenario.humanText}</p>
+
+        {pathLabels.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              Caminho destacado
+            </p>
+            <ol className="space-y-2 text-sm text-foreground/90">
+              {pathLabels.map((label, index) => (
+                <li key={`${label}-${index}`} className="rounded-xl border border-sky-200 bg-white px-3 py-2">
+                  {index + 1}. {label}
+                </li>
+              ))}
+            </ol>
+          </div>
+        ) : null}
+
+        {onClear ? (
+          <div className="flex justify-end">
+            <Button type="button" variant="outline" size="sm" onClick={onClear}>
+              Limpar simulacao
+            </Button>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -818,6 +922,8 @@ function JourneyInspectorBody({
   eventId,
   projection,
   selectedNode,
+  selectedScenario = null,
+  onClearScenario,
   scenarios,
   technicalDetailsOpen,
   templateDraftPreview = null,
@@ -1127,6 +1233,14 @@ function JourneyInspectorBody({
 
   return (
     <div className="flex h-full flex-col gap-4">
+      {selectedScenario ? (
+        <JourneyScenarioInspectorCard
+          projection={projection}
+          scenario={selectedScenario}
+          onClear={onClearScenario}
+        />
+      ) : null}
+
       {hasTemplateDraft ? (
         <Card className="border-primary/20 bg-primary/5 shadow-none">
           <CardHeader className="pb-3">
@@ -1196,6 +1310,8 @@ export function JourneyInspector(props: JourneyInspectorProps) {
     eventId,
     projection,
     selectedNode,
+    selectedScenario,
+    onClearScenario,
     scenarios,
     technicalDetailsOpen,
     templateDraftPreview,
@@ -1208,6 +1324,8 @@ export function JourneyInspector(props: JourneyInspectorProps) {
           eventId={eventId}
           projection={projection}
           selectedNode={selectedNode}
+          selectedScenario={selectedScenario}
+          onClearScenario={onClearScenario}
           scenarios={scenarios}
           technicalDetailsOpen={technicalDetailsOpen}
           templateDraftPreview={templateDraftPreview}

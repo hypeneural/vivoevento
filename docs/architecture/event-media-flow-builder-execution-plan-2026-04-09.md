@@ -1993,6 +1993,35 @@ cd apps/web
 npm run test -- src/modules/events/journey/__tests__/JourneyScenarioSimulator.test.tsx
 ```
 
+Status em `2026-04-11`:
+
+- [x] `apps/web/src/modules/events/journey/JourneyScenarioSimulator.tsx` foi criado para concentrar os botoes de simulacao, o estado ativo e o CTA de limpar;
+- [x] a page agora liga o simulador ao `summary`, ao `canvas` e ao inspector sem disparar mutacao;
+- [x] o resumo humano continua trocando para `scenario.humanText` quando um cenario esta ativo;
+- [x] o canvas segue destacando `highlightedNodeIds` e `highlightedEdgeIds` sem alterar draft ou save state;
+- [x] o inspector passou a receber `selectedScenario` e agora abre a explicacao lateral do caminho, com badge de outcome e lista ordenada das etapas destacadas;
+- [x] o mobile passou a abrir o drawer tambem quando existe simulacao ativa, nao apenas quando ha node selecionado;
+- [x] o usuario consegue limpar a simulacao tanto pelo simulador quanto pela lateral;
+- [x] a simulacao continua 100% local, sem request adicional.
+
+Bateria validada em `2026-04-11`:
+
+```bash
+cd apps/web
+npm run test -- src/modules/events/journey
+npm run type-check
+```
+
+Resultado:
+
+- `52` testes passaram na bateria completa de `src/modules/events/journey`;
+- `type-check` passou sem erros.
+
+Observacao de regressao ampla:
+
+- ao rodar `npm run test -- src/modules/events`, a suite ampla do modulo `events` ficou bloqueada por testes novos de `src/modules/events/qr/*` que importam arquivos ainda inexistentes no worktree atual;
+- esse bloqueio e externo a `journey/*` e nao foi alterado nesta tarefa.
+
 ---
 
 ## Fase 4 - Playwright e validacao visual
