@@ -19,6 +19,7 @@ export const routeImports = {
   media: () => import('@/modules/media/MediaPage'),
   moderation: () => import('@/modules/moderation/ModerationPage'),
   gallery: () => import('@/modules/gallery/GalleryPage'),
+  galleryBuilder: () => import('@/modules/gallery/GalleryBuilderPage'),
   publicGallery: () => import('@/modules/gallery/PublicGalleryPage'),
   wall: () => import('@/modules/wall/WallPage'),
   play: () => import('@/modules/play/PlayPage'),
@@ -58,6 +59,7 @@ const adminPreloadMatchers: Array<{ pattern: RegExp; loaders: RouteLoader[] }> =
       routeImports.eventJourneyBuilder,
       routeImports.eventAccess,
       routeImports.eventEdit,
+      routeImports.galleryBuilder,
     ],
   },
   {

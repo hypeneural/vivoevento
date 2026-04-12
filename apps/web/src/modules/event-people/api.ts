@@ -6,6 +6,7 @@ import type {
   EventMediaFacePeople,
   EventPeopleCreatePayload,
   EventPeoplePresetsResponse,
+  EventPeopleOperationalStatus,
   EventPeopleRelationPayload,
   EventPeopleUpdatePayload,
   EventPeopleListFilters,
@@ -18,6 +19,8 @@ import type {
   SplitReviewItemResponse,
   EventPerson,
   EventPersonReviewQueueItem,
+  EventPersonReferencePhotoCandidate,
+  EventPersonReferencePhotoPurpose,
 } from './types';
 
 export const eventPeopleApi = {
@@ -47,6 +50,10 @@ export const eventPeopleApi = {
     return api.get<EventPeoplePresetsResponse>(`/events/${eventId}/people/presets`);
   },
 
+  async getOperationalStatus(eventId: number | string) {
+    return api.get<EventPeopleOperationalStatus>(`/events/${eventId}/people/operational-status`);
+  },
+
   async listReviewQueue(eventId: number | string, filters: EventPeopleReviewQueueFilters = {}) {
     return api.getRaw<PaginatedApiResponse<EventPersonReviewQueueItem>>(`/events/${eventId}/people/review-queue`, {
       params: filters,
@@ -55,6 +62,43 @@ export const eventPeopleApi = {
 
   async listMediaFaces(eventId: number | string, mediaId: number | string) {
     return api.get<EventMediaFacePeople[]>(`/events/${eventId}/media/${mediaId}/people`);
+  },
+
+  async listReferencePhotoCandidates(eventId: number | string, personId: number | string, limit = 24) {
+    return api.get<EventPersonReferencePhotoCandidate[]>(
+      `/events/${eventId}/people/${personId}/reference-photo-candidates`,
+      {
+        params: { limit },
+      },
+    );
+  },
+
+  async addGalleryReferencePhoto(
+    eventId: number | string,
+    personId: number | string,
+    payload: { event_media_face_id: number; purpose?: EventPersonReferencePhotoPurpose },
+  ) {
+    return api.post<EventPerson>(`/events/${eventId}/people/${personId}/reference-photos/gallery-face`, {
+      body: payload,
+    });
+  },
+
+  async uploadReferencePhoto(
+    eventId: number | string,
+    personId: number | string,
+    payload: { file: File; purpose?: EventPersonReferencePhotoPurpose },
+  ) {
+    const formData = new FormData();
+    formData.append('file', payload.file);
+    if (payload.purpose) formData.append('purpose', payload.purpose);
+
+    return api.upload<EventPerson>(`/events/${eventId}/people/${personId}/reference-photos/upload`, formData);
+  },
+
+  async setPrimaryReferencePhoto(eventId: number | string, personId: number | string, referencePhotoId: number | string) {
+    return api.post<EventPerson>(`/events/${eventId}/people/${personId}/reference-photos/${referencePhotoId}/primary`, {
+      body: {},
+    });
   },
 
   async confirmReviewItem(

@@ -19,6 +19,11 @@ vi.mock('./api', () => ({
     createPerson: vi.fn(),
     updatePerson: vi.fn(),
     getPresets: vi.fn(),
+    getOperationalStatus: vi.fn(),
+    listReferencePhotoCandidates: vi.fn(),
+    addGalleryReferencePhoto: vi.fn(),
+    uploadReferencePhoto: vi.fn(),
+    setPrimaryReferencePhoto: vi.fn(),
     createRelation: vi.fn(),
     updateRelation: vi.fn(),
     deleteRelation: vi.fn(),
@@ -60,15 +65,49 @@ function buildPerson(overrides: Record<string, unknown> = {}) {
     side: 'bride_side',
     avatar_media_id: null,
     avatar_face_id: null,
+    avatar: {
+      media_id: 88,
+      face_id: 99,
+    },
     importance_rank: 90,
     notes: 'Pessoa importante',
     status: 'active',
+    primary_photo: {
+      reference_photo_id: 41,
+      selection_mode: 'manual',
+      source: 'event_face',
+      media_id: 88,
+      event_media_id: 88,
+      event_media_face_id: 99,
+      reference_upload_media_id: null,
+      best_media_id: 88,
+      latest_media_id: 88,
+    },
     stats: [{
       media_count: 6,
       solo_media_count: 2,
       with_others_media_count: 4,
       published_media_count: 5,
       pending_media_count: 1,
+    }],
+    reference_photos: [{
+      id: 41,
+      source: 'event_face',
+      event_media_id: 88,
+      event_media_face_id: 99,
+      reference_upload_media_id: null,
+      purpose: 'both',
+      status: 'active',
+      quality_score: 0.93,
+      is_primary_avatar: true,
+      upload_media: null,
+      face: {
+        id: 99,
+        event_media_id: 88,
+        face_index: 0,
+        quality_score: 0.93,
+        quality_tier: 'search_priority',
+      },
     }],
     representative_faces: [{
       id: 1,
@@ -134,12 +173,22 @@ describe('EventPeoplePage', () => {
       people: [{ key: 'bride', label: 'Noiva', type: 'bride', side: 'neutral', importance_rank: 100 }],
       relations: [{ type: 'spouse_of', label: 'Conjuge de', directionality: 'undirected' }],
     });
+    vi.mocked(eventPeopleApi.getOperationalStatus).mockResolvedValue({
+      people_active: 1,
+      people_draft: 0,
+      assignments_confirmed: 4,
+      review_queue_pending: 2,
+      review_queue_conflict: 1,
+      aws_sync_pending: 1,
+      aws_sync_failed: 0,
+    });
+    vi.mocked(eventPeopleApi.listReferencePhotoCandidates).mockResolvedValue([]);
     vi.mocked(eventPeopleApi.createPerson).mockResolvedValue(buildPerson({ id: 99, display_name: 'Cerimonialista' }));
     vi.mocked(eventPeopleApi.createRelation).mockResolvedValue({} as never);
     vi.mocked(eventPeopleApi.deleteRelation).mockResolvedValue(undefined);
   });
 
-  it('renders the dedicated people workspace with local relations and representative sync state', async () => {
+  it('renders the dedicated people workspace with cockpit status and separated image semantics', async () => {
     renderPage();
 
     expect(await screen.findByText('Pessoas de Casamento Ana e Pedro')).toBeInTheDocument();
@@ -147,6 +196,14 @@ describe('EventPeoplePage', () => {
     expect(await screen.findByText('Conjuge de')).toBeInTheDocument();
     expect(screen.getAllByText('Sincronizado').length).toBeGreaterThan(0);
     expect(screen.getByText('Casal principal')).toBeInTheDocument();
+    expect(screen.getAllByText('Avatar do catalogo').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Foto principal').length).toBeGreaterThan(0);
+    expect(screen.getByText('Fotos de referencia')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Escolher da galeria' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Enviar foto de referencia' })).toBeInTheDocument();
+    expect(screen.getByText('Referencias tecnicas')).toBeInTheDocument();
+    expect(screen.getByText('Revisoes pendentes')).toBeInTheDocument();
+    expect(screen.getByText('Modelo do evento')).toBeInTheDocument();
   });
 
   it('creates a person manually from the dedicated page without using the guided review flow', async () => {

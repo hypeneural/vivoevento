@@ -1,0 +1,45 @@
+<svg width="390" height="820" viewBox="0 0 390 820" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="frame-body" x1="30" y1="18" x2="360" y2="802" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#242B3D" />
+      <stop offset="0.48" stop-color="#0B1020" />
+      <stop offset="1" stop-color="#1B2232" />
+    </linearGradient>
+    <linearGradient id="frame-edge" x1="44" y1="44" x2="344" y2="776" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B7C3DC" stop-opacity="0.58" />
+      <stop offset="0.26" stop-color="#FFFFFF" stop-opacity="0.08" />
+      <stop offset="0.72" stop-color="#FFFFFF" stop-opacity="0.06" />
+      <stop offset="1" stop-color="#F0F5FF" stop-opacity="0.28" />
+    </linearGradient>
+    <filter id="frame-shadow" x="0" y="0" width="390" height="820" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="22" stdDeviation="18" flood-color="#000000" flood-opacity="0.38" />
+    </filter>
+  </defs>
+
+  <g filter="url(#frame-shadow)">
+    <path
+      fill-rule="evenodd"
+      clip-rule="evenodd"
+      d="M66 6H324C357.137 6 384 32.8629 384 66V754C384 787.137 357.137 814 324 814H66C32.8629 814 6 787.137 6 754V66C6 32.8629 32.8629 6 66 6ZM71 35H319C345.51 35 367 56.4903 367 83V737C367 763.51 345.51 785 319 785H71C44.4903 785 23 763.51 23 737V83C23 56.4903 44.4903 35 71 35Z"
+      fill="url(#frame-body)"
+    />
+
+    <path
+      d="M66 9H324C355.48 9 381 34.5198 381 66V754C381 785.48 355.48 811 324 811H66C34.5198 811 9 785.48 9 754V66C9 34.5198 34.5198 9 66 9Z"
+      stroke="url(#frame-edge)"
+      stroke-width="6"
+    />
+
+    <rect x="139" y="22" width="112" height="24" rx="12" fill="#060A14" />
+    <rect x="177.5" y="31" width="35" height="6" rx="3" fill="#3A455E" />
+    <circle cx="157" cy="34" r="4.5" fill="#1A2234" />
+    <circle cx="157" cy="34" r="2" fill="#4D6D9E" />
+
+    <rect x="379" y="192" width="5" height="88" rx="2.5" fill="#1A2234" />
+    <rect x="379" y="302" width="5" height="54" rx="2.5" fill="#1A2234" />
+    <rect x="6" y="168" width="5" height="108" rx="2.5" fill="#1A2234" />
+
+    <path d="M43 52H347" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="2" />
+    <path d="M43 768H347" stroke="#FFFFFF" stroke-opacity="0.04" stroke-width="2" />
+  </g>
+</svg>

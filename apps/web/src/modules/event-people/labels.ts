@@ -119,6 +119,32 @@ export function formatEventPersonSyncStatus(value?: string | null) {
   }
 }
 
+export function formatEventPersonReferencePurpose(value?: string | null) {
+  switch (value) {
+    case 'avatar':
+      return 'Avatar';
+    case 'matching':
+      return 'Matching';
+    case 'both':
+      return 'Avatar e matching';
+    default:
+      return value ?? 'Referencia';
+  }
+}
+
+export function formatEventPersonReferenceStatus(value?: string | null) {
+  switch (value) {
+    case 'active':
+      return 'Ativa';
+    case 'archived':
+      return 'Arquivada';
+    case 'invalid':
+      return 'Invalida';
+    default:
+      return value ?? 'Sem status';
+  }
+}
+
 export function formatEventPersonReviewStatus(value?: EventPersonReviewQueueStatus | string | null) {
   switch (value) {
     case 'pending':

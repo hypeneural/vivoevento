@@ -22,6 +22,7 @@ class EventPerson extends Model
         'side',
         'avatar_media_id',
         'avatar_face_id',
+        'primary_reference_photo_id',
         'importance_rank',
         'notes',
         'status',
@@ -69,6 +70,16 @@ class EventPerson extends Model
     public function representativeFaces(): HasMany
     {
         return $this->hasMany(EventPersonRepresentativeFace::class);
+    }
+
+    public function referencePhotos(): HasMany
+    {
+        return $this->hasMany(EventPersonReferencePhoto::class);
+    }
+
+    public function primaryReferencePhoto(): BelongsTo
+    {
+        return $this->belongsTo(EventPersonReferencePhoto::class, 'primary_reference_photo_id');
     }
 
     public function outgoingRelations(): HasMany

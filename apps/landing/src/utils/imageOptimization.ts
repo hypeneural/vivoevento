@@ -228,9 +228,9 @@ export const ImageSizes = {
  * Call this in App.tsx or main component
  */
 export function preloadCriticalImages(): void {
-  // Hero images
+  // Hero poster + frame
   preloadImages([
-    { src: '/images/hero-visual.webp', type: 'image/webp' },
-    { src: '/images/hero-visual.jpg', type: 'image/jpeg' },
+    { src: '/assets/hero-phone/poster-phone.jpg', type: 'image/jpeg' },
+    { src: '/assets/hero-phone/phone-frame.svg', type: 'image/svg+xml' },
   ]);
 }

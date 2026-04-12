@@ -43,7 +43,7 @@ export default function PricingSection() {
 
   return (
     <section 
-      id="precos" 
+      id="planos" 
       className={`section-shell ${styles.section}`} 
       aria-labelledby="pricing-title"
       ref={scope}

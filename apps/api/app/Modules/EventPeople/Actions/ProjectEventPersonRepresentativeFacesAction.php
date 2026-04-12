@@ -6,6 +6,7 @@ use App\Modules\EventPeople\Enums\EventPersonAssignmentStatus;
 use App\Modules\EventPeople\Enums\EventPersonRepresentativeSyncStatus;
 use App\Modules\EventPeople\Models\EventPerson;
 use App\Modules\EventPeople\Models\EventPersonRepresentativeFace;
+use App\Modules\EventPeople\Support\EventPeopleStateMachine;
 use App\Modules\Events\Models\Event;
 use App\Modules\FaceSearch\Models\EventMediaFace;
 use Illuminate\Support\Collection;
@@ -14,6 +15,10 @@ use Illuminate\Support\Facades\DB;
 class ProjectEventPersonRepresentativeFacesAction
 {
     private const LIMIT = 8;
+
+    public function __construct(
+        private readonly EventPeopleStateMachine $stateMachine,
+    ) {}
 
     /**
      * @return Collection<int, EventPersonRepresentativeFace>
@@ -69,26 +74,39 @@ class ProjectEventPersonRepresentativeFacesAction
             foreach ($selected as $candidate) {
                 /** @var EventPersonRepresentativeFace|null $row */
                 $row = $existing->get($candidate['event_media_face_id']);
-                $syncStatus = $selectionChanged
-                    ? EventPersonRepresentativeSyncStatus::Pending
-                    : ($row?->sync_status ?? EventPersonRepresentativeSyncStatus::Pending);
+                $representative = EventPersonRepresentativeFace::query()->firstOrNew([
+                    'event_id' => $event->id,
+                    'event_person_id' => $person->id,
+                    'event_media_face_id' => $candidate['event_media_face_id'],
+                ]);
 
-                EventPersonRepresentativeFace::query()->updateOrCreate(
-                    [
-                        'event_id' => $event->id,
-                        'event_person_id' => $person->id,
-                        'event_media_face_id' => $candidate['event_media_face_id'],
-                    ],
-                    [
-                        'rank_score' => $candidate['rank_score'],
-                        'quality_score' => $candidate['quality_score'],
-                        'pose_bucket' => $candidate['pose_bucket'],
-                        'context_hash' => $candidate['context_hash'],
-                        'sync_status' => $syncStatus->value,
-                        'last_synced_at' => $selectionChanged ? null : $row?->last_synced_at,
-                        'sync_payload' => $selectionChanged ? null : $row?->sync_payload,
-                    ],
-                );
+                $representative->fill([
+                    'rank_score' => $candidate['rank_score'],
+                    'quality_score' => $candidate['quality_score'],
+                    'pose_bucket' => $candidate['pose_bucket'],
+                    'context_hash' => $candidate['context_hash'],
+                ]);
+
+                if (! $representative->exists) {
+                    $representative->fill([
+                        'sync_status' => EventPersonRepresentativeSyncStatus::Pending->value,
+                        'last_synced_at' => null,
+                        'sync_payload' => null,
+                    ]);
+                }
+
+                $representative->save();
+
+                if ($representative->exists && $selectionChanged) {
+                    $this->stateMachine->transitionRepresentativeSync(
+                        $representative,
+                        EventPersonRepresentativeSyncStatus::Pending,
+                        [
+                            'last_synced_at' => null,
+                            'sync_payload' => null,
+                        ],
+                    );
+                }
             }
 
             EventPersonRepresentativeFace::query()

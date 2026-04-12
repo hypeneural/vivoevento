@@ -7,6 +7,7 @@ use App\Modules\EventPeople\Enums\EventPersonRepresentativeSyncStatus;
 use App\Modules\EventPeople\Models\EventPerson;
 use App\Modules\EventPeople\Models\EventPersonRepresentativeFace;
 use App\Modules\EventPeople\Services\EventPersonAwsProviderFaceResolver;
+use App\Modules\EventPeople\Support\EventPeopleStateMachine;
 use App\Modules\Events\Models\Event;
 use App\Modules\FaceSearch\Services\AwsRekognitionFaceSearchBackend;
 use App\Modules\EventPeople\Support\EventPeopleQueues;
@@ -93,6 +94,8 @@ class SyncEventPersonRepresentativeFacesJob implements ShouldBeEncrypted, Should
         $resolver = app(EventPersonAwsProviderFaceResolver::class);
         /** @var AwsRekognitionFaceSearchBackend $backend */
         $backend = app(AwsRekognitionFaceSearchBackend::class);
+        /** @var EventPeopleStateMachine $stateMachine */
+        $stateMachine = app(EventPeopleStateMachine::class);
 
         $representatives = $projector->execute($event, $person);
 
@@ -141,17 +144,20 @@ class SyncEventPersonRepresentativeFacesJob implements ShouldBeEncrypted, Should
         foreach ($representatives as $representative) {
             $mappedFaceId = $providerFaceIdsByLocalFace[(int) $representative->event_media_face_id] ?? null;
 
-            $representative->forceFill([
-                'sync_status' => is_string($mappedFaceId) && $mappedFaceId !== ''
-                    ? EventPersonRepresentativeSyncStatus::Synced->value
-                    : EventPersonRepresentativeSyncStatus::Failed->value,
-                'last_synced_at' => is_string($mappedFaceId) && $mappedFaceId !== '' ? $syncedAt : null,
-                'sync_payload' => [
-                    'result' => $result,
-                    'provider_face_id' => $mappedFaceId,
-                    'local_face_id' => $representative->event_media_face_id,
+            $stateMachine->transitionRepresentativeSync(
+                $representative,
+                is_string($mappedFaceId) && $mappedFaceId !== ''
+                    ? EventPersonRepresentativeSyncStatus::Synced
+                    : EventPersonRepresentativeSyncStatus::Failed,
+                [
+                    'last_synced_at' => is_string($mappedFaceId) && $mappedFaceId !== '' ? $syncedAt : null,
+                    'sync_payload' => [
+                        'result' => $result,
+                        'provider_face_id' => $mappedFaceId,
+                        'local_face_id' => $representative->event_media_face_id,
+                    ],
                 ],
-            ])->save();
+            );
         }
 
         Log::channel((string) config('observability.queue_log_channel', config('logging.default')))
@@ -184,13 +190,14 @@ class SyncEventPersonRepresentativeFacesJob implements ShouldBeEncrypted, Should
     private function markRepresentatives(iterable $representatives, EventPersonRepresentativeSyncStatus $status, array $payload): void
     {
         $timestamp = $status === EventPersonRepresentativeSyncStatus::Synced ? now() : null;
+        /** @var EventPeopleStateMachine $stateMachine */
+        $stateMachine = app(EventPeopleStateMachine::class);
 
         foreach ($representatives as $representative) {
-            $representative->forceFill([
-                'sync_status' => $status->value,
+            $stateMachine->transitionRepresentativeSync($representative, $status, [
                 'last_synced_at' => $timestamp,
                 'sync_payload' => $payload,
-            ])->save();
+            ]);
         }
     }
 }

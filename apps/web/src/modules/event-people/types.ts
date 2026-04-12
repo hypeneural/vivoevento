@@ -19,6 +19,8 @@ export type EventPersonStatus = 'draft' | 'active' | 'hidden';
 export type EventPersonAssignmentStatus = 'suggested' | 'confirmed' | 'rejected';
 export type EventPersonReviewQueueStatus = 'pending' | 'conflict' | 'resolved' | 'ignored';
 export type EventPersonReviewQueueType = 'unknown_person' | 'cluster_suggestion' | 'identity_conflict' | 'coverage_gap';
+export type EventPersonReferencePhotoPurpose = 'avatar' | 'matching' | 'both';
+export type EventPersonReferencePhotoStatus = 'active' | 'archived' | 'invalid';
 
 export interface EventPersonMediaStat {
   media_count: number;
@@ -48,6 +50,48 @@ export interface EventPersonRepresentativeFace {
     quality_score: number | null;
     quality_tier: string | null;
   };
+}
+
+export interface EventPersonReferencePhoto {
+  id: number;
+  source: string | null;
+  event_media_id: number | null;
+  event_media_face_id: number | null;
+  reference_upload_media_id: number | null;
+  purpose: EventPersonReferencePhotoPurpose | string | null;
+  status: EventPersonReferencePhotoStatus | string | null;
+  quality_score: number | null;
+  is_primary_avatar: boolean;
+  face?: {
+    id: number | null;
+    event_media_id: number | null;
+    face_index: number | null;
+    quality_score: number | null;
+    quality_tier: string | null;
+  };
+  upload_media?: {
+    id: number;
+    original_filename: string;
+    preview_url: string | null;
+    original_url: string | null;
+  } | null;
+}
+
+export interface EventPersonAvatarSummary {
+  media_id: number | null;
+  face_id: number | null;
+}
+
+export interface EventPersonPrimaryPhotoSummary {
+  reference_photo_id?: number | null;
+  selection_mode?: string | null;
+  source?: string | null;
+  media_id?: number | null;
+  event_media_id?: number | null;
+  event_media_face_id?: number | null;
+  reference_upload_media_id?: number | null;
+  best_media_id: number | null;
+  latest_media_id: number | null;
 }
 
 export interface EventPersonRelationPersonSummary {
@@ -105,14 +149,27 @@ export interface EventPerson {
   side: EventPersonSide | string | null;
   avatar_media_id: number | null;
   avatar_face_id: number | null;
+  avatar?: EventPersonAvatarSummary | null;
   importance_rank: number;
   notes: string | null;
   status: EventPersonStatus | string;
+  primary_photo?: EventPersonPrimaryPhotoSummary | null;
   stats?: EventPersonMediaStat[];
+  reference_photos?: EventPersonReferencePhoto[];
   representative_faces?: EventPersonRepresentativeFace[];
   relations?: EventPersonRelation[];
   created_at: string | null;
   updated_at: string | null;
+}
+
+export interface EventPeopleOperationalStatus {
+  people_active: number;
+  people_draft: number;
+  assignments_confirmed: number;
+  review_queue_pending: number;
+  review_queue_conflict: number;
+  aws_sync_pending: number;
+  aws_sync_failed: number;
 }
 
 export interface EventPersonFaceAssignment {
@@ -191,6 +248,24 @@ export interface EventPersonReviewQueueItem {
   resolved_at: string | null;
   person?: EventPersonReviewQueuePersonSummary;
   face?: EventPersonReviewQueueFaceSummary;
+}
+
+export interface EventPersonReferencePhotoCandidate {
+  assignment_id: number;
+  event_media_face_id: number;
+  event_media_id: number | null;
+  face_index: number | null;
+  quality_score: number | null;
+  quality_tier: string | null;
+  reviewed_at: string | null;
+  media?: {
+    id: number;
+    caption: string | null;
+    thumbnail_url: string | null;
+    preview_url: string | null;
+    original_url: string | null;
+    created_at: string | null;
+  } | null;
 }
 
 export interface EventMediaFacePeople {

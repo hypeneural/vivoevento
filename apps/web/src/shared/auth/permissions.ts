@@ -25,6 +25,7 @@ export const PERMISSIONS = {
 
   // Modules
   GALLERY_MANAGE: 'gallery.manage',
+  GALLERY_BUILDER_MANAGE: 'gallery.builder.manage',
   WALL_MANAGE: 'wall.manage',
   PLAY_MANAGE: 'play.manage',
   HUB_MANAGE: 'hub.manage',
@@ -67,7 +68,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, Permission[]> = {
   partner_owner: [
     'dashboard.view', 'events.view', 'events.create', 'events.update',
     'channels.view', 'channels.manage',
-    'media.view', 'media.moderate', 'gallery.manage', 'wall.manage',
+    'media.view', 'media.moderate', 'gallery.manage', 'gallery.builder.manage', 'wall.manage',
     'play.manage', 'hub.manage', 'clients.view', 'clients.manage',
     'plans.view', 'analytics.view', 'settings.manage', 'branding.manage',
     'integrations.manage', 'team.manage',
@@ -76,14 +77,14 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<UserRole, Permission[]> = {
   partner_manager: [
     'dashboard.view', 'events.view', 'events.create', 'events.update',
     'channels.view', 'channels.manage',
-    'media.view', 'media.moderate', 'gallery.manage', 'wall.manage',
+    'media.view', 'media.moderate', 'gallery.manage', 'gallery.builder.manage', 'wall.manage',
     'play.manage', 'hub.manage', 'analytics.view', 'settings.manage',
     'team.manage',
   ],
 
   event_operator: [
     'dashboard.view', 'events.view', 'channels.view', 'media.view', 'media.moderate',
-    'gallery.manage', 'wall.manage', 'play.manage',
+    'gallery.manage', 'gallery.builder.manage', 'wall.manage', 'play.manage',
   ],
 
   financial: [

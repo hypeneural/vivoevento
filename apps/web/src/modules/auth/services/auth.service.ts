@@ -277,7 +277,7 @@ function buildMockSignupSession(
     'events.activate', 'events.manage_branding', 'events.manage_team',
     'channels.view', 'channels.manage',
     'media.view', 'media.moderate', 'media.delete',
-    'gallery.view', 'gallery.manage',
+    'gallery.view', 'gallery.manage', 'gallery.builder.manage',
     'wall.view', 'wall.manage',
     'play.view', 'play.manage',
     'hub.view', 'hub.manage',

@@ -76,7 +76,7 @@ export function buildMockSession(user: User): UserSession {
   const org = mockOrganizations.find(o => o.id === user.organizationId);
   const allPerms = [
     'dashboard.view', 'events.view', 'events.create', 'events.update',
-    'channels.view', 'channels.manage', 'media.view', 'media.moderate', 'gallery.manage', 'wall.manage',
+    'channels.view', 'channels.manage', 'media.view', 'media.moderate', 'gallery.manage', 'gallery.builder.manage', 'wall.manage',
     'play.manage', 'hub.manage', 'partners.view.any', 'partners.manage.any',
     'clients.view', 'clients.manage', 'plans.view', 'billing.manage',
     'analytics.view', 'audit.view', 'settings.manage', 'branding.manage',
@@ -87,8 +87,8 @@ export function buildMockSession(user: User): UserSession {
     super_admin: allPerms,
     platform_admin: allPerms.filter(p => !p.startsWith('billing')),
     partner_owner: allPerms.filter(p => !['audit.view', 'partners.manage.any'].includes(p)),
-    partner_manager: ['dashboard.view', 'events.view', 'events.create', 'events.update', 'channels.view', 'channels.manage', 'media.view', 'media.moderate', 'gallery.manage', 'wall.manage', 'play.manage', 'hub.manage', 'analytics.view', 'settings.manage', 'team.manage'],
-    event_operator: ['dashboard.view', 'events.view', 'channels.view', 'media.view', 'media.moderate', 'gallery.manage', 'wall.manage', 'play.manage'],
+    partner_manager: ['dashboard.view', 'events.view', 'events.create', 'events.update', 'channels.view', 'channels.manage', 'media.view', 'media.moderate', 'gallery.manage', 'gallery.builder.manage', 'wall.manage', 'play.manage', 'hub.manage', 'analytics.view', 'settings.manage', 'team.manage'],
+    event_operator: ['dashboard.view', 'events.view', 'channels.view', 'media.view', 'media.moderate', 'gallery.manage', 'gallery.builder.manage', 'wall.manage', 'play.manage'],
     financial: ['dashboard.view', 'plans.view', 'billing.manage', 'analytics.view'],
     partner: ['dashboard.view', 'events.view', 'media.view', 'gallery.manage', 'analytics.view'],
     viewer: ['dashboard.view', 'events.view', 'channels.view', 'gallery.manage'],

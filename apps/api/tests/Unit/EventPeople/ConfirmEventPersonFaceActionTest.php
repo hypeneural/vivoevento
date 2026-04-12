@@ -2,8 +2,10 @@
 
 use App\Modules\EventPeople\Actions\ConfirmEventPersonFaceAction;
 use App\Modules\EventPeople\Enums\EventPersonAssignmentStatus;
+use App\Modules\EventPeople\Enums\EventPersonReferencePhotoPurpose;
 use App\Modules\EventPeople\Models\EventPerson;
 use App\Modules\EventPeople\Models\EventPersonFaceAssignment;
+use App\Modules\EventPeople\Models\EventPersonReferencePhoto;
 use App\Modules\EventPeople\Models\EventPersonReviewQueueItem;
 use App\Modules\Events\Models\Event;
 use App\Modules\FaceSearch\Models\EventMediaFace;
@@ -48,6 +50,13 @@ it('creates a person inline with a unique slug when confirming a face', function
     expect($result['person']->slug)->toBe('elaine-teste-2')
         ->and($result['review_item']->status->value)->toBe('resolved')
         ->and($result['person']->avatar_face_id)->toBe($face->id);
+
+    $referencePhoto = EventPersonReferencePhoto::query()->firstOrFail();
+
+    expect($referencePhoto->event_person_id)->toBe($result['person']->id)
+        ->and($referencePhoto->event_media_face_id)->toBe($face->id)
+        ->and($referencePhoto->purpose)->toBe(EventPersonReferencePhotoPurpose::Both)
+        ->and($referencePhoto->is_primary_avatar)->toBeTrue();
 });
 
 it('moves the confirmed assignment without duplicating rows for the same face', function () {

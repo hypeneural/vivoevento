@@ -73,10 +73,12 @@ export const queryKeys = {
     peopleLists: (eventId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'people'] as const,
     peopleList: (eventId: number | string, filters: Record<string, unknown>) => [...queryKeys.eventPeople.peopleLists(eventId), filters] as const,
     personDetail: (eventId: number | string, personId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'person', String(personId)] as const,
+    referencePhotoCandidates: (eventId: number | string, personId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'person', String(personId), 'reference-photo-candidates'] as const,
     reviewQueues: (eventId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'review-queue'] as const,
     reviewQueue: (eventId: number | string, filters: Record<string, unknown>) => [...queryKeys.eventPeople.reviewQueues(eventId), filters] as const,
     mediaFaces: (eventId: number | string, mediaId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'media', String(mediaId), 'faces'] as const,
     presets: (eventId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'presets'] as const,
+    operationalStatus: (eventId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'operational-status'] as const,
   },
 
   // Gallery
@@ -86,7 +88,11 @@ export const queryKeys = {
     list: (filters: Record<string, unknown>) => [...queryKeys.gallery.lists(), filters] as const,
     details: () => [...queryKeys.gallery.all(), 'detail'] as const,
     detail: (id: string) => [...queryKeys.gallery.details(), id] as const,
-    byEvent: (eventId: string) => [...queryKeys.gallery.all(), eventId] as const,
+    byEvent: (eventId: string | number) => [...queryKeys.gallery.all(), String(eventId)] as const,
+    settings: (eventId: string | number) => [...queryKeys.gallery.byEvent(eventId), 'settings'] as const,
+    presets: (scope: Record<string, unknown> = {}) => [...queryKeys.gallery.all(), 'presets', scope] as const,
+    revisions: (eventId: string | number) => [...queryKeys.gallery.byEvent(eventId), 'revisions'] as const,
+    preview: (eventIdOrToken: string | number) => [...queryKeys.gallery.all(), 'preview', String(eventIdOrToken)] as const,
   },
 
   // Wall

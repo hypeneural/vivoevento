@@ -4,6 +4,7 @@ namespace App\Modules\EventPeople\Actions;
 
 use App\Modules\EventPeople\Enums\EventPersonAssignmentSource;
 use App\Modules\EventPeople\Enums\EventPersonAssignmentStatus;
+use App\Modules\EventPeople\Enums\EventPersonReferencePhotoPurpose;
 use App\Modules\EventPeople\Enums\EventPersonReviewQueueStatus;
 use App\Modules\EventPeople\Enums\EventPersonSide;
 use App\Modules\EventPeople\Enums\EventPersonStatus;
@@ -13,7 +14,9 @@ use App\Modules\EventPeople\Jobs\ProjectEventPeopleReviewQueueJob;
 use App\Modules\EventPeople\Jobs\SyncEventPersonRepresentativeFacesJob;
 use App\Modules\EventPeople\Models\EventPerson;
 use App\Modules\EventPeople\Models\EventPersonFaceAssignment;
+use App\Modules\EventPeople\Models\EventPersonReferencePhoto;
 use App\Modules\EventPeople\Models\EventPersonReviewQueueItem;
+use App\Modules\EventPeople\Support\EventPeopleStateMachine;
 use App\Modules\Events\Models\Event;
 use App\Modules\FaceSearch\Models\EventMediaFace;
 use App\Modules\Users\Models\User;
@@ -25,6 +28,8 @@ class ConfirmEventPersonFaceAction
 {
     public function __construct(
         private readonly ProjectEventPeopleReviewQueueAction $reviewQueueProjector,
+        private readonly UpsertEventPersonReferencePhotoAction $upsertReferencePhoto,
+        private readonly EventPeopleStateMachine $stateMachine,
     ) {}
 
     /**
@@ -63,15 +68,16 @@ class ConfirmEventPersonFaceAction
 
             if ($confirmedAssignment) {
                 $assignment = $confirmedAssignment;
-                $assignment->fill([
+                $assignment->forceFill([
                     'event_person_id' => $person->id,
-                    'source' => $source->value,
                     'confidence' => 1,
-                    'status' => EventPersonAssignmentStatus::Confirmed->value,
+                ])->save();
+
+                $this->stateMachine->transitionAssignment($assignment, EventPersonAssignmentStatus::Confirmed, [
+                    'source' => $source->value,
                     'reviewed_by' => $user->id,
                     'reviewed_at' => now(),
                 ]);
-                $assignment->save();
             } else {
                 $existingForTarget = EventPersonFaceAssignment::query()
                     ->where('event_id', $event->id)
@@ -85,13 +91,18 @@ class ConfirmEventPersonFaceAction
                     'event_id' => $event->id,
                     'event_person_id' => $person->id,
                     'event_media_face_id' => $face->id,
-                    'source' => $source->value,
                     'confidence' => 1,
-                    'status' => EventPersonAssignmentStatus::Confirmed->value,
+                    'status' => $existingForTarget?->status?->value
+                        ?? $existingForTarget?->status
+                        ?? EventPersonAssignmentStatus::Suggested->value,
+                ]);
+                $assignment->save();
+
+                $this->stateMachine->transitionAssignment($assignment, EventPersonAssignmentStatus::Confirmed, [
+                    'source' => $source->value,
                     'reviewed_by' => $user->id,
                     'reviewed_at' => now(),
                 ]);
-                $assignment->save();
             }
 
             EventPersonFaceAssignment::query()
@@ -99,15 +110,25 @@ class ConfirmEventPersonFaceAction
                 ->where('event_media_face_id', $face->id)
                 ->where('id', '!=', $assignment->id)
                 ->where('status', EventPersonAssignmentStatus::Confirmed->value)
-                ->update([
-                    'status' => EventPersonAssignmentStatus::Rejected->value,
-                    'source' => EventPersonAssignmentSource::ManualCorrected->value,
-                    'reviewed_by' => $user->id,
-                    'reviewed_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                ->lockForUpdate()
+                ->get()
+                ->each(function (EventPersonFaceAssignment $otherAssignment) use ($face, $user): void {
+                    $this->stateMachine->transitionAssignment($otherAssignment, EventPersonAssignmentStatus::Rejected, [
+                        'source' => EventPersonAssignmentSource::ManualCorrected->value,
+                        'reviewed_by' => $user->id,
+                        'reviewed_at' => now(),
+                    ]);
 
-            if (! $person->avatar_face_id) {
+                    $this->archiveReferencePhotosForFace(
+                        (int) $otherAssignment->event_person_id,
+                        (int) $face->id,
+                        $user,
+                    );
+                });
+
+            $isPrimaryAvatar = ! $person->avatar_face_id || (int) $person->avatar_face_id === (int) $face->id;
+
+            if ($isPrimaryAvatar) {
                 $person->forceFill([
                     'avatar_face_id' => $face->id,
                     'avatar_media_id' => $face->event_media_id,
@@ -115,17 +136,32 @@ class ConfirmEventPersonFaceAction
                 ])->save();
             }
 
+            if ($previousPersonId !== null && (int) $previousPersonId !== (int) $person->id) {
+                $this->archiveReferencePhotosForFace($previousPersonId, (int) $face->id, $user);
+            }
+
+            $this->upsertReferencePhoto->execute(
+                $person->fresh(),
+                $face,
+                $user,
+                $isPrimaryAvatar ? EventPersonReferencePhotoPurpose::Both : EventPersonReferencePhotoPurpose::Matching,
+                $isPrimaryAvatar,
+            );
+
             if ($reviewItem) {
                 $reviewItem->forceFill([
-                    'status' => EventPersonReviewQueueStatus::Resolved->value,
                     'event_person_id' => $person->id,
-                    'resolved_at' => now(),
-                    'resolved_by' => $user->id,
                     'payload' => array_merge($reviewItem->payload ?? [], [
                         'resolution' => 'confirmed',
                         'event_person_id' => $person->id,
                     ]),
                 ])->save();
+
+                $this->stateMachine->transitionReviewItem($reviewItem, EventPersonReviewQueueStatus::Resolved, [
+                    'reason' => 'manual_confirmation',
+                    'resolved_by' => $user->id,
+                    'resolved_at' => now(),
+                ]);
             }
 
             $projectedItem = $this->reviewQueueProjector->executeForFace(
@@ -142,7 +178,18 @@ class ConfirmEventPersonFaceAction
             }
 
             return [
-                'person' => $person->fresh(['mediaStats']),
+                'person' => $person->fresh([
+                    'mediaStats',
+                    'primaryReferencePhoto.face',
+                    'primaryReferencePhoto.uploadMedia',
+                    'referencePhotos.face',
+                    'referencePhotos.uploadMedia',
+                    'representativeFaces.face',
+                    'outgoingRelations.personA',
+                    'outgoingRelations.personB',
+                    'incomingRelations.personA',
+                    'incomingRelations.personB',
+                ]),
                 'assignment' => $assignment->fresh(['person', 'face.media']),
                 'review_item' => $projectedItem?->fresh(['person', 'face']),
                 'face' => $face->fresh(['personAssignments.person', 'reviewQueueItems']),
@@ -217,5 +264,31 @@ class ConfirmEventPersonFaceAction
         }
 
         return $candidate;
+    }
+
+    private function archiveReferencePhotosForFace(int $personId, int $faceId, User $user): void
+    {
+        $photos = EventPersonReferencePhoto::query()
+            ->where('event_person_id', $personId)
+            ->where('event_media_face_id', $faceId)
+            ->where('status', 'active')
+            ->get();
+
+        $photos->each(fn (EventPersonReferencePhoto $photo) => $this->stateMachine->transitionReferencePhoto(
+            $photo,
+            \App\Modules\EventPeople\Enums\EventPersonReferencePhotoStatus::Archived,
+            ['updated_by' => $user->id],
+        ));
+
+        if ($photos->isNotEmpty()) {
+            EventPerson::query()
+                ->where('id', $personId)
+                ->whereIn('primary_reference_photo_id', $photos->pluck('id')->all())
+                ->update([
+                    'primary_reference_photo_id' => null,
+                    'updated_by' => $user->id,
+                    'updated_at' => now(),
+                ]);
+        }
     }
 }

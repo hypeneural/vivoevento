@@ -6,12 +6,17 @@ use App\Modules\EventPeople\Enums\EventPersonAssignmentStatus;
 use App\Modules\EventPeople\Enums\EventPersonReviewQueueStatus;
 use App\Modules\EventPeople\Enums\EventPersonReviewQueueType;
 use App\Modules\EventPeople\Models\EventPersonReviewQueueItem;
+use App\Modules\EventPeople\Support\EventPeopleStateMachine;
 use App\Modules\Events\Models\Event;
 use App\Modules\FaceSearch\Models\EventMediaFace;
 use App\Modules\MediaProcessing\Models\EventMedia;
 
 class ProjectEventPeopleReviewQueueAction
 {
+    public function __construct(
+        private readonly EventPeopleStateMachine $stateMachine,
+    ) {}
+
     public function executeForEvent(Event $event, bool $onlyMissing = true): void
     {
         EventMediaFace::query()
@@ -110,17 +115,27 @@ class ProjectEventPeopleReviewQueueAction
             'event_id' => $face->event_id,
             'queue_key' => $this->unknownQueueKey($face),
             'type' => EventPersonReviewQueueType::UnknownPerson->value,
-            'status' => EventPersonReviewQueueStatus::Pending->value,
             'priority' => $this->priorityForFace($face),
             'event_person_id' => null,
             'event_media_face_id' => $face->id,
             'payload' => $payload,
             'last_signal_at' => now(),
-            'resolved_at' => null,
-            'resolved_by' => null,
         ]);
 
+        if (! $item->exists) {
+            $item->fill([
+                'status' => EventPersonReviewQueueStatus::Pending->value,
+                'resolved_at' => null,
+                'resolved_by' => null,
+            ])->save();
+
+            return $item;
+        }
+
         $item->save();
+        $this->stateMachine->transitionReviewItem($item, EventPersonReviewQueueStatus::Pending, [
+            'reason' => 'projected_pending',
+        ]);
 
         return $item;
     }
@@ -143,16 +158,27 @@ class ProjectEventPeopleReviewQueueAction
 
         $item->fill([
             'type' => EventPersonReviewQueueType::UnknownPerson->value,
-            'status' => EventPersonReviewQueueStatus::Resolved->value,
             'priority' => $this->priorityForFace($face),
             'event_person_id' => $eventPersonId,
             'event_media_face_id' => $face->id,
             'payload' => $payload,
             'last_signal_at' => now(),
-            'resolved_at' => now(),
         ]);
 
+        if (! $item->exists) {
+            $item->fill([
+                'status' => EventPersonReviewQueueStatus::Resolved->value,
+                'resolved_at' => now(),
+            ])->save();
+
+            return $item;
+        }
+
         $item->save();
+        $this->stateMachine->transitionReviewItem($item, EventPersonReviewQueueStatus::Resolved, [
+            'reason' => 'projected_resolved',
+            'resolved_at' => now(),
+        ]);
 
         return $item;
     }
@@ -174,16 +200,27 @@ class ProjectEventPeopleReviewQueueAction
 
         $item->fill([
             'type' => EventPersonReviewQueueType::UnknownPerson->value,
-            'status' => EventPersonReviewQueueStatus::Ignored->value,
             'priority' => $this->priorityForFace($face),
             'event_person_id' => null,
             'event_media_face_id' => $face->id,
             'payload' => $payload,
             'last_signal_at' => now(),
-            'resolved_at' => $item->resolved_at ?? now(),
         ]);
 
+        if (! $item->exists) {
+            $item->fill([
+                'status' => EventPersonReviewQueueStatus::Ignored->value,
+                'resolved_at' => now(),
+            ])->save();
+
+            return $item;
+        }
+
         $item->save();
+        $this->stateMachine->transitionReviewItem($item, EventPersonReviewQueueStatus::Ignored, [
+            'reason' => 'projected_ignored',
+            'resolved_at' => $item->resolved_at ?? now(),
+        ]);
 
         return $item;
     }
@@ -231,17 +268,27 @@ class ProjectEventPeopleReviewQueueAction
 
             $item->fill([
                 'type' => EventPersonReviewQueueType::IdentityConflict->value,
-                'status' => EventPersonReviewQueueStatus::Conflict->value,
                 'priority' => $priority,
                 'event_person_id' => $confirmedAssignment->event_person_id,
                 'event_media_face_id' => $face->id,
                 'payload' => $payload,
                 'last_signal_at' => now(),
-                'resolved_at' => null,
-                'resolved_by' => null,
             ]);
 
+            if (! $item->exists) {
+                $item->fill([
+                    'status' => EventPersonReviewQueueStatus::Conflict->value,
+                    'resolved_at' => null,
+                    'resolved_by' => null,
+                ])->save();
+
+                return $item;
+            }
+
             $item->save();
+            $this->stateMachine->transitionReviewItem($item, EventPersonReviewQueueStatus::Conflict, [
+                'reason' => 'identity_conflict_detected',
+            ]);
 
             return $item;
         }
@@ -269,16 +316,18 @@ class ProjectEventPeopleReviewQueueAction
 
         $item->fill([
             'type' => EventPersonReviewQueueType::IdentityConflict->value,
-            'status' => EventPersonReviewQueueStatus::Resolved->value,
             'priority' => 0,
             'event_person_id' => $confirmedAssignment?->event_person_id,
             'event_media_face_id' => $face->id,
             'payload' => $payload,
             'last_signal_at' => now(),
-            'resolved_at' => now(),
         ]);
 
         $item->save();
+        $this->stateMachine->transitionReviewItem($item, EventPersonReviewQueueStatus::Resolved, [
+            'reason' => 'stable_identity',
+            'resolved_at' => now(),
+        ]);
 
         return null;
     }

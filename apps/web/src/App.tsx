@@ -46,6 +46,7 @@ const EditEventPage = lazy(routeImports.eventEdit);
 const MediaPage = lazy(routeImports.media);
 const ModerationPage = lazy(routeImports.moderation);
 const GalleryPage = lazy(routeImports.gallery);
+const GalleryBuilderPage = lazy(routeImports.galleryBuilder);
 const PublicGalleryPage = lazy(routeImports.publicGallery);
 const WallPage = lazy(routeImports.wall);
 const PlayPage = lazy(routeImports.play);
@@ -191,6 +192,14 @@ const router = createBrowserRouter(
             <Route path="events/:id/wall" element={<WallPage />} />
             <Route path="events/:id/play" element={<PlayPage />} />
             <Route path="events/:id/edit" element={<EditEventPage />} />
+            <Route
+              path="events/:id/gallery/builder"
+              element={(
+                <ModuleGuard moduleKey="gallery" requiredPermissions={['gallery.builder.manage']}>
+                  <GalleryBuilderPage />
+                </ModuleGuard>
+              )}
+            />
 
             <Route path="media" element={<MediaPage />} />
             <Route path="moderation" element={<ModerationPage />} />

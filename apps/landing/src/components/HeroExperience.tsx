@@ -7,24 +7,21 @@ import {
   CalendarDays,
   Check,
   Sparkles,
-  Images,
-  MonitorPlay,
-  Gamepad2,
 } from "lucide-react";
 import styles from "./HeroExperience.module.scss";
-import { heroVariations, eventImages } from "@/data/landing";
+import { heroVariations } from "@/data/landing";
 import { siteConfig } from "@/config/site";
 import { useSmoothScroll } from "@/hooks/useSmoothScroll";
 import { usePersonaContent } from "@/hooks/usePersonaContent";
 import { trackCTAClick } from "@/utils/tracking";
+import PhoneVideoShowcase from "@/components/PhoneVideoShowcase";
 
 gsap.registerPlugin(useGSAP);
 
-// Trust points simplificados
 const trustPoints = [
-  { icon: Check, text: "Não precisa instalar App", detail: "Receba por QR, Link, WhatsApp ou Telegram" },
+  { icon: Check, text: "Não precisa instalar app", detail: "Receba por QR, link, WhatsApp ou Telegram" },
   { icon: Check, text: "IA configurável para as mídias", detail: "Modera, trata foto e responde personalizada" },
-  { icon: Check, text: "Tempo real", detail: "Galeria Personalizada, Telão Dinâmico, Jogos, Mini Site" },
+  { icon: Check, text: "Tempo real", detail: "Galeria personalizada, telão dinâmico, jogos e mini site" },
 ];
 
 export default function HeroExperience() {
@@ -32,10 +29,9 @@ export default function HeroExperience() {
   const scope = useRef<HTMLElement | null>(null);
   const { scrollToId } = useSmoothScroll();
 
-  // Get persona-specific content
   const heroContent = usePersonaContent(
     heroVariations,
-    heroVariations.social // fallback to social persona
+    heroVariations.social,
   );
 
   useGSAP(
@@ -55,12 +51,12 @@ export default function HeroExperience() {
           duration: 0.8,
           stagger: 0.1,
           ease: "power3.out",
-        }
+        },
       );
 
       return undefined;
     },
-    { scope, dependencies: [reduceMotion] }
+    { scope, dependencies: [reduceMotion] },
   );
 
   const handleInternalJump = (event: MouseEvent<HTMLButtonElement>, id: string) => {
@@ -73,7 +69,6 @@ export default function HeroExperience() {
     <section className={styles.hero} ref={scope} aria-labelledby="hero-title">
       <div className="container">
         <div className={styles.grid}>
-          {/* Copy Column - Simplificado e Limpo */}
           <div className={styles.copyColumn}>
             <span className="eyebrow" data-hero-reveal>
               <Sparkles size={14} aria-hidden="true" />
@@ -93,7 +88,6 @@ export default function HeroExperience() {
               {heroContent.subheadline}
             </p>
 
-            {/* Trust Points - 3 checkmarks limpos */}
             <div className={styles.trustPoints} data-hero-reveal role="list" aria-label="Benefícios principais">
               {trustPoints.map((point, index) => (
                 <div key={index} className={styles.trustPoint} role="listitem">
@@ -108,13 +102,12 @@ export default function HeroExperience() {
               ))}
             </div>
 
-            {/* CTAs - Apenas 2, hierarquia clara */}
             <div className={styles.actions} data-hero-reveal>
-              <a 
-                className="button" 
-                data-variant="primary" 
-                href={siteConfig.primaryCtaUrl} 
-                target="_blank" 
+              <a
+                className="button"
+                data-variant="primary"
+                href={siteConfig.primaryCtaUrl}
+                target="_blank"
                 rel="noreferrer"
                 aria-label="Agendar demonstração da plataforma"
                 onClick={() => trackCTAClick("primary", "hero", "Agendar demonstração")}
@@ -123,9 +116,9 @@ export default function HeroExperience() {
                 {heroContent.ctas.primary.text}
               </a>
 
-              <button 
-                type="button" 
-                className={styles.textAction} 
+              <button
+                type="button"
+                className={styles.textAction}
                 onClick={(event) => handleInternalJump(event, "como-funciona")}
                 aria-label="Ver como funciona a plataforma"
               >
@@ -135,68 +128,15 @@ export default function HeroExperience() {
             </div>
           </div>
 
-          {/* Visual Column — Collage de evento real */}
           <div className={styles.visualColumn} data-hero-reveal>
-            <div className={styles.visualShell}>
-              {/* Badge de status */}
-              <div className={styles.statusBadge} role="status" aria-live="polite">
-                <span className={styles.statusDot} aria-hidden="true" />
-                27 envios ativos agora
-              </div>
-
-              {/* Collage de imagens reais */}
-              <div className={styles.collageContainer}>
-                <div className={styles.collageMain}>
-                  <img 
-                    src={eventImages.galleryFeatured.src} 
-                    alt={eventImages.galleryFeatured.alt} 
-                    loading="eager" 
-                    decoding="async"
-                  />
-                  <div className={styles.collageBadge} data-position="top-left">
-                    <Images size={14} />
-                    <span>Galeria ao vivo</span>
-                  </div>
-                </div>
-                <div className={styles.collageSide}>
-                  <div className={styles.collageSideImg}>
-                    <img 
-                      src={eventImages.wallHero.src} 
-                      alt={eventImages.wallHero.alt} 
-                      loading="eager" 
-                      decoding="async"
-                    />
-                    <div className={styles.collageBadge} data-position="bottom-left">
-                      <MonitorPlay size={14} />
-                      <span>Telão</span>
-                    </div>
-                  </div>
-                  <div className={styles.collageSideImg}>
-                    <img 
-                      src={eventImages.galleryThird.src} 
-                      alt={eventImages.galleryThird.alt} 
-                      loading="lazy" 
-                      decoding="async"
-                    />
-                    <div className={styles.collageBadge} data-position="bottom-left">
-                      <Gamepad2 size={14} />
-                      <span>Jogos</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Floating elements — outside shell to avoid overflow:hidden clipping */}
-            <div className={styles.floatingBadge} data-position="top-left">
-              <Check size={14} />
-              <span>IA ativa</span>
-            </div>
-
-            <div className={styles.floatingBadge} data-position="bottom-right">
-              <Sparkles size={14} />
-              <span>Tempo real</span>
-            </div>
+            <PhoneVideoShowcase
+              poster="/assets/hero-phone/poster-phone.jpg"
+              previewMp4Src="/assets/hero-phone/preview-phone.mp4"
+              previewWebmSrc="/assets/hero-phone/preview-phone.webm"
+              fullDemoMp4Src="/assets/hero-phone/full-demo.mp4"
+              frameSrc="/assets/hero-phone/phone-frame.svg"
+              title="Demonstração real do Evento Vivo em um evento"
+            />
           </div>
         </div>
       </div>

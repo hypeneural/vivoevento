@@ -33,19 +33,29 @@ O caminho de menor risco e maior aderencia ao monorepo atual e:
    - `page_schema`
    - `media_behavior`
    - um envelope agregado pode existir no payload, mas nao deve ser a unica fonte de verdade
-4. incluir seguranca de produto desde o dia 1:
+4. trocar a entrada do produto de "lista de presets" para uma matriz de modelos:
+   - `event_type_family`
+   - `style_skin`
+   - `behavior_profile`
+   - o usuario entra por combinacoes humanas como "casamento romantico" ou "corporativo clean", e o sistema deriva layout, paleta, hero, CTA e politica de video
+5. incluir seguranca de produto desde o dia 1:
    - `draft_version`
    - `published_version`
    - autosave
    - preview link compartilhavel
    - restore previous version
-5. usar libs externas para renderizacao da galeria, nao para dominar a arquitetura inteira:
+6. tornar mobile-first um contrato explicito da V1:
+   - metas de Web Vitals no percentil 75
+   - segmentacao mobile e desktop
+   - prioridade visual de carregamento
+   - contrato de imagem responsiva
+7. usar libs externas para renderizacao da galeria, nao para dominar a arquitetura inteira:
    - `react-photo-album` para layouts
    - `PhotoSwipe` para lightbox de foto
    - player/modal dedicado para video
    - virtualizacao local ou `@tanstack/react-virtual` / `masonic` quando o volume exigir
-6. usar IA guardrailed, gerando propostas aplicaveis e JSON validado por schema, nunca JSX/CSS livre;
-7. deixar `Puck` como melhor candidato para uma fase 2 ou 3, caso o produto realmente precise de drag-and-drop visual mais livre.
+8. usar IA guardrailed, gerando propostas aplicaveis e JSON validado por schema, nunca JSX/CSS livre;
+9. deixar `Puck` como melhor candidato para uma fase 2 ou 3, caso o produto realmente precise de drag-and-drop visual mais livre.
 
 Em uma frase:
 
@@ -234,6 +244,47 @@ Leitura pratica:
 - ja existe precedente local para guardrail de contraste;
 - ja existe leitura de `prefers-reduced-motion`;
 - a stack web atual ja tem exemplos validos para superficies de midia mais densas sem mudar de arquitetura.
+
+### Revalidacao complementar em `2026-04-12`
+
+Para validar as melhorias propostas depois desta analise, a bateria abaixo foi rerodada:
+
+#### Backend
+
+```bash
+cd apps/api
+php artisan test tests/Feature/Gallery/PublicGalleryAvailabilityTest.php tests/Feature/Gallery/GalleryAdminWorkflowTest.php
+php artisan test tests/Feature/MediaProcessing/EventMediaListTest.php
+```
+
+Resultado:
+
+- `16` testes passaram
+- `191` assertions passaram
+
+Leitura pratica:
+
+- `PublicGalleryAvailabilityTest` confirma que a galeria publica ja entrega `thumbnail_url`, `preview_url`, `width`, `height` e `orientation`;
+- `EventMediaListTest` confirma que o backend ja sabe preferir variantes otimizadas, mas ainda nao expoe um mapa de fontes responsivas para `srcset`/`sizes`;
+- isso valida a melhoria de criar um contrato novo de `responsive_sources`, em vez de assumir que ele ja existe.
+
+#### Frontend
+
+```bash
+cd apps/web
+npx.cmd vitest run src/modules/gallery/PublicGalleryPage.test.tsx src/modules/media/MediaPage.test.tsx src/modules/moderation/components/ModerationMediaSurface.test.tsx src/modules/qr-code/support/qrReadability.test.ts src/modules/wall/player/runtime-profile.test.ts
+```
+
+Resultado:
+
+- `5` arquivos passaram
+- `13` testes passaram
+
+Leitura pratica:
+
+- `PublicGalleryPage` continua presa em `<img src={thumbnail_url} loading="lazy">`, entao a melhoria de priorizacao visual e imagem responsiva e real;
+- `ModerationMediaSurface` ja prova precedente local para `sizes`, escolha contextual de asset e separacao forte entre imagem e video;
+- `qrReadability` e `runtime-profile` confirmam que contraste e `prefers-reduced-motion` podem e devem virar contrato do renderer, nao so nota de UX.
 
 ---
 
@@ -923,8 +974,10 @@ Campos sugeridos:
 - `theme_tokens_json`
 - `page_schema_json`
 - `media_behavior_json`
-- `persona_key`
-- `event_type_key`
+- `event_type_family`
+- `style_skin`
+- `behavior_profile`
+- `derived_preset_key`
 - `created_at`
 - `updated_at`
 
@@ -1015,7 +1068,26 @@ Payload sugerido:
     "page_schema": {},
     "media_behavior": {}
   },
-  "data": [],
+  "data": [
+    {
+      "id": 501,
+      "media_type": "image",
+      "thumbnail_url": "https://...",
+      "preview_url": "https://...",
+      "original_url": "https://...",
+      "width": 1600,
+      "height": 1067,
+      "responsive_sources": {
+        "sizes": "(max-width: 640px) 50vw, (max-width: 1200px) 33vw, 25vw",
+        "srcset": "https://.../gallery-640.webp 640w, https://.../gallery-960.webp 960w, https://.../gallery-1600.webp 1600w",
+        "variants": [
+          { "variant_key": "gallery_640", "src": "https://.../gallery-640.webp", "width": 640, "height": 427, "mime_type": "image/webp" },
+          { "variant_key": "gallery_960", "src": "https://.../gallery-960.webp", "width": 960, "height": 640, "mime_type": "image/webp" },
+          { "variant_key": "gallery", "src": "https://.../gallery-1600.webp", "width": 1600, "height": 1067, "mime_type": "image/webp" }
+        ]
+      }
+    }
+  ],
   "meta": {}
 }
 ```
@@ -1026,14 +1098,28 @@ Vantagem:
 - frontend atual nao quebra;
 - nova UI pode usar os campos extras.
 
-### Opcao fase 2
+Ponto importante:
 
-Separar boot e feed:
+- o estado atual do repo confirma que `thumbnail_url` e `preview_url` existem, mas `responsive_sources` ainda nao;
+- por isso, `responsive_sources` precisa entrar como contrato novo e testado, e nao como suposicao da V1.
+
+### Opcao reforcada para V1 mobile-first
+
+Separar cedo boot e feed:
 
 - `GET /api/v1/public/events/{slug}/gallery`
 - `GET /api/v1/public/events/{slug}/gallery/media?page=2`
 
-Isso so faz sentido quando a pagina publica ficar mais rica e precisar de boot mais pesado.
+Essa separacao deixa de ser "fase 2 talvez" e passa a ser preferencia tecnica da V1 quando:
+
+- o hero e os blocos publicos ficam mais ricos;
+- a pagina precisa bater budget mobile de Web Vitals;
+- a experiencia precisa renderizar primeiro a parte critica e depois continuar puxando o stream de midia.
+
+Se a equipe quiser rollout mais conservador:
+
+- a rota atual pode nascer como compatibilidade aditiva;
+- mas o contrato do frontend deve ser desenhado desde o inicio para suportar `boot da experience` separado de `feed de midia`.
 
 ### Preview compartilhavel
 
@@ -1065,6 +1151,11 @@ O builder da galeria deve seguir o mesmo rigor do `Hub`, mas com contrato melhor
 ```json
 {
   "version": 1,
+  "model_matrix": {
+    "event_type_family": "wedding",
+    "style_skin": "romantic",
+    "behavior_profile": "story"
+  },
   "theme_key": "wedding-rose",
   "layout_key": "editorial-masonry",
   "theme_tokens": {
@@ -1155,8 +1246,8 @@ O builder da galeria deve seguir o mesmo rigor do `Hub`, mas com contrato melhor
       "chunk_strategy": "sectioned"
     },
     "loading": {
+      "hero_and_first_band": "eager",
       "below_fold": "lazy",
-      "hero": "eager",
       "content_visibility": "auto"
     },
     "lightbox": {
@@ -1164,6 +1255,7 @@ O builder da galeria deve seguir o mesmo rigor do `Hub`, mas com contrato melhor
       "videos": false
     },
     "video": {
+      "allowed_modes": ["poster_only", "poster_to_modal", "inline_preview"],
       "mode": "poster_to_modal",
       "show_badge": true,
       "allow_inline_preview": false
@@ -1191,44 +1283,113 @@ Exemplos de operacao:
 - "adiciona banner no meio" -> altera `page_schema`;
 - "troca o estilo da grade" -> altera `media_behavior.grid`.
 
-## 4. Presets iniciais recomendados
+## 4. Matriz de modelos recomendada
 
-Catalogo base sugerido:
+Em vez de vender a V1 como uma lista unica de presets tecnicos, o melhor desenho e partir de uma matriz de modelos que fala a lingua do usuario:
 
-- `editorial-masonry`
-- `timeless-rows`
-- `clean-columns`
-- `justified-story`
-- `live-stream`
+- `event_type_family`
+- `style_skin`
+- `behavior_profile`
 
-Temas iniciais sugeridos:
+### `event_type_family`
 
-- `event-brand`
-- `pearl`
-- `wedding-rose`
-- `black-tie`
-- `quince-glam`
-- `corporate-clean`
+Familias iniciais recomendadas:
 
-Blocos iniciais sugeridos:
+- `wedding`
+- `quince`
+- `corporate`
 
-- `hero`
-- `gallery_stream`
-- `banner_strip`
-- `info_cards`
-- `quote`
-- `cta_strip`
-- `footer_brand`
+Responsabilidade principal:
 
-Regra importante:
+- orientar hero, blocos contextuais, copy base e linguagem visual dominante.
 
-- "banner no meio das fotos" deve ser bloco oficial, nunca gambiarra de DOM solto.
+### `style_skin`
 
-Atalhos de entrada recomendados para usuario leigo:
+Skins iniciais recomendadas:
+
+- `romantic`
+- `modern`
+- `classic`
+- `premium`
+- `clean`
+
+Responsabilidade principal:
+
+- orientar `theme_tokens`, tipografia, radius, sombras e atmosfera visual.
+
+### `behavior_profile`
+
+Perfis iniciais recomendados:
+
+- `light`
+- `story`
+- `live`
+- `sponsors`
+
+Responsabilidade principal:
+
+- orientar `media_behavior`, densidade, politicas de video, ritmo da pagina e interstitials.
+
+### Como a matriz deriva a experiencia
+
+Exemplos:
+
+- `wedding + romantic + story` -> hero editorial, `masonry`, paleta rose, quote e destaque de momentos;
+- `quince + modern + live` -> hero vibrante, `masonry` ou `rows`, cards mais energicos e ticker de momentos;
+- `corporate + clean + sponsors` -> `rows`, sponsor strip, CTA objetivo e badge/video mais contido.
+
+Leitura pratica:
+
+- o usuario entra por algo que entende;
+- o sistema continua derivando `theme_tokens`, `page_schema` e `media_behavior`;
+- presets tecnicos como `editorial-masonry` ou `timeless-rows` viram detalhe interno, nao a porta principal de entrada.
+
+### Layouts derivados recomendados
+
+Recomendacao de default:
+
+- `wedding` e `quince`: `masonry` ou `rows`;
+- `corporate`: `rows` por padrao;
+- `columns`: apenas para landing curta, bloco editorial curto ou album menor.
+
+Isso reforca o que a documentacao oficial do `react-photo-album` ja mostra:
+
+- `rows` e `masonry` tem trilha propria de infinite scroll;
+- `columns` nao e um bom encaixe para feed longo.
+
+### Catalogo de blocos orientado ao caso de uso
+
+O catalogo da V1 deve falar a lingua do evento, mesmo quando a implementacao reaproveita componentes base.
+
+Blocos e variantes recomendados:
+
+- `WeddingHero`
+- `QuinceHero`
+- `CorporateHero`
+- `SponsorsStrip`
+- `FindMeCta`
+- `TimelineMoments`
+- `CeremonyInfo`
+- `GiftTableInfo`
+- `PhotoHighlightRail`
+- `LiveMomentsTicker`
+
+Regra de implementacao:
+
+- nao significa duplicar tudo em componentes isolados;
+- significa expor variantes e inspector contextual com semantica de evento, em vez de painel generico demais.
+
+### Atalhos de entrada recomendados para usuario leigo
 
 - `quero algo romantico`
 - `quero algo moderno`
 - `quero algo clean/premium`
+
+Esses atalhos continuam uteis, mas agora devem ser aplicados junto com o contexto:
+
+- tipo do evento
+- branding herdado
+- comportamento desejado
 
 ---
 
@@ -1253,8 +1414,9 @@ Entrada da IA:
 - draft atual da galeria
 - branding efetivo do evento
 - tipo do evento
+- `event_type_family`, `style_skin` e `behavior_profile` atuais
 - persona principal
-- presets disponiveis
+- modelos disponiveis
 - blocos permitidos
 - layouts permitidos
 - regras de guardrail
@@ -1404,10 +1566,13 @@ O builder deve ser:
 
 Fluxo recomendado:
 
-1. escolher o estilo
-2. ajustar cores e capa
-3. revisar blocos principais
-4. publicar
+1. escolher o tipo do evento
+2. escolher a vibe
+3. aplicar `Comecar com base do evento`
+4. ajustar capa/logo
+5. revisar cores sugeridas
+6. revisar o preview mobile
+7. publicar
 
 ### Modo profissional
 
@@ -1432,11 +1597,14 @@ Topo:
 
 Esquerda:
 
+- wizard rapido
+- tipo do evento
 - presets prontos
 - vibe
 - paleta sugerida
 - capa
 - logo
+- `Comecar com base do evento`
 - botao "ajudar com IA"
 
 Centro:
@@ -1469,22 +1637,80 @@ Direita:
 - restore previous version;
 - diff visivel antes de publicar.
 
+Leitura pratica:
+
+- o modo rapido precisa nascer como wizard guiado, nao so como inspector reduzido;
+- isso reduz escolha vazia e melhora onboarding para noiva, cerimonialista e operador leigo.
+
 ---
 
 ## Performance e video
 
-## 1. Estrategia de layout
+## 1. Mobile-first como contrato de produto
+
+A V1 deve nascer com budget explicito de Web Vitals, nao apenas com "boas intencoes" de performance.
+
+Metas recomendadas:
+
+- `LCP <= 2.5s`
+- `INP <= 200ms`
+- `CLS <= 0.1`
+
+Regra de medicao:
+
+- percentil `75`;
+- segmentacao por mobile e desktop;
+- leitura em RUM/analytics real quando houver trafego suficiente;
+- budgets sinteticos em ambiente controlado para evitar regressao durante desenvolvimento.
+
+Leitura pratica:
+
+- esse contrato precisa entrar antes do hardening final;
+- ele afeta hero, lazy loading, chunking, tamanho de midia e decisao de separar boot da experiencia do feed longo.
+
+## 2. Estrategia de layout
 
 Pelas docs oficiais do `react-photo-album`, a decisao de layout nao deve tratar `rows`, `columns` e `masonry` como equivalentes.
 
 Recomendacao:
 
 - priorizar `masonry` e `rows` para galerias publicas longas;
-- deixar `columns` para experiencias menores ou mais editoriais;
+- deixar `columns` para experiencias menores, landing curta ou bloco editorial;
 - usar `breakpoints` desde o inicio para reduzir recalculo continuo de layout;
 - usar `render` overrides quando precisar badge, CTA ou overlay por item.
 
-## 2. Estrategia de carregamento
+Regra de produto por familia:
+
+- `wedding` e `quince`: `masonry` ou `rows` por padrao;
+- `corporate`: `rows` por padrao;
+- `columns`: fora do centro da V1 longa.
+
+## 3. Contrato de imagem responsiva
+
+Hoje o repo ja entrega:
+
+- `thumbnail_url`
+- `preview_url`
+- `original_url`
+- `width`
+- `height`
+
+Mas isso ainda nao e o mesmo que um contrato mobile-first de midia responsiva.
+
+Recomendacao:
+
+- adicionar `responsive_sources` por item;
+- expor `srcset` e `sizes`;
+- expor variantes por largura e mime;
+- manter dimensoes explicitas para layout, lightbox e skeleton previsivel.
+
+Leitura pratica:
+
+- `ModerationMediaSurface` ja prova precedente local para `sizes`;
+- `PublicGalleryPage` ainda nao usa isso;
+- `PhotoSwipe` se beneficia diretamente de item com `src`, `width`, `height` e `srcset`.
+
+## 4. Estrategia de carregamento por prioridade visual
 
 Migrar de CSS columns simples para renderer dedicado traz ganhos de:
 
@@ -1495,17 +1721,20 @@ Migrar de CSS columns simples para renderer dedicado traz ganhos de:
 
 Recomendacao pratica:
 
-- imagem fora da primeira dobra com `loading="lazy"`;
-- hero e LCP com carga normal, nao lazy;
+- hero: `eager`;
+- primeira faixa de cards: `eager`;
+- resto do feed: `loading="lazy"`;
+- banners abaixo da dobra: lazy;
+- video no grid: somente poster inicialmente;
 - `content-visibility: auto` em blocos longos quando fizer sentido;
 - chunking por secoes, nao so por pagina.
 
 Observacao:
 
-- o ponto de `hero`/LCP nao lazy e uma inferencia pragmatica a partir da documentacao do atributo `loading`, que existe para recursos fora da area critica;
+- a doc de `HTMLImageElement.loading` e a doc de lazy loading deixam claro que lazy loading existe para recursos fora da area critica e para encurtar o critical rendering path;
 - `content-visibility` ajuda, mas perde parte do ganho se o codigo ficar lendo layout/DOM de subarvores ocultas.
 
-## 3. Foto e video nao sao o mesmo problema
+## 5. Foto e video nao sao o mesmo problema
 
 O backend ja esta pronto para muito mais do que a UI atual mostra.
 
@@ -1515,14 +1744,19 @@ As docs oficiais do `PhotoSwipe` confirmam que:
 - imagens responsivas sao recomendadas;
 - custom content existe, mas a ferramenta continua sendo mais orientada a foto do que a video/iframe.
 
-Entao a recomendacao correta e:
+Entao a recomendacao correta e formalizar modos de video no dominio:
 
-- foto: `thumbnail -> lightbox`;
-- video: `poster forte + badge + CTA claro`;
-- video abre em modal/player dedicado;
-- nao forcar video dentro do mesmo fluxo de lightbox de foto.
+- `poster_only`
+- `poster_to_modal`
+- `inline_preview`
 
-## 4. Escala
+Regra recomendada:
+
+- mobile default: `poster_to_modal`;
+- `PhotoSwipe` fica exclusivo para foto;
+- video abre em modal/player dedicado e nao disputa o mesmo contrato de lightbox.
+
+## 6. Escala e virtualizacao
 
 Para eventos pequenos e medios:
 
@@ -1538,6 +1772,12 @@ Precedente local relevante:
 
 - `MediaVirtualFeed.tsx` ja prova `ResizeObserver`, overscan, padding virtual e feed grande com custo controlado.
 
+Gatilho explicito recomendado:
+
+- se o evento ultrapassar o threshold operacional definido em `Sprint 0` para quantidade de itens, altura renderizada estimada ou custo de DOM por chunk, ativar uma variante otimizada de renderizacao;
+- `IntersectionObserver` continua como base nativa para lazy loading e infinite scroll;
+- `TanStack Virtual` entra quando o custo de DOM e scroll deixar de caber no renderer normal.
+
 ---
 
 ## Roadmap recomendado
@@ -1548,7 +1788,9 @@ Objetivo:
 
 - sair de CSS columns simples;
 - suportar video melhor;
-- preparar payload publico para branding/experience.
+- preparar payload publico para branding/experience;
+- colocar mobile-first e budget de Web Vitals como contrato desde o inicio;
+- desenhar cedo a separacao entre `boot da experience` e `feed de midia`.
 
 Entrega:
 
@@ -1556,8 +1798,10 @@ Entrega:
 - `PhotoSwipe` para foto
 - modal/player dedicado para video
 - payload publico estendido
+- contrato de `responsive_sources`
 - hero simples por evento
-- lazy loading correto
+- hero e primeira faixa como prioridade visual
+- lazy loading correto para o restante
 - contrast guard
 - preparacao de preview mobile/desktop
 
@@ -1575,13 +1819,15 @@ Objetivo:
 Entrega:
 
 - modo rapido e modo profissional
+- modo rapido em formato de wizard
+- matriz de modelos por `event_type_family`, `style_skin` e `behavior_profile`
 - `draft_version` / `published_version`
 - autosave
 - preview link compartilhavel
 - restore previous version
 - presets por organizacao
 - temas e tokens
-- blocos oficiais
+- blocos oficiais e variantes orientadas a casamento, 15 anos e corporativo
 - inspector contextual
 - public gallery configuravel
 
@@ -1615,7 +1861,8 @@ Entrega possivel:
 
 Condicao:
 
-- so faz sentido depois que schema, blocos e guardrails estiverem muito claros.
+- so faz sentido depois que schema, blocos e guardrails estiverem muito claros;
+- e so se houver demanda real por nesting/authoring mais livre que nao caiba no builder atual.
 
 ---
 
@@ -1647,8 +1894,10 @@ Motivo:
 - feature test para `POST /events/{event}/gallery/revisions/{revision}/restore`
 - feature test para `GET/POST /gallery/presets`
 - feature test para payload publico com `experience`
+- feature test para contrato de `responsive_sources`
 - feature test para preview compartilhavel
 - unit test do `GalleryBuilderPresetRegistry`
+- unit test da matriz `event_type_family` + `style_skin` + `behavior_profile`
 - unit test da normalizacao de `theme_tokens`
 - unit test da validacao de contraste e motion tokens
 - unit test da validacao do schema gerado por IA
@@ -1661,12 +1910,15 @@ Motivo:
 - `GalleryRenderer.test.tsx`
 - `PublicGalleryPage.test.tsx` cobrindo presets e video
 - `GalleryAiVariationsPanel.test.tsx`
+- testes do wizard de modo rapido
 - testes de modo rapido/profissional
 - testes de inspector contextual
 - testes de restore/autosave/publish status
 - testes de photo lightbox e video modal
+- testes de `responsive_sources`, `srcset` e `sizes`
 - testes de contraste/reduced motion na preview
 - testes de preview mobile/desktop
+- testes de contratos de budget mobile e prioridade visual
 
 ---
 
@@ -1680,9 +1932,11 @@ Motivo:
 - [ ] estender payload publico da galeria
 - [ ] trocar renderer publico para layout dedicado
 - [ ] suportar video de forma visivel no frontend publico
+- [ ] criar contrato de `responsive_sources`, `srcset` e `sizes`
 - [ ] separar o contrato em `theme_tokens`, `page_schema` e `media_behavior`
+- [ ] transformar presets em matriz `event_type_family` + `style_skin` + `behavior_profile`
 - [ ] criar editor administrativo da galeria
-- [ ] criar modo rapido e modo profissional
+- [ ] criar modo rapido como wizard e modo profissional como inspector completo
 - [ ] criar autosave
 - [ ] criar `draft_version` e `published_version`
 - [ ] criar preview link compartilhavel
@@ -1692,6 +1946,8 @@ Motivo:
 - [ ] desenhar schema JSON guardrailed para IA
 - [ ] fazer IA responder com variacoes aplicaveis e diff parcial
 - [ ] validar contraste minimo e reduced motion
+- [ ] explicitar budgets mobile de Web Vitals desde o inicio do rollout
+- [ ] definir gatilho explicito para renderer otimizado/virtualizacao
 - [ ] copiar padrao de prompt/schema/historico de `MediaIntelligence`
 - [ ] adicionar testes backend
 - [ ] adicionar testes frontend
@@ -1772,8 +2028,13 @@ Leitura pratica:
 
 - WCAG contrast minimum: https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum
 - WCAG non-text contrast: https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html
+- web.dev LCP: https://web.dev/articles/lcp
+- web.dev INP: https://web.dev/articles/inp
+- web.dev CLS: https://web.dev/articles/cls
+- MDN responsive images: https://developer.mozilla.org/en-US/docs/Web/HTML/Guides/Responsive_images
 - MDN prefers-reduced-motion: https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion
 - MDN content-visibility: https://developer.mozilla.org/en-US/docs/Web/CSS/content-visibility
+- MDN Intersection Observer API: https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API
 - MDN lazy loading: https://developer.mozilla.org/en-US/docs/Web/Performance/Lazy_loading
 - MDN HTMLImageElement.loading: https://developer.mozilla.org/en-US/docs/Web/API/HTMLImageElement/loading
 
@@ -1781,7 +2042,9 @@ Leitura pratica:
 
 - contraste minimo nao deve ser opcional no builder;
 - reduced motion precisa virar token/comportamento suportado pelo renderer;
-- lazy loading e `content-visibility` ajudam, mas precisam entrar com criterio de UX e nao so como "otimizacao generica".
+- `LCP <= 2.5s`, `INP <= 200ms` e `CLS <= 0.1` no p75 segmentado por mobile/desktop sao budgets corretos para a V1 mobile-first;
+- `srcset` e `sizes` devem virar contrato de API, nao detalhe opcional do frontend;
+- lazy loading, `IntersectionObserver` e `content-visibility` ajudam, mas precisam entrar com criterio de UX e nao so como "otimizacao generica".
 
 ---
 
@@ -1803,11 +2066,12 @@ Nao.
 
 1. ampliar `Gallery` seguindo o padrao do `Hub` em registry, defaults, validacao e preview;
 2. separar a configuracao em `theme_tokens`, `page_schema` e `media_behavior`;
-3. endurecer o renderer publico primeiro, com foto e video tratados de forma diferente;
-4. colocar draft/publish, autosave, preview compartilhavel e restore como partes obrigatorias do produto;
-5. introduzir IA como engine de propostas e diff aplicavel, nao como gerador livre de pagina;
-6. avaliar `Puck` apenas quando o schema e o produto estiverem maduros.
+3. transformar a entrada do produto em uma matriz de modelos por tipo de evento, estilo e comportamento;
+4. endurecer o renderer publico primeiro, com foto e video tratados de forma diferente e contrato de imagem responsiva;
+5. colocar draft/publish, autosave, preview compartilhavel e restore como partes obrigatorias do produto;
+6. introduzir IA como engine de propostas e diff aplicavel, nao como gerador livre de pagina;
+7. avaliar `Puck` apenas quando o schema e o produto estiverem maduros e houver demanda real por authoring mais livre.
 
 Em resumo:
 
-**o problema principal hoje nao e falta de editor externo; e falta de transformar a galeria atual de feed paginado em experiencia configuravel, segura e versionada de dominio. O produto precisa vender resultado bonito, rapido e seguro, nao liberdade total.**
+**a V1 nao deve ser tratada como page builder generico de galeria. Ela deve ser um sistema de modelos de galeria por tipo de evento, mobile-first, rapido, seguro, versionado e altamente customizavel dentro de guardrails.**

@@ -31,7 +31,7 @@ class RolesAndPermissionsSeeder extends Seeder
             // Media
             'media.view', 'media.moderate', 'media.reprocess', 'media.delete',
             // Gallery
-            'gallery.view', 'gallery.manage',
+            'gallery.view', 'gallery.manage', 'gallery.builder.manage',
             // Wall
             'wall.view', 'wall.manage',
             // Play
@@ -84,7 +84,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'events.activate', 'events.manage_branding', 'events.manage_team',
             'channels.view', 'channels.manage',
             'media.view', 'media.moderate', 'media.reprocess', 'media.delete',
-            'gallery.view', 'gallery.manage',
+            'gallery.view', 'gallery.manage', 'gallery.builder.manage',
             'wall.view', 'wall.manage',
             'play.view', 'play.manage',
             'hub.view', 'hub.manage',
@@ -107,7 +107,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'events.manage_branding', 'events.manage_team',
             'channels.view', 'channels.manage',
             'media.view', 'media.moderate', 'media.reprocess',
-            'gallery.view', 'gallery.manage',
+            'gallery.view', 'gallery.manage', 'gallery.builder.manage',
             'wall.view', 'wall.manage',
             'play.view', 'play.manage',
             'hub.view', 'hub.manage',
@@ -123,7 +123,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'events.view', 'events.update',
             'channels.view',
             'media.view', 'media.moderate', 'media.reprocess',
-            'gallery.view', 'gallery.manage',
+            'gallery.view', 'gallery.manage', 'gallery.builder.manage',
             'wall.view', 'wall.manage',
             'play.view', 'play.manage',
             'hub.view',

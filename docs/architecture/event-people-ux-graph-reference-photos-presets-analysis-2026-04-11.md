@@ -56,14 +56,19 @@ Se o produto tentar transformar o grafo em tela principal cedo demais, ele piora
 
 Validacao local do codigo:
 
-- a pagina `apps/web/src/modules/event-people/EventPeoplePage.tsx` so exibe `selectedPerson.representative_faces`;
+- a pagina `apps/web/src/modules/event-people/EventPeoplePage.tsx` agora separa:
+  - `avatar`;
+  - `foto principal`;
+  - `reference_photos`;
+  - `representative_faces`;
 - `apps/web/src/modules/event-people/api.ts` nao tem endpoint de upload ou selecao manual de foto de referencia;
 - `StoreEventPersonRequest` e `UpdateEventPersonRequest` nao aceitam `avatar_media_id` nem `avatar_face_id`.
 
 Na pratica:
 
 - hoje nao existe upload manual de foto de referencia em `events/{id}/people`;
-- o card atual mostra so referencias derivadas das faces ja confirmadas no acervo;
+- a pagina deixou de misturar referencia humana com referencia tecnica;
+- o card humano agora usa `reference_photos` e o tecnico usa `representative_faces`;
 - o avatar tambem nao tem seletor manual na pagina, apesar do dominio ja ter `avatar_media_id` e `avatar_face_id`.
 
 ### 4. `Sugestoes prontas` precisam deixar de ser uma lista rasa e virar `modelo do tipo de evento`
@@ -93,10 +98,13 @@ Conclusao:
 Validacao direta em `apps/web/src/modules/event-people/EventPeoplePage.tsx`:
 
 - existe lista de pessoas a esquerda;
+- existe cockpit com status persistentes;
 - existe formulario central de cadastro e relacoes;
-- existe card `Sugestoes prontas`;
+- existe card `Modelo do evento`;
 - existe card `Fotos de referencia`;
-- o card `Fotos de referencia` e somente leitura;
+- existe card `Referencias tecnicas`;
+- existe separacao visual de `avatar` e `foto principal`;
+- os cards de referencia continuam somente leitura;
 - nao existe CTA para `Escolher da galeria`;
 - nao existe CTA para `Enviar foto de referencia`;
 - nao existe CTA para `Definir foto principal`.
@@ -108,6 +116,10 @@ Validacao direta em `apps/api/app/Modules/EventPeople`:
 - `avatar_media_id` e `avatar_face_id` existem no modelo `EventPerson`;
 - `ConfirmEventPersonFaceAction` ja define avatar automaticamente na primeira confirmacao util;
 - `MergeEventPeopleAction` reaproveita avatar da pessoa origem quando faz sentido;
+- existe `event_person_reference_photos` como camada humana separada;
+- existe `EventPeopleStateMachine` para transicoes explicitas;
+- existem `ListEventPeopleQuery` e `ListEventPeopleReviewQueueQuery` para leituras quentes;
+- existe endpoint `GET /events/{event}/people/operational-status` para o cockpit;
 - requests de store/update ainda nao expoem alteracao manual de avatar;
 - nao existe recurso dedicado para `reference photos` manuais.
 
@@ -124,6 +136,8 @@ Resultado:
 
 - `3 files passed`
 - `6 tests passed`
+- `39 tests passed` no backend do modulo
+- `type-check` verde no frontend
 
 Leitura pratica:
 
@@ -1166,6 +1180,14 @@ Mesmo que `groups` e `coverage_targets` ainda nao sejam usados na UI, eles ja de
 - validar `EXPLAIN` das queries criticas;
 - reforcar status visiveis no cockpit da pagina de pessoas.
 
+### Execucao desta rodada
+
+- [x] maquina de estados
+- [x] protocolo de cache otimista
+- [x] query objects + `EXPLAIN`
+- [x] cockpit com status persistentes
+- [x] separacao de imagens da pessoa
+
 Saida minima esperada em `P0`:
 
 - busca estavel;
@@ -1181,6 +1203,14 @@ Saida minima esperada em `P0`:
 - criar `event_person_reference_photos`;
 - permitir `Escolher da galeria`;
 - permitir `Enviar foto de referencia` com validacao de pessoa dominante.
+
+### Execucao desta rodada
+
+- [x] separar `avatar`, `foto principal`, `foto de referencia` e `representative face`
+- [x] criar `event_person_reference_photos`
+- [x] permitir `Escolher da galeria`
+- [x] permitir `Enviar foto de referencia` com validacao de pessoa dominante
+- [x] permitir `Definir foto principal` por acao humana
 
 ## P2 - Modelo do evento
 

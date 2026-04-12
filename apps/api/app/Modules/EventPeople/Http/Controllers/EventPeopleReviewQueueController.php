@@ -16,6 +16,7 @@ use App\Modules\EventPeople\Http\Resources\EventPersonResource;
 use App\Modules\EventPeople\Http\Resources\EventPersonReviewQueueResource;
 use App\Modules\EventPeople\Models\EventPerson;
 use App\Modules\EventPeople\Models\EventPersonReviewQueueItem;
+use App\Modules\EventPeople\Queries\ListEventPeopleReviewQueueQuery;
 use App\Modules\Events\Models\Event;
 use App\Shared\Http\BaseController;
 use App\Shared\Support\EventAccessService;
@@ -29,6 +30,7 @@ class EventPeopleReviewQueueController extends BaseController
         Event $event,
         EventAccessService $eventAccess,
         ProjectEventPeopleReviewQueueAction $projectReviewQueue,
+        ListEventPeopleReviewQueueQuery $query,
     ): JsonResponse {
         abort_unless($eventAccess->can($request->user(), $event, 'media.moderate'), 403);
 
@@ -37,22 +39,7 @@ class EventPeopleReviewQueueController extends BaseController
         $filters = $request->validated();
         $perPage = (int) ($filters['per_page'] ?? 36);
 
-        $query = EventPersonReviewQueueItem::query()
-            ->where('event_id', $event->id)
-            ->with(['person', 'face'])
-            ->orderByDesc('priority')
-            ->orderByDesc('last_signal_at')
-            ->orderBy('id');
-
-        if (! empty($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        if (! empty($filters['type'])) {
-            $query->where('type', $filters['type']);
-        }
-
-        return $this->paginated(EventPersonReviewQueueResource::collection($query->paginate($perPage)));
+        return $this->paginated(EventPersonReviewQueueResource::collection($query->paginate($event, $filters, $perPage)));
     }
 
     public function confirm(

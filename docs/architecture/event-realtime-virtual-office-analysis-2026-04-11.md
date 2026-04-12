@@ -539,6 +539,12 @@ Regra de fila:
 - `ShouldBroadcast` por padrao;
 - `ShouldBroadcastNow` apenas para sinais muito criticos, como `wall player offline`, `provider travado` ou alerta operacional severo.
 
+Cadencia recomendada de broadcast:
+
+- `critico imediato`: incidentes que precisam aparecer quase no instante em que a persistencia confirma o fato;
+- `operacional normal`: diffs de estado, counters e health que podem seguir a fila padrao;
+- `timeline coalescivel`: sinais de baixo valor que podem ser agregados por janela curta antes de virar append visual.
+
 Regra de presenca:
 
 - se quisermos awareness de quem esta olhando a sala, o canal de presence deve ficar separado do canal operacional;
@@ -861,6 +867,12 @@ Regra de UX:
 - detalhe sob demanda;
 - animacao como explicacao, nao como espetaculo.
 
+Regra de layout obrigatoria:
+
+- leitura macro precisa ocupar a leitura principal da tela e continuar visivel mesmo de longe;
+- leitura meso precisa promover uma unica estacao dominante quando houver gargalo claro;
+- leitura micro deve ficar concentrada no rail e no detalhe lateral, nunca competindo com a leitura global.
+
 ### Regra narrativa
 
 O estado real deve alimentar uma coreografia deterministica, nao uma simulacao literal.
@@ -875,6 +887,25 @@ Exemplos:
 
 O objetivo nao e "ver cada foto andando". O objetivo e sentir que a operacao esta viva sem perder legibilidade.
 
+### Papeis de trabalho
+
+Para a sala realmente parecer uma equipe operando o evento, a cenografia nao deve nascer apenas de estacoes.
+
+Ela precisa nascer de poucos papeis de trabalho, semanticamente claros:
+
+- `coordinator`: percorre a sala, sintetiza atencao e reforca saude global ou risco;
+- `dispatcher`: recebe entrada e encaminha atividade da recepcao para as proximas areas;
+- `runner`: leva cards simbolicos entre areas e reforca mudanca de fase;
+- `reviewer`: fica mais associado a revisao humana e backlog pendente;
+- `operator`: reage ao health do wall e ao `current/next`;
+- `triage`: expressa safety e IA como trabalho de avaliacao, nao apenas como maquina piscando.
+
+Regra de produto:
+
+- a V1 nao deve parecer "pipeline com sprites";
+- ela deve parecer "equipe trabalhando" com poucos arquetipos reutilizaveis;
+- esses papeis existem para orientar leitura, nao para simular recursos humanos literais.
+
 ### Camada de direcao cenica
 
 `event-translator.ts` nao deve ser tratado apenas como tradutor tecnico.
@@ -885,6 +916,23 @@ Ele e a camada de direcao cenica da sala:
 - decide o que merece virar gesto visual;
 - sintetiza muitos eventos em poucos sinais legiveis;
 - protege a cena contra ruido e excesso de microanimacao.
+
+### Orquestracao de atencao
+
+A camada de direcao cenica deve responder continuamente a uma pergunta:
+
+- qual e a coisa mais importante para olhar agora?
+
+Ordem recomendada de prioridade:
+
+- falha operacional urgente;
+- gargalo dominante;
+- progresso visivel que ajuda a explicar fluxo;
+- atividade decorativa e respiracao da cena.
+
+Isso significa que nem todo evento merece o mesmo peso visual.
+
+Quando a sala estiver carregada, o correto e reduzir decoracao antes de reduzir legibilidade.
 
 ### Backpressure visual
 
@@ -897,6 +945,34 @@ Regras:
 - quando o throughput subir, degradar para heat, glow, fila sintetica e contadores;
 - limitar efeitos concorrentes por estacao e por layer;
 - a camada de direcao cenica deve coalescer micro-bursts antes de pedir trabalho novo para o renderer.
+
+### Orcamento perceptivo
+
+Nao basta ter apenas frame budget tecnico. A sala precisa nascer com budget perceptivo.
+
+Regras:
+
+- limitar quantos agentes podem se mover ao mesmo tempo;
+- limitar quantos baloes podem aparecer de forma concorrente;
+- limitar quantos alertas visuais cabem sem esconder o gargalo principal;
+- limitar quantas thumbs recentes a galeria mostra antes de resumir;
+- promover uma unica estacao dominante quando houver disputa de atencao.
+
+O problema da V1 nao sera apenas CPU. Tambem sera ruido.
+
+### Calma operacional
+
+A sala tambem precisa ter um estado intencional de calma.
+
+Quando o evento estiver saudavel e com pouco volume, a tela nao deve parecer quebrada nem vazia.
+
+Regras:
+
+- poucos movimentos;
+- luzes suaves;
+- timeline mais silenciosa;
+- pequenos sinais de "tudo sob controle";
+- nenhum pulso agressivo so para fingir atividade.
 
 ### Legivel sob estresse
 
@@ -928,6 +1004,16 @@ Mapa de gestos recomendado:
 - `Telao`: monitor central com `current/next`;
 - `Feedback`: mensagens e reacoes saindo da estacao;
 - `Alertas`: sirene discreta, nunca permanente.
+
+Versao reduced-motion recomendada por gesto:
+
+- `Recepcao`: menos deslocamento e mais contagem/pulso discreto;
+- `Download / Arquivo`: menos esteira e mais indicador de entrada/saida;
+- `Laboratorio / Variantes`: menos nascimento de thumbs e mais troca de estado;
+- `Safety AI`: menos varredura e mais mudanca de cor/severidade;
+- `Moderacao Humana`: menos movimento de cards e mais pilha/contador;
+- `Galeria`: menos brilho e mais moldura de recentes;
+- `Telao`: menos glow e mais selo claro de `current/next/health`.
 
 ### Recepcao
 
@@ -1083,6 +1169,12 @@ HUD minimo recomendado:
 - rodape: rail vivo com densidade controlada;
 - detalhe lateral so quando o operador seleciona uma estacao ou item.
 
+Regra dura:
+
+- o HUD deve mostrar apenas o que ajuda decisao imediata;
+- qualquer metrica secundaria vai para detalhe lateral ou history;
+- se o HUD virar dashboard, a cena perde funcao.
+
 O estado default deve ser:
 
 - sem sidebar fixa;
@@ -1100,6 +1192,7 @@ Mesmo sendo uma tela live, a control room deve nascer com duas camadas acessivei
 
 - uma regiao `status` para atualizacoes nao criticas;
 - uma regiao `alert` apenas para problemas realmente urgentes;
+- uma timeline live com `role="log"`, nome acessivel claro e append apenas no fim do rail;
 - labels claros para fullscreen, filtros, detalhe lateral e mudancas de modo.
 
 ---
@@ -1249,6 +1342,19 @@ Recomendacao de UX:
 
 Esses comportamentos ja foram validados como padrao aceitavel no wall player.
 
+### Entrada em cena do fullscreen
+
+Fullscreen nao deve ser tratado como detalhe tecnico. Ele precisa ter UX explicita.
+
+Fluxo recomendado:
+
+- botao visivel `Entrar em modo sala`;
+- mini overlay inicial com `3` dicas curtas;
+- indicacao clara de como sair com `Esc`;
+- fallback elegante quando `requestFullscreen()` for negado ou encerrado pelo navegador.
+
+O objetivo e evitar que uma falha normal do browser pareca bug do produto.
+
 ### Lifecycle operacional da tela
 
 Essa pagina precisa tratar o lifecycle real do navegador como requisito de produto, nao como detalhe de implementacao.
@@ -1262,6 +1368,15 @@ Regras:
 - se wake lock estiver habilitado, reacquirir quando a pagina voltar a ficar ativa e visivel;
 - o loop da cena deve assumir que `requestAnimationFrame()` pode ser pausado ou degradado em abas ocultas;
 - se `prefers-reduced-motion` estiver ativo, a sala deve reduzir movimento nao essencial sem esconder sinais operacionais.
+
+Estados de UX obrigatorios:
+
+- `Reconectando...`;
+- `Sincronizando a sala...`;
+- `Sala degradada: dados ao vivo indisponiveis`;
+- `Resync concluido`.
+
+Reconnect e resync nao sao apenas infraestrutura. Eles precisam ser experiencia legivel.
 
 ---
 
@@ -1416,6 +1531,14 @@ Se o realtime cair:
 - timeline continua atualizando por cursor manual;
 - HUD mostra modo degradado.
 
+Comportamento visual recomendado no degradado:
+
+- menos movimento;
+- mais indicadores estaticos;
+- menos efeitos;
+- mais foco em saude global, alertas e wall health;
+- mensagem clara de que a sala perdeu live sem parecer travada.
+
 Esse padrao ja existe hoje em `Wall`.
 
 ---
@@ -1487,6 +1610,7 @@ Conclusao pratica:
 
 Referencia oficial:
 
+- [Laravel 12.x - Events](https://laravel.com/docs/12.x/events)
 - [Laravel 12.x - Broadcasting](https://laravel.com/docs/12.x/broadcasting)
 - [Laravel 12.x - Queues](https://laravel.com/docs/12.x/queues)
 
@@ -1498,6 +1622,7 @@ Implicacao para a arquitetura:
 - `ShouldBroadcast` entra em fila por padrao;
 - `ShouldBroadcastNow` deve ficar reservado para casos realmente criticos;
 - eventos disparados dentro de transacoes podem sair antes do commit, e a doc recomenda `ShouldDispatchAfterCommit` quando o broadcast depende do estado persistido;
+- `ShouldDispatchAfterCommit` so despacha depois do commit e evita que um evento va para a UI se a transacao falhar;
 - a documentacao de filas tambem cobre `after_commit=true` na conexao como regra sistemica para jobs, listeners e broadcasts dependentes de transacao;
 - presence channels suportam awareness de usuarios conectados com callbacks como `here`, `joining` e `leaving`.
 
@@ -1520,6 +1645,7 @@ Referencias oficiais:
 - [MDN - Element.requestFullscreen()](https://developer.mozilla.org/en-US/docs/Web/API/Element/requestFullscreen)
 - [MDN - Document fullscreenchange event](https://developer.mozilla.org/en-US/docs/Web/API/Document/fullscreenchange_event)
 - [MDN - Screen Wake Lock API](https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API)
+- [MDN - ARIA log role](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/log_role)
 - [MDN - ARIA status role](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Roles/status_role)
 - [MDN - ARIA alert role](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/alert_role)
 - [Laravel Reverb - Scaling](https://laravel.com/docs/13.x/reverb#scaling)
@@ -1538,7 +1664,9 @@ Implicacao para a arquitetura:
 - `createImageBitmap()` e bom caminho para preparar sprites;
 - `OffscreenCanvas` desacopla do DOM e pode ir para worker, mas isso deve entrar apenas se profiling pedir;
 - `requestAnimationFrame()` segue sendo o loop certo e pode ser pausado em abas ocultas na maioria dos navegadores.
+- `requestFullscreen()` e assincrono, exige ativacao do usuario e pode falhar, o que confirma fullscreen como acao explicita da UI com fallback honesto;
 - fullscreen e wake lock precisam respeitar o lifecycle real do documento;
+- `log` e o papel ARIA mais adequado para um rail live append-only em que novas entradas chegam no fim com ordem significativa;
 - `status` e `alert` ajudam a tornar a camada live acessivel sem transformar toda atualizacao em ruido;
 - Reverb ja documenta escala horizontal com Redis Pub/Sub, o que sustenta a trilha de crescimento proposta.
 
@@ -1597,7 +1725,7 @@ Entrega:
 - sem replay real;
 - com wall snapshot, moderation backlog e pipeline metrics.
 
-Critero de aceite:
+Criterio de aceite:
 
 - uma pessoa precisa entender em ate `5s` se a operacao esta saudavel, em atencao ou em risco.
 
@@ -1615,7 +1743,7 @@ Objetivo:
 - normalizar timeline e snapshot;
 - separar `roomStore` de `sceneRuntime`;
 - travar contrato de delta antes do polimento visual;
-- consolidar gestos visuais inequívocos por estacao.
+- consolidar gestos visuais inequivocos por estacao.
 
 Entrega:
 
@@ -1624,9 +1752,9 @@ Entrega:
 - animacoes guiadas por evento real, mas coreografadas;
 - historico util para "o que aconteceu".
 
-Critero de aceite:
+Criterio de aceite:
 
-- cada estacao precisa ter um gesto visual inequívoco;
+- cada estacao precisa ter um gesto visual inequivoco;
 - a cena precisa continuar legivel mesmo durante burst alto.
 
 Essa e a fase que transforma a ideia em produto forte.
@@ -1715,6 +1843,46 @@ Leitura pratica:
 - a entrega nao depende de trocar framework ou de introduzir engine externa;
 - a base atual ja possui referencia concreta para `visibilitychange`, wake lock, reduced motion e budget/performance mode no wall player.
 
+Validacao estrutural adicional no codigo:
+
+- `WallPlayerPage` ja pede fullscreen sob clique e reacquire wake lock em `visibilitychange`;
+- `usePerformanceMode` ja observa `prefers-reduced-motion` e hardware mais fraco;
+- `WallPlayerRoot.test.tsx` valida que o player reduz motion quando entra em modo de performance;
+- `useWallRealtimeSync.test.tsx` e `useWallPollingFallback.test.tsx` sustentam a estrategia de live + fallback que inspirou esta arquitetura.
+
+### Revalidacao adicional em `2026-04-12`
+
+Backend:
+
+```bash
+cd apps/api
+php artisan test tests/Feature/Wall/WallDiagnosticsTest.php tests/Feature/Wall/WallLiveSnapshotTest.php tests/Feature/MediaProcessing/MediaPipelineMetricsTest.php tests/Feature/ContentModeration/ContentModerationPipelineTest.php tests/Feature/Events/EventJourneyControllerTest.php
+```
+
+Resultado:
+
+- `32` testes passaram;
+- `334` assertions passaram;
+- wall diagnostics, live snapshot, metricas de pipeline, safety pipeline e journey builder seguiram verdes.
+
+Frontend:
+
+```bash
+cd apps/web
+npm run test -- src/lib/realtime.test.ts src/modules/wall/hooks/useWallRealtimeSync.test.tsx src/modules/wall/hooks/useWallPollingFallback.test.tsx src/modules/wall/player/runtime-profile.test.ts src/modules/wall/player/hooks/usePerformanceMode.test.ts src/modules/wall/player/components/WallPlayerRoot.test.tsx
+```
+
+Resultado:
+
+- `6` arquivos passaram;
+- `18` testes passaram;
+- realtime base, fallback, runtime profile, reduced motion e comportamento do wall player seguiram verdes.
+
+Leitura pratica:
+
+- a stack atual continua sustentando lifecycle, degraded mode, wake lock e reduced motion;
+- a nova control room pode e deve reaproveitar esses padroes em vez de inventar um runtime paralelo.
+
 ---
 
 ## Veredito Final
@@ -1748,3 +1916,15 @@ Usar apenas como referencia conceitual de zonas e espaco vivo.
 5. so depois investir pesado em assets, replay e cenografia.
 
 Essa ordem entrega valor rapido sem comprometer a arquitetura.
+
+### Como executar sem perder controle
+
+A execucao detalhada deve seguir o backlog por PR do plano complementar:
+
+- `docs/architecture/event-realtime-virtual-office-execution-plan-2026-04-11.md`
+
+Regra pratica:
+
+- nenhum PR deve misturar contrato, projection, realtime e polimento visual;
+- cada PR precisa nascer com testes red, fechar com green e declarar o slice backend/frontend;
+- o `event-translator` so deve receber polimento visual depois de contrato, sequencia, resync e after-commit estarem testados.

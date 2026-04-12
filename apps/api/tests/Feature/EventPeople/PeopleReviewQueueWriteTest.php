@@ -78,6 +78,14 @@ it('confirms a review item into an existing person and resolves the queue locall
         'status' => EventPersonReviewQueueStatus::Resolved->value,
         'event_person_id' => $person->id,
     ]);
+
+    $this->assertDatabaseHas('event_person_reference_photos', [
+        'event_id' => $event->id,
+        'event_person_id' => $person->id,
+        'event_media_face_id' => $face->id,
+        'purpose' => 'both',
+        'status' => 'active',
+    ]);
 });
 
 it('creates a new person inline when confirming a face', function () {
@@ -238,6 +246,12 @@ it('splits a confirmed face back into pending review', function () {
         'event_media_face_id' => $face->id,
         'event_person_id' => $person->id,
         'status' => EventPersonAssignmentStatus::Rejected->value,
+    ]);
+
+    $this->assertDatabaseHas('event_person_reference_photos', [
+        'event_person_id' => $person->id,
+        'event_media_face_id' => $face->id,
+        'status' => 'archived',
     ]);
 });
 

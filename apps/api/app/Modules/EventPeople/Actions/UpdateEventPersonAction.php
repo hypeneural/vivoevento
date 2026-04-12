@@ -6,10 +6,15 @@ use App\Modules\EventPeople\Enums\EventPersonSide;
 use App\Modules\EventPeople\Enums\EventPersonStatus;
 use App\Modules\EventPeople\Enums\EventPersonType;
 use App\Modules\EventPeople\Models\EventPerson;
+use App\Modules\EventPeople\Support\EventPeopleStateMachine;
 use App\Modules\Users\Models\User;
 
 class UpdateEventPersonAction
 {
+    public function __construct(
+        private readonly EventPeopleStateMachine $stateMachine,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $payload
      */
@@ -37,13 +42,21 @@ class UpdateEventPersonAction
             $updates['notes'] = $payload['notes'];
         }
 
-        if (array_key_exists('status', $payload)) {
-            $updates['status'] = EventPersonStatus::tryFrom((string) $payload['status'])?->value ?? $person->status?->value ?? $person->status;
-        }
-
         $updates['updated_by'] = $user->id;
 
+        $targetStatus = null;
+
+        if (array_key_exists('status', $payload)) {
+            $targetStatus = EventPersonStatus::tryFrom((string) $payload['status']);
+        }
+
         $person->fill($updates)->save();
+
+        if ($targetStatus instanceof EventPersonStatus) {
+            $this->stateMachine->transitionPerson($person, $targetStatus, [
+                'updated_by' => $user->id,
+            ]);
+        }
 
         return $person->fresh();
     }

@@ -2,8 +2,13 @@ import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import Lenis from "lenis";
 import { SmoothScrollContext } from "@/hooks/useSmoothScroll";
 
+const HEADER_OFFSET = -96;
+const MAX_SCROLL_RETRIES = 8;
+const RETRY_DELAY_MS = 80;
+
 export function SmoothScroller({ children }: { children: ReactNode }) {
   const lenisRef = useRef<Lenis | null>(null);
+  const retryTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -40,20 +45,51 @@ export function SmoothScroller({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current !== null) {
+        window.clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const api = useMemo(
     () => ({
       scrollToId: (id: string) => {
-        const target = document.getElementById(id);
-        if (!target) return;
+        const attemptScroll = (attempt = 0) => {
+          const target = document.getElementById(id);
+          if (!target) {
+            if (attempt >= MAX_SCROLL_RETRIES) {
+              return;
+            }
 
-        if (lenisRef.current) {
-          lenisRef.current.scrollTo(target, {
-            offset: -96,
-            duration: 1.05,
+            retryTimeoutRef.current = window.setTimeout(() => {
+              attemptScroll(attempt + 1);
+            }, RETRY_DELAY_MS);
+            return;
+          }
+
+          if (retryTimeoutRef.current !== null) {
+            window.clearTimeout(retryTimeoutRef.current);
+            retryTimeoutRef.current = null;
+          }
+
+          if (lenisRef.current) {
+            lenisRef.current.scrollTo(target, {
+              offset: HEADER_OFFSET,
+              duration: 1.05,
+            });
+            return;
+          }
+
+          const targetTop = target.getBoundingClientRect().top + window.scrollY + HEADER_OFFSET;
+          window.scrollTo({
+            top: Math.max(0, targetTop),
+            behavior: "smooth",
           });
-        } else {
-          target.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
+        };
+
+        attemptScroll();
       },
     }),
     []
