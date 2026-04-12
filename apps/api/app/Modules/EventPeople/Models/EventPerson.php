@@ -82,6 +82,11 @@ class EventPerson extends Model
         return $this->belongsTo(EventPersonReferencePhoto::class, 'primary_reference_photo_id');
     }
 
+    public function groupMemberships(): HasMany
+    {
+        return $this->hasMany(EventPersonGroupMembership::class);
+    }
+
     public function outgoingRelations(): HasMany
     {
         return $this->hasMany(EventPersonRelation::class, 'person_a_id');

@@ -1928,3 +1928,24 @@ Regra pratica:
 - nenhum PR deve misturar contrato, projection, realtime e polimento visual;
 - cada PR precisa nascer com testes red, fechar com green e declarar o slice backend/frontend;
 - o `event-translator` so deve receber polimento visual depois de contrato, sequencia, resync e after-commit estarem testados.
+
+Status inicial:
+
+- `PR-00` foi iniciado e concluido em `2026-04-12`;
+- contrato compartilhado e fixtures de `EventOperations` foram criados;
+- a suite especifica passou com `2` arquivos e `6` testes;
+- `npm run type-check` passou no frontend;
+- `PR-01` foi iniciado e concluido em `2026-04-12`;
+- `operations.view`, rota `/events/:id/control-room` fora do `AdminLayout`, shell fullscreen e overlay de entrada foram criados;
+- a validacao do `PR-01` passou com `1` teste backend, `7` assertions, `5` arquivos frontend e `10` testes frontend;
+- `npm run type-check` passou novamente apos a rota fullscreen;
+- `PR-02` foi iniciado e concluido em `2026-04-12`;
+- lifecycle de fullscreen, `visibilitychange`, wake lock, motion reduzido e status pill acessivel foram adicionados ao shell;
+- a suite completa de `src/modules/event-operations` passou com `8` arquivos e `16` testes;
+- a regressao do wall player passou com `2` arquivos e `5` testes;
+- `npm run type-check` passou novamente apos o lifecycle.
+- `PR-03` foi iniciado e concluido em `2026-04-12`;
+- a V0 read-only agora combina `journey-builder`, `media/pipeline-metrics`, backlog de moderacao, timeline de auditoria, `wall/live-snapshot` e `wall/diagnostics` em um view model inicial unico;
+- o slice do PR-03 passou com `4` arquivos e `6` testes, enquanto a suite completa de `src/modules/event-operations` passou com `12` arquivos e `22` testes;
+- a regressao frontend adjacente passou com `2` arquivos e `19` testes, e a bateria backend das fontes existentes passou com `35` testes e `392` assertions;
+- `npm run type-check` passou novamente apos o boot read-only.

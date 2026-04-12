@@ -73,6 +73,8 @@ export const queryKeys = {
     peopleLists: (eventId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'people'] as const,
     peopleList: (eventId: number | string, filters: Record<string, unknown>) => [...queryKeys.eventPeople.peopleLists(eventId), filters] as const,
     personDetail: (eventId: number | string, personId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'person', String(personId)] as const,
+    graph: (eventId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'graph'] as const,
+    groups: (eventId: number | string, filters: Record<string, unknown> = {}) => [...queryKeys.eventPeople.byEvent(eventId), 'groups', filters] as const,
     referencePhotoCandidates: (eventId: number | string, personId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'person', String(personId), 'reference-photo-candidates'] as const,
     reviewQueues: (eventId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'review-queue'] as const,
     reviewQueue: (eventId: number | string, filters: Record<string, unknown>) => [...queryKeys.eventPeople.reviewQueues(eventId), filters] as const,
@@ -106,6 +108,14 @@ export const queryKeys = {
     insights: (eventId: string) => [...queryKeys.wall.byEvent(eventId), 'insights'] as const,
     liveSnapshot: (eventId: string) => [...queryKeys.wall.byEvent(eventId), 'liveSnapshot'] as const,
     simulation: (eventId: string, fingerprint: string) => [...queryKeys.wall.byEvent(eventId), 'simulation', fingerprint] as const,
+  },
+
+  // Event Operations
+  operations: {
+    all: () => ['operations'] as const,
+    byEvent: (eventId: string | number) => [...queryKeys.operations.all(), String(eventId)] as const,
+    room: (eventId: string | number) => [...queryKeys.operations.byEvent(eventId), 'room'] as const,
+    timeline: (eventId: string | number, cursor: string | null = 'initial') => [...queryKeys.operations.byEvent(eventId), 'timeline', cursor ?? 'initial'] as const,
   },
 
   // Organizations

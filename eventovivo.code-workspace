@@ -1,0 +1,44 @@
+{
+  "folders": [
+    {
+      "name": "API",
+      "path": "apps/api"
+    },
+    {
+      "name": "WEB",
+      "path": "apps/web"
+    },
+    {
+      "name": "LANDING",
+      "path": "apps/landing"
+    },
+    {
+      "name": "PACKAGES",
+      "path": "packages"
+    },
+    {
+      "name": "DOCS",
+      "path": "docs"
+    },
+    {
+      "name": "SCRIPTS",
+      "path": "scripts"
+    }
+  ],
+  "settings": {
+    "chat.useCustomizationsInParentRepositories": true,
+    "workbench.editor.labelFormat": "medium",
+    "search.exclude": {
+      "**/tmp_moderation_deploy_source/**": true,
+      "**/tmp_moderation_release/**": true,
+      "**/test-results/**": true,
+      "**/tmp-flow-*.png": true
+    },
+    "files.exclude": {
+      "**/tmp_moderation_deploy_source": true,
+      "**/tmp_moderation_release": true,
+      "**/test-results": true,
+      "**/tmp-flow-*.png": true
+    }
+  }
+}

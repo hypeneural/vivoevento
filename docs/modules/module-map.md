@@ -18,7 +18,7 @@
 | 12 | FaceSearch | Processamento | 2 | Configuracao, indexacao facial por evento e base vetorial inicial |
 | 13 | EventPeople | Experiencia / IA | 3 | Pessoas do evento, relacoes, review guiado e base de cobertura inteligente |
 | 14 | MediaIntelligence | Processamento | 2 | VLM rapido, prompts por evento e historico semantico por foto |
-| 15 | Gallery | Experiencia | 3 | Galeria ao vivo e curadoria |
+| 15 | Gallery | Experiencia | 3 | Galeria publica, curadoria e builder versionado da experiencia |
 | 16 | Wall | Experiencia | 3 | Telao e slideshow realtime |
 | 17 | Play | Experiencia | 4 | Jogos interativos |
 | 18 | Hub | Experiencia | 4 | Pagina central do evento |

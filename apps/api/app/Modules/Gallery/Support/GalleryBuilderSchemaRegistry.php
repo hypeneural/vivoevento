@@ -83,6 +83,7 @@ class GalleryBuilderSchemaRegistry
                         'variant' => 'wedding',
                         'show_logo' => true,
                         'show_face_search_cta' => true,
+                        'image_path' => null,
                     ],
                     'gallery_stream' => [
                         'enabled' => true,
@@ -90,6 +91,7 @@ class GalleryBuilderSchemaRegistry
                     'banner_strip' => [
                         'enabled' => false,
                         'positions' => ['after_12'],
+                        'image_path' => null,
                     ],
                     'quote' => [
                         'enabled' => false,

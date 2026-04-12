@@ -51,13 +51,17 @@ Referencias internas obrigatorias para a trilha:
 
 Sprint 0 foi iniciada e concluida em `2026-04-12`.
 
+Sprint 1 foi iniciada em `2026-04-12`.
+
+Sprint 2 foi iniciada e concluida em `2026-04-12`.
+
 O que ja esta validado antes de iniciar:
 
 - a galeria publica/admin atual esta verde;
 - o `Hub` builder atual esta verde;
 - o contrato operacional de midia entrega `preview_url`, `original_url`, dimensoes e metadados suficientes;
 - o frontend ja tem precedente para contraste, `prefers-reduced-motion` e feed virtualizado;
-- o repo ainda nao instalou `react-photo-album`, `PhotoSwipe`, `@tanstack/react-virtual`, `masonic`, `Puck`, `Easyblocks` ou `GrapesJS`.
+- ate o inicio da Sprint 1, o repo ainda nao instalava `react-photo-album`, `PhotoSwipe`, `@tanstack/react-virtual`, `masonic`, `Puck`, `Easyblocks` ou `GrapesJS`.
 
 Revalidacao complementar em `2026-04-12`:
 
@@ -81,6 +85,31 @@ Implementacao Sprint 0 em `2026-04-12`:
 - `queryKeys.gallery` estendido para `settings`, `presets`, `revisions` e `preview`;
 - registries/guards de contrato criados em `apps/api/app/Modules/Gallery/Support`;
 - bateria TDD de Sprint 0 criada e executada.
+
+Implementacao Sprint 1 em `2026-04-12`:
+
+- `react-photo-album` e `photoswipe` instalados em `apps/web`;
+- wrapper proprio adotado para PhotoSwipe, sem adicionar `react-photoswipe-gallery` na V1;
+- payload publico da galeria estendido com `event`, `experience` e `responsive_sources`;
+- rota publica incremental `GET /api/v1/public/events/{slug}/gallery/media` adicionada para preparar separacao entre boot da experience e feed longo;
+- `GalleryResponsiveSourceBuilder`, `PublicGalleryMediaResource` e `BuildPublicGalleryPayloadAction` criados no backend;
+- `GalleryRenderer`, `GalleryPhotoLightbox` e `GalleryVideoModal` criados no frontend;
+- `PublicGalleryPage` passou a usar hero com branding, renderer dedicado, primeira faixa eager e restante lazy;
+- foto e video foram separados como regra de UX: foto abre em PhotoSwipe, video abre em modal/player proprio;
+- bateria TDD de Sprint 1 criada e executada.
+
+Implementacao Sprint 2 core backend em `2026-04-12`:
+
+- migrations `event_gallery_settings`, `event_gallery_revisions` e `gallery_presets` criadas;
+- models/factories `EventGallerySetting`, `EventGalleryRevision` e `GalleryPreset` adicionados;
+- `GalleryBuilderPresetRegistry` e `GalleryRevisionManager` criados para defaults, normalizacao e versionamento;
+- endpoints admin de `settings`, `autosave`, `publish`, `revisions`, `restore`, `preview-link` e `presets` adicionados ao modulo `Gallery`;
+- endpoints `POST /events/{event}/gallery/hero-image` e `POST /events/{event}/gallery/banner-image` adicionados para assets do builder;
+- `GET /api/v1/public/gallery-previews/{token}` adicionado para preview compartilhavel por revisao draft;
+- `BuildPublicGalleryPayloadAction` passou a respeitar `published_version` quando existir e a isolar draft em preview tokenizado;
+- `page_schema.blocks.hero` e `page_schema.blocks.banner_strip` passaram a suportar `image_path` persistido e `image_url` resolvido no payload;
+- `README.md` do modulo `Gallery` e `docs/modules/module-map.md` atualizados;
+- bateria TDD de Sprint 2 foi ampliada para cobrir uploads de assets e executada com regressao do modulo.
 
 ---
 
@@ -561,6 +590,25 @@ Entregar valor visivel primeiro:
 - tratar foto e video corretamente;
 - preparar a base do preview futuro.
 
+### Status da Sprint 1 em 2026-04-12
+
+- [x] `S1-T1` `react-photo-album` e `photoswipe` instalados; wrapper proprio escolhido para manter controle do contrato e evitar dependencia extra de wrapper.
+- [x] `S1-T2` payload publico estendido com `event`, `experience`, `responsive_sources`, `srcset`, `sizes` e rota incremental `/gallery/media`.
+- [x] `S1-T3` renderer publico substituido por `GalleryRenderer` com `react-photo-album`, priorizando `masonry` e `rows`; `columns` ficou apenas suportado como layout menor/editorial.
+- [x] `S1-T4` foto e video separados no frontend publico: foto com PhotoSwipe, video com badge e modal/player dedicado.
+- [x] `S1-T5` hero com branding, CTA de face search preservado, primeira faixa de midias eager, restante lazy e respeitando reduced motion.
+- [ ] `S1-T6` medicao real de LCP/INP/CLS em ambiente de referencia ainda pendente; contrato, renderer e testes ja deixam a pagina pronta para essa medicao sem bloquear a implementacao funcional da Sprint 1.
+
+Arquivos principais entregues:
+
+- `apps/api/app/Modules/Gallery/Actions/BuildPublicGalleryPayloadAction.php`
+- `apps/api/app/Modules/Gallery/Http/Resources/PublicGalleryMediaResource.php`
+- `apps/api/app/Modules/Gallery/Support/GalleryResponsiveSourceBuilder.php`
+- `apps/web/src/modules/gallery/components/GalleryRenderer.tsx`
+- `apps/web/src/modules/gallery/components/GalleryPhotoLightbox.tsx`
+- `apps/web/src/modules/gallery/components/GalleryVideoModal.tsx`
+- `apps/web/src/modules/gallery/PublicGalleryPage.tsx`
+
 ### Tarefas da sprint
 
 ### `S1-T1` Instalar e travar libs de renderer
@@ -670,6 +718,14 @@ Regressao recomendada:
 - `apps/web/src/modules/wall/player/runtime-profile.test.ts`
 - `apps/web/src/modules/qr-code/support/qrReadability.test.ts`
 
+Resultado executado em `2026-04-12`:
+
+- backend Sprint 1: `4` testes passaram, `43` assertions;
+- frontend Sprint 1: `7` arquivos passaram, `10` testes passaram;
+- regressao backend `Gallery + Unit/Gallery + Hub + EventMediaList`: `47` testes passaram, `459` assertions;
+- regressao frontend `Gallery + Hub + Journey + IA + qrReadability + runtime-profile`: `18` arquivos passaram, `45` testes passaram;
+- `npm run type-check`: passou.
+
 ### Definicao de pronto da sprint
 
 - o publico ja percebe a galeria como experiencia melhor, nao so feed;
@@ -692,6 +748,26 @@ Criar a infraestrutura do builder no backend, ainda sem IA:
 - presets por organizacao;
 - autosave/publish/restore;
 - preview compartilhavel.
+
+### Status da Sprint 2 em `2026-04-12`
+
+- [x] `S2-T1` scaffolding do builder adicionado em `Gallery` com actions, queries, requests, resources e README do modulo
+- [x] `S2-T2` persistencia criada com `event_gallery_settings`, `event_gallery_revisions` e `gallery_presets`
+- [x] `S2-T3` registries, normalizacao e validacao forte conectados ao contrato separado do builder
+- [x] `S2-T4` endpoints admin expostos para settings, autosave, publish, revisions, restore, preview-link, presets, `hero-image` e `banner-image`
+- [x] `S2-T5` preview compartilhavel publico entregue em `GET /api/v1/public/gallery-previews/{token}`
+- [x] bateria TDD da Sprint 2 executada com cobertura complementar de upload de assets
+
+Arquivos principais entregues:
+
+- `apps/api/app/Modules/Gallery/Models/EventGallerySetting.php`
+- `apps/api/app/Modules/Gallery/Models/EventGalleryRevision.php`
+- `apps/api/app/Modules/Gallery/Models/GalleryPreset.php`
+- `apps/api/app/Modules/Gallery/Actions/UploadEventGalleryAssetAction.php`
+- `apps/api/app/Modules/Gallery/Http/Controllers/GalleryBuilderController.php`
+- `apps/api/app/Modules/Gallery/Support/GalleryBuilderPresetRegistry.php`
+- `apps/api/app/Modules/Gallery/Support/GalleryRevisionManager.php`
+- `apps/api/app/Modules/Gallery/Support/GalleryBuilderAssetUrlResolver.php`
 
 ### Tarefas da sprint
 
@@ -801,6 +877,7 @@ Backend:
 - `apps/api/tests/Feature/Gallery/EventGalleryRevisionLifecycleTest.php`
 - `apps/api/tests/Feature/Gallery/GalleryPresetManagementTest.php`
 - `apps/api/tests/Feature/Gallery/PublicGalleryPreviewTokenTest.php`
+- `apps/api/tests/Feature/Gallery/EventGalleryAssetUploadTest.php`
 - `apps/api/tests/Unit/Gallery/GalleryModelMatrixRegistryTest.php`
 - `apps/api/tests/Unit/Gallery/GalleryBuilderPresetRegistryTest.php`
 - `apps/api/tests/Unit/Gallery/GalleryRevisionManagerTest.php`
@@ -810,6 +887,11 @@ Regressao recomendada:
 
 - `apps/api/tests/Feature/Gallery/GalleryAdminWorkflowTest.php`
 - `apps/api/tests/Feature/Hub`
+
+Resultado executado em `2026-04-12`:
+
+- backend Sprint 2: `18` testes passaram, `209` assertions;
+- regressao backend `Gallery + Unit/Gallery + Hub + EventMediaList`: `58` testes passaram, `618` assertions.
 
 ### Definicao de pronto da sprint
 
@@ -1144,6 +1226,7 @@ Suite nova esperada:
 apps/api/tests/Feature/Gallery/
   PublicGalleryExperiencePayloadTest.php
   PublicGalleryResponsiveSourcesTest.php
+  EventGalleryAssetUploadTest.php
   EventGallerySettingsTest.php
   EventGalleryRevisionLifecycleTest.php
   GalleryPresetManagementTest.php
@@ -1235,22 +1318,22 @@ Regra pratica:
 
 ## Checklist de homologacao da V1
 
-- [ ] payload publico `experience` existe e e compativel
-- [ ] `responsive_sources`, `srcset` e `sizes` existem
-- [ ] galeria publica usa renderer novo
-- [ ] foto usa lightbox e video usa modal/player proprio
-- [ ] `event_gallery_settings` existe
-- [ ] `event_gallery_revisions` existe
-- [ ] `gallery_presets` existe
+- [x] payload publico `experience` existe e e compativel
+- [x] `responsive_sources`, `srcset` e `sizes` existem
+- [x] galeria publica usa renderer novo
+- [x] foto usa lightbox e video usa modal/player proprio
+- [x] `event_gallery_settings` existe
+- [x] `event_gallery_revisions` existe
+- [x] `gallery_presets` existe
 - [ ] builder admin em `/events/:id/gallery/builder`
-- [ ] `theme_tokens`, `page_schema` e `media_behavior` separados
-- [ ] matriz `event_type_family` + `style_skin` + `behavior_profile` existe
+- [x] `theme_tokens`, `page_schema` e `media_behavior` separados
+- [x] matriz `event_type_family` + `style_skin` + `behavior_profile` existe
 - [ ] modo rapido e modo profissional existem
 - [ ] modo rapido existe como wizard guiado
-- [ ] autosave funciona
+- [x] autosave funciona
 - [ ] `draft_version` e `published_version` estao visiveis
-- [ ] preview link compartilhavel funciona
-- [ ] restore previous version funciona
+- [x] preview link compartilhavel funciona
+- [x] restore previous version funciona
 - [ ] IA gera `3` variacoes seguras e aplicaveis
 - [ ] contraste minimo e reduced motion estao endurecidos
 - [ ] budgets mobile de Web Vitals estao medidos

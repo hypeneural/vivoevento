@@ -411,6 +411,13 @@ Objetivo:
 - transformar esta documentacao em fonte de execucao versionada;
 - criar fixtures estaveis para desenvolvimento paralelo.
 
+Status em `2026-04-12`:
+
+- concluido;
+- red confirmado com falha de import para `@eventovivo/shared-types/event-operations` e fixtures ausentes;
+- green confirmado com `2` arquivos e `6` testes passando;
+- `npm run type-check` passou.
+
 Slice:
 
 - docs;
@@ -455,6 +462,15 @@ Objetivo:
 - abrir a superficie protegida sem dados reais;
 - provar que a rota fica fora do `AdminLayout`.
 
+Status em `2026-04-12`:
+
+- concluido;
+- red confirmado com `operations.view` ausente, route import ausente e shell/overlay ausentes;
+- green backend confirmado com `1` teste e `7` assertions passando;
+- green frontend confirmado com `3` arquivos e `4` testes passando;
+- regressao frontend de `src/modules/event-operations` confirmou `5` arquivos e `10` testes passando;
+- `npm run type-check` passou.
+
 Slice:
 
 - backend minimo de permissao;
@@ -477,7 +493,7 @@ Testes red:
 ```text
 apps/api/tests/Feature/Auth/OperationsViewPermissionTest.php
 apps/web/src/modules/event-operations/EventOperationsRoomPage.test.tsx
-apps/web/src/modules/event-operations/event-operations-route.test.tsx
+apps/web/src/modules/event-operations/event-operations-route.test.ts
 apps/web/src/modules/event-operations/components/OperationsFullscreenEntryOverlay.test.tsx
 ```
 
@@ -504,6 +520,15 @@ Objetivo:
 
 - extrair o comportamento tecnico que ja existe no wall player para a control room;
 - transformar fullscreen e degradacao do browser em UX explicita.
+
+Status em `2026-04-12`:
+
+- concluido;
+- red confirmado com hooks e componente ausentes;
+- green do slice confirmado com `3` arquivos e `6` testes passando;
+- regressao do wall player confirmada com `2` arquivos e `5` testes passando;
+- suite completa de `src/modules/event-operations` confirmou `8` arquivos e `16` testes passando;
+- `npm run type-check` passou.
 
 Slice:
 
@@ -555,6 +580,16 @@ Objetivo:
 
 - entregar primeira tela util sem projection nova;
 - combinar dados existentes em um view model unico.
+
+Status em `2026-04-12`:
+
+- concluido;
+- red confirmado com hook de boot, HUD, rail e alert stack ausentes, seguido de ajuste do teste legado da pagina para o novo contrato com Query;
+- green do slice confirmado com `4` arquivos e `6` testes passando;
+- suite completa de `src/modules/event-operations` confirmou `12` arquivos e `22` testes passando;
+- regressao frontend adjacente confirmou `2` arquivos e `19` testes passando;
+- validacao backend das fontes existentes confirmou `35` testes e `392` assertions passando em `EventJourney`, `MediaPipelineMetrics`, `WallDiagnostics`, `WallLiveSnapshot` e `Audit`;
+- `npm run type-check` passou.
 
 Slice:
 

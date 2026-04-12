@@ -16,9 +16,17 @@ vi.mock('./api', () => ({
   eventPeopleApi: {
     listPeople: vi.fn(),
     getPerson: vi.fn(),
+    getGraph: vi.fn(),
     createPerson: vi.fn(),
     updatePerson: vi.fn(),
     getPresets: vi.fn(),
+    listGroups: vi.fn(),
+    createGroup: vi.fn(),
+    updateGroup: vi.fn(),
+    deleteGroup: vi.fn(),
+    applyPresetGroups: vi.fn(),
+    addGroupMember: vi.fn(),
+    removeGroupMember: vi.fn(),
     getOperationalStatus: vi.fn(),
     listReferencePhotoCandidates: vi.fn(),
     addGalleryReferencePhoto: vi.fn(),
@@ -28,6 +36,23 @@ vi.mock('./api', () => ({
     updateRelation: vi.fn(),
     deleteRelation: vi.fn(),
   },
+}));
+
+vi.mock('./components/EventPeopleGraphView', () => ({
+  EventPeopleGraphView: ({
+    graph,
+    onOpenPerson,
+  }: {
+    graph: { stats?: { people_count?: number } } | null;
+    onOpenPerson?: (personId: number) => void;
+  }) => (
+    <div data-testid="event-people-graph-view">
+      <p>Mapa carregado com {graph?.stats?.people_count ?? 0} pessoas</p>
+      <button type="button" onClick={() => onOpenPerson?.(7)}>
+        Abrir pessoa do mapa
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('@/hooks/use-toast', () => ({
@@ -168,11 +193,64 @@ describe('EventPeoplePage', () => {
     }));
 
     vi.mocked(eventPeopleApi.getPerson).mockResolvedValue(buildPerson());
+    vi.mocked(eventPeopleApi.getGraph).mockResolvedValue({
+      people: [
+        {
+          id: 7,
+          display_name: 'Mae da noiva',
+          role_key: null,
+          role_label: 'Mae da noiva',
+          role_family: 'familia',
+          type: 'mother',
+          side: 'bride_side',
+          status: 'active',
+          avatar_url: null,
+          importance_rank: 90,
+          media_count: 6,
+          published_media_count: 5,
+          has_primary_photo: true,
+        },
+      ],
+      relations: [],
+      groups: [],
+      stats: {
+        people_count: 1,
+        relation_count: 0,
+        connected_people_count: 0,
+        principal_people_count: 0,
+        without_primary_photo_count: 0,
+      },
+      filters: {
+        statuses: ['active'],
+        sides: ['bride_side'],
+        role_families: ['familia'],
+        relation_types: [],
+      },
+    });
     vi.mocked(eventPeopleApi.getPresets).mockResolvedValue({
       event_type: 'wedding',
-      people: [{ key: 'bride', label: 'Noiva', type: 'bride', side: 'neutral', importance_rank: 100 }],
+      model_key: 'wedding',
+      people: [{
+        key: 'bride',
+        label: 'Noiva',
+        role_key: 'bride',
+        role_label: 'Noiva',
+        role_family: 'principal',
+        type: 'bride',
+        side: 'neutral',
+        importance_rank: 100,
+      }],
       relations: [{ type: 'spouse_of', label: 'Conjuge de', directionality: 'undirected' }],
+      groups: [{ key: 'couple', label: 'Casal', role_family: 'principal', member_role_keys: ['bride'], importance_rank: 100 }],
+      coverage_targets: [{ key: 'couple_portrait', label: 'Casal junto', target_type: 'group', role_keys: ['bride'], group_key: 'couple', priority: 100 }],
     });
+    vi.mocked(eventPeopleApi.listGroups).mockResolvedValue([]);
+    vi.mocked(eventPeopleApi.createGroup).mockRejectedValue(new Error('not used'));
+    vi.mocked(eventPeopleApi.updateGroup).mockRejectedValue(new Error('not used'));
+    vi.mocked(eventPeopleApi.deleteGroup).mockResolvedValue(undefined);
+    vi.mocked(eventPeopleApi.applyPresetGroups).mockResolvedValue([]);
+    vi.mocked(eventPeopleApi.addGroupMember).mockRejectedValue(new Error('not used'));
+    vi.mocked(eventPeopleApi.removeGroupMember).mockResolvedValue(undefined);
     vi.mocked(eventPeopleApi.getOperationalStatus).mockResolvedValue({
       people_active: 1,
       people_draft: 0,
@@ -204,7 +282,10 @@ describe('EventPeoplePage', () => {
     expect(screen.getByText('Referencias tecnicas')).toBeInTheDocument();
     expect(screen.getByText('Revisoes pendentes')).toBeInTheDocument();
     expect(screen.getByText('Modelo do evento')).toBeInTheDocument();
-  });
+    expect(screen.getByText('Grupos do evento')).toBeInTheDocument();
+    expect(screen.getByText('Pessoas principais')).toBeInTheDocument();
+    expect(screen.getByText('1 grupos sementes e 1 alvos de cobertura preparados para as proximas fases.')).toBeInTheDocument();
+  }, 15_000);
 
   it('creates a person manually from the dedicated page without using the guided review flow', async () => {
     renderPage();
@@ -220,5 +301,27 @@ describe('EventPeoplePage', () => {
         display_name: 'Cerimonialista',
       }));
     });
+  });
+
+  it('switches to the complementary relations map and can reopen the selected person sheet from it', async () => {
+    renderPage();
+
+    expect(await screen.findByText('Pessoas de Casamento Ana e Pedro')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mapa de relacoes' }));
+
+    await waitFor(() => {
+      expect(eventPeopleApi.getGraph).toHaveBeenCalledWith('42');
+    });
+    expect(await screen.findByTestId('event-people-graph-view')).toBeInTheDocument();
+    expect(screen.getByText('Mapa carregado com 1 pessoas')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir pessoa do mapa' }));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('event-people-graph-view')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Cadastro e relacoes')).toBeInTheDocument();
+    expect(screen.getAllByText('Mae da noiva').length).toBeGreaterThan(0);
   });
 });

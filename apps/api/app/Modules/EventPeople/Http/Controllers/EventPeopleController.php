@@ -5,10 +5,12 @@ namespace App\Modules\EventPeople\Http\Controllers;
 use App\Modules\EventPeople\Actions\CreateEventPersonAction;
 use App\Modules\EventPeople\Actions\UpdateEventPersonAction;
 use App\Modules\EventPeople\Http\Requests\ListEventPeopleRequest;
+use App\Modules\EventPeople\Http\Resources\EventPeopleGraphResource;
 use App\Modules\EventPeople\Http\Requests\StoreEventPersonRequest;
 use App\Modules\EventPeople\Http\Requests\UpdateEventPersonRequest;
 use App\Modules\EventPeople\Http\Resources\EventPersonResource;
 use App\Modules\EventPeople\Models\EventPerson;
+use App\Modules\EventPeople\Queries\BuildEventPeopleGraphQuery;
 use App\Modules\EventPeople\Queries\ListEventPeopleQuery;
 use App\Modules\EventPeople\Services\EventPeopleOperationalMetricsService;
 use App\Modules\Events\Models\Event;
@@ -63,6 +65,19 @@ class EventPeopleController extends BaseController
         );
 
         return $this->success(new EventPersonResource($updated));
+    }
+
+    public function graph(
+        ListEventPeopleRequest $request,
+        Event $event,
+        EventAccessService $eventAccess,
+        BuildEventPeopleGraphQuery $query,
+    ): JsonResponse {
+        abort_unless($eventAccess->can($request->user(), $event, 'media.view'), 403);
+
+        return $this->success(new EventPeopleGraphResource(
+            $query->build($event, $request->validated())
+        ));
     }
 
     public function show(

@@ -4,51 +4,44 @@ declare(strict_types=1);
 
 namespace App\Modules\Gallery\Actions;
 
-use App\Modules\Events\Enums\EventType;
 use App\Modules\Events\Models\Event;
 use App\Modules\Events\Support\EventBrandingResolver;
-use App\Modules\Gallery\Support\GalleryBuilderSchemaRegistry;
-use App\Modules\Gallery\Support\GalleryModelMatrixRegistry;
-use App\Modules\Gallery\Support\GalleryThemeTokenResolver;
+use App\Modules\Gallery\Support\GalleryBuilderAssetUrlResolver;
+use App\Modules\Gallery\Support\GalleryBuilderPresetRegistry;
 
 class BuildPublicGalleryPayloadAction
 {
     public function __construct(
         private readonly EventBrandingResolver $brandingResolver,
-        private readonly GalleryBuilderSchemaRegistry $schemaRegistry,
-        private readonly GalleryModelMatrixRegistry $modelMatrixRegistry,
-        private readonly GalleryThemeTokenResolver $themeTokenResolver,
+        private readonly GalleryBuilderPresetRegistry $presetRegistry,
+        private readonly GalleryBuilderAssetUrlResolver $assetUrlResolver,
     ) {}
 
     /**
+     * @param  array<string, mixed>|null  $storedSettings
      * @return array{event: array<string, mixed>, experience: array<string, mixed>}
      */
-    public function execute(Event $event): array
+    public function execute(Event $event, ?array $storedSettings = null, ?int $publishedVersion = null): array
     {
         $branding = $this->brandingResolver->resolve($event);
-        $selection = $this->selectionForEvent($event);
-        $derived = $this->modelMatrixRegistry->derive(
-            $selection['event_type_family'],
-            $selection['style_skin'],
-            $selection['behavior_profile'],
+        $experience = $this->presetRegistry->normalize($event, $storedSettings);
+        $experience['page_schema'] = $this->assetUrlResolver->hydratePageSchema(
+            is_array($experience['page_schema'] ?? null) ? $experience['page_schema'] : [],
         );
-
-        $experience = $this->schemaRegistry->baseExperience();
-        $experience['published_version'] = null;
-        $experience['model_matrix'] = $selection;
-        $experience['theme_key'] = 'event-brand';
-        $experience['layout_key'] = $derived['layout_key'];
-        $experience['theme_tokens'] = $this->themeTokenResolver->resolve(
-            'event-brand',
-            $branding['primary_color'] ?? null,
-            $branding['secondary_color'] ?? null,
+        $experience['version'] = 1;
+        $experience['published_version'] = $publishedVersion;
+        $experience['model_matrix'] = [
+            'event_type_family' => $experience['event_type_family'],
+            'style_skin' => $experience['style_skin'],
+            'behavior_profile' => $experience['behavior_profile'],
+        ];
+        unset(
+            $experience['event_type_family'],
+            $experience['style_skin'],
+            $experience['behavior_profile'],
+            $experience['derived_preset_key'],
+            $experience['is_enabled'],
         );
-        $experience['page_schema']['blocks']['hero']['variant'] = $selection['event_type_family'];
-        $experience['media_behavior']['grid']['layout'] = $derived['grid_layout'];
-        $experience['media_behavior']['video']['mode'] = $derived['video_mode'];
-        $experience['media_behavior']['video']['allow_inline_preview'] = $derived['video_mode'] === 'inline_preview';
-        $experience['media_behavior']['interstitials']['enabled'] = $derived['interstitial_policy'] !== 'disabled';
-        $experience['media_behavior']['interstitials']['policy'] = $derived['interstitial_policy'];
 
         return [
             'event' => [
@@ -70,33 +63,5 @@ class BuildPublicGalleryPayloadAction
             ],
             'experience' => $experience,
         ];
-    }
-
-    /**
-     * @return array{event_type_family: string, style_skin: string, behavior_profile: string}
-     */
-    private function selectionForEvent(Event $event): array
-    {
-        $eventType = $event->event_type instanceof EventType
-            ? $event->event_type
-            : EventType::tryFrom((string) $event->event_type);
-
-        return match ($eventType) {
-            EventType::Corporate, EventType::Fair, EventType::Graduation => [
-                'event_type_family' => 'corporate',
-                'style_skin' => 'clean',
-                'behavior_profile' => 'light',
-            ],
-            EventType::Fifteen, EventType::Birthday => [
-                'event_type_family' => 'quince',
-                'style_skin' => 'modern',
-                'behavior_profile' => 'light',
-            ],
-            default => [
-                'event_type_family' => 'wedding',
-                'style_skin' => 'romantic',
-                'behavior_profile' => 'light',
-            ],
-        };
     }
 }

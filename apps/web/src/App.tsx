@@ -40,6 +40,7 @@ const EventsListPage = lazy(routeImports.eventsList);
 const CreateEventPage = lazy(routeImports.eventCreate);
 const EventDetailPage = lazy(routeImports.eventDetail);
 const EventPeoplePage = lazy(routeImports.eventPeople);
+const EventOperationsRoomPage = lazy(routeImports.eventOperationsRoom);
 const EventJourneyBuilderPage = lazy(routeImports.eventJourneyBuilder);
 const EventAccessPage = lazy(routeImports.eventAccess);
 const EditEventPage = lazy(routeImports.eventEdit);
@@ -171,6 +172,15 @@ const router = createBrowserRouter(
           <Route path=":eventId" element={<EventWorkspaceHomePage />} />
           <Route path=":eventId/:section" element={<EventWorkspaceModulePage />} />
         </Route>
+
+        <Route
+          path="events/:id/control-room"
+          element={(
+            <ModuleGuard moduleKey="events" requiredPermissions={['operations.view']}>
+              <EventOperationsRoomPage />
+            </ModuleGuard>
+          )}
+        />
 
         <Route element={<OrganizationWorkspaceRoute />}>
           <Route element={<AdminLayout />}>

@@ -185,6 +185,16 @@ class Event extends Model
         return $this->hasOne(\App\Modules\Hub\Models\EventHubSetting::class);
     }
 
+    public function gallerySettings(): HasOne
+    {
+        return $this->hasOne(\App\Modules\Gallery\Models\EventGallerySetting::class);
+    }
+
+    public function galleryRevisions(): HasMany
+    {
+        return $this->hasMany(\App\Modules\Gallery\Models\EventGalleryRevision::class);
+    }
+
     public function contentModerationSettings(): HasOne
     {
         return $this->hasOne(\App\Modules\ContentModeration\Models\EventContentModerationSetting::class);

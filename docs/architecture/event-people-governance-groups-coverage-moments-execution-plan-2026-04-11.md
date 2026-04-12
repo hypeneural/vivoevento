@@ -444,9 +444,9 @@ O que ela ainda nao trava:
 
 ### Grupos
 
-- nao existem `event_person_groups` nem memberships;
-- nao ha filtros por nucleo;
-- nao ha preset de grupos por tipo de evento.
+- `event_person_groups` e `event_person_group_memberships` ja existem no modulo;
+- painel de grupos e seed do `Modelo do evento` ja funcionam localmente;
+- ainda faltam read models dedicados de stats e filtro de catalogo por nucleo.
 
 ### Coverage
 
@@ -1298,22 +1298,22 @@ npx.cmd vitest run src/modules/event-people/components/RelationalDeliveries.test
 
 ## Checklist final desta doc
 
-- [ ] explicitar maquina de estados do dominio
-- [ ] explicitar contrato das projecoes e replay por `event_id`
-- [ ] mover leituras operacionais para query objects estaveis
-- [ ] blindar queries quentes com `EXPLAIN`
-- [ ] congelar protocolo de cache otimista e transicoes do frontend
-- [ ] transformar overview, fila e pagina de pessoas em cockpit operacional
-- [ ] subir acessibilidade minima de status e foco
+- [x] explicitar maquina de estados do dominio
+- [x] explicitar contrato das projecoes e replay por `event_id`
+- [x] mover leituras operacionais para query objects estaveis
+- [x] blindar queries quentes com `EXPLAIN`
+- [x] congelar protocolo de cache otimista e transicoes do frontend
+- [x] transformar overview, fila e pagina de pessoas em cockpit operacional
+- [x] subir acessibilidade minima de status e foco
 - [ ] fechar politica de retention AWS por evento
 - [ ] criar auditoria remota de collection e users
 - [ ] criar cleanup de `UserId` por pessoa
 - [ ] criar cleanup de faces remotas inuteis
 - [ ] criar sweep de cleanup por evento encerrado
 - [ ] documentar runbook operacional de audit, ressync e cleanup
-- [ ] criar `event_person_groups`
-- [ ] criar `event_person_group_memberships`
-- [ ] criar presets e CRUD de grupos
+- [x] criar `event_person_groups`
+- [x] criar `event_person_group_memberships`
+- [x] criar presets e CRUD de grupos
 - [ ] criar stats e filtros por grupo
 - [ ] criar `event_coverage_targets`
 - [ ] criar `event_must_have_pairs`
@@ -1325,6 +1325,17 @@ npx.cmd vitest run src/modules/event-people/components/RelationalDeliveries.test
 - [ ] criar recipe engine de colecoes relacionais
 - [ ] criar entregas prontas por vinculo
 - [ ] preparar trilha guest-facing derivada
+
+Status em `2026-04-12`:
+
+- `Mapa de relacoes` complementar em `React Flow` ja foi entregue em `EventPeoplePage`, com endpoint proprio `GET /people/graph`;
+- `groups` e `coverage_targets` ja nascem como seeds do `Modelo do evento`;
+- grupos reais agora existem com:
+  - `GET/POST/PATCH/DELETE /people/groups`
+  - memberships por grupo
+  - aplicacao de seeds do modelo por evento
+  - painel local em `EventPeoplePage`
+- dominio de coverage, read models dedicados de grupo e momentos continuam pendentes.
 
 ---
 

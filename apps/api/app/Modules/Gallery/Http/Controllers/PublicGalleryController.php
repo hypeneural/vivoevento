@@ -4,6 +4,7 @@ namespace App\Modules\Gallery\Http\Controllers;
 use App\Modules\Analytics\Services\AnalyticsTracker;
 use App\Modules\Gallery\Actions\BuildPublicGalleryPayloadAction;
 use App\Modules\Gallery\Http\Resources\PublicGalleryMediaResource;
+use App\Modules\Gallery\Models\EventGallerySetting;
 use App\Modules\MediaProcessing\Models\EventMedia;
 use App\Shared\Http\BaseController;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -30,7 +31,15 @@ class PublicGalleryController extends BaseController
         $this->trackPageView($analytics, $eventModel, $request);
 
         $collection = PublicGalleryMediaResource::collection($this->paginatedMedia($eventModel->id));
-        $payload = $payloadBuilder->execute($eventModel);
+        $settings = EventGallerySetting::query()
+            ->with('currentPublishedRevision')
+            ->where('event_id', $eventModel->id)
+            ->first();
+        $payload = $payloadBuilder->execute(
+            $eventModel,
+            $settings?->currentPublishedRevision?->toBuilderPayload(),
+            $settings?->published_version,
+        );
 
         return $this->publicGalleryPaginated($collection, [
             'public_search_enabled' => $eventModel->allowsPublicSelfieSearch(),
@@ -52,6 +61,37 @@ class PublicGalleryController extends BaseController
                 'public_search_enabled' => $eventModel->allowsPublicSelfieSearch(),
                 'find_me_url' => $eventModel->allowsPublicSelfieSearch() ? $eventModel->publicFindMeUrl() : null,
             ],
+        );
+    }
+
+    public function preview(string $token, BuildPublicGalleryPayloadAction $payloadBuilder): JsonResponse
+    {
+        $settings = EventGallerySetting::query()
+            ->with(['event.organization', 'event.modules', 'previewRevision'])
+            ->where('preview_share_token', $token)
+            ->whereNotNull('preview_revision_id')
+            ->where(function ($query) {
+                $query->whereNull('preview_share_expires_at')
+                    ->orWhere('preview_share_expires_at', '>', now());
+            })
+            ->firstOrFail();
+
+        abort_unless($settings->event, 404);
+        abort_unless($settings->previewRevision, 404);
+
+        $payload = $payloadBuilder->execute(
+            $settings->event,
+            $settings->previewRevision->toBuilderPayload(),
+            $settings->published_version,
+        );
+
+        return $this->publicGalleryPaginated(
+            PublicGalleryMediaResource::collection($this->paginatedMedia($settings->event_id)),
+            [
+                'public_search_enabled' => $settings->event->allowsPublicSelfieSearch(),
+                'find_me_url' => $settings->event->allowsPublicSelfieSearch() ? $settings->event->publicFindMeUrl() : null,
+            ],
+            $payload,
         );
     }
 

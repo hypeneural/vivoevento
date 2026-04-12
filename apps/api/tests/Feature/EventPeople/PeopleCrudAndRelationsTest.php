@@ -2,6 +2,7 @@
 
 use App\Modules\EventPeople\Models\EventPerson;
 use App\Modules\EventPeople\Models\EventPersonMediaStat;
+use App\Modules\EventPeople\Models\EventPersonPairScore;
 use App\Modules\EventPeople\Models\EventPersonReferencePhoto;
 use App\Modules\EventPeople\Models\EventPersonRelation;
 use App\Modules\EventPeople\Models\EventPersonRepresentativeFace;
@@ -256,6 +257,97 @@ it('returns presets and allows creating, updating and deleting manual relations'
     $this->assertDatabaseMissing('event_person_relations', [
         'id' => $relationId,
     ]);
+});
+
+it('returns a dedicated relations graph payload for React Flow with people, relations, groups and graph stats', function () {
+    [$user, $organization] = $this->actingAsOwner();
+
+    $event = Event::factory()->create([
+        'organization_id' => $organization->id,
+        'event_type' => 'wedding',
+    ]);
+
+    $bride = EventPerson::factory()->create([
+        'event_id' => $event->id,
+        'display_name' => 'Noiva',
+        'type' => 'bride',
+        'side' => 'neutral',
+        'importance_rank' => 100,
+        'status' => 'active',
+    ]);
+
+    $groom = EventPerson::factory()->create([
+        'event_id' => $event->id,
+        'display_name' => 'Noivo',
+        'type' => 'groom',
+        'side' => 'neutral',
+        'importance_rank' => 100,
+        'status' => 'active',
+    ]);
+
+    $media = EventMedia::factory()->create([
+        'event_id' => $event->id,
+        'original_filename' => 'noiva-principal.jpg',
+    ]);
+
+    EventPersonMediaStat::query()->create([
+        'event_id' => $event->id,
+        'event_person_id' => $bride->id,
+        'media_count' => 7,
+        'solo_media_count' => 3,
+        'with_others_media_count' => 4,
+        'published_media_count' => 6,
+        'pending_media_count' => 1,
+        'best_media_id' => $media->id,
+        'latest_media_id' => $media->id,
+        'projected_at' => now(),
+    ]);
+
+    EventPersonReferencePhoto::query()->create([
+        'event_id' => $event->id,
+        'event_person_id' => $bride->id,
+        'source' => 'event_face',
+        'event_media_id' => $media->id,
+        'purpose' => 'both',
+        'status' => 'active',
+        'quality_score' => 0.95,
+    ]);
+
+    EventPersonRelation::query()->create([
+        'event_id' => $event->id,
+        'person_a_id' => $bride->id,
+        'person_b_id' => $groom->id,
+        'person_pair_key' => "{$bride->id}:{$groom->id}",
+        'relation_type' => 'spouse_of',
+        'directionality' => 'undirected',
+        'source' => 'manual',
+        'strength' => 0.9,
+        'is_primary' => true,
+    ]);
+
+    EventPersonPairScore::query()->create([
+        'event_id' => $event->id,
+        'person_a_id' => $bride->id,
+        'person_b_id' => $groom->id,
+        'person_pair_key' => "{$bride->id}:{$groom->id}",
+        'co_media_count' => 4,
+        'weighted_score' => 88.5,
+        'projected_at' => now(),
+    ]);
+
+    $response = $this->apiGet("/events/{$event->id}/people/graph");
+
+    $this->assertApiSuccess($response);
+    $response->assertJsonPath('data.stats.people_count', 2)
+        ->assertJsonPath('data.stats.relation_count', 1)
+        ->assertJsonPath('data.relations.0.relation_type', 'spouse_of')
+        ->assertJsonPath('data.relations.0.co_photo_count', 4)
+        ->assertJsonPath('data.groups.0.key', 'couple')
+        ->assertJsonPath('data.groups.0.current_member_count', 2)
+        ->assertJsonPath('data.people.0.role_label', 'Noiva')
+        ->assertJsonPath('data.people.0.role_family', 'principal')
+        ->assertJsonPath('data.people.0.media_count', 7)
+        ->assertJsonPath('data.people.0.has_primary_photo', true);
 });
 
 it('lists confirmed gallery candidates, saves one as human reference and lets the operator define the primary photo', function () {

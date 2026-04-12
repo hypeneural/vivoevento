@@ -21,6 +21,8 @@ export type EventPersonReviewQueueStatus = 'pending' | 'conflict' | 'resolved' |
 export type EventPersonReviewQueueType = 'unknown_person' | 'cluster_suggestion' | 'identity_conflict' | 'coverage_gap';
 export type EventPersonReferencePhotoPurpose = 'avatar' | 'matching' | 'both';
 export type EventPersonReferencePhotoStatus = 'active' | 'archived' | 'invalid';
+export type EventPersonGroupStatus = 'active' | 'archived';
+export type EventPersonGroupMembershipStatus = 'active' | 'archived';
 
 export interface EventPersonMediaStat {
   media_count: number;
@@ -164,6 +166,64 @@ export interface EventPeoplePresetsResponse {
   coverage_targets?: EventPeopleCoverageTargetSeed[];
 }
 
+export interface EventPersonGroupStats {
+  member_count: number;
+  people_with_primary_photo_count: number;
+  people_with_media_count: number;
+  media_count: number;
+  published_media_count: number;
+}
+
+export interface EventPersonGroupMembershipPersonSummary extends EventPersonRelationPersonSummary {
+  has_primary_photo: boolean;
+}
+
+export interface EventPersonGroupMembership {
+  id: number;
+  event_person_group_id: number;
+  event_person_id: number;
+  role_label: string | null;
+  source: string | null;
+  confidence: number | null;
+  status: EventPersonGroupMembershipStatus | string;
+  person?: EventPersonGroupMembershipPersonSummary | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface EventPersonGroup {
+  id: number;
+  event_id: number;
+  display_name: string;
+  slug: string;
+  group_type: string | null;
+  side: EventPersonSide | string | null;
+  notes: string | null;
+  importance_rank: number;
+  status: EventPersonGroupStatus | string;
+  stats: EventPersonGroupStats;
+  memberships: EventPersonGroupMembership[];
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface EventPersonGroupPayload {
+  display_name: string;
+  group_type?: string | null;
+  side?: EventPersonSide | string | null;
+  importance_rank?: number | null;
+  notes?: string | null;
+  status?: EventPersonGroupStatus | string | null;
+}
+
+export interface EventPersonGroupMemberPayload {
+  event_person_id: number;
+  role_label?: string | null;
+  source?: string | null;
+  confidence?: number | null;
+  status?: EventPersonGroupMembershipStatus | string | null;
+}
+
 export interface EventPerson {
   id: number;
   event_id: number;
@@ -194,6 +254,64 @@ export interface EventPeopleOperationalStatus {
   review_queue_conflict: number;
   aws_sync_pending: number;
   aws_sync_failed: number;
+}
+
+export interface EventPeopleGraphPerson {
+  id: number;
+  display_name: string;
+  role_key: string | null;
+  role_label: string;
+  role_family: string;
+  type: string | null;
+  side: string | null;
+  status: string | null;
+  avatar_url: string | null;
+  importance_rank: number;
+  media_count: number;
+  published_media_count: number;
+  has_primary_photo: boolean;
+}
+
+export interface EventPeopleGraphRelation {
+  id: number;
+  person_a_id: number;
+  person_b_id: number;
+  person_a_name: string | null;
+  person_b_name: string | null;
+  relation_type: string;
+  directionality: string;
+  source: string | null;
+  strength: number | null;
+  is_primary: boolean;
+  notes: string | null;
+  co_photo_count: number | null;
+}
+
+export interface EventPeopleGraphGroupSeed extends EventPeoplePresetGroup {
+  current_member_count: number;
+}
+
+export interface EventPeopleGraphStats {
+  people_count: number;
+  relation_count: number;
+  connected_people_count: number;
+  principal_people_count: number;
+  without_primary_photo_count: number;
+}
+
+export interface EventPeopleGraphFilters {
+  statuses: string[];
+  sides: string[];
+  role_families: string[];
+  relation_types: string[];
+}
+
+export interface EventPeopleGraphResponse {
+  people: EventPeopleGraphPerson[];
+  relations: EventPeopleGraphRelation[];
+  groups: EventPeopleGraphGroupSeed[];
+  stats: EventPeopleGraphStats;
+  filters: EventPeopleGraphFilters;
 }
 
 export interface EventPersonFaceAssignment {

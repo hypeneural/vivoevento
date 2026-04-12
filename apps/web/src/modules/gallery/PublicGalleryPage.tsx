@@ -5,6 +5,8 @@ import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { getPublicGallery } from '@/modules/events/api';
+import { galleryExperienceFixtures } from './gallery-builder';
+import { GalleryRenderer } from './components/GalleryRenderer';
 
 export default function PublicGalleryPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -51,16 +53,51 @@ export default function PublicGalleryPage() {
 
   const media = galleryQuery.data?.data ?? [];
   const publicFaceSearch = galleryQuery.data?.meta.face_search;
+  const publicEvent = galleryQuery.data?.event;
+  const experience = galleryQuery.data?.experience ?? galleryExperienceFixtures.weddingPremiumLight;
+  const branding = publicEvent?.branding;
+  const pageBackground = experience.theme_tokens.palette.page_background;
+  const textPrimary = experience.theme_tokens.palette.text_primary;
+  const accent = experience.theme_tokens.palette.accent;
 
   return (
-    <div className="min-h-[100dvh] bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.18),_transparent_35%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] px-4 py-8 text-white">
+    <div
+      className="min-h-[100dvh] px-4 py-6 text-white md:py-8"
+      style={{
+        background:
+          `radial-gradient(circle at top, ${accent}33, transparent 35%), linear-gradient(180deg, ${pageBackground} 0%, #020617 100%)`,
+        color: textPrimary,
+      }}
+    >
       <div className="mx-auto max-w-6xl space-y-8">
-        <div className="space-y-3 text-center">
-          <p className="text-xs uppercase tracking-[0.28em] text-white/55">Evento Vivo</p>
-          <h1 className="text-3xl font-semibold md:text-4xl">Galeria Publica</h1>
-          <p className="text-sm text-white/70">
-            {galleryQuery.data?.meta.total ?? media.length} foto(s) publicadas para este evento.
-          </p>
+        <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950 text-white shadow-2xl">
+          {branding?.cover_image_url ? (
+            <img
+              src={branding.cover_image_url}
+              alt=""
+              className="h-52 w-full object-cover md:h-72"
+              loading="eager"
+              decoding="async"
+            />
+          ) : null}
+          <div className="space-y-4 p-6 text-center md:p-10">
+            {branding?.logo_url ? (
+              <img
+                src={branding.logo_url}
+                alt=""
+                className="mx-auto h-14 w-14 rounded-2xl object-contain"
+                loading="eager"
+                decoding="async"
+              />
+            ) : null}
+            <div className="space-y-3">
+              <p className="text-xs uppercase tracking-[0.28em] text-white/55">Evento Vivo</p>
+              <h1 className="text-3xl font-semibold md:text-5xl">{publicEvent?.title ?? 'Galeria Publica'}</h1>
+              <p className="text-sm text-white/70">
+                {galleryQuery.data?.meta.total ?? media.length} foto(s) publicadas para este evento.
+              </p>
+            </div>
+          </div>
         </div>
 
         {publicFaceSearch?.public_search_enabled && publicFaceSearch.find_me_url ? (
@@ -89,23 +126,7 @@ export default function PublicGalleryPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="columns-2 gap-3 space-y-3 md:columns-3 lg:columns-4">
-            {media.map((item) => (
-              <div key={item.id} className="break-inside-avoid overflow-hidden rounded-3xl border border-white/10 bg-white/5">
-                {item.thumbnail_url ? (
-                  <img
-                    src={item.thumbnail_url}
-                    alt={item.caption || item.sender_name}
-                    className="w-full object-cover"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                ) : (
-                  <div className="flex h-48 items-center justify-center text-sm text-white/55">Sem preview</div>
-                )}
-              </div>
-            ))}
-          </div>
+          <GalleryRenderer media={media} experience={experience} />
         )}
       </div>
     </div>

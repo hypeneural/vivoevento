@@ -57,6 +57,7 @@ import {
 } from './labels';
 import type {
   EventPeopleCreatePayload,
+  EventPeoplePresetPerson,
   EventPeopleRelationPayload,
   EventPerson,
   EventPersonReferencePhotoCandidate,
@@ -65,6 +66,8 @@ import type {
   EventPersonStatus,
   EventPersonType,
 } from './types';
+import { EventPeopleGraphView } from './components/EventPeopleGraphView';
+import { EventPeopleGroupsPanel } from './components/EventPeopleGroupsPanel';
 
 type MutationSnapshot = ReturnType<typeof snapshotEventPeopleCache>;
 type OperationTone = 'neutral' | 'success' | 'warning' | 'danger';
@@ -123,6 +126,7 @@ export default function EventPeoplePage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isUiPending, startUiTransition] = useTransition();
+  const [viewMode, setViewMode] = useState<'people' | 'graph'>('people');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<EventPersonStatus | 'all'>('active');
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
@@ -167,6 +171,12 @@ export default function EventPeoplePage() {
     staleTime: 10_000,
     refetchInterval: 15_000,
   });
+  const graphQuery = useQuery({
+    queryKey: queryKeys.eventPeople.graph(eventId || 'none'),
+    queryFn: () => eventPeopleApi.getGraph(eventId),
+    enabled: eventId !== '' && viewMode === 'graph',
+    staleTime: 30_000,
+  });
   const selectedPersonQuery = useQuery({
     queryKey: queryKeys.eventPeople.personDetail(eventId || 'none', selectedPersonId ?? 'none'),
     queryFn: () => eventPeopleApi.getPerson(eventId, selectedPersonId as number),
@@ -190,7 +200,7 @@ export default function EventPeoplePage() {
   const operationalStatus = operationalStatusQuery.data;
   const presetPeopleGroups = useMemo(() => {
     const order = ['principal', 'familia', 'corte', 'amigos', 'corporativo', 'academico', 'equipe', 'fornecedor'];
-    const groups = new Map<string, typeof presetsQuery.data.people>();
+    const groups = new Map<string, EventPeoplePresetPerson[]>();
 
     (presetsQuery.data?.people ?? []).forEach((preset) => {
       const family = preset.role_family ?? 'outros';
@@ -252,6 +262,18 @@ export default function EventPeoplePage() {
   };
 
   const selectPerson = (personId: number) => startUiTransition(() => {
+    setViewMode('people');
+    setIsCreating(false);
+    setSelectedPersonId(personId);
+  });
+
+  const openGraphView = () => startUiTransition(() => {
+    setIsCreating(false);
+    setViewMode('graph');
+  });
+
+  const openPersonFromGraph = (personId: number) => startUiTransition(() => {
+    setViewMode('people');
     setIsCreating(false);
     setSelectedPersonId(personId);
   });
@@ -683,6 +705,34 @@ export default function EventPeoplePage() {
         ))}
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant={viewMode === 'people' ? 'default' : 'outline'}
+          onClick={() => setViewMode('people')}
+        >
+          <UserCircle2 className="h-4 w-4" />
+          Pessoas
+        </Button>
+        <Button
+          type="button"
+          variant={viewMode === 'graph' ? 'default' : 'outline'}
+          onClick={openGraphView}
+        >
+          <UsersRound className="h-4 w-4" />
+          Mapa de relacoes
+        </Button>
+      </div>
+
+      {viewMode === 'graph' ? (
+        <EventPeopleGraphView
+          graph={graphQuery.data ?? null}
+          isLoading={graphQuery.isLoading}
+          isFetching={graphQuery.isFetching}
+          initialSelectedPersonId={selectedPersonId}
+          onOpenPerson={openPersonFromGraph}
+        />
+      ) : (
       <div className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
         <Card className="border-border/60">
           <CardHeader className="space-y-4">
@@ -772,7 +822,64 @@ export default function EventPeoplePage() {
             </Card>
 
             <div className="grid gap-4">
-              <Card className="border-border/60"><CardHeader><CardTitle className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" />Modelo do evento</CardTitle></CardHeader><CardContent className="space-y-2"><p className="text-sm text-muted-foreground">Atalhos para cadastrar as pessoas mais importantes do evento sem montar tudo do zero.</p>{(presetsQuery.data?.people ?? []).map((preset) => <button key={preset.key} type="button" className="w-full rounded-2xl border border-border/60 bg-background px-4 py-3 text-left transition hover:border-primary/40 hover:bg-primary/5" onClick={() => createPerson.mutate({ display_name: preset.label, type: preset.type, side: preset.side, importance_rank: preset.importance_rank, status: 'active' })}><div className="flex items-center justify-between gap-3"><div><p className="font-medium">{preset.label}</p><p className="text-xs text-muted-foreground">{formatEventPersonMeta({ type: preset.type, side: preset.side }, 'Pessoa do evento')}</p></div><Sparkles className="h-4 w-4 text-primary" /></div></button>)}</CardContent></Card>
+              <Card className="border-border/60">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    Modelo do evento
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">Atalhos organizados por papel real do evento, com base para grupos e cobertura importante.</p>
+                  {presetPeopleGroups.map(([family, presets]) => (
+                    <div key={family} className="space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{formatEventPersonRoleFamily(family)}</p>
+                        <Badge variant="outline">{presets.length}</Badge>
+                      </div>
+                      {presets.map((preset) => {
+                        const label = preset.role_label ?? preset.label;
+                        const alreadyExists = existingPresetNames.has(label.trim().toLowerCase());
+
+                        return (
+                          <button
+                            key={preset.key}
+                            type="button"
+                            className="w-full rounded-2xl border border-border/60 bg-background px-4 py-3 text-left transition hover:border-primary/40 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-70"
+                            onClick={() => createPerson.mutate({
+                              display_name: label,
+                              type: preset.type,
+                              side: preset.side,
+                              importance_rank: preset.importance_rank,
+                              status: 'active',
+                            })}
+                            disabled={alreadyExists || createPerson.isPending}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="font-medium">{label}</p>
+                                <p className="text-xs text-muted-foreground">{formatEventPersonMeta({ type: preset.type, side: preset.side }, 'Pessoa do evento')}</p>
+                              </div>
+                              {alreadyExists ? <Badge variant="secondary">Ja existe</Badge> : <Sparkles className="h-4 w-4 text-primary" />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                  {(presetsQuery.data?.groups?.length ?? 0) > 0 ? (
+                    <div className="rounded-2xl border border-dashed border-border/60 px-4 py-3 text-xs text-muted-foreground">
+                      {presetsQuery.data?.groups?.length ?? 0} grupos sementes e {presetsQuery.data?.coverage_targets?.length ?? 0} alvos de cobertura preparados para as proximas fases.
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+              <EventPeopleGroupsPanel
+                eventId={eventId}
+                selectedPerson={selectedPerson}
+                presetGroups={presetsQuery.data?.groups ?? []}
+                onStatusChange={setOperationStatus}
+              />
               <Card className="border-border/60"><CardHeader><CardTitle className="flex items-center gap-2"><UserCircle2 className="h-4 w-4 text-primary" />Avatar e foto principal</CardTitle></CardHeader><CardContent className="space-y-3 text-sm"><div className="rounded-2xl border border-border/60 bg-background px-4 py-3"><p className="font-medium">Avatar do catalogo</p><p className="mt-1 text-muted-foreground">{selectedPerson?.avatar?.media_id ? `Foto #${selectedPerson.avatar.media_id} com ${avatarLabel.toLowerCase()}` : 'Nenhum avatar definido ainda.'}</p></div><div className="rounded-2xl border border-border/60 bg-background px-4 py-3"><p className="font-medium">Foto principal</p><p className="mt-1 text-muted-foreground">{selectedPerson?.primary_photo?.best_media_id ? primaryPhotoLabel : 'A melhor foto humana ainda nao foi definida.'}</p></div></CardContent></Card>
               <Card className="border-border/60">
                 <CardHeader>
@@ -914,6 +1021,7 @@ export default function EventPeoplePage() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

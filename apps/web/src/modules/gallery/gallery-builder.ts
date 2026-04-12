@@ -1,18 +1,137 @@
 import {
   GALLERY_BEHAVIOR_PROFILES,
   GALLERY_BLOCK_KEYS,
+  GALLERY_DENSITIES,
   GALLERY_EVENT_TYPE_FAMILIES,
+  GALLERY_INTERSTITIAL_POLICIES,
   GALLERY_LAYOUT_KEYS,
   GALLERY_MOBILE_BUDGET,
   GALLERY_STYLE_SKINS,
   GALLERY_THEME_KEYS,
   GALLERY_VIDEO_MODES,
   type GalleryBehaviorProfile,
+  type GalleryDensity,
   type GalleryEventTypeFamily,
   type GalleryExperienceConfig,
+  type GalleryInterstitialPolicy,
+  type GalleryLayoutKey,
+  type GalleryMediaBehavior,
   type GalleryModelMatrixSelection,
+  type GalleryPageSchema,
   type GalleryStyleSkin,
+  type GalleryThemeKey,
+  type GalleryThemeTokens,
 } from '@eventovivo/shared-types';
+
+export interface GalleryBuilderExperienceLayers {
+  event_type_family: GalleryEventTypeFamily;
+  style_skin: GalleryStyleSkin;
+  behavior_profile: GalleryBehaviorProfile;
+  theme_key: GalleryThemeKey;
+  layout_key: GalleryLayoutKey;
+  theme_tokens: GalleryThemeTokens;
+  page_schema: GalleryPageSchema;
+  media_behavior: GalleryMediaBehavior;
+}
+
+export interface GalleryBuilderEventSummary {
+  id: number;
+  title: string;
+  slug: string;
+}
+
+export interface GalleryBuilderSettings extends GalleryBuilderExperienceLayers {
+  id: number;
+  event_id: number;
+  is_enabled: boolean;
+  current_draft_revision_id: number | null;
+  current_published_revision_id: number | null;
+  preview_revision_id: number | null;
+  draft_version: number;
+  published_version: number;
+  preview_share_token: string | null;
+  preview_url: string | null;
+  preview_share_expires_at: string | null;
+  last_autosaved_at: string | null;
+  updated_by: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface GalleryBuilderRevision extends GalleryBuilderExperienceLayers {
+  id: number;
+  event_id: number;
+  version_number: number;
+  kind: 'autosave' | 'publish' | 'restore' | string;
+  change_summary: {
+    reason?: string | null;
+    source?: string | null;
+    layers?: string[];
+  } | null;
+  creator: {
+    id: number;
+    name: string;
+  } | null;
+  created_at: string | null;
+}
+
+export interface GalleryBuilderPreset {
+  id: number;
+  organization_id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  event_type_family: GalleryEventTypeFamily;
+  style_skin: GalleryStyleSkin;
+  behavior_profile: GalleryBehaviorProfile;
+  theme_key: GalleryThemeKey;
+  layout_key: GalleryLayoutKey;
+  derived_preset_key: string | null;
+  source_event: {
+    id: number;
+    title: string;
+    slug: string;
+  } | null;
+  creator: {
+    id: number;
+    name: string;
+  } | null;
+  payload: {
+    theme_tokens: GalleryThemeTokens;
+    page_schema: GalleryPageSchema;
+    media_behavior: GalleryMediaBehavior;
+  };
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface GalleryBuilderResponsiveSourceContract {
+  sizes: string;
+  required_variant_fields: string[];
+  target_widths: number[];
+}
+
+export interface GalleryBuilderShowResponse {
+  event: GalleryBuilderEventSummary;
+  settings: GalleryBuilderSettings;
+  mobile_budget: typeof GALLERY_MOBILE_BUDGET;
+  responsive_source_contract: GalleryBuilderResponsiveSourceContract;
+}
+
+export interface GalleryBuilderPreviewLinkResponse {
+  token: string;
+  preview_url: string;
+  expires_at: string | null;
+  revision: GalleryBuilderRevision;
+}
+
+export interface GalleryBuilderMutationResult {
+  settings: GalleryBuilderSettings;
+  revision?: GalleryBuilderRevision;
+}
+
+export type GalleryBuilderMode = 'quick' | 'professional';
+export type GalleryBuilderViewport = 'mobile' | 'desktop';
 
 export const galleryModelMatrixOptions = {
   eventTypeFamilies: [...GALLERY_EVENT_TYPE_FAMILIES],
@@ -20,11 +139,34 @@ export const galleryModelMatrixOptions = {
   behaviorProfiles: [...GALLERY_BEHAVIOR_PROFILES],
 } as const;
 
+export const galleryModelMatrixLabels = {
+  eventTypeFamily: {
+    wedding: 'Casamento',
+    quince: '15 anos',
+    corporate: 'Corporativo',
+  } satisfies Record<GalleryEventTypeFamily, string>,
+  styleSkin: {
+    romantic: 'Romantico',
+    modern: 'Moderno',
+    classic: 'Classico',
+    premium: 'Premium',
+    clean: 'Clean',
+  } satisfies Record<GalleryStyleSkin, string>,
+  behaviorProfile: {
+    light: 'Leve',
+    story: 'Historia',
+    live: 'Ao vivo',
+    sponsors: 'Patrocinios',
+  } satisfies Record<GalleryBehaviorProfile, string>,
+} as const;
+
 export const galleryContractCatalog = {
   themeKeys: [...GALLERY_THEME_KEYS],
   layoutKeys: [...GALLERY_LAYOUT_KEYS],
   blockKeys: [...GALLERY_BLOCK_KEYS],
   videoModes: [...GALLERY_VIDEO_MODES],
+  densities: [...GALLERY_DENSITIES],
+  interstitialPolicies: [...GALLERY_INTERSTITIAL_POLICIES],
   mobileBudget: GALLERY_MOBILE_BUDGET,
   publicResponsiveSizes: '(max-width: 640px) 50vw, (max-width: 1200px) 33vw, 25vw',
 } as const;
@@ -119,6 +261,8 @@ export function createGalleryExperienceFixture(
           variant: selection.event_type_family,
           show_logo: true,
           show_face_search_cta: true,
+          image_path: null,
+          image_url: null,
         },
         gallery_stream: {
           enabled: true,
@@ -126,6 +270,8 @@ export function createGalleryExperienceFixture(
         banner_strip: {
           enabled: selection.behavior_profile === 'sponsors',
           positions: ['after_12'],
+          image_path: null,
+          image_url: null,
         },
         quote: {
           enabled: selection.behavior_profile === 'story',
@@ -179,6 +325,210 @@ export function createGalleryExperienceFixture(
       },
     },
   };
+}
+
+export function buildGalleryExperienceFromBuilder(
+  layers: GalleryBuilderExperienceLayers,
+): GalleryExperienceConfig {
+  return {
+    version: 1,
+    model_matrix: {
+      event_type_family: layers.event_type_family,
+      style_skin: layers.style_skin,
+      behavior_profile: layers.behavior_profile,
+    },
+    theme_key: layers.theme_key,
+    layout_key: layers.layout_key,
+    theme_tokens: layers.theme_tokens,
+    page_schema: layers.page_schema,
+    media_behavior: layers.media_behavior,
+  };
+}
+
+export function createGalleryBuilderSettingsFixture(
+  overrides: Partial<GalleryBuilderSettings> = {},
+): GalleryBuilderSettings {
+  const baseExperience = createGalleryExperienceFixture({
+    event_type_family: 'wedding',
+    style_skin: 'romantic',
+    behavior_profile: 'story',
+  });
+
+  return {
+    id: 1,
+    event_id: 42,
+    is_enabled: true,
+    event_type_family: baseExperience.model_matrix.event_type_family,
+    style_skin: baseExperience.model_matrix.style_skin,
+    behavior_profile: baseExperience.model_matrix.behavior_profile,
+    theme_key: baseExperience.theme_key,
+    layout_key: baseExperience.layout_key,
+    theme_tokens: baseExperience.theme_tokens,
+    page_schema: baseExperience.page_schema,
+    media_behavior: baseExperience.media_behavior,
+    current_draft_revision_id: 101,
+    current_published_revision_id: 96,
+    preview_revision_id: null,
+    draft_version: 7,
+    published_version: 5,
+    preview_share_token: null,
+    preview_url: null,
+    preview_share_expires_at: null,
+    last_autosaved_at: '2026-04-12T12:00:00Z',
+    updated_by: 9,
+    created_at: '2026-04-12T10:00:00Z',
+    updated_at: '2026-04-12T12:00:00Z',
+    ...overrides,
+  };
+}
+
+export function createGalleryBuilderRevisionFixture(
+  overrides: Partial<GalleryBuilderRevision> = {},
+): GalleryBuilderRevision {
+  const settings = createGalleryBuilderSettingsFixture();
+
+  return {
+    id: 201,
+    event_id: settings.event_id,
+    version_number: 7,
+    kind: 'autosave',
+    event_type_family: settings.event_type_family,
+    style_skin: settings.style_skin,
+    behavior_profile: settings.behavior_profile,
+    theme_key: settings.theme_key,
+    layout_key: settings.layout_key,
+    theme_tokens: settings.theme_tokens,
+    page_schema: settings.page_schema,
+    media_behavior: settings.media_behavior,
+    change_summary: {
+      reason: 'Ajuste de paleta e hero',
+      source: 'builder',
+      layers: ['theme_tokens', 'page_schema'],
+    },
+    creator: {
+      id: 9,
+      name: 'Operador',
+    },
+    created_at: '2026-04-12T12:00:00Z',
+    ...overrides,
+  };
+}
+
+export function createGalleryBuilderPresetFixture(
+  overrides: Partial<GalleryBuilderPreset> = {},
+): GalleryBuilderPreset {
+  const experience = createGalleryExperienceFixture({
+    event_type_family: 'wedding',
+    style_skin: 'premium',
+    behavior_profile: 'light',
+  });
+
+  return {
+    id: 301,
+    organization_id: 10,
+    name: 'Casamento premium',
+    slug: 'casamento-premium',
+    description: 'Preset editorial premium para casamento.',
+    event_type_family: experience.model_matrix.event_type_family,
+    style_skin: experience.model_matrix.style_skin,
+    behavior_profile: experience.model_matrix.behavior_profile,
+    theme_key: experience.theme_key,
+    layout_key: experience.layout_key,
+    derived_preset_key: 'wedding-premium-light',
+    source_event: {
+      id: 42,
+      title: 'Casamento Ana e Leo',
+      slug: 'casamento-ana-leo',
+    },
+    creator: {
+      id: 9,
+      name: 'Operador',
+    },
+    payload: {
+      theme_tokens: experience.theme_tokens,
+      page_schema: experience.page_schema,
+      media_behavior: experience.media_behavior,
+    },
+    created_at: '2026-04-12T11:00:00Z',
+    updated_at: '2026-04-12T11:30:00Z',
+    ...overrides,
+  };
+}
+
+export function mergeGalleryLayers(
+  current: GalleryBuilderSettings,
+  nextLayers: Partial<GalleryBuilderExperienceLayers>,
+): GalleryBuilderSettings {
+  return {
+    ...current,
+    ...nextLayers,
+    theme_tokens: nextLayers.theme_tokens ?? current.theme_tokens,
+    page_schema: nextLayers.page_schema ?? current.page_schema,
+    media_behavior: nextLayers.media_behavior ?? current.media_behavior,
+  };
+}
+
+export function applyMatrixSelectionToDraft(
+  current: GalleryBuilderSettings,
+  selection: GalleryModelMatrixSelection,
+): GalleryBuilderSettings {
+  const nextExperience = createGalleryExperienceFixture(selection);
+  const currentHero = current.page_schema.blocks.hero as { image_path?: string | null; image_url?: string | null } | undefined;
+  const currentBanner = current.page_schema.blocks.banner_strip as { image_path?: string | null; image_url?: string | null } | undefined;
+  const nextHero = nextExperience.page_schema.blocks.hero as Record<string, unknown>;
+  const nextBanner = nextExperience.page_schema.blocks.banner_strip as Record<string, unknown>;
+
+  return mergeGalleryLayers(current, {
+    event_type_family: selection.event_type_family,
+    style_skin: selection.style_skin,
+    behavior_profile: selection.behavior_profile,
+    theme_key: nextExperience.theme_key,
+    layout_key: nextExperience.layout_key,
+    theme_tokens: nextExperience.theme_tokens,
+    page_schema: {
+      ...nextExperience.page_schema,
+      blocks: {
+        ...nextExperience.page_schema.blocks,
+        hero: {
+          ...nextHero,
+          image_path: currentHero?.image_path ?? null,
+          image_url: currentHero?.image_url ?? null,
+        },
+        banner_strip: {
+          ...nextBanner,
+          image_path: currentBanner?.image_path ?? null,
+          image_url: currentBanner?.image_url ?? null,
+        },
+      },
+    },
+    media_behavior: nextExperience.media_behavior,
+  });
+}
+
+export function formatGalleryModelMatrix(
+  selection: GalleryModelMatrixSelection | GalleryBuilderExperienceLayers,
+) {
+  return [
+    galleryModelMatrixLabels.eventTypeFamily[selection.event_type_family],
+    galleryModelMatrixLabels.styleSkin[selection.style_skin],
+    galleryModelMatrixLabels.behaviorProfile[selection.behavior_profile],
+  ].join(' / ');
+}
+
+export function formatGalleryDensity(density: GalleryDensity) {
+  return density === 'compact'
+    ? 'Compacta'
+    : density === 'immersive'
+      ? 'Imersiva'
+      : 'Confortavel';
+}
+
+export function formatGalleryInterstitialPolicy(policy: GalleryInterstitialPolicy) {
+  return policy === 'disabled'
+    ? 'Desativado'
+    : policy === 'story'
+      ? 'Narrativa'
+      : 'Patrocinios';
 }
 
 export const galleryExperienceFixtures = {

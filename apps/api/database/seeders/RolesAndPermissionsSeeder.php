@@ -32,6 +32,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'media.view', 'media.moderate', 'media.reprocess', 'media.delete',
             // Gallery
             'gallery.view', 'gallery.manage', 'gallery.builder.manage',
+            // Operations
+            'operations.view',
             // Wall
             'wall.view', 'wall.manage',
             // Play
@@ -85,6 +87,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'channels.view', 'channels.manage',
             'media.view', 'media.moderate', 'media.reprocess', 'media.delete',
             'gallery.view', 'gallery.manage', 'gallery.builder.manage',
+            'operations.view',
             'wall.view', 'wall.manage',
             'play.view', 'play.manage',
             'hub.view', 'hub.manage',
@@ -108,6 +111,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'channels.view', 'channels.manage',
             'media.view', 'media.moderate', 'media.reprocess',
             'gallery.view', 'gallery.manage', 'gallery.builder.manage',
+            'operations.view',
             'wall.view', 'wall.manage',
             'play.view', 'play.manage',
             'hub.view', 'hub.manage',
@@ -124,6 +128,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'channels.view',
             'media.view', 'media.moderate', 'media.reprocess',
             'gallery.view', 'gallery.manage', 'gallery.builder.manage',
+            'operations.view',
             'wall.view', 'wall.manage',
             'play.view', 'play.manage',
             'hub.view',

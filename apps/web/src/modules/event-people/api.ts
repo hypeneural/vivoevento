@@ -5,9 +5,14 @@ import type {
   ConfirmReviewItemResponse,
   EventMediaFacePeople,
   EventPeopleCreatePayload,
+  EventPeopleGraphResponse,
   EventPeoplePresetsResponse,
   EventPeopleOperationalStatus,
   EventPeopleRelationPayload,
+  EventPersonGroup,
+  EventPersonGroupMemberPayload,
+  EventPersonGroupMembership,
+  EventPersonGroupPayload,
   EventPeopleUpdatePayload,
   EventPeopleListFilters,
   EventPeopleReviewQueueFilters,
@@ -34,6 +39,10 @@ export const eventPeopleApi = {
     return api.get<EventPerson>(`/events/${eventId}/people/${personId}`);
   },
 
+  async getGraph(eventId: number | string) {
+    return api.get<EventPeopleGraphResponse>(`/events/${eventId}/people/graph`);
+  },
+
   async createPerson(eventId: number | string, payload: EventPeopleCreatePayload) {
     return api.post<EventPerson>(`/events/${eventId}/people`, {
       body: payload,
@@ -48,6 +57,44 @@ export const eventPeopleApi = {
 
   async getPresets(eventId: number | string) {
     return api.get<EventPeoplePresetsResponse>(`/events/${eventId}/people/presets`);
+  },
+
+  async listGroups(eventId: number | string, filters: Record<string, unknown> = {}) {
+    return api.get<EventPersonGroup[]>(`/events/${eventId}/people/groups`, {
+      params: filters,
+    });
+  },
+
+  async createGroup(eventId: number | string, payload: EventPersonGroupPayload) {
+    return api.post<EventPersonGroup>(`/events/${eventId}/people/groups`, {
+      body: payload,
+    });
+  },
+
+  async updateGroup(eventId: number | string, groupId: number | string, payload: Partial<EventPersonGroupPayload>) {
+    return api.patch<EventPersonGroup>(`/events/${eventId}/people/groups/${groupId}`, {
+      body: payload,
+    });
+  },
+
+  async deleteGroup(eventId: number | string, groupId: number | string) {
+    return api.delete<void>(`/events/${eventId}/people/groups/${groupId}`);
+  },
+
+  async applyPresetGroups(eventId: number | string) {
+    return api.post<EventPersonGroup[]>(`/events/${eventId}/people/groups/apply-preset`, {
+      body: {},
+    });
+  },
+
+  async addGroupMember(eventId: number | string, groupId: number | string, payload: EventPersonGroupMemberPayload) {
+    return api.post<EventPersonGroupMembership>(`/events/${eventId}/people/groups/${groupId}/members`, {
+      body: payload,
+    });
+  },
+
+  async removeGroupMember(eventId: number | string, groupId: number | string, membershipId: number | string) {
+    return api.delete<void>(`/events/${eventId}/people/groups/${groupId}/members/${membershipId}`);
   },
 
   async getOperationalStatus(eventId: number | string) {

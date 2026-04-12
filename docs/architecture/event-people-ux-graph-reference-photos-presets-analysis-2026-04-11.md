@@ -1235,12 +1235,101 @@ npx.cmd vitest run src/modules/event-people
 - introduzir `role_key`, `role_label` e `role_family`;
 - preparar `groups` e `coverage_targets` como seeds do preset.
 
+### Execucao desta rodada
+
+- [x] refatorar presets para tipos reais de evento: `wedding`, `fifteen`, `birthday`, `corporate`, `fair`, `graduation` e `generic`
+- [x] introduzir `role_key`, `role_label` e `role_family` mantendo compatibilidade com `key`, `label`, `type` e `side`
+- [x] preparar `groups` como sementes do preset, ainda sem CRUD de grupos
+- [x] preparar `coverage_targets` como sementes do preset, ainda sem dominio completo de coverage
+- [x] organizar o card `Modelo do evento` por `role_family` e evitar cadastro duplicado por nome
+
+### Validacao de regressao em 2026-04-12
+
+- [x] backend `EventPeople`: `44` testes passaram, `371` assertions
+- [x] frontend `src/modules/event-people`: `3` arquivos passaram, `6` testes passaram
+- [x] frontend `type-check`: passou
+
+Comandos executados:
+
+```bash
+cd apps/api
+php artisan test tests/Feature/EventPeople tests/Unit/EventPeople
+```
+
+```bash
+cd apps/web
+npx.cmd vitest run src/modules/event-people
+npm run type-check
+```
+
 ## P3 - Mapa de relacoes
 
 - criar `GET /people/graph`;
 - montar a view em `React Flow`;
 - abrir detalhe da pessoa e do par no painel lateral;
 - manter o grafo como vista complementar.
+
+### Execucao desta rodada
+
+- [x] criar `GET /people/graph`
+- [x] montar a view em `React Flow`
+- [x] abrir detalhe da pessoa e do par no painel lateral
+- [x] manter o grafo como vista complementar dentro de `EventPeoplePage`
+- [x] reaproveitar `groups` sementes do modelo no painel lateral do mapa
+
+### Validacao de regressao em 2026-04-12
+
+- [x] backend `EventPeople`: `46` testes passaram, `395` assertions
+- [x] frontend `src/modules/event-people`: `4` arquivos passaram, `9` testes passaram
+- [x] frontend `type-check`: passou
+
+Comandos executados:
+
+```bash
+cd apps/api
+php artisan test tests/Feature/EventPeople tests/Unit/EventPeople
+```
+
+```bash
+cd apps/web
+npx.cmd vitest run src/modules/event-people
+npm run type-check
+```
+
+## P4 - Grupos do evento
+
+- materializar `groups` do `Modelo do evento` em grupos reais;
+- permitir CRUD local de grupo e memberships;
+- manter o fluxo centrado em `Pessoas`, sem transformar grupo em pagina separada;
+- preparar a base local de coverage sem abrir coverage ainda.
+
+### Execucao desta rodada
+
+- [x] criar `event_person_groups` e `event_person_group_memberships`
+- [x] expor `GET/POST/PATCH/DELETE /people/groups`
+- [x] expor membership add/remove por grupo
+- [x] permitir aplicar os grupos sementes do `Modelo do evento`
+- [x] integrar `Grupos do evento` dentro de `EventPeoplePage`
+- [x] permitir adicionar a pessoa aberta ao grupo selecionado sem sair da pagina
+
+### Validacao de regressao em 2026-04-12
+
+- [x] backend `EventPeople`: `49` testes passaram, `459` assertions
+- [x] frontend `src/modules/event-people`: `5` arquivos passaram, `11` testes passaram
+- [x] frontend `type-check`: passou
+
+Comandos executados:
+
+```bash
+cd apps/api
+php artisan test tests/Feature/EventPeople tests/Unit/EventPeople
+```
+
+```bash
+cd apps/web
+npx.cmd vitest run src/modules/event-people
+npm run type-check
+```
 
 Esse e o melhor custo-beneficio porque primeiro reduz erro e atrito, depois aumenta impacto visual.
 

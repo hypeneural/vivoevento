@@ -44,6 +44,13 @@ Jobs do modulo devem usar `redis`, `afterCommit`, tags por `event_id` e, quando 
 
 - `GET /api/v1/events/{event}/people`
 - `POST /api/v1/events/{event}/people`
+- `GET /api/v1/events/{event}/people/groups`
+- `POST /api/v1/events/{event}/people/groups`
+- `POST /api/v1/events/{event}/people/groups/apply-preset`
+- `PATCH /api/v1/events/{event}/people/groups/{group}`
+- `DELETE /api/v1/events/{event}/people/groups/{group}`
+- `POST /api/v1/events/{event}/people/groups/{group}/members`
+- `DELETE /api/v1/events/{event}/people/groups/{group}/members/{membership}`
 - `GET /api/v1/events/{event}/people/{person}`
 - `PATCH /api/v1/events/{event}/people/{person}`
 - `GET /api/v1/events/{event}/people/presets`
@@ -64,3 +71,9 @@ Jobs do modulo devem usar `redis`, `afterCommit`, tags por `event_id` e, quando 
 - o sync com AWS roda em fila dedicada e nunca bloqueia a confirmacao humana;
 - merge, move e split de pessoas reencaminham o sync apenas para as identidades impactadas;
 - o status de cada representative fica registrado em `event_person_representative_faces`.
+
+## Grupos sociais locais
+
+- grupos e memberships ficam 100% locais no banco transacional;
+- `Modelo do evento` pode materializar seeds de grupos sem tocar AWS;
+- coverage e momentos vao consumir essa camada depois, sem mudar o ownership do modulo.
