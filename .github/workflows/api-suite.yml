@@ -32,7 +32,7 @@ jobs:
           php-version: '8.3'
           coverage: none
           tools: composer:v2
-          extensions: mbstring, xml, ctype, iconv, intl, pdo_sqlite, sqlite3, bcmath, fileinfo, curl, openssl
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_sqlite, sqlite3, bcmath, fileinfo, curl, openssl, redis
 
       - name: Cache Composer dependencies
         uses: actions/cache@v4
