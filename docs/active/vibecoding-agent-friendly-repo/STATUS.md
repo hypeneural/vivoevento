@@ -29,12 +29,13 @@ Transform the monorepo from documentation-heavy into a repo with clear agent-fac
   - `7` skipped
   - `2` todos
   - duration `549.13s`
-- the remaining remote gap is to rerun GitHub Actions with the latest API-test fixes included
+- the latest API test-stability fixes were pushed in commit `29b05a5`
+- the next remote validation is live as run `24316799489` and is currently `in_progress`
 
 ## Next Steps
 
-1. push the latest API test-stability fixes and let `API Suite` rerun on GitHub Actions
-2. compare the new remote result against the successful local full-suite run
+1. inspect the final result of remote run `24316799489`
+2. compare the remote result against the successful local full-suite run
 3. start using `docs/active/<feature>/STATUS.md` and `VERIFY.md` for long-running product work beyond this repo-hardening initiative
 
 ## Risks

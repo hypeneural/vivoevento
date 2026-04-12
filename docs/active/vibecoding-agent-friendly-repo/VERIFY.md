@@ -48,14 +48,18 @@ git push origin codex/agent-native-p1
   - `7` skipped
   - `2` todos
   - duration `549.13s`
+- the API test-stability fixes were pushed in commit `29b05a5`
+- the next `API Suite` run was triggered automatically on branch push:
+  - run id: `24316799489`
+  - URL: `https://github.com/hypeneural/vivoevento/actions/runs/24316799489`
+  - current status at the time of this update: `in_progress`
 
 ## Not Validated
 
 - the latest remote `API Suite` run for commit `722d1b4` has not yet finished from this environment
-- the latest code changes after the local full-suite fix have not yet been rerun remotely on GitHub Actions
+- the latest code changes after the local full-suite fix have not yet finished remotely on GitHub Actions
 
 ## Follow-up
 
-- push the latest API test-stability fixes
-- inspect the next `API Suite` run on GitHub Actions
+- inspect the final result of `https://github.com/hypeneural/vivoevento/actions/runs/24316799489`
 - once it passes, record the final run URL and status here
