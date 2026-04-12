@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class EventPersonGroup extends Model
 {
@@ -43,6 +44,16 @@ class EventPersonGroup extends Model
     public function memberships(): HasMany
     {
         return $this->hasMany(EventPersonGroupMembership::class);
+    }
+
+    public function groupStat(): HasOne
+    {
+        return $this->hasOne(EventPersonGroupStat::class);
+    }
+
+    public function groupMediaStat(): HasOne
+    {
+        return $this->hasOne(EventPersonGroupMediaStat::class);
     }
 
     public function scopeForEvent($query, int $eventId)

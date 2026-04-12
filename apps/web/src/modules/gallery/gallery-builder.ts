@@ -130,6 +130,63 @@ export interface GalleryBuilderMutationResult {
   revision?: GalleryBuilderRevision;
 }
 
+type DeepPartial<T> = {
+  [K in keyof T]?: T[K] extends Array<unknown>
+    ? T[K]
+    : T[K] extends Record<string, unknown>
+      ? DeepPartial<T[K]>
+      : T[K];
+};
+
+export type GalleryAiTargetLayer = 'mixed' | 'theme_tokens' | 'page_schema' | 'media_behavior';
+export type GalleryAiApplyScope = 'all' | Exclude<GalleryAiTargetLayer, 'mixed'>;
+
+export interface GalleryAiVariationModelMatrix {
+  event_type_family: GalleryEventTypeFamily;
+  style_skin: GalleryStyleSkin;
+  behavior_profile: GalleryBehaviorProfile;
+  theme_key: GalleryThemeKey;
+  layout_key: GalleryLayoutKey;
+}
+
+export interface GalleryAiVariationPatch {
+  theme_tokens?: DeepPartial<GalleryThemeTokens>;
+  page_schema?: DeepPartial<GalleryPageSchema>;
+  media_behavior?: DeepPartial<GalleryMediaBehavior>;
+}
+
+export interface GalleryAiVariation {
+  id: string;
+  label: string;
+  summary: string;
+  scope: GalleryAiTargetLayer;
+  available_layers: Array<Exclude<GalleryAiTargetLayer, 'mixed'>>;
+  model_matrix: GalleryAiVariationModelMatrix;
+  patch: GalleryAiVariationPatch;
+}
+
+export interface GalleryAiProposalRun {
+  id: number;
+  event_id: number;
+  organization_id: number | null;
+  user_id: number | null;
+  prompt_text: string;
+  persona_key: string | null;
+  event_type_key: string | null;
+  target_layer: GalleryAiTargetLayer;
+  base_preset_key: string | null;
+  response_schema_version: number;
+  status: string;
+  provider_key: string;
+  model_key: string;
+  created_at: string | null;
+}
+
+export interface GalleryAiProposalsResponse {
+  run: GalleryAiProposalRun;
+  variations: GalleryAiVariation[];
+}
+
 export type GalleryBuilderMode = 'quick' | 'professional';
 export type GalleryBuilderViewport = 'mobile' | 'desktop';
 
@@ -455,6 +512,130 @@ export function createGalleryBuilderPresetFixture(
   };
 }
 
+export function createGalleryAiVariationFixture(
+  overrides: Partial<GalleryAiVariation> = {},
+): GalleryAiVariation {
+  return {
+    id: 'romantic-soft',
+    label: 'Romantico suave',
+    summary: 'Rose claro, hero mais editorial e grade masonry confortavel.',
+    scope: 'mixed',
+    available_layers: ['theme_tokens', 'page_schema', 'media_behavior'],
+    model_matrix: {
+      event_type_family: 'wedding',
+      style_skin: 'romantic',
+      behavior_profile: 'story',
+      theme_key: 'wedding-rose',
+      layout_key: 'justified-story',
+    },
+    patch: {
+      theme_tokens: {
+        palette: {
+          accent: '#d97786',
+        },
+      },
+      page_schema: {
+        blocks: {
+          hero: {
+            show_logo: true,
+          },
+        },
+      },
+      media_behavior: {
+        grid: {
+          layout: 'masonry',
+          density: 'comfortable',
+        },
+      },
+    },
+    ...overrides,
+  };
+}
+
+export function createGalleryAiProposalsFixture(
+  overrides: Partial<GalleryAiProposalsResponse> = {},
+): GalleryAiProposalsResponse {
+  return {
+    run: {
+      id: 401,
+      event_id: 42,
+      organization_id: 10,
+      user_id: 9,
+      prompt_text: 'quero uma galeria romantica em tons rose',
+      persona_key: 'operator',
+      event_type_key: 'wedding',
+      target_layer: 'mixed',
+      base_preset_key: 'wedding.romantic.story',
+      response_schema_version: 1,
+      status: 'success',
+      provider_key: 'local-guardrailed',
+      model_key: 'gallery-builder-local-v1',
+      created_at: '2026-04-12T13:00:00Z',
+    },
+    variations: [
+      createGalleryAiVariationFixture(),
+      createGalleryAiVariationFixture({
+        id: 'modern-clean',
+        label: 'Moderno clean',
+        summary: 'Menos ornamento, mais respiro visual e leitura limpa.',
+        model_matrix: {
+          event_type_family: 'wedding',
+          style_skin: 'modern',
+          behavior_profile: 'light',
+          theme_key: 'wedding-rose',
+          layout_key: 'editorial-masonry',
+        },
+        patch: {
+          theme_tokens: {
+            palette: {
+              accent: '#475569',
+            },
+          },
+          page_schema: {
+            blocks: {
+              quote: {
+                enabled: false,
+              },
+            },
+          },
+          media_behavior: {
+            grid: {
+              layout: 'masonry',
+              density: 'comfortable',
+            },
+          },
+        },
+      }),
+      createGalleryAiVariationFixture({
+        id: 'premium-album',
+        label: 'Premium album',
+        summary: 'Mais contraste editorial, peso visual elegante e ritmo de album.',
+        model_matrix: {
+          event_type_family: 'wedding',
+          style_skin: 'premium',
+          behavior_profile: 'light',
+          theme_key: 'black-tie',
+          layout_key: 'editorial-masonry',
+        },
+        patch: {
+          theme_tokens: {
+            palette: {
+              accent: '#f8fafc',
+            },
+          },
+          media_behavior: {
+            grid: {
+              layout: 'masonry',
+              density: 'immersive',
+            },
+          },
+        },
+      }),
+    ],
+    ...overrides,
+  };
+}
+
 export function mergeGalleryLayers(
   current: GalleryBuilderSettings,
   nextLayers: Partial<GalleryBuilderExperienceLayers>,
@@ -466,6 +647,85 @@ export function mergeGalleryLayers(
     page_schema: nextLayers.page_schema ?? current.page_schema,
     media_behavior: nextLayers.media_behavior ?? current.media_behavior,
   };
+}
+
+function deepMergeLayer<T>(base: T, patch: DeepPartial<T> | undefined): T {
+  if (!patch) {
+    return base;
+  }
+
+  if (Array.isArray(base) || Array.isArray(patch)) {
+    return patch as T;
+  }
+
+  if (
+    typeof base !== 'object'
+    || base === null
+    || typeof patch !== 'object'
+    || patch === null
+  ) {
+    return patch as T;
+  }
+
+  const result: Record<string, unknown> = { ...(base as Record<string, unknown>) };
+
+  for (const [key, value] of Object.entries(patch as Record<string, unknown>)) {
+    const currentValue = result[key];
+
+    if (
+      Array.isArray(value)
+      || Array.isArray(currentValue)
+      || typeof value !== 'object'
+      || value === null
+      || typeof currentValue !== 'object'
+      || currentValue === null
+    ) {
+      result[key] = value;
+      continue;
+    }
+
+    result[key] = deepMergeLayer(
+      currentValue as Record<string, unknown>,
+      value as Record<string, unknown>,
+    );
+  }
+
+  return result as T;
+}
+
+export function applyGalleryAiVariationToDraft(
+  current: GalleryBuilderSettings,
+  variation: GalleryAiVariation,
+  scope: GalleryAiApplyScope,
+): GalleryBuilderSettings {
+  const next = { ...current };
+
+  if (scope === 'all') {
+    next.event_type_family = variation.model_matrix.event_type_family;
+    next.style_skin = variation.model_matrix.style_skin;
+    next.behavior_profile = variation.model_matrix.behavior_profile;
+    next.theme_key = variation.model_matrix.theme_key;
+    next.layout_key = variation.model_matrix.layout_key;
+  }
+
+  if (scope === 'theme_tokens' || scope === 'all') {
+    next.style_skin = variation.model_matrix.style_skin;
+    next.theme_key = variation.model_matrix.theme_key;
+    next.theme_tokens = deepMergeLayer(next.theme_tokens, variation.patch.theme_tokens);
+  }
+
+  if (scope === 'page_schema' || scope === 'all') {
+    next.event_type_family = variation.model_matrix.event_type_family;
+    next.page_schema = deepMergeLayer(next.page_schema, variation.patch.page_schema);
+  }
+
+  if (scope === 'media_behavior' || scope === 'all') {
+    next.behavior_profile = variation.model_matrix.behavior_profile;
+    next.layout_key = variation.model_matrix.layout_key;
+    next.media_behavior = deepMergeLayer(next.media_behavior, variation.patch.media_behavior);
+  }
+
+  return next;
 }
 
 export function applyMatrixSelectionToDraft(

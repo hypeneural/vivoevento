@@ -1949,3 +1949,20 @@ Status inicial:
 - o slice do PR-03 passou com `4` arquivos e `6` testes, enquanto a suite completa de `src/modules/event-operations` passou com `12` arquivos e `22` testes;
 - a regressao frontend adjacente passou com `2` arquivos e `19` testes, e a bateria backend das fontes existentes passou com `35` testes e `392` assertions;
 - `npm run type-check` passou novamente apos o boot read-only.
+- `PR-04` foi iniciado e concluido em `2026-04-12`;
+- a control room ganhou `canvas` V0 com camadas `background`, `stations`, `agents` e `effects`, papeis visuais de trabalho e leitura sintetica de `5s` e `15s` por cima do mesmo view model read-only;
+- o slice do PR-04 passou com `4` arquivos e `9` testes, enquanto a suite completa de `src/modules/event-operations` passou com `16` arquivos e `31` testes;
+- a regressao frontend adjacente passou com `2` arquivos e `19` testes, e a bateria backend das fontes existentes passou novamente com `35` testes e `392` assertions;
+- `npm run type-check` passou novamente apos a camada visual operacional.
+- `PR-05` foi iniciado e concluido em `2026-04-12`;
+- o backend agora tem modulo formal `EventOperations`, provider registrado, `README`, `routes/api.php`, models com factories e migrations de `event_operation_events` e `event_operation_snapshots`;
+- o slice do PR-05 passou com `6` testes e `33` assertions, enquanto a regressao backend das fontes existentes passou novamente com `35` testes e `392` assertions;
+- a suite completa de `src/modules/event-operations` passou novamente com `16` arquivos e `31` testes, a regressao frontend adjacente passou com `2` arquivos e `19` testes, e `npm run type-check` passou apos o scaffold backend.
+- `PR-06` foi iniciado e concluido em `2026-04-12`;
+- o backend agora tem `EventOperationsSequenceService`, `AppendEventOperationEventAction`, `RebuildEventOperationsSnapshotAction`, `EventOperationsSnapshotBuilder` e Data objects versionados para `delta`, `station` e `room`;
+- o slice do PR-06 passou com `7` testes e `47` assertions, enquanto a suite completa de `EventOperations` backend passou com `13` testes e `80` assertions;
+- a regressao backend das fontes existentes passou novamente com `35` testes e `392` assertions, a suite completa de `src/modules/event-operations` passou novamente com `16` arquivos e `31` testes, a regressao frontend adjacente passou com `2` arquivos e `19` testes, e `npm run type-check` passou apos sequencia, append e snapshot versioning.
+- `PR-07` foi iniciado e concluido em `2026-04-12`;
+- a API agora expoe `GET /api/v1/events/{event}/operations/room` e `GET /api/v1/events/{event}/operations/timeline`, com requests/resources/controlador proprios e autorizacao por `operations.view`;
+- o slice do PR-07 passou com `7` testes e `103` assertions, enquanto a suite completa de `EventOperations` backend passou com `20` testes e `183` assertions;
+- a regressao backend das fontes existentes passou novamente com `35` testes e `392` assertions, a suite completa de `src/modules/event-operations` passou novamente com `16` arquivos e `31` testes, a regressao frontend adjacente passou com `2` arquivos e `19` testes, e `npm run type-check` passou apos room/timeline e autorizacao.

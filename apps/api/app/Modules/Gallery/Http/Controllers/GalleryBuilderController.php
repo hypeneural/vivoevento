@@ -5,9 +5,11 @@ namespace App\Modules\Gallery\Http\Controllers;
 use App\Modules\Events\Models\Event;
 use App\Modules\Gallery\Actions\AutosaveEventGalleryDraftAction;
 use App\Modules\Gallery\Actions\PublishEventGalleryDraftAction;
+use App\Modules\Gallery\Actions\RunGalleryBuilderPromptAction;
 use App\Modules\Gallery\Actions\RestoreEventGalleryRevisionAction;
 use App\Modules\Gallery\Actions\UploadEventGalleryAssetAction;
 use App\Modules\Gallery\Actions\UpdateEventGallerySettingsAction;
+use App\Modules\Gallery\Http\Requests\RunGalleryBuilderPromptRequest;
 use App\Modules\Gallery\Http\Requests\ShowEventGallerySettingsRequest;
 use App\Modules\Gallery\Http\Requests\UploadEventGalleryAssetRequest;
 use App\Modules\Gallery\Http\Requests\UpdateEventGallerySettingsRequest;
@@ -234,6 +236,39 @@ class GalleryBuilderController extends BaseController
                 'url' => $result['url'],
             ],
             'settings' => (new EventGallerySettingsResource($result['settings']))->resolve(),
+        ]);
+    }
+
+    public function aiProposals(
+        RunGalleryBuilderPromptRequest $request,
+        Event $event,
+        GalleryBuilderPresetRegistry $registry,
+        RunGalleryBuilderPromptAction $action,
+    ): JsonResponse {
+        abort_unless($request->user()?->can('gallery.builder.manage'), 403);
+        $this->authorize('update', $event);
+
+        $settings = $this->ensureSettings($event, $request->user(), $registry);
+        $result = $action->execute($event, $settings, $request->validated(), $request->user());
+
+        return $this->success([
+            'run' => [
+                'id' => $result['run']->id,
+                'event_id' => $result['run']->event_id,
+                'organization_id' => $result['run']->organization_id,
+                'user_id' => $result['run']->user_id,
+                'prompt_text' => $result['run']->prompt_text,
+                'persona_key' => $result['run']->persona_key,
+                'event_type_key' => $result['run']->event_type_key,
+                'target_layer' => $result['run']->target_layer,
+                'base_preset_key' => $result['run']->base_preset_key,
+                'response_schema_version' => $result['run']->response_schema_version,
+                'status' => $result['run']->status,
+                'provider_key' => $result['run']->provider_key,
+                'model_key' => $result['run']->model_key,
+                'created_at' => $result['run']->created_at?->toIso8601String(),
+            ],
+            'variations' => $result['variations'],
         ]);
     }
 

@@ -41,8 +41,9 @@ return [
         'MediaIntelligence' => App\Modules\MediaIntelligence\Providers\MediaIntelligenceServiceProvider::class,
 
         // Etapa 3 — Experiência
-        'Gallery' => App\Modules\Gallery\Providers\GalleryServiceProvider::class,
-        'Wall'    => App\Modules\Wall\Providers\WallServiceProvider::class,
+        'Gallery'         => App\Modules\Gallery\Providers\GalleryServiceProvider::class,
+        'Wall'            => App\Modules\Wall\Providers\WallServiceProvider::class,
+        'EventOperations' => App\Modules\EventOperations\Providers\EventOperationsServiceProvider::class,
 
         // Etapa 4 — Interação
         'Play' => App\Modules\Play\Providers\PlayServiceProvider::class,

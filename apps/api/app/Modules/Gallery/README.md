@@ -11,6 +11,7 @@ Galeria publica, curadoria administrativa e builder versionado da experiencia de
 - revisions para `draft/publish/autosave/restore`;
 - presets reutilizaveis por organizacao;
 - preview compartilhavel baseado em token e revisao draft.
+- assistente de IA guardrailed com `3` variacoes aplicaveis em JSON.
 
 ## Rotas
 
@@ -37,6 +38,7 @@ Galeria publica, curadoria administrativa e builder versionado da experiencia de
 | POST | `/api/v1/events/{id}/gallery/preview-link` | Gerar token/link de preview draft |
 | POST | `/api/v1/events/{id}/gallery/hero-image` | Upload direto da imagem principal do hero |
 | POST | `/api/v1/events/{id}/gallery/banner-image` | Upload direto da imagem do banner/interstitial |
+| POST | `/api/v1/events/{id}/gallery/ai/proposals` | Gerar `3` propostas guardrailed e aplicaveis de IA |
 | GET | `/api/v1/gallery/presets` | Listar presets da organizacao ativa |
 | POST | `/api/v1/gallery/presets` | Salvar preset reutilizavel da organizacao |
 
@@ -53,6 +55,7 @@ Galeria publica, curadoria administrativa e builder versionado da experiencia de
 - `EventGallerySetting`
 - `EventGalleryRevision`
 - `GalleryPreset`
+- `GalleryBuilderPromptRun`
 
 ## Dependencias
 
@@ -69,3 +72,4 @@ Galeria publica, curadoria administrativa e builder versionado da experiencia de
 - preview tokenizado resolve uma revisao autosalva especifica;
 - `GalleryBuilderPresetRegistry` centraliza defaults, matriz de modelos e normalizacao;
 - `GalleryRevisionManager` garante versionamento monotonicamente crescente por evento.
+- a IA do builder retorna JSON validado por schema e nunca HTML, CSS ou JSX livre.

@@ -16,6 +16,8 @@ class ListEventPersonGroupsQuery
         $query = EventPersonGroup::query()
             ->forEvent($event->id)
             ->with([
+                'groupStat',
+                'groupMediaStat',
                 'memberships' => fn ($membershipQuery) => $membershipQuery
                     ->orderByDesc('status')
                     ->orderBy('role_label')

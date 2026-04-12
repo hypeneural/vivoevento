@@ -23,6 +23,8 @@ export type EventPersonReferencePhotoPurpose = 'avatar' | 'matching' | 'both';
 export type EventPersonReferencePhotoStatus = 'active' | 'archived' | 'invalid';
 export type EventPersonGroupStatus = 'active' | 'archived';
 export type EventPersonGroupMembershipStatus = 'active' | 'archived';
+export type EventCoverageState = 'missing' | 'weak' | 'ok' | 'strong';
+export type EventCoverageTargetType = 'person' | 'pair' | 'group';
 
 export interface EventPersonMediaStat {
   media_count: number;
@@ -189,6 +191,82 @@ export interface EventPersonGroupMembership {
   person?: EventPersonGroupMembershipPersonSummary | null;
   created_at: string | null;
   updated_at: string | null;
+}
+
+export interface EventCoverageTargetStat {
+  coverage_state: EventCoverageState | string;
+  score: number;
+  resolved_entity_count: number;
+  media_count: number;
+  published_media_count: number;
+  joint_media_count: number;
+  people_with_primary_photo_count: number;
+  reason_codes: string[];
+  projected_at?: string | null;
+}
+
+export interface EventCoverageTargetPersonSummary {
+  id: number;
+  display_name: string;
+  type: string | null;
+  side: string | null;
+  status: string | null;
+}
+
+export interface EventCoverageTargetGroupSummary {
+  id: number;
+  display_name: string;
+  slug: string;
+  importance_rank: number;
+}
+
+export interface EventCoverageTarget {
+  id: number;
+  key: string;
+  label: string;
+  target_type: EventCoverageTargetType | string;
+  status: string;
+  importance_rank: number;
+  required_media_count: number;
+  required_published_media_count: number;
+  last_evaluated_at?: string | null;
+  person_a?: EventCoverageTargetPersonSummary | null;
+  person_b?: EventCoverageTargetPersonSummary | null;
+  group?: EventCoverageTargetGroupSummary | null;
+  stat?: EventCoverageTargetStat | null;
+}
+
+export interface EventCoverageAlertTargetSummary {
+  id: number;
+  key: string;
+  label: string;
+  coverage_state?: EventCoverageState | string | null;
+}
+
+export interface EventCoverageAlert {
+  id: number;
+  alert_key: string;
+  severity: string;
+  title: string;
+  summary: string | null;
+  status: string;
+  last_evaluated_at?: string | null;
+  target?: EventCoverageAlertTargetSummary | null;
+}
+
+export interface EventPeopleCoverageSummary {
+  missing: number;
+  weak: number;
+  ok: number;
+  strong: number;
+  active_alerts: number;
+  last_evaluated_at?: string | null;
+}
+
+export interface EventPeopleCoverageResponse {
+  summary: EventPeopleCoverageSummary;
+  targets: EventCoverageTarget[];
+  alerts: EventCoverageAlert[];
 }
 
 export interface EventPersonGroup {

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Evento Vivo icon</title>
+  <desc id="desc">Gradient icon for the Evento Vivo admin panel.</desc>
+  <defs>
+    <linearGradient id="bg" x1="6" y1="4" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#171b37" />
+      <stop offset="0.56" stop-color="#1f2250" />
+      <stop offset="1" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="accent" x1="34" y1="18" x2="54" y2="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8b5cf6" />
+      <stop offset="1" stop-color="#38bdf8" />
+    </linearGradient>
+    <radialGradient id="glowTop" cx="0" cy="0" r="1" gradientTransform="translate(50 14) rotate(90) scale(16)">
+      <stop offset="0" stop-color="#60a5fa" stop-opacity="0.95" />
+      <stop offset="1" stop-color="#60a5fa" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="glowBottom" cx="0" cy="0" r="1" gradientTransform="translate(14 54) rotate(90) scale(18)">
+      <stop offset="0" stop-color="#7c3aed" stop-opacity="0.7" />
+      <stop offset="1" stop-color="#7c3aed" stop-opacity="0" />
+    </radialGradient>
+    <filter id="blur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" />
+    </filter>
+  </defs>
+
+  <rect width="64" height="64" rx="18" fill="#0b1020" />
+  <circle cx="50" cy="14" r="14" fill="url(#glowTop)" filter="url(#blur)" />
+  <circle cx="14" cy="54" r="16" fill="url(#glowBottom)" filter="url(#blur)" />
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#bg)" />
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="none" stroke="rgba(255,255,255,0.08)" />
+
+  <path
+    d="M19 17C19 15.8954 19.8954 15 21 15H44C45.1046 15 46 15.8954 46 17V20C46 21.1046 45.1046 22 44 22H27V27H39C40.1046 27 41 27.8954 41 29V32C41 33.1046 40.1046 34 39 34H27V42H45C46.1046 42 47 42.8954 47 44V47C47 48.1046 46.1046 49 45 49H21C19.8954 49 19 48.1046 19 47V17Z"
+    fill="#f8fafc"
+  />
+  <path d="M34 18H40L44 32.5L48 18H54L46 46H42L34 18Z" fill="url(#accent)" />
+  <circle cx="50" cy="18" r="4" fill="#38bdf8" />
+  <circle cx="50" cy="18" r="7" fill="none" stroke="#38bdf8" stroke-opacity="0.28" stroke-width="2" />
+</svg>

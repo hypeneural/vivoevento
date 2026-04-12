@@ -5,7 +5,7 @@ namespace App\Modules\EventPeople\Queries;
 use App\Modules\EventPeople\Models\EventPerson;
 use App\Modules\EventPeople\Models\EventPersonPairScore;
 use App\Modules\EventPeople\Models\EventPersonRelation;
-use App\Modules\EventPeople\Services\EventPeoplePresetCatalog;
+use App\Modules\EventPeople\Support\EventPeopleRoleResolver;
 use App\Modules\Events\Models\Event;
 use App\Modules\MediaProcessing\Services\MediaAssetUrlService;
 use Illuminate\Support\Collection;
@@ -13,7 +13,7 @@ use Illuminate\Support\Collection;
 class BuildEventPeopleGraphQuery
 {
     public function __construct(
-        private readonly EventPeoplePresetCatalog $presetCatalog,
+        private readonly EventPeopleRoleResolver $roleResolver,
         private readonly ListEventPeopleQuery $peopleQuery,
         private readonly MediaAssetUrlService $assets,
     ) {}
@@ -24,11 +24,8 @@ class BuildEventPeopleGraphQuery
      */
     public function build(Event $event, array $filters = []): array
     {
-        $eventType = is_string($event->event_type)
-            ? $event->event_type
-            : $event->event_type?->value;
-        $presetPackage = $this->presetCatalog->forEventType($eventType);
-        $presetPeople = collect($presetPackage['people'] ?? [])->values();
+        $presetPackage = $this->roleResolver->presetPackageForEvent($event);
+        $presetPeople = $this->roleResolver->presetPeopleForEvent($event);
 
         /** @var Collection<int, EventPerson> $people */
         $people = $this->peopleQuery
@@ -118,7 +115,7 @@ class BuildEventPeopleGraphQuery
     private function personPayload(EventPerson $person, Collection $presetPeople): array
     {
         $stat = $person->relationLoaded('mediaStats') ? $person->mediaStats->first() : null;
-        $roleMeta = $this->resolveRoleMeta($person, $presetPeople);
+        $roleMeta = $this->roleResolver->resolveRoleMeta($person, $presetPeople);
 
         return [
             'id' => (int) $person->id,
@@ -161,59 +158,6 @@ class BuildEventPeopleGraphQuery
         ];
     }
 
-    /**
-     * @param  Collection<int, array<string, mixed>>  $presetPeople
-     * @return array{role_key: ?string, role_label: string, role_family: string}
-     */
-    private function resolveRoleMeta(EventPerson $person, Collection $presetPeople): array
-    {
-        $personType = $person->type?->value ?? $person->type;
-        $personSide = $person->side?->value ?? $person->side;
-        $normalizedDisplayName = mb_strtolower(trim($person->display_name));
-
-        $displayMatches = $presetPeople
-            ->filter(function (array $preset) use ($normalizedDisplayName): bool {
-                $labels = array_filter([
-                    $preset['role_label'] ?? null,
-                    $preset['label'] ?? null,
-                ]);
-
-                return collect($labels)
-                    ->contains(fn (string $label): bool => mb_strtolower(trim($label)) === $normalizedDisplayName);
-            })
-            ->values();
-
-        if ($displayMatches->count() === 1) {
-            $match = $displayMatches->first();
-
-            return [
-                'role_key' => $match['role_key'] ?? $match['key'] ?? null,
-                'role_label' => $match['role_label'] ?? $match['label'] ?? $this->formatTypeLabel($personType),
-                'role_family' => $match['role_family'] ?? $this->fallbackRoleFamily($personType),
-            ];
-        }
-
-        $typeSideMatches = $presetPeople
-            ->filter(fn (array $preset): bool => ($preset['type'] ?? null) === $personType && ($preset['side'] ?? null) === $personSide)
-            ->values();
-
-        if ($typeSideMatches->count() === 1) {
-            $match = $typeSideMatches->first();
-
-            return [
-                'role_key' => $match['role_key'] ?? $match['key'] ?? null,
-                'role_label' => $match['role_label'] ?? $match['label'] ?? $this->formatTypeLabel($personType),
-                'role_family' => $match['role_family'] ?? $this->fallbackRoleFamily($personType),
-            ];
-        }
-
-        return [
-            'role_key' => null,
-            'role_label' => $this->formatTypeLabel($personType),
-            'role_family' => $this->fallbackRoleFamily($personType),
-        ];
-    }
-
     private function resolveAvatarUrl(EventPerson $person): ?string
     {
         $primaryReferencePhoto = $person->relationLoaded('primaryReferencePhoto') ? $person->primaryReferencePhoto : null;
@@ -236,37 +180,4 @@ class BuildEventPeopleGraphQuery
         return null;
     }
 
-    private function formatTypeLabel(?string $type): string
-    {
-        return match ($type) {
-            'bride' => 'Noiva',
-            'groom' => 'Noivo',
-            'mother' => 'Mae',
-            'father' => 'Pai',
-            'sibling' => 'Irmao(irma)',
-            'friend' => 'Amigo(a)',
-            'groomsman' => 'Padrinho',
-            'bridesmaid' => 'Madrinha',
-            'vendor' => 'Fornecedor',
-            'staff' => 'Equipe',
-            'speaker' => 'Palestrante',
-            'artist' => 'Artista',
-            'executive' => 'Executivo',
-            default => 'Pessoa do evento',
-        };
-    }
-
-    private function fallbackRoleFamily(?string $type): string
-    {
-        return match ($type) {
-            'bride', 'groom', 'executive' => 'principal',
-            'mother', 'father', 'sibling' => 'familia',
-            'groomsman', 'bridesmaid' => 'corte',
-            'friend' => 'amigos',
-            'staff' => 'equipe',
-            'vendor', 'artist' => 'fornecedor',
-            'speaker' => 'corporativo',
-            default => 'outros',
-        };
-    }
 }

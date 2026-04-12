@@ -20,14 +20,15 @@
 | 14 | MediaIntelligence | Processamento | 2 | VLM rapido, prompts por evento e historico semantico por foto |
 | 15 | Gallery | Experiencia | 3 | Galeria publica, curadoria e builder versionado da experiencia |
 | 16 | Wall | Experiencia | 3 | Telao e slideshow realtime |
-| 17 | Play | Experiencia | 4 | Jogos interativos |
-| 18 | Hub | Experiencia | 4 | Pagina central do evento |
-| 19 | Plans | Negocio | 5 | Catalogo de planos |
-| 20 | Billing | Negocio | 5 | Assinaturas e cobrancas |
-| 21 | Partners | Negocio | 5 | Camada B2B para parceiros |
-| 22 | Analytics | Suporte | 5 | Metricas e consolidados |
-| 23 | Audit | Suporte | 5 | Trilha de auditoria |
-| 24 | Notifications | Suporte | 5 | Avisos e alertas |
+| 17 | EventOperations | Experiencia / Operacoes | 3 | Sala operacional realtime por evento |
+| 18 | Play | Experiencia | 4 | Jogos interativos |
+| 19 | Hub | Experiencia | 4 | Pagina central do evento |
+| 20 | Plans | Negocio | 5 | Catalogo de planos |
+| 21 | Billing | Negocio | 5 | Assinaturas e cobrancas |
+| 22 | Partners | Negocio | 5 | Camada B2B para parceiros |
+| 23 | Analytics | Suporte | 5 | Metricas e consolidados |
+| 24 | Audit | Suporte | 5 | Trilha de auditoria |
+| 25 | Notifications | Suporte | 5 | Avisos e alertas |
 
 ## Dependencias entre Modulos
 
@@ -59,6 +60,12 @@ graph TD
     Gallery --> Events
     Wall --> MediaProcessing
     Wall --> Events
+    EventOperations --> Events
+    EventOperations --> InboundMedia
+    EventOperations --> MediaProcessing
+    EventOperations --> Gallery
+    EventOperations --> Wall
+    EventOperations --> Audit
     Play --> Events
     Hub --> Events
     Billing --> Plans

@@ -81,6 +81,7 @@ export const queryKeys = {
     mediaFaces: (eventId: number | string, mediaId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'media', String(mediaId), 'faces'] as const,
     presets: (eventId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'presets'] as const,
     operationalStatus: (eventId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'operational-status'] as const,
+    coverage: (eventId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'coverage'] as const,
   },
 
   // Gallery

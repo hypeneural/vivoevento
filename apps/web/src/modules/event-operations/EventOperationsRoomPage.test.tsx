@@ -1,12 +1,25 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { eventOperationsHealthySnapshotFixture } from './__fixtures__/operations-room.fixture';
 import EventOperationsRoomPage from './EventOperationsRoomPage';
 import type { EventOperationsV0Room } from './types';
 
 const useEventOperationsBootMock = vi.fn();
+const getContextMock = vi.fn(() => ({
+  clearRect: vi.fn(),
+  fillRect: vi.fn(),
+  strokeRect: vi.fn(),
+  beginPath: vi.fn(),
+  moveTo: vi.fn(),
+  lineTo: vi.fn(),
+  stroke: vi.fn(),
+  fillText: vi.fn(),
+  save: vi.fn(),
+  restore: vi.fn(),
+  imageSmoothingEnabled: false,
+}));
 
 vi.mock('./hooks/useEventOperationsBoot', () => ({
   useEventOperationsBoot: (...args: unknown[]) => useEventOperationsBootMock(...args),
@@ -40,12 +53,22 @@ function renderPage() {
 }
 
 describe('EventOperationsRoomPage', () => {
+  beforeAll(() => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+      getContextMock as HTMLCanvasElement['getContext'],
+    );
+  });
+
   beforeEach(() => {
     useEventOperationsBootMock.mockReturnValue({
       data: makeRoom(),
       isLoading: false,
       isError: false,
     });
+  });
+
+  afterAll(() => {
+    vi.restoreAllMocks();
   });
 
   it('renders the fullscreen control room shell without admin chrome', () => {

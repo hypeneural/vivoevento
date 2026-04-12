@@ -5,6 +5,7 @@ import type {
   ConfirmReviewItemResponse,
   EventMediaFacePeople,
   EventPeopleCreatePayload,
+  EventPeopleCoverageResponse,
   EventPeopleGraphResponse,
   EventPeoplePresetsResponse,
   EventPeopleOperationalStatus,
@@ -57,6 +58,16 @@ export const eventPeopleApi = {
 
   async getPresets(eventId: number | string) {
     return api.get<EventPeoplePresetsResponse>(`/events/${eventId}/people/presets`);
+  },
+
+  async getCoverage(eventId: number | string) {
+    return api.get<EventPeopleCoverageResponse>(`/events/${eventId}/people/coverage`);
+  },
+
+  async refreshCoverage(eventId: number | string) {
+    return api.post<EventPeopleCoverageResponse>(`/events/${eventId}/people/coverage/refresh`, {
+      body: {},
+    });
   },
 
   async listGroups(eventId: number | string, filters: Record<string, unknown> = {}) {

@@ -648,6 +648,16 @@ Objetivo:
 - fazer a V0 parecer equipe trabalhando, nao pipeline com sprites;
 - validar linguagem visual antes do backend novo.
 
+Status em `2026-04-12`:
+
+- concluido;
+- red confirmado com `scene-runtime`, `visual-roles`, `OperationsRoomCanvas` e sinais de leitura macro/meso ainda ausentes;
+- green do slice confirmado com `4` arquivos e `9` testes passando;
+- suite completa de `src/modules/event-operations` confirmou `16` arquivos e `31` testes passando;
+- regressao frontend adjacente confirmou `2` arquivos e `19` testes passando;
+- validacao backend das fontes existentes confirmou `35` testes e `392` assertions passando em `EventJourney`, `MediaPipelineMetrics`, `WallDiagnostics`, `WallLiveSnapshot` e `Audit`;
+- `npm run type-check` passou.
+
 Slice:
 
 - frontend canvas;
@@ -698,6 +708,16 @@ Objetivo:
 - criar ownership backend formal da feature;
 - persistir eventos append-only e snapshots.
 
+Status em `2026-04-12`:
+
+- concluido;
+- red confirmado com provider, models, migrations, registro do modulo e mapa de modulos ainda ausentes;
+- green do slice confirmado com `6` testes e `33` assertions passando em `EventOperations` e `operations.view`;
+- regressao backend das fontes existentes confirmou `35` testes e `392` assertions passando em `EventJourney`, `MediaPipelineMetrics`, `WallDiagnostics`, `WallLiveSnapshot` e `Audit`;
+- suite completa de `src/modules/event-operations` confirmou `16` arquivos e `31` testes passando;
+- regressao frontend adjacente confirmou `2` arquivos e `19` testes passando;
+- `npm run type-check` passou.
+
 Slice:
 
 - backend estrutural;
@@ -746,6 +766,17 @@ Objetivo:
 
 - fechar o contrato monotonico do backend antes de abrir API ou broadcast.
 
+Status em `2026-04-12`:
+
+- concluido;
+- red confirmado com servico monotonicamente crescente, append action, snapshot builder e versionamento ainda ausentes;
+- green do slice confirmado com `7` testes e `47` assertions passando;
+- suite completa de `EventOperations` confirmou `13` testes e `80` assertions passando, incluindo scaffold, models, sequence, append e snapshot versioning;
+- regressao backend das fontes existentes confirmou `35` testes e `392` assertions passando em `EventJourney`, `MediaPipelineMetrics`, `WallDiagnostics`, `WallLiveSnapshot` e `Audit`;
+- suite completa de `src/modules/event-operations` confirmou `16` arquivos e `31` testes passando;
+- regressao frontend adjacente confirmou `2` arquivos e `19` testes passando;
+- `npm run type-check` passou.
+
 Slice:
 
 - backend dominio;
@@ -793,6 +824,17 @@ Objetivo:
 
 - expor boot e history com contrato versionado;
 - garantir autorizacao por `operations.view`.
+
+Status em `2026-04-12`:
+
+- concluido;
+- red confirmado com `room` e `timeline` ainda sem rotas/controlador e, por isso, falhando pelo motivo certo antes do slice HTTP;
+- green do slice confirmado com `7` testes e `103` assertions passando para `room`, `timeline` e autorizacao;
+- suite completa de `EventOperations` confirmou `20` testes e `183` assertions passando, incluindo scaffold, models, sequence, append, snapshot e API;
+- regressao backend das fontes existentes confirmou `35` testes e `392` assertions passando em `EventJourney`, `MediaPipelineMetrics`, `WallDiagnostics`, `WallLiveSnapshot` e `Audit`;
+- suite completa de `src/modules/event-operations` confirmou `16` arquivos e `31` testes passando;
+- regressao frontend adjacente confirmou `2` arquivos e `19` testes passando;
+- `npm run type-check` passou.
 
 Slice:
 

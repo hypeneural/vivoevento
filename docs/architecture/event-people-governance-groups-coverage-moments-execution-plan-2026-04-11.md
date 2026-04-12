@@ -1314,12 +1314,12 @@ npx.cmd vitest run src/modules/event-people/components/RelationalDeliveries.test
 - [x] criar `event_person_groups`
 - [x] criar `event_person_group_memberships`
 - [x] criar presets e CRUD de grupos
-- [ ] criar stats e filtros por grupo
-- [ ] criar `event_coverage_targets`
-- [ ] criar `event_must_have_pairs`
-- [ ] criar `event_coverage_alerts`
-- [ ] criar score de cobertura por pessoa, par e grupo
-- [ ] criar painel `Cobertura importante`
+- [x] criar stats e filtros por grupo
+- [x] criar `event_coverage_targets`
+- [x] criar `event_must_have_pairs`
+- [x] criar `event_coverage_alerts`
+- [x] criar score de cobertura por pessoa, par e grupo
+- [x] criar painel `Cobertura importante`
 - [ ] criar `event_relational_collections`
 - [ ] criar `event_relational_collection_items`
 - [ ] criar recipe engine de colecoes relacionais
@@ -1335,7 +1335,9 @@ Status em `2026-04-12`:
   - memberships por grupo
   - aplicacao de seeds do modelo por evento
   - painel local em `EventPeoplePage`
-- dominio de coverage, read models dedicados de grupo e momentos continuam pendentes.
+- read models dedicados de grupo foram adicionados (`event_person_group_stats`, `event_person_group_media_stats`);
+- dominio de coverage foi entregue com targets, alerts e painel local;
+- momentos e colecoes relacionais continuam pendentes.
 
 ---
 

@@ -20,6 +20,8 @@ vi.mock('./api', () => ({
     createPerson: vi.fn(),
     updatePerson: vi.fn(),
     getPresets: vi.fn(),
+    getCoverage: vi.fn(),
+    refreshCoverage: vi.fn(),
     listGroups: vi.fn(),
     createGroup: vi.fn(),
     updateGroup: vi.fn(),
@@ -245,6 +247,18 @@ describe('EventPeoplePage', () => {
       coverage_targets: [{ key: 'couple_portrait', label: 'Casal junto', target_type: 'group', role_keys: ['bride'], group_key: 'couple', priority: 100 }],
     });
     vi.mocked(eventPeopleApi.listGroups).mockResolvedValue([]);
+    vi.mocked(eventPeopleApi.getCoverage).mockResolvedValue({
+      summary: {
+        missing: 1,
+        weak: 0,
+        ok: 0,
+        strong: 0,
+        active_alerts: 1,
+        last_evaluated_at: null,
+      },
+      targets: [],
+      alerts: [],
+    });
     vi.mocked(eventPeopleApi.createGroup).mockRejectedValue(new Error('not used'));
     vi.mocked(eventPeopleApi.updateGroup).mockRejectedValue(new Error('not used'));
     vi.mocked(eventPeopleApi.deleteGroup).mockResolvedValue(undefined);
@@ -283,6 +297,7 @@ describe('EventPeoplePage', () => {
     expect(screen.getByText('Revisoes pendentes')).toBeInTheDocument();
     expect(screen.getByText('Modelo do evento')).toBeInTheDocument();
     expect(screen.getByText('Grupos do evento')).toBeInTheDocument();
+    expect(screen.getByText('Cobertura importante')).toBeInTheDocument();
     expect(screen.getByText('Pessoas principais')).toBeInTheDocument();
     expect(screen.getByText('1 grupos sementes e 1 alvos de cobertura preparados para as proximas fases.')).toBeInTheDocument();
   }, 15_000);

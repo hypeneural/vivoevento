@@ -2,6 +2,7 @@
 
 use App\Modules\EventPeople\Http\Controllers\EventMediaPeopleController;
 use App\Modules\EventPeople\Http\Controllers\EventPeopleController;
+use App\Modules\EventPeople\Http\Controllers\EventPeopleCoverageController;
 use App\Modules\EventPeople\Http\Controllers\EventPeoplePresetsController;
 use App\Modules\EventPeople\Http\Controllers\EventPeopleReviewQueueController;
 use App\Modules\EventPeople\Http\Controllers\EventPersonGroupsController;
@@ -15,6 +16,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('events/{event}/people/operational-status', [EventPeopleController::class, 'operationalStatus']);
     Route::get('events/{event}/people/graph', [EventPeopleController::class, 'graph']);
     Route::get('events/{event}/people/presets', [EventPeoplePresetsController::class, 'show']);
+    Route::get('events/{event}/people/coverage', [EventPeopleCoverageController::class, 'index']);
+    Route::post('events/{event}/people/coverage/refresh', [EventPeopleCoverageController::class, 'refresh']);
     Route::get('events/{event}/people/groups', [EventPersonGroupsController::class, 'index']);
     Route::post('events/{event}/people/groups', [EventPersonGroupsController::class, 'store']);
     Route::post('events/{event}/people/groups/apply-preset', [EventPersonGroupsController::class, 'applyPreset']);

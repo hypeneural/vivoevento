@@ -5,6 +5,7 @@ namespace App\Modules\EventPeople\Http\Controllers;
 use App\Modules\EventPeople\Actions\AddEventPersonGroupMemberAction;
 use App\Modules\EventPeople\Actions\ApplyEventPersonGroupPresetAction;
 use App\Modules\EventPeople\Actions\CreateEventPersonGroupAction;
+use App\Modules\EventPeople\Actions\ProjectEventPersonGroupStatsAction;
 use App\Modules\EventPeople\Actions\UpdateEventPersonGroupAction;
 use App\Modules\EventPeople\Http\Requests\ListEventPersonGroupsRequest;
 use App\Modules\EventPeople\Http\Requests\StoreEventPersonGroupMemberRequest;
@@ -41,12 +42,13 @@ class EventPersonGroupsController extends BaseController
         Event $event,
         EventAccessService $eventAccess,
         CreateEventPersonGroupAction $action,
+        ProjectEventPersonGroupStatsAction $projectStats,
     ): JsonResponse {
         abort_unless($eventAccess->can($request->user(), $event, 'events.update'), 403);
 
-        $group = $this->loadGroup(
-            $action->execute($event, $request->user(), $request->validated())
-        );
+        $group = $action->execute($event, $request->user(), $request->validated());
+        $projectStats->executeForGroup($group);
+        $group = $this->loadGroup($group);
 
         return $this->created(new EventPersonGroupResource($group));
     }
@@ -57,13 +59,14 @@ class EventPersonGroupsController extends BaseController
         EventPersonGroup $group,
         EventAccessService $eventAccess,
         UpdateEventPersonGroupAction $action,
+        ProjectEventPersonGroupStatsAction $projectStats,
     ): JsonResponse {
         abort_unless($eventAccess->can($request->user(), $event, 'events.update'), 403);
         abort_unless((int) $group->event_id === (int) $event->id, 404);
 
-        $group = $this->loadGroup(
-            $action->execute($group, $request->user(), $request->validated())
-        );
+        $group = $action->execute($group, $request->user(), $request->validated());
+        $projectStats->executeForGroup($group);
+        $group = $this->loadGroup($group);
 
         return $this->success(new EventPersonGroupResource($group));
     }
@@ -88,12 +91,14 @@ class EventPersonGroupsController extends BaseController
         EventPersonGroup $group,
         EventAccessService $eventAccess,
         AddEventPersonGroupMemberAction $action,
+        ProjectEventPersonGroupStatsAction $projectStats,
     ): JsonResponse {
         abort_unless($eventAccess->can($request->user(), $event, 'events.update'), 403);
         abort_unless((int) $group->event_id === (int) $event->id, 404);
 
         $membership = $action->execute($group, $request->user(), $request->validated())
             ->load('person');
+        $projectStats->executeForGroup($group);
 
         return $this->created(new EventPersonGroupMembershipResource($membership));
     }
@@ -104,6 +109,7 @@ class EventPersonGroupsController extends BaseController
         EventPersonGroup $group,
         EventPersonGroupMembership $membership,
         EventAccessService $eventAccess,
+        ProjectEventPersonGroupStatsAction $projectStats,
     ): JsonResponse {
         abort_unless($eventAccess->can($request->user(), $event, 'events.update'), 403);
         abort_unless((int) $group->event_id === (int) $event->id, 404);
@@ -111,6 +117,7 @@ class EventPersonGroupsController extends BaseController
         abort_unless((int) $membership->event_person_group_id === (int) $group->id, 404);
 
         $membership->delete();
+        $projectStats->executeForGroup($group);
 
         return $this->noContent();
     }
@@ -120,17 +127,23 @@ class EventPersonGroupsController extends BaseController
         Event $event,
         EventAccessService $eventAccess,
         ApplyEventPersonGroupPresetAction $action,
+        ProjectEventPersonGroupStatsAction $projectStats,
     ): JsonResponse {
         abort_unless($eventAccess->can($request->user(), $event, 'events.update'), 403);
 
-        return $this->success(EventPersonGroupResource::collection(
-            $this->loadGroups($action->execute($event, $request->user()))
-        ));
+        $groups = $action->execute($event, $request->user());
+        foreach ($groups as $group) {
+            $projectStats->executeForGroup($group);
+        }
+
+        return $this->success(EventPersonGroupResource::collection($this->loadGroups($groups)));
     }
 
     private function loadGroup(EventPersonGroup $group): EventPersonGroup
     {
         return $group->load([
+            'groupStat',
+            'groupMediaStat',
             'memberships.person.mediaStats',
             'memberships.person.primaryReferencePhoto',
         ]);
@@ -143,6 +156,8 @@ class EventPersonGroupsController extends BaseController
     private function loadGroups(\Illuminate\Database\Eloquent\Collection $groups): \Illuminate\Database\Eloquent\Collection
     {
         return $groups->load([
+            'groupStat',
+            'groupMediaStat',
             'memberships.person.mediaStats',
             'memberships.person.primaryReferencePhoto',
         ]);

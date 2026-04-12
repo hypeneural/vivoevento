@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Evento Vivo Painel social share image</title>
+  <desc id="desc">Social preview image for the Evento Vivo admin panel.</desc>
+  <defs>
+    <linearGradient id="bg" x1="80" y1="40" x2="1120" y2="590" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0b1020" />
+      <stop offset="0.5" stop-color="#10172d" />
+      <stop offset="1" stop-color="#050816" />
+    </linearGradient>
+    <linearGradient id="surface" x1="695" y1="92" x2="1110" y2="525" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1c2445" />
+      <stop offset="1" stop-color="#10192f" />
+    </linearGradient>
+    <linearGradient id="accent" x1="150" y1="100" x2="470" y2="420" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8b5cf6" />
+      <stop offset="1" stop-color="#38bdf8" />
+    </linearGradient>
+    <linearGradient id="pill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.18" />
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.06" />
+    </linearGradient>
+    <radialGradient id="glowPurple" cx="0" cy="0" r="1" gradientTransform="translate(300 120) rotate(90) scale(180 240)">
+      <stop offset="0" stop-color="#8b5cf6" stop-opacity="0.28" />
+      <stop offset="1" stop-color="#8b5cf6" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="glowBlue" cx="0" cy="0" r="1" gradientTransform="translate(915 148) rotate(90) scale(220 280)">
+      <stop offset="0" stop-color="#38bdf8" stop-opacity="0.24" />
+      <stop offset="1" stop-color="#38bdf8" stop-opacity="0" />
+    </radialGradient>
+    <filter id="blur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="38" />
+    </filter>
+    <style>
+      text { font-family: Inter, "Segoe UI", Arial, sans-serif; }
+      .eyebrow { fill: #93c5fd; font-size: 20px; font-weight: 700; letter-spacing: 0.28em; }
+      .title { fill: #f8fafc; font-size: 72px; font-weight: 800; letter-spacing: -0.04em; }
+      .subtitle { fill: #cbd5e1; font-size: 30px; font-weight: 500; letter-spacing: -0.02em; }
+      .pill-label { fill: #e2e8f0; font-size: 22px; font-weight: 700; }
+      .card-title { fill: #f8fafc; font-size: 24px; font-weight: 700; }
+      .card-copy { fill: #94a3b8; font-size: 16px; font-weight: 600; }
+      .metric-label { fill: #94a3b8; font-size: 15px; font-weight: 700; letter-spacing: 0.08em; }
+      .metric-value { fill: #f8fafc; font-size: 28px; font-weight: 800; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)" />
+  <circle cx="300" cy="120" r="180" fill="url(#glowPurple)" filter="url(#blur)" />
+  <circle cx="915" cy="148" r="220" fill="url(#glowBlue)" filter="url(#blur)" />
+
+  <g opacity="0.08">
+    <path d="M0 105H1200" stroke="#ffffff" />
+    <path d="M0 210H1200" stroke="#ffffff" />
+    <path d="M0 315H1200" stroke="#ffffff" />
+    <path d="M0 420H1200" stroke="#ffffff" />
+    <path d="M0 525H1200" stroke="#ffffff" />
+    <path d="M170 0V630" stroke="#ffffff" />
+    <path d="M350 0V630" stroke="#ffffff" />
+    <path d="M530 0V630" stroke="#ffffff" />
+    <path d="M710 0V630" stroke="#ffffff" />
+    <path d="M890 0V630" stroke="#ffffff" />
+    <path d="M1070 0V630" stroke="#ffffff" />
+  </g>
+
+  <g transform="translate(92 94)">
+    <rect width="84" height="84" rx="24" fill="#0f172a" />
+    <rect x="6" y="6" width="72" height="72" rx="22" fill="url(#accent)" opacity="0.15" />
+    <rect x="6" y="6" width="72" height="72" rx="22" fill="#161d39" />
+    <path
+      d="M24 23C24 21.8954 24.8954 21 26 21H57C58.1046 21 59 21.8954 59 23V26C59 27.1046 58.1046 28 57 28H35V34H51C52.1046 34 53 34.8954 53 36V39C53 40.1046 52.1046 41 51 41H35V50H58C59.1046 50 60 50.8954 60 52V55C60 56.1046 59.1046 57 58 57H26C24.8954 57 24 56.1046 24 55V23Z"
+      fill="#f8fafc"
+    />
+    <path d="M45 24H50.5L54.5 37.5L58.5 24H64L56.5 54H52.5L45 24Z" fill="url(#accent)" />
+    <circle cx="60" cy="24" r="4" fill="#38bdf8" />
+    <circle cx="60" cy="24" r="7" fill="none" stroke="#38bdf8" stroke-opacity="0.24" stroke-width="2" />
+  </g>
+
+  <text x="200" y="128" class="eyebrow">PAINEL ADMINISTRATIVO</text>
+  <text x="92" y="244" class="title">Evento Vivo</text>
+  <text x="92" y="308" class="subtitle">Operacao de eventos, midias, telao, links e analytics</text>
+  <text x="92" y="348" class="subtitle">em um unico painel para equipes e parceiros.</text>
+
+  <g transform="translate(92 404)">
+    <rect width="130" height="48" rx="24" fill="url(#pill)" stroke="rgba(255,255,255,0.12)" />
+    <text x="65" y="31" class="pill-label" text-anchor="middle">Eventos</text>
+
+    <rect x="146" width="128" height="48" rx="24" fill="url(#pill)" stroke="rgba(255,255,255,0.12)" />
+    <text x="210" y="31" class="pill-label" text-anchor="middle">Midias</text>
+
+    <rect x="290" width="118" height="48" rx="24" fill="url(#pill)" stroke="rgba(255,255,255,0.12)" />
+    <text x="349" y="31" class="pill-label" text-anchor="middle">Telao</text>
+
+    <rect x="424" width="154" height="48" rx="24" fill="url(#pill)" stroke="rgba(255,255,255,0.12)" />
+    <text x="501" y="31" class="pill-label" text-anchor="middle">WhatsApp</text>
+
+    <rect x="594" width="144" height="48" rx="24" fill="url(#pill)" stroke="rgba(255,255,255,0.12)" />
+    <text x="666" y="31" class="pill-label" text-anchor="middle">Analytics</text>
+  </g>
+
+  <g transform="translate(700 90)">
+    <rect width="404" height="448" rx="34" fill="url(#surface)" stroke="rgba(255,255,255,0.08)" />
+    <rect x="28" y="28" width="348" height="82" rx="22" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)" />
+    <text x="52" y="60" class="card-title">Operacao em tempo real</text>
+    <text x="52" y="88" class="card-copy">Midia, equipes e experiencias publicas no mesmo fluxo.</text>
+
+    <g transform="translate(28 136)">
+      <rect width="104" height="90" rx="20" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.08)" />
+      <text x="18" y="30" class="metric-label">EVENTOS</text>
+      <text x="18" y="66" class="metric-value">24</text>
+      <rect x="84" y="18" width="8" height="42" rx="4" fill="#38bdf8" opacity="0.8" />
+    </g>
+
+    <g transform="translate(150 136)">
+      <rect width="104" height="90" rx="20" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.08)" />
+      <text x="18" y="30" class="metric-label">MIDIAS</text>
+      <text x="18" y="66" class="metric-value">8.4k</text>
+      <rect x="84" y="24" width="8" height="36" rx="4" fill="#8b5cf6" opacity="0.8" />
+    </g>
+
+    <g transform="translate(272 136)">
+      <rect width="104" height="90" rx="20" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.08)" />
+      <text x="18" y="30" class="metric-label">ALCANCE</text>
+      <text x="18" y="66" class="metric-value">99%</text>
+      <rect x="84" y="12" width="8" height="48" rx="4" fill="#22c55e" opacity="0.85" />
+    </g>
+
+    <g transform="translate(28 254)">
+      <rect width="230" height="158" rx="24" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.08)" />
+      <text x="22" y="34" class="card-title">Visao do painel</text>
+      <path d="M24 110C54 94 76 116 102 90C130 62 158 75 182 56C194 46 206 44 218 48" fill="none" stroke="#8b5cf6" stroke-width="8" stroke-linecap="round" />
+      <path d="M24 126C48 132 72 110 102 118C132 126 156 98 184 102C198 104 208 96 220 88" fill="none" stroke="#38bdf8" stroke-width="8" stroke-linecap="round" />
+      <circle cx="102" cy="90" r="7" fill="#8b5cf6" />
+      <circle cx="184" cy="102" r="7" fill="#38bdf8" />
+    </g>
+
+    <g transform="translate(276 254)">
+      <rect width="100" height="158" rx="24" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.08)" />
+      <rect x="20" y="26" width="60" height="10" rx="5" fill="#f8fafc" opacity="0.9" />
+      <rect x="20" y="52" width="48" height="8" rx="4" fill="#94a3b8" opacity="0.8" />
+      <rect x="20" y="82" width="60" height="16" rx="8" fill="#22c55e" opacity="0.9" />
+      <rect x="20" y="108" width="42" height="16" rx="8" fill="#38bdf8" opacity="0.85" />
+    </g>
+  </g>
+</svg>

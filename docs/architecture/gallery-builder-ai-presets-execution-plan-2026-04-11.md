@@ -909,6 +909,26 @@ Resultado executado em `2026-04-12`:
 
 Entregar o builder administrativo utilizavel por operador e por usuario leigo.
 
+### Status da Sprint 3 em `2026-04-12`
+
+- [x] `S3-T1` rota e shell do builder entregues em `/events/:id/gallery/builder`, com carregamento real de settings, presets, revisions e media do evento
+- [x] `S3-T2` modo rapido entregue com `GalleryModeSwitch`, `GalleryQuickStartWizard`, `GalleryQuickSetupRail` e atalhos de vibe orientados pela matriz do contrato
+- [x] `S3-T3` modo profissional entregue com `GalleryPresetRail`, `GalleryThemePanel`, `GalleryBlocksPanel` e `GalleryContextInspector`
+- [x] `S3-T4` preview central entregue com `GalleryPreviewFrame`, `GalleryPreviewToolbar`, alternancia mobile/desktop e reuse do `GalleryRenderer` publico
+- [x] `S3-T5` revisoes e versionamento integrados no frontend com `GalleryRevisionPanel`, visibilidade de `draft_version`/`published_version`, restore, publish, autosave e preview link compartilhavel
+- [x] bateria TDD da Sprint 3 executada com regressao de `Gallery`, `Hub`, `Journey`, `MediaAutomaticReplies`, `qrReadability`, `runtime-profile` e `type-check`
+
+Arquivos principais entregues:
+
+- `apps/web/src/modules/gallery/GalleryBuilderPage.tsx`
+- `apps/web/src/modules/gallery/api.ts`
+- `apps/web/src/modules/gallery/gallery-builder.ts`
+- `apps/web/src/modules/gallery/hooks/useGalleryBuilderSettings.ts`
+- `apps/web/src/modules/gallery/hooks/useGalleryPresets.ts`
+- `apps/web/src/modules/gallery/hooks/useGalleryRevisions.ts`
+- `apps/web/src/modules/gallery/components/GalleryPreviewFrame.tsx`
+- `apps/web/src/modules/gallery/components/GalleryRevisionPanel.tsx`
+
 ### Tarefas da sprint
 
 ### `S3-T1` Abrir rota e shell do builder
@@ -994,6 +1014,13 @@ Regressao recomendada:
 - `apps/web/src/modules/hub/PublicHubPage.test.tsx`
 - `apps/web/src/modules/events/event-media-flow-builder-architecture-characterization.test.ts`
 
+Resultado executado em `2026-04-12`:
+
+- frontend Sprint 3: `8` arquivos passaram, `10` testes passaram;
+- regressao frontend `Gallery`: `20` arquivos passaram, `31` testes passaram;
+- regressao frontend `Hub + Journey + IA + qrReadability + runtime-profile`: `5` arquivos passaram, `23` testes passaram;
+- `npx.cmd tsc --noEmit`: passou.
+
 ### Definicao de pronto da sprint
 
 - builder admin existe em rota propria;
@@ -1009,6 +1036,25 @@ Regressao recomendada:
 ### Objetivo da sprint
 
 Plugar IA depois que schema, presets e versionamento ja existem.
+
+### Status da Sprint 4 em `2026-04-12`
+
+- [x] `S4-T1` persistencia de execucoes de IA criada com `gallery_builder_prompt_runs`, model `GalleryBuilderPromptRun` e factory dedicada
+- [x] `S4-T2` backend de propostas entregue com `RunGalleryBuilderPromptAction`, `GalleryAiPatchApplier`, schema JSON guardrailed e payload OpenAI-compatible com `json_schema`
+- [x] `S4-T3` UI entregue com `GalleryAiVariationsPanel`, exibicao de `3` variacoes, apply parcial por camada e autosave no draft
+- [x] `S4-T4` guardrails endurecidos para bloquear HTML/CSS/JSX, campos fora do catalogo, contraste inseguro e publish sem preview compartilhavel depois de apply de IA
+- [x] bateria TDD da Sprint 4 executada com regressao backend/frontend do modulo e checagem adjacente
+
+Arquivos principais entregues:
+
+- `apps/api/app/Modules/Gallery/Actions/RunGalleryBuilderPromptAction.php`
+- `apps/api/app/Modules/Gallery/Models/GalleryBuilderPromptRun.php`
+- `apps/api/app/Modules/Gallery/Support/GalleryAiPatchApplier.php`
+- `apps/api/app/Modules/Gallery/Support/GalleryBuilderPromptSchemaFactory.php`
+- `apps/api/app/Modules/Gallery/Support/GalleryAiProposalGenerator.php`
+- `apps/web/src/modules/gallery/components/GalleryAiVariationsPanel.tsx`
+- `apps/web/src/modules/gallery/hooks/useGalleryAiProposals.ts`
+- `apps/web/src/modules/gallery/gallery-ai-partial-apply.test.tsx`
 
 ### Tarefas da sprint
 
@@ -1097,6 +1143,16 @@ Frontend:
 Observacao:
 
 - se houver smoke test de provider real, ele deve nascer como opt-in, nunca como dependencia da suite comum.
+
+Resultado executado em `2026-04-12`:
+
+- backend Sprint 4: `6` testes passaram, `57` assertions;
+- regressao backend `Gallery + Unit/Gallery`: `43` testes passaram, `443` assertions;
+- regressao backend `Hub + EventMediaList`: `21` testes passaram, `232` assertions;
+- frontend Sprint 4: `3` arquivos passaram, `6` testes passaram;
+- regressao frontend `Gallery`: `22` arquivos passaram, `34` testes passaram;
+- regressao frontend `Hub + Journey + IA + qrReadability + runtime-profile`: `5` arquivos passaram, `23` testes passaram;
+- `npx.cmd tsc --noEmit`: passou.
 
 ### Definicao de pronto da sprint
 
@@ -1325,16 +1381,16 @@ Regra pratica:
 - [x] `event_gallery_settings` existe
 - [x] `event_gallery_revisions` existe
 - [x] `gallery_presets` existe
-- [ ] builder admin em `/events/:id/gallery/builder`
+- [x] builder admin em `/events/:id/gallery/builder`
 - [x] `theme_tokens`, `page_schema` e `media_behavior` separados
 - [x] matriz `event_type_family` + `style_skin` + `behavior_profile` existe
-- [ ] modo rapido e modo profissional existem
-- [ ] modo rapido existe como wizard guiado
+- [x] modo rapido e modo profissional existem
+- [x] modo rapido existe como wizard guiado
 - [x] autosave funciona
-- [ ] `draft_version` e `published_version` estao visiveis
+- [x] `draft_version` e `published_version` estao visiveis
 - [x] preview link compartilhavel funciona
 - [x] restore previous version funciona
-- [ ] IA gera `3` variacoes seguras e aplicaveis
+- [x] IA gera `3` variacoes seguras e aplicaveis
 - [ ] contraste minimo e reduced motion estao endurecidos
 - [ ] budgets mobile de Web Vitals estao medidos
 - [ ] bateria TDD esta verde

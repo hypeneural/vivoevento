@@ -6,6 +6,7 @@ import { EVENT_OPERATIONS_SCHEMA_VERSION } from '@eventovivo/shared-types/event-
 import { OperationsAlertStack } from './components/OperationsAlertStack';
 import { OperationsFullscreenEntryOverlay } from './components/OperationsFullscreenEntryOverlay';
 import { OperationsHud } from './components/OperationsHud';
+import { OperationsRoomCanvas } from './components/OperationsRoomCanvas';
 import { OperationsStatusPill } from './components/OperationsStatusPill';
 import { OperationsTimelineRail } from './components/OperationsTimelineRail';
 import { useControlRoomLifecycle } from './hooks/useControlRoomLifecycle';
@@ -79,9 +80,17 @@ export default function EventOperationsRoomPage() {
 
         <div className="mt-6 grid gap-6 xl:grid-cols-[1.35fr_0.85fr]">
           <section className="space-y-6">
+            {bootQuery.data ? (
+              <OperationsRoomCanvas
+                room={bootQuery.data}
+                motionMode={motion.motionMode}
+                stationGestures={motion.stationGestures}
+              />
+            ) : null}
+
             <article className="rounded-3xl border border-white/10 bg-slate-950/75 p-6 shadow-2xl">
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-200">
-                Leitura macro
+                Contexto read-only
               </p>
               {bootQuery.isLoading ? (
                 <div className="mt-4 space-y-3 text-sm text-slate-300">
@@ -140,7 +149,7 @@ export default function EventOperationsRoomPage() {
                         {bootQuery.data.wall.current_item_id ?? 'Sem item atual'}
                       </p>
                       <p className="mt-1 text-sm text-slate-300">
-                        Proximo: {bootQuery.data.wall.next_item_id ?? 'sem previsao'} • Confianca {bootQuery.data.wall.confidence}
+                        Proximo: {bootQuery.data.wall.next_item_id ?? 'sem previsao'} | Confianca {bootQuery.data.wall.confidence}
                       </p>
                     </div>
 

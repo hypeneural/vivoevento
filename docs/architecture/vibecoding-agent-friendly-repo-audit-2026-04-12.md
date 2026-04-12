@@ -34,8 +34,9 @@ Mas hoje o ganho de produtividade para vibecoding ainda esta abaixo do potencial
 Conclusao pratica:
 
 - o problema principal nao e falta de documentacao;
-- o problema principal e falta de curadoria de contexto para agentes.
-- o ganho maior agora vem de transformar regras difusas em customizacoes nativas do VS Code e do Codex, com escopo correto.
+- o problema principal e falta de fronteiras operacionais legiveis para agentes.
+- o repo hoje esta mais proximo de `bem documentado` do que de `agent-native`;
+- o ganho maior agora vem de transformar regras difusas em execucao previsivel, com configuracao de projeto, papeis claros e fonte de verdade por camada.
 
 ### O que realmente importa
 
@@ -75,6 +76,25 @@ Regra pratica validada:
 - hooks guardam validacao e enforcement deterministico;
 - MCP entra apenas quando o contexto relevante esta fora do repo ou muda com frequencia.
 
+### Veredito real
+
+O Eventovivo nao sofre principalmente de falta de markdown.
+
+Ele sofre de falta de um trilho canonico que diga ao agente:
+
+- qual arquivo manda em cada tipo de decisao;
+- qual fluxo seguir quando a tarefa sai de analise para execucao;
+- qual agente deve assumir cada etapa;
+- qual validacao minima precisa acontecer antes de encerrar.
+
+Enquanto essa divisao nao existir de forma nativa no IDE e no Codex, o risco e continuar usando documentos como se fossem ao mesmo tempo:
+
+- regra;
+- workflow;
+- checklist;
+- historico;
+- estado vivo.
+
 ---
 
 ## Estado Atual Validado
@@ -94,10 +114,101 @@ Regra pratica validada:
 - `.github/` ainda nao tem `copilot-instructions`, `instructions`, `prompts` ou `agents`.
 - `.vscode/settings.json` estava vazio.
 - Nao existe `.code-workspace` multi-root.
-- `docs/architecture/` virou o deposito principal de analises, planos, imagens de validacao e runbooks; hoje ha `122` arquivos ali.
+- Nao existe `.codex/config.toml` no root.
+- `docs/architecture/` virou o deposito principal de analises, planos, imagens de validacao e runbooks; hoje ha `123` arquivos ali.
 - O repo raiz esta com artefatos temporarios e copias de release/deploy que poluem busca e contexto.
 - Nao existe arquivo de versao de Node como `.nvmrc`, `.node-version` ou `.tool-versions`.
 - A CI em `.github/workflows/moderation.yml` cobre apenas uma fatia do produto, nao o monorepo inteiro.
+
+---
+
+## Analise Detalhada da Stack
+
+### 1. Backend
+
+O backend atual esta tecnicamente bem posicionado para agentic work:
+
+- Laravel `13`;
+- PHP `8.3`;
+- Horizon, Reverb, Pulse, Telescope e Pennant;
+- modulos por dominio em `apps/api/app/Modules/*`;
+- stack de dados e permissao previsivel com Spatie.
+
+Veredito:
+
+- a stack backend nao e gargalo para vibecoding;
+- o problema esta mais em contrato operacional e descoberta de contexto do que em tecnologia;
+- o maior drift aqui hoje e documental:
+  - `AGENTS.md` ainda fala Laravel `12`;
+  - `apps/api/README.md` ainda e o README padrao do Laravel.
+
+### 2. Painel admin e experiencias web
+
+O `apps/web` tambem esta em uma stack adequada:
+
+- React `18`;
+- TypeScript `5`;
+- Vite `5`;
+- TanStack Query `5`;
+- Radix + shadcn/ui;
+- Vitest;
+- `pusher-js` compativel com Reverb.
+
+Veredito:
+
+- a stack frontend tambem nao e o problema;
+- o painel ja tem modularidade e runtime suficientes para trabalho orientado por agente;
+- o que falta e reduzir variacao humana no fluxo de execucao.
+
+Sinais reais:
+
+- `npm run type-check` passou;
+- o subset de moderation da CI passou com `44` testes;
+- a CI atual cobre apenas uma vertical do produto;
+- ha warning de backlog em migracao futura do React Router v7.
+
+### 3. Landing
+
+O `apps/landing` esta separado e isso ajuda ownership, mas sua stack e mais sensivel a drift de teste:
+
+- React `18`;
+- Vite `5`;
+- GSAP, `motion`, Lenis, Rive;
+- Sass modular;
+- Vitest.
+
+Veredito:
+
+- a separacao da landing foi uma boa decisao arquitetural;
+- em contrapartida, a combinacao de motion, storytelling e copy torna os testes mais frageis;
+- isso ja apareceu na pratica: a suite atual quebrou por drift entre componente real e assercoes antigas.
+
+### 4. Infra, scripts e operacao
+
+Ha bons sinais de maturidade operacional:
+
+- `Makefile` com setup, dev, test, lint e utilitarios;
+- `deploy/` e `scripts/` versionados;
+- superficies publicas separadas por dominio;
+- infra local e de producao bem clara no `README.md`.
+
+Veredito:
+
+- o repo ja esta maduro o bastante para usar configuracao de projeto do Codex;
+- hoje falta apenas transformar essa maturidade operacional em defaults explicitos para o agente.
+
+### 5. O que a stack esta dizendo sobre o problema real
+
+Cruzar manifests, CI, docs e estrutura mostra um padrao consistente:
+
+- a base tecnica esta suficientemente moderna;
+- o modulo por dominio ja reduz ambiguidade de ownership;
+- a dor real esta em execucao e precedencia de contexto.
+
+Em resumo:
+
+- o Eventovivo nao precisa de outra stack para vibecoding performar bem;
+- ele precisa de fronteiras operacionais melhores.
 
 ---
 
@@ -149,6 +260,7 @@ Regra recomendada:
 - `AGENTS.override.md` define comportamento local por area;
 - `docs/active/<feature>/` e o unico contexto vivo de uma feature em andamento;
 - o restante de `docs/architecture/` deve ser tratado como historico, referencia ou diagnostico.
+- `.kiro/specs/*` deve ser tratado como contexto auxiliar importado, nunca como instrucao vigente por padrao.
 
 ### 5. Poluicao de busca
 
@@ -220,8 +332,35 @@ Regra:
 - `.github/copilot-instructions.md` vira o baseline curto do VS Code;
 - `AGENTS.md` fica como contrato de repo, ownership modular, validacao e done;
 - `*.instructions.md` entram por contexto de arquivo/tarefa.
+- no VS Code, instruction files multiplos se combinam sem ordem garantida;
+- por isso, regra que depende de precedencia deve ir para `AGENTS.override.md`, nao para uma disputa entre varios `*.instructions.md`.
 
-### 2. Overrides por area
+### 2. Fonte de verdade por camada
+
+O repositorio precisa declarar explicitamente qual artefato manda em cada tipo de decisao.
+
+Mapa recomendado:
+
+- `.github/copilot-instructions.md`
+  - convencoes transversais do workspace;
+- `AGENTS.md`
+  - contrato operacional do agente e definicao de pronto;
+- `AGENTS.override.md`
+  - regras especializadas por app, pasta ou dominio;
+- `.github/instructions/**/*.instructions.md`
+  - guias contextuais por stack e por pasta com `applyTo`;
+- `docs/active/<feature>/`
+  - unico contexto vivo de uma feature em andamento;
+- `docs/execution-plans/`
+  - plano executavel da feature;
+- `docs/architecture/`
+  - diagnostico e historico, nunca instrucao vigente por padrao;
+- `README.md`
+  - onboarding humano e visao geral do produto;
+- `.kiro/specs/*`
+  - referencia secundaria apenas quando explicitamente mencionada.
+
+### 3. Overrides por area
 
 Estrutura recomendada:
 
@@ -242,7 +381,7 @@ Regra:
 - `apps/landing/AGENTS.override.md` detalha performance, animacao, copy e validacoes especificas da landing;
 - `docs/AGENTS.override.md` detalha como escrever analise, execution plan, `STATUS.md` e `VERIFY.md`.
 
-### 3. Docs mais descobriveis por agente
+### 4. Docs mais descobriveis por agente
 
 Estrutura recomendada:
 
@@ -267,7 +406,39 @@ Regra:
 - apenas `docs/active/<feature>/` deve ser tratado como contexto operacional vivo;
 - o restante deve ser consumido como referencia, nao como instrucao vigente por padrao.
 
-### 4. Workflows repetidos em prompt files
+### 5. Configuracao explicita do Codex por projeto
+
+O repo precisa de um `.codex/config.toml` no root.
+
+Validacao oficial:
+
+- Codex usa `~/.codex/config.toml` para defaults pessoais;
+- aceita overrides de projeto em `.codex/config.toml`;
+- CLI, IDE e app compartilham as mesmas camadas;
+- `approval_policy`, `sandbox_mode`, `model`, `plan_mode_reasoning_effort`, `profiles` e MCP podem nascer ali;
+- `instructions` e reservado; para instrucao persistente o caminho recomendado continua sendo `AGENTS.md` ou `model_instructions_file`.
+
+Regra:
+
+- manter defaults seguros no projeto;
+- tirar do prompt decisoes repetidas sobre modelo, aprovacao e sandbox;
+- usar profiles depois, quando planner e implementer tiverem necessidades claramente distintas.
+
+Shape inicial recomendado:
+
+```toml
+#:schema https://developers.openai.com/codex/config-schema.json
+
+model = "gpt-5.4"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+plan_mode_reasoning_effort = "medium"
+model_reasoning_effort = "medium"
+personality = "pragmatic"
+web_search = "cached"
+```
+
+### 6. Workflows repetidos em prompt files
 
 Entrar logo depois da limpeza minima da raiz.
 
@@ -278,17 +449,17 @@ Estrutura recomendada:
   plan-feature.prompt.md
   implement-from-plan.prompt.md
   review-module.prompt.md
-  write-architecture-note.prompt.md
   trace-feature-flow.prompt.md
+  verify-feature.prompt.md
 ```
 
 Regra:
 
 - prompt files sao o melhor formato para o fluxo atual de `analise -> plano -> implementacao -> review`;
 - devem nascer cedo porque o VS Code os trata como slash commands reutilizaveis;
-- so depois vale transformar o que sobrar em skill.
+- devem virar o trilho operacional principal do IDE antes de ampliar `skills`.
 
-### 5. Papeis claros de agente
+### 7. Papeis claros de agente
 
 Entrar junto com os prompt files, nao muito depois.
 
@@ -309,7 +480,23 @@ Regra:
 - handoffs entre eles devem ser explicitos.
 - controles como `tools`, `agents`, `user-invocable` e `disable-model-invocation` devem ficar em custom agents, nao em skills.
 
-### 6. Skills pequenas, estreitas e portateis
+### 8. Observabilidade das customizacoes
+
+Depois que `instructions`, `prompts`, `agents` e `skills` entrarem, o problema deixa de ser falta de contexto e passa a ser diagnostico de precedencia.
+
+Regra:
+
+- usar o Chat Customizations editor para visualizar e editar a arvore de customizacao;
+- usar Diagnostics para verificar quais instructions, prompt files, agents e skills estao carregados;
+- usar Agent Debug Logs e Chat Debug view para investigar override errado, prompt file nao aplicado ou ferramenta inesperada.
+
+Checklist minimo apos cada rodada grande:
+
+1. quais instructions o chat carregou;
+2. qual agent esta ativo e com quais tools;
+3. se o diretorio atual puxou o `AGENTS.override.md` esperado.
+
+### 9. Skills pequenas, estreitas e portateis
 
 Entrar assim que o baseline e os primeiros prompt files estiverem estaveis.
 
@@ -355,7 +542,7 @@ Cinco skills que fazem mais sentido primeiro:
 5. `verify-and-close`
    - decide quais comandos rodar, registra evidencias em `VERIFY.md` e fecha a tarefa com criterio objetivo.
 
-### 7. Hooks minimos e de alto valor
+### 10. Hooks minimos e de alto valor
 
 Entrar depois da base, dos agentes e das primeiras skills.
 
@@ -372,7 +559,25 @@ Regra:
 - evitar hook amplo demais logo no inicio;
 - aplicar primeiro apenas em agentes ou workflows de alto valor.
 
-### 8. Contrato de review e verificacao
+### 11. Ergonomia operacional do time
+
+O repo tambem precisa de um padrao de uso diario.
+
+Regra recomendada:
+
+- tarefa simples:
+  - reasoning `low` ou `medium`;
+  - prompt curto com `Goal`, `Context`, `Constraints` e `Done when`;
+- tarefa longa ou ambigua:
+  - `/plan` primeiro;
+  - depois handoff para `implementer`;
+- tarefa pesada:
+  - agent mode ou cloud/background, nao chat solto;
+- sempre:
+  - abrir arquivos-chave no editor;
+  - anexar contexto com `@file` no Codex ou `#file` / `#selection` / `#codebase` no VS Code quando isso reduzir ambiguidade.
+
+### 12. Contrato de review e verificacao
 
 Estrutura recomendada:
 
@@ -387,7 +592,7 @@ Regra:
 - review nao pode depender de memoria manual;
 - `VERIFY.md` deve listar comandos, escopo validado e criterio de aceite objetivo.
 
-### 9. Ambiente local e CI com contrato unico
+### 13. Ambiente local e CI com contrato unico
 
 Padrao recomendado:
 
@@ -411,10 +616,11 @@ Prioridade alta, baixo risco:
    - alinhar a historia oficial de Node entre README, CI e dev local.
 3. Criar `.github/copilot-instructions.md`.
 4. Criar `.github/instructions/`.
-5. Separar `docs/execution-plans` de `docs/architecture`.
-6. Criar arquivos de versao do ambiente (`.nvmrc` ou equivalente).
-7. Tirar artefatos temporarios da raiz ou isolar em pasta scratch ignorada.
-8. Consertar os testes quebrados em `apps/landing` e o teste quebrado em `apps/api`.
+5. Criar `.codex/config.toml`.
+6. Separar `docs/execution-plans` de `docs/architecture`.
+7. Criar arquivos de versao do ambiente (`.nvmrc` ou equivalente).
+8. Tirar artefatos temporarios da raiz ou isolar em pasta scratch ignorada.
+9. Consertar os testes quebrados em `apps/landing` e o teste quebrado em `apps/api`.
 
 ### P1 - Produtividade
 
@@ -422,18 +628,21 @@ Depois do baseline acima:
 
 1. Criar os prompt files principais.
 2. Criar `planner`, `implementer` e `reviewer`.
-3. Criar apenas um conjunto inicial de `5` skills estreitas.
-4. Adotar `code_review.md`.
-5. Institucionalizar `VERIFY.md` em features longas.
+3. Adotar `code_review.md`.
+4. Institucionalizar `VERIFY.md` em features longas.
+5. Separar de forma canonica `docs/active/` de `docs/architecture/`.
 6. Formalizar o uso de `/plan` nas tarefas grandes.
+7. Adotar uma rotina fixa de diagnostico das customizacoes carregadas.
 
 ### P2 - Operacao e extensao
 
 1. Adotar `docs/active/<feature>/STATUS.md`.
 2. Padronizar um template unico para execution plan.
-3. Introduzir hooks em pontos especificos e bem controlados.
-4. Introduzir MCP apenas onde o contexto estiver fora do repo ou mudar com frequencia.
-5. Expandir skills so depois de evidencias de repeticao e ganho real.
+3. Criar apenas um conjunto inicial de `5` skills estreitas.
+4. Introduzir dois hooks minimos e bem controlados.
+5. Introduzir MCP apenas onde o contexto estiver fora do repo ou mudar com frequencia.
+6. Avaliar subagents apenas quando a tarefa justificar paralelismo real.
+7. Expandir skills so depois de evidencias de repeticao e ganho real.
 
 ---
 
@@ -464,6 +673,10 @@ Observacao importante:
   - https://developers.openai.com/codex/learn/best-practices
 - Codex AGENTS guide:
   - https://developers.openai.com/codex/guides/agents-md
+- Codex configuration reference:
+  - https://developers.openai.com/codex/config-reference
+- Codex CLI slash commands:
+  - https://developers.openai.com/codex/cli/slash-commands
 - Codex pricing FAQ sobre contexto e AGENTS:
   - https://developers.openai.com/codex/pricing
 - Ponto validado nestas docs:
@@ -473,7 +686,11 @@ Observacao importante:
   - skills entram quando o workflow ja deixou de ser apenas prompt reutilizavel;
   - cada skill deve ficar focada em um trabalho, com descricao clara de quando usar;
   - scripts e assets dentro da skill so valem quando melhoram confiabilidade;
-  - shared team skills em repositorio sao um padrao valido em `.agents/skills`.
+  - shared team skills em repositorio sao um padrao valido em `.agents/skills`;
+  - prompt curto com `Goal`, `Context`, `Constraints` e `Done when` e o formato recomendado de partida;
+  - `/plan` deve entrar cedo quando a tarefa for longa, ambigua ou multi-step;
+  - `@file` e mencoes de arquivo ajudam a ancorar contexto;
+  - `.codex/config.toml` e o lugar correto para defaults de modelo, aprovacao, sandbox, profiles e MCP.
 
 ### VS Code
 
@@ -493,6 +710,8 @@ Observacao importante:
   - https://code.visualstudio.com/docs/editing/workspaces/multi-root-workspaces
 - Customize AI for your project:
   - https://code.visualstudio.com/docs/copilot/guides/customize-copilot-guide
+- VS Code 1.112 update notes:
+  - https://code.visualstudio.com/updates/
 - Ponto validado nestas docs:
   - o baseline recomendado hoje e `/.github/copilot-instructions.md`;
   - `.instructions.md` devem ser usadas para regras por linguagem, framework e pasta;
@@ -502,7 +721,10 @@ Observacao importante:
   - VS Code suporta project skills em `.github/skills/`, `.claude/skills/` e `.agents/skills/`;
   - propriedades como `user-invocable`, `disable-model-invocation`, `tools` e `agents` pertencem a custom agents, nao a skills;
   - `chat.useCustomizationsInParentRepositories` coleta customizacoes do workspace ate a raiz Git;
-  - hooks sao apropriados para enforcement deterministico, mas seguem em Preview e pedem adocao gradual.
+  - hooks sao apropriados para enforcement deterministico, mas seguem em Preview e pedem adocao gradual;
+  - o VS Code aplica customizacoes ao subir da pasta aberta ate a raiz Git;
+  - quando parent discovery esta ligado, isso vale para `copilot-instructions`, `AGENTS`, instructions, prompt files, custom agents, skills e hooks;
+  - a visibilidade das customizacoes carregadas deve ser feita pelo editor e diagnostics de customizacao.
 
 ---
 
@@ -514,9 +736,11 @@ Se a proxima rodada for de execucao, eu faria nesta ordem:
 2. criacao de `.github/copilot-instructions.md`;
 3. criacao de `apps/api/AGENTS.override.md`, `apps/web/AGENTS.override.md`, `apps/landing/AGENTS.override.md` e `docs/AGENTS.override.md`;
 4. criacao de `.github/instructions/`;
-5. criacao dos cinco prompt files principais;
-6. criacao dos tres custom agents;
-7. criacao das cinco skills iniciais em escopo estreito;
+5. criacao de `.codex/config.toml`;
+6. criacao dos cinco prompt files principais;
+7. criacao dos tres custom agents;
 8. adocao de `code_review.md`;
 9. separacao real de `docs/execution-plans/` e `docs/active/`;
-10. correcoes dos testes quebrados em `apps/landing` e do teste falhando em `apps/api`.
+10. validacao do carregamento de instructions, agents e overrides;
+11. correcoes dos testes quebrados em `apps/landing` e do teste falhando em `apps/api`;
+12. so depois criacao das cinco skills iniciais em escopo estreito.
