@@ -35,16 +35,20 @@ git push origin codex/agent-native-p1
   - `apps/api/.env.example` had `MEDIA_INTELLIGENCE_OPENROUTER_APP_NAME=Evento Vivo` without quotes
   - `.github/workflows/api-suite.yml` did not install the `redis` PHP extension while the app bootstraps with `REDIS_CLIENT=phpredis`
 - both bootstrap issues were fixed and pushed in commit `722d1b4`
+- the follow-up `API Suite` run was triggered automatically on branch push:
+  - run id: `24316230270`
+  - URL: `https://github.com/hypeneural/vivoevento/actions/runs/24316230270`
+  - current status at the time of this update: `in_progress`
 - local exact reproduction of the workflow bootstrap is not possible on this machine because `ext-redis` is not installed locally
 - the focused API unit test still passes with env overrides that avoid local Redis-extension coupling
 
 ## Not Validated
 
 - the complete `apps/api` test suite did not finish locally within the available timeout window
-- the latest remote `API Suite` run for commit `722d1b4` has not yet been confirmed green from this environment
+- the latest remote `API Suite` run for commit `722d1b4` has not yet finished from this environment
 
 ## Follow-up
 
-- inspect the latest `API Suite` run on GitHub Actions
+- inspect the final result of `https://github.com/hypeneural/vivoevento/actions/runs/24316230270`
 - if it fails again, capture the next concrete failing step and fix it directly
 - once it passes, record the remote run URL and final status here

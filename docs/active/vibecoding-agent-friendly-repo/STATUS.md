@@ -20,12 +20,13 @@ Transform the monorepo from documentation-heavy into a repo with clear agent-fac
 - the first remote run failed in bootstrap before tests, and the failure was traced to:
   - an unquoted value with spaces in `apps/api/.env.example`
   - missing `redis` extension in the GitHub Actions PHP setup
-- both CI bootstrap issues are fixed and pushed; the next remote run is the one that matters for full-suite proof
+- both CI bootstrap issues are fixed and pushed
+- the follow-up remote run for commit `722d1b4` is live as run `24316230270` and is currently `in_progress`
 - full local revalidation of the entire API suite is still pending because the local run exceeded the available timeout window
 
 ## Next Steps
 
-1. inspect the latest remote `API Suite` result for commit `722d1b4`
+1. inspect the final result of remote run `24316230270` for commit `722d1b4`
 2. if the run passes, treat CI as the current proof point for full API-suite validation
 3. start using `docs/active/<feature>/STATUS.md` and `VERIFY.md` for long-running product work beyond this repo-hardening initiative
 
