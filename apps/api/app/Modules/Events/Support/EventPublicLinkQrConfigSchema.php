@@ -10,7 +10,7 @@ class EventPublicLinkQrConfigSchema
 
     public const LINK_KEYS = ['gallery', 'upload', 'wall', 'hub', 'play', 'find_me'];
     public const USAGE_PRESETS = ['telao', 'upload_rapido', 'galeria_premium', 'impresso_pequeno', 'convite_whatsapp'];
-    public const SKIN_PRESETS = ['classico', 'premium', 'minimalista', 'escuro'];
+    public const SKIN_PRESETS = ['classico', 'premium', 'minimalista', 'escuro', 'luxo_dourado', 'oceano', 'romantico', 'festa', 'grafite', 'terracota', 'floresta', 'lavanda'];
     public const LOGO_MODES = ['none', 'event_logo', 'organization_logo', 'custom'];
     public const DRAW_TYPES = ['svg', 'canvas'];
     public const BACKGROUND_MODES = ['solid', 'transparent'];
@@ -301,6 +301,7 @@ class EventPublicLinkQrConfigSchema
             ],
             'logo' => filled($effectiveBranding['logo_url'] ?? null) ? [
                 'mode' => 'event_logo',
+                'asset_path' => $effectiveBranding['logo_path'] ?? null,
                 'asset_url' => $effectiveBranding['logo_url'],
             ] : null,
         ];
@@ -353,6 +354,158 @@ class EventPublicLinkQrConfigSchema
                     'corners_square' => ['color' => '#020617'],
                     'corners_dot' => ['color' => '#020617'],
                     'background' => ['color' => '#ffffff'],
+                ],
+            ],
+            'luxo_dourado' => [
+                'style' => [
+                    'dots' => [
+                        'type' => 'classy-rounded',
+                        'color' => '#6b4f1d',
+                        'gradient' => $this->linearGradient(['#6b4f1d', '#d4a017'], M_PI / 6),
+                    ],
+                    'corners_square' => [
+                        'type' => 'extra-rounded',
+                        'color' => '#8c6a23',
+                        'gradient' => $this->linearGradient(['#8c6a23', '#d4a017'], M_PI / 5),
+                    ],
+                    'corners_dot' => [
+                        'type' => 'rounded',
+                        'color' => '#8c6a23',
+                    ],
+                    'background' => ['color' => '#fffaf0'],
+                ],
+            ],
+            'oceano' => [
+                'style' => [
+                    'dots' => [
+                        'type' => 'rounded',
+                        'color' => '#0f172a',
+                        'gradient' => $this->linearGradient(['#0f172a', '#0f766e'], M_PI / 8),
+                    ],
+                    'corners_square' => [
+                        'type' => 'rounded',
+                        'color' => '#155e75',
+                        'gradient' => $this->radialGradient(['#155e75', '#0284c7']),
+                    ],
+                    'corners_dot' => [
+                        'type' => 'dot',
+                        'color' => '#0284c7',
+                    ],
+                    'background' => ['color' => '#f8fafc'],
+                ],
+            ],
+            'romantico' => [
+                'style' => [
+                    'dots' => [
+                        'type' => 'extra-rounded',
+                        'color' => '#9f1239',
+                        'gradient' => $this->linearGradient(['#9f1239', '#fb7185'], M_PI / 7),
+                    ],
+                    'corners_square' => [
+                        'type' => 'rounded',
+                        'color' => '#be185d',
+                        'gradient' => $this->linearGradient(['#be185d', '#fb7185'], M_PI / 8),
+                    ],
+                    'corners_dot' => [
+                        'type' => 'rounded',
+                        'color' => '#be185d',
+                    ],
+                    'background' => ['color' => '#fff1f2'],
+                ],
+            ],
+            'festa' => [
+                'style' => [
+                    'dots' => [
+                        'type' => 'dots',
+                        'color' => '#4c1d95',
+                        'gradient' => $this->linearGradient(['#4c1d95', '#c2410c'], M_PI / 4),
+                    ],
+                    'corners_square' => [
+                        'type' => 'classy-rounded',
+                        'color' => '#6d28d9',
+                        'gradient' => $this->linearGradient(['#6d28d9', '#ea580c'], M_PI / 5),
+                    ],
+                    'corners_dot' => [
+                        'type' => 'dots',
+                        'color' => '#db2777',
+                    ],
+                    'background' => ['color' => '#fff7ed'],
+                ],
+            ],
+            'grafite' => [
+                'style' => [
+                    'dots' => [
+                        'type' => 'classy',
+                        'color' => '#111827',
+                        'gradient' => $this->linearGradient(['#111827', '#6b7280'], M_PI / 7),
+                    ],
+                    'corners_square' => [
+                        'type' => 'square',
+                        'color' => '#1f2937',
+                        'gradient' => $this->linearGradient(['#1f2937', '#9ca3af'], M_PI / 9),
+                    ],
+                    'corners_dot' => [
+                        'type' => 'rounded',
+                        'color' => '#4b5563',
+                    ],
+                    'background' => ['color' => '#f8fafc'],
+                ],
+            ],
+            'terracota' => [
+                'style' => [
+                    'dots' => [
+                        'type' => 'rounded',
+                        'color' => '#9a3412',
+                        'gradient' => $this->linearGradient(['#9a3412', '#f97316'], M_PI / 6),
+                    ],
+                    'corners_square' => [
+                        'type' => 'extra-rounded',
+                        'color' => '#c2410c',
+                        'gradient' => $this->linearGradient(['#c2410c', '#fdba74'], M_PI / 8),
+                    ],
+                    'corners_dot' => [
+                        'type' => 'dot',
+                        'color' => '#b45309',
+                    ],
+                    'background' => ['color' => '#fff7ed'],
+                ],
+            ],
+            'floresta' => [
+                'style' => [
+                    'dots' => [
+                        'type' => 'classy-rounded',
+                        'color' => '#166534',
+                        'gradient' => $this->linearGradient(['#166534', '#65a30d'], M_PI / 5),
+                    ],
+                    'corners_square' => [
+                        'type' => 'rounded',
+                        'color' => '#166534',
+                        'gradient' => $this->radialGradient(['#166534', '#84cc16']),
+                    ],
+                    'corners_dot' => [
+                        'type' => 'rounded',
+                        'color' => '#3f6212',
+                    ],
+                    'background' => ['color' => '#f7fee7'],
+                ],
+            ],
+            'lavanda' => [
+                'style' => [
+                    'dots' => [
+                        'type' => 'extra-rounded',
+                        'color' => '#6d28d9',
+                        'gradient' => $this->linearGradient(['#6d28d9', '#c084fc'], M_PI / 6),
+                    ],
+                    'corners_square' => [
+                        'type' => 'classy-rounded',
+                        'color' => '#7c3aed',
+                        'gradient' => $this->linearGradient(['#7c3aed', '#d8b4fe'], M_PI / 8),
+                    ],
+                    'corners_dot' => [
+                        'type' => 'dot',
+                        'color' => '#8b5cf6',
+                    ],
+                    'background' => ['color' => '#faf5ff'],
                 ],
             ],
             default => [],
@@ -421,5 +574,36 @@ class EventPublicLinkQrConfigSchema
     private function toInt(mixed $value, int $fallback): int
     {
         return is_numeric($value) ? (int) round((float) $value) : $fallback;
+    }
+
+    private function linearGradient(array $colors, float $rotation = 0): array
+    {
+        return [
+            'type' => 'linear',
+            'rotation' => $rotation,
+            'colorStops' => $this->gradientStops($colors),
+        ];
+    }
+
+    private function radialGradient(array $colors): array
+    {
+        return [
+            'type' => 'radial',
+            'colorStops' => $this->gradientStops($colors),
+        ];
+    }
+
+    private function gradientStops(array $colors): array
+    {
+        $lastIndex = max(count($colors) - 1, 1);
+
+        return array_map(
+            fn (string $color, int $index) => [
+                'offset' => $index / $lastIndex,
+                'color' => $color,
+            ],
+            $colors,
+            array_keys($colors),
+        );
     }
 }

@@ -7,6 +7,7 @@ import {
   resolveLayoutTransition,
   resolveEffectiveTransition,
   resolveKenBurnsAnimationClass,
+  resolveOperationalTransitionEffect,
   shouldShowNeonPulse,
 } from '../engine/motion';
 import type { WallMotionTokens } from '../themes/motion';
@@ -100,10 +101,29 @@ describe('resolveLayoutTransition', () => {
     const resolved = resolveLayoutTransition('unsupported-effect' as never, tokens, false);
 
     expect(resolved.effect).toBe('fade');
+    expect(resolved.fallbackReason).toBe('effect_unavailable');
     expect(resolved.transition).toMatchObject({
       duration: tokens.visualDuration,
       ease: tokens.enter.ease,
     });
     expect(resolved.variants.initial).toMatchObject({ opacity: 0, scale: 0.996 });
+  });
+
+  it('falls back to a cheaper safe effect on performance tier for heavier transitions', () => {
+    const resolved = resolveLayoutTransition('flip', tokens, false, 'performance');
+
+    expect(resolved.effect).toBe('fade');
+    expect(resolved.fallbackReason).toBe('capability_tier');
+    expect(resolved.variants.initial).toMatchObject({ opacity: 0, scale: 0.996 });
+  });
+});
+
+describe('resolveOperationalTransitionEffect', () => {
+  it('prioritizes reduced motion over other transition fallbacks', () => {
+    const resolved = resolveOperationalTransitionEffect('flip', true, 'performance');
+
+    expect(resolved.requestedEffect).toBe('flip');
+    expect(resolved.effect).toBe('none');
+    expect(resolved.fallbackReason).toBe('reduced_motion');
   });
 });

@@ -3,7 +3,6 @@ import { Loader2, QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import type { ApiEventEffectiveBranding, ApiEventPublicLink } from '@/lib/api-types';
 import { QrCodeMiniPreview } from '@/modules/events/qr/QrCodeMiniPreview';
 import type { QRCodeStylingOptions } from '@/modules/qr-code/support/qrCodeStylingDriver';
@@ -25,11 +24,26 @@ function EventPublicLinkQrEditorFallback() {
   return (
     <div
       data-testid="event-public-link-qr-editor-fallback"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 backdrop-blur-sm"
+      role="status"
+      aria-live="polite"
     >
-      <div className="flex items-center gap-2 rounded-2xl bg-background px-4 py-3 text-sm shadow-lg">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Carregando editor de QR...
+      <div className="w-full max-w-sm rounded-[28px] border border-white/10 bg-slate-950/95 p-5 text-white shadow-2xl">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold">Abrindo editor de QR</p>
+            <p className="text-xs text-white/70">Preparando visual, modelos e arquivo para baixar.</p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <div className="h-2 rounded-full bg-emerald-400/80 animate-pulse" />
+          <div className="h-2 rounded-full bg-sky-400/60 animate-pulse [animation-delay:120ms]" />
+          <div className="h-2 rounded-full bg-white/30 animate-pulse [animation-delay:240ms]" />
+        </div>
       </div>
     </div>
   );
@@ -73,11 +87,10 @@ export function EventPublicLinkQrTrigger({
 
   return (
     <>
-      <Button
+      <button
         ref={triggerRef}
         type="button"
-        variant="ghost"
-        className="group flex h-auto min-w-[150px] flex-col items-center justify-center gap-3 rounded-3xl border border-slate-200 bg-white px-4 py-5 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
+        className="group flex h-auto min-w-[132px] flex-col items-center justify-center gap-2 rounded-[22px] border border-slate-200 bg-white px-3 py-3 text-left shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
         aria-label={`Editar QR code de ${link.label}`}
         onMouseEnter={warm}
         onFocus={warm}
@@ -89,19 +102,19 @@ export function EventPublicLinkQrTrigger({
         {previewOptions ? (
           <QrCodeMiniPreview
             options={previewOptions}
-            size={112}
+            size={100}
             className="border-0 bg-transparent p-0"
           />
         ) : (
-          <QRCodeSVG value={link.qr_value} size={112} bgColor="#ffffff" fgColor="#0f172a" />
+          <QRCodeSVG value={link.qr_value} size={100} bgColor="#ffffff" fgColor="#0f172a" />
         )}
         <div className="space-y-1 text-center">
           <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
             <QrCode className="h-3.5 w-3.5" />
             {hasSavedStyle ? 'QR personalizado' : 'QR pronto para uso'}
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            Clique para editar, trocar a logo e baixar
+          <p className="text-[10px] leading-4 text-muted-foreground">
+            Editar, trocar a logo e baixar
           </p>
           {hasSavedStyle ? (
             <Badge variant="secondary" className="text-[10px]">
@@ -113,7 +126,7 @@ export function EventPublicLinkQrTrigger({
             </Badge>
           )}
         </div>
-      </Button>
+      </button>
 
       <Suspense fallback={open ? <EventPublicLinkQrEditorFallback /> : null}>
         {open ? (

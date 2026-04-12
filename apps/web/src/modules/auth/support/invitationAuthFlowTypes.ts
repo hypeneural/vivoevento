@@ -13,6 +13,8 @@ export type InvitationAuthFlowStep =
 
 export type InvitationAuthFlowState = {
   step: InvitationAuthFlowStep;
+  history: InvitationAuthFlowStep[];
+  canGoBack: boolean;
 };
 
 export type InvitationAuthFlowAction =
@@ -25,14 +27,24 @@ export type InvitationAuthFlowAction =
   | { type: 'FORGOT_OTP_SENT' }
   | { type: 'FORGOT_OTP_CONFIRMED' }
   | { type: 'PASSWORD_RESET_SUCCEEDED' }
-  | { type: 'RETURN_TO_METHOD' }
-  | { type: 'RETURN_TO_LOGIN' }
-  | { type: 'RETURN_TO_REGISTER' }
-  | { type: 'RETURN_TO_FORGOT_REQUEST' }
-  | { type: 'RETURN_TO_FORGOT_CODE' };
+  | { type: 'GO_BACK' };
+
+function buildState(history: InvitationAuthFlowStep[]): InvitationAuthFlowState {
+  const nextHistory = history.length > 0 ? history : ['method'];
+
+  return {
+    step: nextHistory[nextHistory.length - 1],
+    history: nextHistory,
+    canGoBack: nextHistory.length > 1,
+  };
+}
 
 export function createInvitationAuthFlowState(initialStep: LoginInitialStep): InvitationAuthFlowState {
-  return {
-    step: initialStep === 'forgot' ? 'forgot' : 'method',
-  };
+  return buildState(initialStep === 'forgot' ? ['login', 'forgot'] : ['method']);
+}
+
+export function createInvitationAuthFlowStateFromHistory(
+  history: InvitationAuthFlowStep[],
+): InvitationAuthFlowState {
+  return buildState(history);
 }

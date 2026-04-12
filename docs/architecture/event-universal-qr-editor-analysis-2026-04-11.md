@@ -539,11 +539,27 @@ Resultado:
 
 Depois desta rodada, o que ainda esta aberto nas docs internas nao e base do editor, e sim evolucao de maturidade:
 
-- suite dedicada de acessibilidade do trigger/modal com foco inicial, trap e `Escape`;
-- heuristica de leitura em tempo real com guardrails mais fortes;
 - decode opcional via `BarcodeDetector` como melhoria progressiva;
 - telemetria de UX com `performance.mark()` e `performance.measure()`;
 - extensoes SVG curadas com `applyExtension` e assets server-side como fase seguinte.
+
+## Fechamento de acessibilidade e leitura em 2026-04-11
+
+Nesta rodada o editor tambem fechou o bloco que ainda estava mais fraco para V1:
+
+- suite dedicada de acessibilidade cobrindo dialog com nome acessivel e fechamento por `Escape`;
+- heuristica de leitura em tempo real com:
+  - score;
+  - badge;
+  - motivo principal;
+- bloqueio de save e download quando o contraste entra em faixa extrema;
+- CTA de download evidente no preview e na aba `Exportacao`.
+
+Leitura pratica:
+
+- o usuario leigo agora enxerga se o QR esta seguro antes de salvar;
+- o time nao depende de `BarcodeDetector` para entregar uma V1 defensavel;
+- o decode real continua correto como proxima melhoria, nao como requisito de base.
 
 ## Leitura real da stack atual
 
@@ -2290,3 +2306,89 @@ Para o time tecnico, o ponto mais importante e:
 - React Hook Form official site: https://react-hook-form.com/
 - MDN Barcode Detection API: https://developer.mozilla.org/en-US/docs/Web/API/Barcode_Detection_API
 - MDN OffscreenCanvas: https://developer.mozilla.org/en-US/docs/Web/API/OffscreenCanvas
+
+---
+
+## Atualizacao de UX, linguagem e presets em 2026-04-11
+
+Depois da rodada de validacao com implementacao real, a leitura mais importante e esta:
+
+- a base do editor ja comporta um fluxo leigo com copy em portugues simples;
+- os termos tecnicos mais confusos da UI foram trocados por equivalentes mais humanos;
+- os campos principais agora podem ter tooltip explicando o que cada ajuste faz em linguagem de produto;
+- o catalogo de skins pode ser ampliado com seguranca porque a superficie oficial da lib cobre:
+  - tipos diferentes para dots;
+  - tipos diferentes para cantos;
+  - gradientes lineares e radiais;
+  - shape;
+  - logo central e exportacao.
+
+O editor agora trabalha com esta linha de linguagem:
+
+- `Protecao de leitura` no lugar do termo cru de correcao;
+- `Margem de respiro` no lugar de `quiet zone`;
+- `Formato do QR` no lugar de `shape`;
+- `Configuracao do arquivo` no lugar de `defaults de exportacao`;
+- `Esconder pontos atras da logo` no lugar de `hide background dots`;
+- explicacao do contrato de produto em texto leigo:
+  - a aparencia fica salva por link;
+  - o destino aberto pelo QR continua sendo o link publico real do evento.
+
+Tambem entrou uma ampliacao do catalogo de modelos visuais, sempre dentro do schema semantico e espelhado no backend:
+
+- classico
+- premium
+- minimalista
+- escuro
+- luxo_dourado
+- oceano
+- romantico
+- festa
+- grafite
+- terracota
+- floresta
+- lavanda
+
+Esses modelos extras fazem sentido porque a documentacao oficial da `qr-code-styling` confirma suporte explicito a:
+
+- `dotsOptions.type`
+- `cornersSquareOptions.type`
+- `cornersDotOptions.type`
+- `gradient.type`
+- `backgroundOptions`
+- `imageOptions`
+- `shape`
+
+Leitura pratica:
+
+- vale crescer o catalogo por "familias visuais";
+- nao vale salvar o objeto bruto da lib;
+- todo preset continua precisando passar pelos guardrails de contraste, logo e margem.
+
+Testes executados nesta rodada:
+
+- frontend:
+  - `QrCodeHelp.test.tsx`
+  - `qrDefaults.test.ts`
+  - `qrPresetChooser.test.tsx`
+  - `EventPublicLinkQrEditorShell.test.tsx`
+  - `QrCodeLogoPanel.test.tsx`
+- backend:
+  - `EventPublicLinkQrConfigTest.php`
+  - `UpsertEventPublicLinkQrConfigActionTest.php`
+- `npm run type-check`
+
+### Nota tecnica importante da listagem de eventos
+
+Na listagem do detalhe do evento, houve uma regressao visual em que o QR aparecia como um ponto preto muito pequeno.
+
+Causa raiz:
+
+- o trigger do QR estava usando o `Button` base do design system;
+- esse `Button` aplica uma regra utilitaria para qualquer `svg` filho;
+- como a `qr-code-styling` injeta um `svg` cru dentro do trigger, o QR acabou herdando um tamanho minimo visual, parecendo um quadrado preto.
+
+Correcao aplicada:
+
+- o trigger passou a usar `button` nativo estilizado, sem a regra compartilhada que encolhia `svg` internos;
+- entrou teste dedicado para travar essa regressao.

@@ -10,11 +10,12 @@ import {
   FormDescription,
   FormField,
   FormItem,
-  FormLabel,
 } from '@/components/ui/form';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import type { ApiEventEffectiveBranding } from '@/lib/api-types';
+import { QrFieldLabel, QrHelpTooltip } from '@/modules/qr-code/components/QrCodeHelp';
+import { resolveQrAssetUrl } from '@/modules/qr-code/support/qrAssetUrl';
 import type { QrCascadeExplanation, QrFieldOrigin } from '@/modules/qr-code/support/qrCascadeExplanation';
 import type { EventPublicLinkQrConfig, QrLogoMode } from '@/modules/qr-code/support/qrTypes';
 
@@ -36,7 +37,7 @@ function renderOriginBadge(origin: QrFieldOrigin) {
     case 'custom':
       return <Badge variant="secondary">Personalizado aqui</Badge>;
     default:
-      return <Badge variant="outline">Veio do preset</Badge>;
+      return <Badge variant="outline">Veio do modelo</Badge>;
   }
 }
 
@@ -47,7 +48,7 @@ function resolveLogoModeLabel(mode: QrLogoMode) {
     case 'organization_logo':
       return 'Usando a logo da organizacao';
     case 'custom':
-      return 'Usando um arquivo enviado';
+      return 'Usando uma imagem enviada';
     default:
       return 'Sem logo no centro';
   }
@@ -74,16 +75,19 @@ export function QrCodeLogoPanel({
     control: form.control,
     name: 'logo.asset_path',
   });
-  const brandingLogoUrl = effectiveBranding?.logo_url ?? null;
-  const effectiveLogoUrl = logoUrl ?? brandingLogoUrl;
+  const brandingLogoPath = effectiveBranding?.logo_path ?? null;
+  const brandingOriginalLogoUrl = effectiveBranding?.logo_url ?? null;
+  const brandingLogoUrl = resolveQrAssetUrl(effectiveBranding?.logo_path, effectiveBranding?.logo_url);
+  const effectiveCustomLogoUrl = resolveQrAssetUrl(logoPath, logoUrl);
+  const effectiveLogoUrl = effectiveCustomLogoUrl ?? brandingLogoUrl;
   const logoEnabled = logoMode !== 'none' && Boolean(effectiveLogoUrl);
 
   const handleLogoModeChange = (nextValue: QrLogoMode) => {
     form.setValue('logo.mode', nextValue, { shouldDirty: true });
 
     if ((nextValue === 'event_logo' || nextValue === 'organization_logo') && brandingLogoUrl) {
-      form.setValue('logo.asset_url', brandingLogoUrl, { shouldDirty: true });
-      form.setValue('logo.asset_path', null, { shouldDirty: true });
+      form.setValue('logo.asset_url', brandingOriginalLogoUrl ?? brandingLogoUrl, { shouldDirty: true });
+      form.setValue('logo.asset_path', brandingLogoPath, { shouldDirty: true });
     }
   };
 
@@ -112,13 +116,17 @@ export function QrCodeLogoPanel({
           <div className="flex items-center gap-2">
             <ImageIcon className="h-4 w-4 text-primary" />
             <p className="text-sm font-medium">Logo central</p>
+            <QrHelpTooltip
+              title="Logo central"
+              description="Coloca uma marca no meio do QR. O editor protege a leitura automaticamente quando a logo esta ativa."
+            />
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">Origem</Badge>
             {renderOriginBadge(explanation.logo)}
           </div>
           <p className="text-xs text-muted-foreground">
-            O caminho mais simples e seguro e usar a logo do evento. Se precisar variar so neste QR, envie um arquivo proprio.
+            O caminho mais simples e seguro e usar a logo do evento. Se precisar variar so neste QR, envie uma imagem propria.
           </p>
         </div>
 
@@ -133,7 +141,7 @@ export function QrCodeLogoPanel({
 
           <div className="mt-4 flex min-h-[180px] items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white p-6">
             {effectiveLogoUrl ? (
-              <img src={effectiveLogoUrl} alt="Preview da logo do QR" className="max-h-28 w-auto max-w-full object-contain" />
+              <img src={effectiveLogoUrl} alt="Pre-visualizacao da logo do QR" className="max-h-28 w-auto max-w-full object-contain" />
             ) : (
               <div className="text-center text-muted-foreground">
                 <ImageIcon className="mx-auto h-10 w-10" />
@@ -176,7 +184,7 @@ export function QrCodeLogoPanel({
               ) : (
                 <UploadCloud className="mr-2 h-4 w-4" />
               )}
-              Enviar arquivo
+              Enviar imagem
             </Button>
             <Button
               type="button"
@@ -192,7 +200,7 @@ export function QrCodeLogoPanel({
 
           <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
             <Badge variant="secondary">PNG, JPG ou WebP</Badge>
-            <Badge variant="outline">Ate 10MB</Badge>
+            <Badge variant="outline">Ate 10 MB</Badge>
             <Badge variant="outline">O sistema reforca a leitura automaticamente</Badge>
           </div>
         </div>
@@ -202,7 +210,10 @@ export function QrCodeLogoPanel({
           name="logo.image_size"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Tamanho da logo</FormLabel>
+              <QrFieldLabel
+                label="Tamanho da logo"
+                description="Logo maior chama mais atencao, mas ocupa mais area de leitura. O editor trava no limite seguro da biblioteca."
+              />
               <FormControl>
                 <Slider
                   disabled={!logoEnabled}
@@ -214,7 +225,7 @@ export function QrCodeLogoPanel({
                 />
               </FormControl>
               <FormDescription className="text-xs">
-                Valor atual: {field.value.toFixed(2)}. O editor trava no limite recomendado pela doc oficial da lib.
+                Valor atual: {field.value.toFixed(2)}. O editor trava no limite recomendado pela documentacao oficial da biblioteca.
               </FormDescription>
             </FormItem>
           )}
@@ -226,7 +237,10 @@ export function QrCodeLogoPanel({
           render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-2xl border border-slate-200 px-4 py-3">
               <div className="space-y-1">
-                <FormLabel>Ocultar dots sob a logo</FormLabel>
+                <QrFieldLabel
+                  label="Esconder pontos atras da logo"
+                  description="Apaga os pontinhos que ficariam cobertos pela logo. Isso costuma deixar a leitura mais segura."
+                />
                 <FormDescription className="text-xs">
                   Mantem a leitura mais segura quando a logo esta ativa.
                 </FormDescription>
@@ -244,7 +258,7 @@ export function QrCodeLogoPanel({
             Restaurar esta secao
           </Button>
           <FormDescription className="self-center text-xs">
-            Isso volta apenas a configuracao de logo para o default do evento e do preset atual.
+            Isso volta apenas a configuracao de logo para o padrao do evento e do modelo atual.
           </FormDescription>
         </div>
       </CardContent>

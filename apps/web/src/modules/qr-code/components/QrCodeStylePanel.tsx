@@ -9,17 +9,17 @@ import {
   FormDescription,
   FormField,
   FormItem,
-  FormLabel,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { QrCodeMiniPreview } from '@/modules/events/qr/QrCodeMiniPreview';
+import { QrFieldLabel, QrHelpTooltip } from '@/modules/qr-code/components/QrCodeHelp';
 import { buildQrCodeStylingOptions } from '@/modules/qr-code/support/qrOptionsBuilder';
 import { buildQrCascadeDefaults } from '@/modules/qr-code/support/qrPresetCascade';
-import { QR_SKIN_PRESETS } from '@/modules/qr-code/support/qrTypes';
-import { QR_SKIN_PRESET_METADATA } from '@/modules/qr-code/support/qrPresets';
-import type { EventPublicLinkQrConfig, QrSkinPreset } from '@/modules/qr-code/support/qrTypes';
+import { QR_SKIN_PRESET_METADATA, QR_USAGE_PRESET_METADATA } from '@/modules/qr-code/support/qrPresets';
 import type { QrCascadeExplanation, QrFieldOrigin } from '@/modules/qr-code/support/qrCascadeExplanation';
+import { QR_SKIN_PRESETS } from '@/modules/qr-code/support/qrTypes';
+import type { EventPublicLinkQrConfig, QrSkinPreset } from '@/modules/qr-code/support/qrTypes';
 
 interface QrCodeStylePanelProps {
   config: EventPublicLinkQrConfig;
@@ -35,7 +35,7 @@ function renderOriginBadge(origin: QrFieldOrigin) {
     case 'custom':
       return <Badge variant="secondary">Personalizado aqui</Badge>;
     default:
-      return <Badge variant="outline">Veio do preset</Badge>;
+      return <Badge variant="outline">Veio do modelo</Badge>;
   }
 }
 
@@ -56,33 +56,34 @@ export function QrCodeStylePanel({ config, explanation, onSkinPresetChange, onRe
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Palette className="h-4 w-4 text-primary" />
-            <p className="text-sm font-medium">Cores base do QR</p>
+            <p className="text-sm font-medium">Visual do QR</p>
+            <QrHelpTooltip
+              title="Visual do QR"
+              description="Escolha um modelo pronto e depois ajuste cores pontuais, se quiser. O objetivo e facilitar para quem nao quer montar tudo do zero."
+            />
           </div>
           <div className="flex flex-wrap gap-2">
-            <Badge variant="outline">{usagePreset}</Badge>
-            <Badge variant="secondary">{skinPreset}</Badge>
+            <Badge variant="outline">{QR_USAGE_PRESET_METADATA[usagePreset ?? config.usage_preset].label}</Badge>
+            <Badge variant="secondary">{QR_SKIN_PRESET_METADATA[skinPreset ?? config.skin_preset].label}</Badge>
           </div>
           <p className="text-xs text-muted-foreground">
-            Esta fase libera o ajuste fino das cores principais sem desmontar o fluxo guiado por preset.
+            Escolha um modelo visual pronto e ajuste as cores principais sem sair do fluxo guiado.
           </p>
         </div>
 
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Badge variant="secondary">Preset visual</Badge>
+            <Badge variant="secondary">Modelo visual</Badge>
+            <QrHelpTooltip
+              title="Modelo visual"
+              description="Troca o acabamento do QR sem mudar o endereco que ele abre. E o jeito mais rapido de experimentar estilos diferentes."
+            />
             {renderOriginBadge(explanation.skinPreset)}
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {QR_SKIN_PRESETS.map((preset) => {
               const meta = QR_SKIN_PRESET_METADATA[preset];
               const active = config.skin_preset === preset;
-              const swatch = preset === 'classico'
-                ? 'bg-slate-50 border border-slate-200'
-                : preset === 'premium'
-                  ? 'bg-amber-500'
-                  : preset === 'minimalista'
-                    ? 'bg-white border border-slate-200'
-                    : 'bg-slate-900';
               const presetConfig = buildQrCascadeDefaults({
                 linkKey: 'gallery',
                 usagePreset: config.usage_preset,
@@ -112,7 +113,7 @@ export function QrCodeStylePanel({ config, explanation, onSkinPresetChange, onRe
                 >
                   <div className="flex items-center gap-2">
                     <QrCodeMiniPreview options={previewOptions} size={56} className="h-14 w-14 border-solid" />
-                    <span className={`h-6 w-6 rounded-lg ${swatch}`} />
+                    <span className={`h-6 w-6 rounded-lg ${meta.swatchClass}`} />
                     <p className="text-sm font-semibold">{meta.label}</p>
                   </div>
                   <p className="mt-1 text-[11px] text-muted-foreground">{meta.description}</p>
@@ -132,11 +133,14 @@ export function QrCodeStylePanel({ config, explanation, onSkinPresetChange, onRe
             render={({ field }) => (
               <FormItem>
                 <div className="flex items-center justify-between gap-2">
-                  <FormLabel>Cor principal</FormLabel>
+                  <QrFieldLabel
+                    label="Cor principal"
+                    description="E a cor da maior parte dos pontos do QR. Prefira tons escuros sobre fundo claro para leitura mais segura."
+                  />
                   {renderOriginBadge(explanation.primaryColor)}
                 </div>
                 <FormControl>
-                  <Input type="color" value={field.value} onChange={field.onChange} className="h-11 p-1" />
+                  <Input type="color" value={field.value ?? '#0f172a'} onChange={field.onChange} className="h-11 p-1" />
                 </FormControl>
               </FormItem>
             )}
@@ -148,11 +152,14 @@ export function QrCodeStylePanel({ config, explanation, onSkinPresetChange, onRe
             render={({ field }) => (
               <FormItem>
                 <div className="flex items-center justify-between gap-2">
-                  <FormLabel>Cor de fundo</FormLabel>
+                  <QrFieldLabel
+                    label="Cor de fundo"
+                    description="E a cor atras do QR. Fundo claro costuma funcionar melhor, principalmente em impressos e telas com reflexo."
+                  />
                   {renderOriginBadge(explanation.backgroundColor)}
                 </div>
                 <FormControl>
-                  <Input type="color" value={field.value} onChange={field.onChange} className="h-11 p-1" />
+                  <Input type="color" value={field.value ?? '#ffffff'} onChange={field.onChange} className="h-11 p-1" />
                 </FormControl>
               </FormItem>
             )}
@@ -163,9 +170,12 @@ export function QrCodeStylePanel({ config, explanation, onSkinPresetChange, onRe
             name="style.corners_square.color"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Olhos externos</FormLabel>
+                <QrFieldLabel
+                  label="Olhos externos"
+                  description="Sao os tres quadros maiores dos cantos. Eles ajudam a camera a localizar o QR."
+                />
                 <FormControl>
-                  <Input type="color" value={field.value} onChange={field.onChange} className="h-11 p-1" />
+                  <Input type="color" value={field.value ?? '#0f172a'} onChange={field.onChange} className="h-11 p-1" />
                 </FormControl>
               </FormItem>
             )}
@@ -176,9 +186,12 @@ export function QrCodeStylePanel({ config, explanation, onSkinPresetChange, onRe
             name="style.corners_dot.color"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Olhos internos</FormLabel>
+                <QrFieldLabel
+                  label="Olhos internos"
+                  description="E o miolo dentro dos tres cantos. Pode ter outra cor para reforcar a identidade visual."
+                />
                 <FormControl>
-                  <Input type="color" value={field.value} onChange={field.onChange} className="h-11 p-1" />
+                  <Input type="color" value={field.value ?? '#0f172a'} onChange={field.onChange} className="h-11 p-1" />
                 </FormControl>
               </FormItem>
             )}
@@ -191,9 +204,12 @@ export function QrCodeStylePanel({ config, explanation, onSkinPresetChange, onRe
           render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-2xl border border-slate-200 px-4 py-3">
               <div className="space-y-1">
-                <FormLabel>Fundo transparente</FormLabel>
+                <QrFieldLabel
+                  label="Fundo transparente"
+                  description="Remove o fundo branco. Use so quando voce sabe que o QR vai ficar sobre uma superficie clara e limpa."
+                />
                 <FormDescription className="text-xs">
-                  Mantem o QR mais flexivel para composicoes, mas ainda com guardrails do schema.
+                  Deixa o QR mais flexivel para composicoes, mas exige cuidado maior com o fundo.
                 </FormDescription>
               </div>
               <FormControl>

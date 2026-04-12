@@ -96,6 +96,36 @@ export function formatFallbackReason(value?: string | null) {
   return formatLooseLabel(value, 'Sem detalhe');
 }
 
+export function formatTransitionEffect(value?: ApiWallDiagnosticsPlayer['active_transition_effect']) {
+  return formatLooseLabel(value, 'Sem transicao ativa');
+}
+
+export function formatTransitionMode(value?: ApiWallDiagnosticsPlayer['transition_mode']) {
+  switch (value) {
+    case 'random':
+      return 'rand';
+    case 'fixed':
+      return 'fixo';
+    default:
+      return 'fixo';
+  }
+}
+
+export function formatTransitionFallbackReason(
+  value?: ApiWallDiagnosticsPlayer['transition_last_fallback_reason'],
+) {
+  switch (value) {
+    case 'reduced_motion':
+      return 'motion reduzido';
+    case 'capability_tier':
+      return 'tier de capacidade';
+    case 'effect_unavailable':
+      return 'efeito indisponivel';
+    default:
+      return 'fallback seguro';
+  }
+}
+
 export function formatVideoPhase(value?: ApiWallDiagnosticsPlayer['current_video_phase']) {
   return formatLooseLabel(value, 'Sem fase');
 }
@@ -256,6 +286,18 @@ export function formatOperationalGuidance(player: ApiWallDiagnosticsPlayer) {
 
   if (player.current_media_type === 'video' && player.current_video_phase === 'waiting') {
     return 'O video em foco ainda responde, mas esta aguardando buffer. Observe se a tela sai sozinha do waiting ou entra em stall.';
+  }
+
+  if (player.transition_last_fallback_reason === 'reduced_motion') {
+    return 'A tela esta rodando com motion reduzido. As trocas entram em fallback seguro enquanto essa preferencia estiver ativa.';
+  }
+
+  if (player.transition_last_fallback_reason === 'capability_tier') {
+    return 'A tela caiu para transicao segura por limite de capacidade do runtime. Vale acompanhar hardware, budget e tier efetivo.';
+  }
+
+  if (player.transition_last_fallback_reason === 'effect_unavailable') {
+    return 'A tela recebeu um efeito que nao existe mais no registry atual e caiu para a transicao segura.';
   }
 
   if (player.health_status === 'healthy') {

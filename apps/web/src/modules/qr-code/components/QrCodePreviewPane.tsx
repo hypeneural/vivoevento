@@ -41,7 +41,7 @@ export function QrCodePreviewPane({
       ref={containerRef}
       data-testid="qr-code-preview-pane"
       className={cn(
-        'flex min-h-[220px] w-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white p-6',
+        'flex min-h-[220px] w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm [&>canvas]:h-full [&>canvas]:w-full [&>canvas]:max-w-full [&>svg]:h-full [&>svg]:w-full [&>svg]:max-w-full',
         className,
       )}
     />

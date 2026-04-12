@@ -353,7 +353,7 @@ Arquivos-alvo:
 - `apps/api/app/Modules/Wall/Http/Requests/UpdateWallSettingsRequest.php`
 - `apps/api/app/Modules/Wall/Http/Requests/SimulateWallRequest.php`
 - `apps/api/app/Modules/Wall/Services/WallPayloadFactory.php`
-- `apps/api/app/Modules/Wall/Services/WallLiveSnapshotService.php`
+- `apps/api/app/Modules/Wall/Services/WallSimulationService.php`
 
 Subtarefas:
 
@@ -632,33 +632,33 @@ Arquivos-alvo:
 
 Subtarefas:
 
-- [ ] adicionar efeitos seguros novos:
-  - `lift-fade`
-  - `cross-zoom`
-  - `swipe-up`
-- [ ] manter `blur-fade` fora do default ate budget/capability validarem;
-- [ ] adicionar `transition_pool` ao contrato shared/backend;
-- [ ] persistir `transition_pool` como JSON saneado;
-- [ ] validar `transition_pool` como lista unica de efeitos permitidos;
-- [ ] bloquear `none` no pool custom do modo random;
-- [ ] expor `transition_pool` no manager apenas quando `transition_mode=random`;
-- [ ] manter fallback para pool default quando a pool custom vier vazia ou invalida.
+  - [x] adicionar efeitos seguros novos:
+    - `lift-fade`
+    - `cross-zoom`
+    - `swipe-up`
+  - [x] manter `blur-fade` fora do default ate budget/capability validarem;
+  - [x] adicionar `transition_pool` ao contrato shared/backend;
+  - [x] persistir `transition_pool` como JSON saneado;
+  - [x] validar `transition_pool` como lista unica de efeitos permitidos;
+  - [x] bloquear `none` no pool custom do modo random;
+  - [x] expor `transition_pool` no manager apenas quando `transition_mode=random`;
+  - [x] manter fallback para pool default quando a pool custom vier vazia ou invalida.
 
 ### Bateria TDD da fase 5
 
-- [ ] ampliar `apps/api/tests/Feature/Wall/WallTransitionSettingsTest.php`
-- [ ] ampliar `apps/api/tests/Feature/Wall/WallTransitionOptionsTest.php`
-- [ ] ampliar `apps/web/src/modules/wall/player/engine/transition-registry.test.ts`
-- [ ] ampliar `apps/web/src/modules/wall/player/engine/transition-scheduler.test.ts`
-- [ ] ampliar `apps/web/src/modules/wall/components/manager/inspector/WallAppearanceTab.test.tsx`
+  - [x] ampliar `apps/api/tests/Feature/Wall/WallTransitionSettingsTest.php`
+  - [x] ampliar `apps/api/tests/Feature/Wall/WallTransitionOptionsTest.php`
+  - [x] ampliar `apps/web/src/modules/wall/player/engine/transition-registry.test.ts`
+  - [x] ampliar `apps/web/src/modules/wall/player/engine/transition-scheduler.test.ts`
+  - [x] ampliar `apps/web/src/modules/wall/components/manager/inspector/WallAppearanceTab.test.tsx`
 
 Cenarios obrigatorios:
 
-- [ ] `transition_pool` invalida falha em validacao;
-- [ ] `transition_pool` vazia cai para pool default segura;
-- [ ] cada efeito novo tem definicao, fallback e teste proprio;
-- [ ] `random` respeita pool custom sem perder anti-repeticao;
-- [ ] manager nao permite pool incompativel com o layout vigente.
+  - [x] `transition_pool` invalida falha em validacao;
+  - [x] `transition_pool` vazia cai para pool default segura;
+  - [x] cada efeito novo tem definicao, fallback e teste proprio;
+  - [x] `random` respeita pool custom sem perder anti-repeticao;
+  - [x] manager nao permite pool incompativel com o layout vigente.
 
 ## Fase 6 - Capability, reduced motion e observabilidade operacional
 
@@ -670,38 +670,97 @@ Objetivo:
 Arquivos-alvo:
 
 - `packages/shared-types/src/wall.ts`
-- `apps/api/app/Modules/Wall/Http/Resources/WallDiagnosticsResource.php`
+- `apps/api/app/Modules/Wall/Http/Requests/WallHeartbeatRequest.php`
+- `apps/api/app/Modules/Wall/Models/WallPlayerRuntimeStatus.php`
+- `apps/api/app/Modules/Wall/Services/WallDiagnosticsService.php`
+- novo `apps/api/database/migrations/*_add_transition_runtime_metrics_to_wall_player_runtime_statuses.php`
 - `apps/web/src/modules/wall/player/hooks/useWallPlayer.ts`
 - `apps/web/src/modules/wall/components/manager/diagnostics/WallPlayerRuntimeCard.tsx`
+- `apps/web/src/modules/wall/components/manager/diagnostics/wall-player-runtime-copy.ts`
 - `apps/web/src/modules/wall/components/manager/diagnostics/WallPlayerRuntimeCard.test.tsx`
 
 Subtarefas:
 
-- [ ] adicionar na telemetria do player:
+- [x] adicionar na telemetria do player:
   - `active_transition_effect`
   - `transition_mode`
   - `transition_random_pick_count`
   - `transition_fallback_count`
-- [ ] marcar fallback por:
+- [x] marcar fallback por:
   - reduced motion
   - capability tier
   - efeito indisponivel
-- [ ] refletir esses campos em diagnostics;
-- [ ] mostrar copy operacional simples no manager;
-- [ ] preparar regra capability-aware para efeitos premium mais caros no futuro.
+- [x] refletir esses campos em diagnostics;
+- [x] mostrar copy operacional simples no manager;
+- [x] preparar regra capability-aware para efeitos premium mais caros no futuro.
 
 ### Bateria TDD da fase 6
 
-- [ ] ampliar `apps/web/src/modules/wall/player/hooks/useWallPlayer.test.tsx`
-- [ ] ampliar `apps/web/src/modules/wall/components/manager/diagnostics/WallPlayerRuntimeCard.test.tsx`
-- [ ] ampliar suite backend que cobre diagnostics do wall
+- [x] ampliar `apps/web/src/modules/wall/player/hooks/useWallPlayer.test.tsx`
+- [x] ampliar `apps/web/src/modules/wall/components/manager/diagnostics/WallPlayerRuntimeCard.test.tsx`
+- [x] ampliar suite backend que cobre diagnostics do wall
 
 Cenarios obrigatorios:
 
-- [ ] heartbeat carrega o efeito realmente ativo, nao so o configurado;
-- [ ] fallback por reduced motion incrementa contador apropriado;
-- [ ] diagnostics mostram quando `random` esta ativo;
-- [ ] diagnostics mostram quando o player caiu para fallback seguro.
+- [x] heartbeat carrega o efeito realmente ativo, nao so o configurado;
+- [x] fallback por reduced motion incrementa contador apropriado;
+- [x] diagnostics mostram quando `random` esta ativo;
+- [x] diagnostics mostram quando o player caiu para fallback seguro.
+
+### Validacao da fase 6 - capability, reduced motion e diagnostics - 2026-04-11
+
+Frontend focado:
+
+```bash
+cd apps/web
+npm run test -- src/modules/wall/player/engine/motion.test.ts src/modules/wall/player/hooks/useWallPlayer.test.tsx src/modules/wall/components/manager/diagnostics/WallPlayerRuntimeCard.test.tsx src/modules/wall/components/manager/diagnostics/WallPlayerDetailsSheet.test.tsx src/modules/wall/pages/EventWallManagerPage.test.tsx
+npm run type-check
+```
+
+Resultado:
+
+- `5 arquivos`
+- `44 testes`
+- `PASS`
+
+Frontend amplo do modulo:
+
+```bash
+cd apps/web
+npm run test -- src/modules/wall
+```
+
+Resultado:
+
+- `67 arquivos`
+- `340 testes`
+- `PASS`
+
+Backend focado:
+
+```bash
+cd apps/api
+php artisan test tests/Feature/Wall/WallDiagnosticsTest.php
+```
+
+Resultado:
+
+- `10 testes`
+- `117 assertions`
+- `PASS`
+
+Backend amplo do modulo:
+
+```bash
+cd apps/api
+php artisan test tests/Feature/Wall
+```
+
+Resultado:
+
+- `78 testes`
+- `627 assertions`
+- `PASS`
 
 ---
 
@@ -806,6 +865,7 @@ Saida esperada:
 ## Backend - manter
 
 - `apps/api/tests/Feature/Wall/WallOptionsCharacterizationTest.php`
+- `apps/api/tests/Feature/Wall/WallDiagnosticsTest.php`
 
 ## Backend - criar
 
@@ -867,7 +927,7 @@ npm run type-check
 
 ```bash
 cd apps/api
-php artisan test tests/Feature/Wall/WallOptionsCharacterizationTest.php tests/Feature/Wall/WallTransitionOptionsTest.php tests/Feature/Wall/WallTransitionSettingsTest.php
+php artisan test tests/Feature/Wall/WallOptionsCharacterizationTest.php tests/Feature/Wall/WallTransitionOptionsTest.php tests/Feature/Wall/WallTransitionSettingsTest.php tests/Feature/Wall/WallDiagnosticsTest.php
 
 cd ../web
 npm run test -- src/modules/wall/player/engine/transition-registry.test.ts src/modules/wall/player/engine/transition-scheduler.test.ts src/modules/wall/player/hooks/useWallPlayer.test.tsx src/modules/wall/components/manager/diagnostics/WallPlayerRuntimeCard.test.tsx
@@ -880,26 +940,79 @@ npm run type-check
 
 O P0 so pode ser considerado pronto quando:
 
-- [ ] `transition_mode` existe em contrato shared, backend e frontend;
-- [ ] payload legado sem `transition_mode` funciona como `fixed`;
-- [ ] `/wall/options` expoe `transition_modes`;
-- [ ] registry substitui o `switch` como fonte de verdade;
-- [ ] `random` nasce no runtime do player, nao no render;
-- [ ] re-render do mesmo slide nao altera o efeito;
-- [ ] `random` fica restrito a `single-item`;
-- [ ] preview e player usam o mesmo resolver;
-- [ ] reduced motion continua derrubando para fallback seguro;
-- [ ] nenhum teste de caracterizacao atual do wall regressa.
+- [x] `transition_mode` existe em contrato shared, backend e frontend;
+- [x] payload legado sem `transition_mode` funciona como `fixed`;
+- [x] `/wall/options` expoe `transition_modes`;
+- [x] registry substitui o `switch` como fonte de verdade;
+- [x] `random` nasce no runtime do player, nao no render;
+- [x] re-render do mesmo slide nao altera o efeito;
+- [x] `random` fica restrito a `single-item`;
+- [x] preview e player usam o mesmo resolver;
+- [x] reduced motion continua derrubando para fallback seguro;
+- [x] nenhum teste de caracterizacao atual do wall regressa.
 
 ## Definicao de pronto do P1
 
 O P1 so pode ser considerado pronto quando:
 
-- [ ] `transition_pool` custom funciona e e validada;
-- [ ] os efeitos novos seguros entram com testes proprios;
-- [ ] diagnostics mostram efeito ativo e fallback;
-- [ ] o manager explica claramente quando `random` foi degradado;
-- [ ] o time consegue medir repeticao, fallback e uso dos efeitos sem inspecao manual do DOM.
+- [x] `transition_pool` custom funciona e e validada;
+- [x] os efeitos novos seguros entram com testes proprios;
+- [x] diagnostics mostram efeito ativo e fallback;
+- [x] o manager explica claramente quando `random` foi degradado;
+- [x] o time consegue medir repeticao, fallback e uso dos efeitos sem inspecao manual do DOM.
+
+---
+
+## Revisao final apos execucao
+
+### O que ficou realmente entregue
+
+- [x] contrato `transition_mode` entregue em shared, backend e frontend;
+- [x] `transition_pool` custom entregue com validacao e saneamento;
+- [x] `transition registry` substituiu o `switch` como fonte central dos efeitos;
+- [x] `random` e resolvido no runtime do player, com anti-repeticao e sem sorteio no render;
+- [x] `random` continua restrito a layouts `single-item`;
+- [x] preview e player usam a mesma regra operacional;
+- [x] diagnostics persistem e exibem efeito ativo, modo, contador de picks aleatorios e fallback;
+- [x] suite ampla do modulo `wall` passou em frontend e backend apos a fase 6.
+
+### O que nao e gap bloqueante deste plano
+
+- medicao operacional em tela real ou ambiente controlado depois do deploy;
+- alarmes automatizados em cima dos contadores de fallback;
+- metrica adicional de `transition_pool_size`;
+- metadata opcional extra em `/wall/options`, como `default_transition_pool`, `premium_only` e `reduced_motion_fallback`;
+- evolucao futura para `motion/react`;
+- suporte de `random` para layouts `board`.
+
+### Validacao final repetida apos a revisao do plano - 2026-04-11
+
+Frontend amplo do modulo:
+
+```bash
+cd apps/web
+npm run test -- src/modules/wall
+npm run type-check
+```
+
+Resultado:
+
+- `67 arquivos`
+- `340 testes`
+- `PASS`
+
+Backend amplo do modulo:
+
+```bash
+cd apps/api
+php artisan test tests/Feature/Wall
+```
+
+Resultado:
+
+- `78 testes`
+- `627 assertions`
+- `PASS`
 
 ---
 

@@ -16,7 +16,7 @@ export interface QrCascadeExplanation {
   exportDefaults: QrFieldOrigin;
 }
 
-type BrandingSeedInput = Pick<ApiEventEffectiveBranding, 'logo_url' | 'primary_color' | 'secondary_color'> | null | undefined;
+type BrandingSeedInput = Pick<ApiEventEffectiveBranding, 'logo_path' | 'logo_url' | 'primary_color' | 'secondary_color'> | null | undefined;
 
 function isEqualValue(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
@@ -84,14 +84,17 @@ export function resolveQrCascadeExplanation(params: {
     logo: resolveOrigin(
       {
         mode: config.logo.mode,
+        asset_path: config.logo.asset_path,
         asset_url: config.logo.asset_url,
       },
       {
         mode: presetDefaults.logo.mode,
+        asset_path: presetDefaults.logo.asset_path,
         asset_url: presetDefaults.logo.asset_url,
       },
       {
         mode: brandedDefaults.logo.mode,
+        asset_path: brandedDefaults.logo.asset_path,
         asset_url: brandedDefaults.logo.asset_url,
       },
     ),

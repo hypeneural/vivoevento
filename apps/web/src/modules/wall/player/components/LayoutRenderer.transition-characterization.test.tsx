@@ -226,6 +226,8 @@ describe('LayoutRenderer transition characterization', () => {
         visualDuration: 0.42,
       }),
       false,
+      'premium',
+      false,
     );
     expect(screen.getByTestId('animate-presence')).toHaveAttribute('data-mode', 'wait');
     expect(screen.getByTestId('single-layout')).toHaveTextContent('hero');

@@ -16,6 +16,10 @@ export default defineConfig(({ mode }) => ({
         target: "http://localhost:8000",
         changeOrigin: true,
       },
+      "/storage": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+      },
     },
   },
   plugins: [

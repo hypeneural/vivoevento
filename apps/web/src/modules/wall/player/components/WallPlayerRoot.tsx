@@ -86,7 +86,13 @@ export function WallPlayerRoot({ code }: { code: string }) {
   const lastBoardDowngradeSignatureRef = useRef<string | null>(null);
   const boardBudgetDowngradeCountRef = useRef(0);
 
-  const { reducedEffects, modeLabel, performanceTier, runtimeBudget } = usePerformanceMode();
+  const {
+    reducedEffects,
+    prefersReducedMotion,
+    modeLabel,
+    performanceTier,
+    runtimeBudget,
+  } = usePerformanceMode();
   const { visible: toastVisible, message: toastMessage } = useNewPhotoToast();
   const isAdShowing = Boolean(state.currentAd);
   const captionVisible = Boolean(
@@ -328,6 +334,7 @@ export function WallPlayerRoot({ code }: { code: string }) {
               media={currentItem}
               settings={stageAwareSettings}
               reducedMotion={reducedEffects}
+              prefersReducedMotion={prefersReducedMotion}
               allItems={state.items}
               videoControl={videoControl}
               eventId={state.event?.id ?? code}

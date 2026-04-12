@@ -20,6 +20,7 @@ export interface WallTransitionDefinition {
   buildVariants: (context: WallTransitionContext) => LayoutTransitionVariants;
   buildTransition: (context: WallTransitionContext) => Transition;
   reducedMotionFallback: WallTransition;
+  performanceTierFallback?: WallTransition | null;
 }
 
 const DEFAULT_WALL_TRANSITION: WallTransition = 'fade';
@@ -59,6 +60,7 @@ const WALL_TRANSITION_DEFINITIONS = [
     }),
     buildTransition: (context) => buildTimedTransition(context, 'fade'),
     reducedMotionFallback: REDUCED_MOTION_FALLBACK,
+    performanceTierFallback: null,
   },
   {
     id: 'slide',
@@ -70,6 +72,7 @@ const WALL_TRANSITION_DEFINITIONS = [
     }),
     buildTransition: (context) => buildTimedTransition(context, 'slide'),
     reducedMotionFallback: REDUCED_MOTION_FALLBACK,
+    performanceTierFallback: null,
   },
   {
     id: 'zoom',
@@ -81,6 +84,7 @@ const WALL_TRANSITION_DEFINITIONS = [
     }),
     buildTransition: (context) => buildTimedTransition(context, 'zoom'),
     reducedMotionFallback: REDUCED_MOTION_FALLBACK,
+    performanceTierFallback: null,
   },
   {
     id: 'flip',
@@ -92,6 +96,7 @@ const WALL_TRANSITION_DEFINITIONS = [
     }),
     buildTransition: (context) => buildTimedTransition(context, 'flip'),
     reducedMotionFallback: REDUCED_MOTION_FALLBACK,
+    performanceTierFallback: 'fade',
   },
   {
     id: 'lift-fade',
@@ -103,6 +108,7 @@ const WALL_TRANSITION_DEFINITIONS = [
     }),
     buildTransition: (context) => buildTimedTransition(context, 'lift-fade'),
     reducedMotionFallback: REDUCED_MOTION_FALLBACK,
+    performanceTierFallback: null,
   },
   {
     id: 'cross-zoom',
@@ -114,6 +120,7 @@ const WALL_TRANSITION_DEFINITIONS = [
     }),
     buildTransition: (context) => buildTimedTransition(context, 'cross-zoom'),
     reducedMotionFallback: REDUCED_MOTION_FALLBACK,
+    performanceTierFallback: null,
   },
   {
     id: 'swipe-up',
@@ -125,6 +132,7 @@ const WALL_TRANSITION_DEFINITIONS = [
     }),
     buildTransition: (context) => buildTimedTransition(context, 'swipe-up'),
     reducedMotionFallback: REDUCED_MOTION_FALLBACK,
+    performanceTierFallback: null,
   },
   {
     id: 'none',
@@ -136,6 +144,7 @@ const WALL_TRANSITION_DEFINITIONS = [
     }),
     buildTransition: (context) => buildTimedTransition(context, 'none'),
     reducedMotionFallback: REDUCED_MOTION_FALLBACK,
+    performanceTierFallback: null,
   },
 ] as const satisfies readonly WallTransitionDefinition[];
 

@@ -16,6 +16,16 @@ vi.mock('./loader', () => ({
   }),
 }));
 
+vi.mock('@/modules/events/qr/QrCodeMiniPreview', () => ({
+  QrCodeMiniPreview: () => (
+    <div data-testid="qr-code-mini-preview">
+      <svg data-testid="qr-code-mini-preview-svg" viewBox="0 0 10 10">
+        <rect width="10" height="10" />
+      </svg>
+    </div>
+  ),
+}));
+
 import { EventPublicLinkQrTrigger } from './EventPublicLinkQrTrigger';
 
 function MockLazyEditor({
@@ -98,6 +108,27 @@ describe('EventPublicLinkQrTrigger', () => {
       eventId: '42',
       link: expect.objectContaining({ key: 'gallery' }),
     }));
+  });
+
+  it('does not rely on the shared Button svg sizing rules when rendering a live mini preview', () => {
+    render(
+      <EventPublicLinkQrTrigger
+        eventId="42"
+        link={makeLink()}
+        effectiveBranding={makeBranding()}
+        previewOptions={{
+          width: 100,
+          height: 100,
+          type: 'svg',
+          data: 'https://example.com/gallery/casamento-ana-pedro',
+        }}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: /editar qr code de galeria/i });
+
+    expect(screen.getByTestId('qr-code-mini-preview-svg')).toBeInTheDocument();
+    expect(button.className).not.toContain('[_svg]:size-4');
   });
 
   it('shows suspense fallback while the lazy editor chunk loads and restores focus after close', async () => {

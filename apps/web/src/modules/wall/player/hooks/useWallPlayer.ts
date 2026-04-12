@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { clearWallAssetCaches, getWallCacheDiagnostics } from '../engine/cache';
+import { resolveOperationalTransitionEffect } from '../engine/motion';
+import { resolveWallRuntimeTransitionMode } from '../engine/transition-scheduler';
+import { resolveRenderableLayout } from '../engine/layoutStrategy';
 import { getWallBoot, sendWallHeartbeat, WallUnavailableError } from '../api';
 import {
   clearWallHeartbeatMeta,
@@ -10,12 +13,20 @@ import {
   writeWallHeartbeatMeta,
 } from '../heartbeat-storage';
 import { resolveWallRuntimeProfile } from '../runtime-profile';
-import { resolveWallCacheEnabled } from '../runtime-capabilities';
+import {
+  resolveWallCacheEnabled,
+  resolveWallPerformanceTier,
+} from '../runtime-capabilities';
+import { getWallLayoutDefinition } from '../themes/registry';
 import type {
   WallBoardRuntimeTelemetry,
   WallConnectionStatus,
   WallPlayerCommandPayload,
   WallRuntimeItem,
+  WallSettings,
+  WallTransition,
+  WallTransitionFallbackReason,
+  WallTransitionMode,
 } from '../types';
 import { useWallEngine } from './useWallEngine';
 import { useWallRealtime } from './useWallRealtime';
@@ -47,6 +58,63 @@ function countAssetsByStatus(items: WallRuntimeItem[]) {
   });
 }
 
+interface TransitionRuntimeTelemetry {
+  activeTransitionEffect: WallTransition | null;
+  transitionMode: WallTransitionMode;
+  fallbackReason: WallTransitionFallbackReason | null;
+}
+
+function resolveTransitionRuntimeTelemetry(input: {
+  settings?: WallSettings | null;
+  currentItem?: WallRuntimeItem | null;
+  activeTransitionEffect?: WallTransition | null;
+  runtimeProfile: ReturnType<typeof resolveWallRuntimeProfile>;
+}): TransitionRuntimeTelemetry {
+  const performanceTier = resolveWallPerformanceTier({
+    prefersReducedMotion: input.runtimeProfile.prefers_reduced_motion ?? false,
+    deviceMemoryGb: input.runtimeProfile.device_memory_gb ?? null,
+    hardwareConcurrency: input.runtimeProfile.hardware_concurrency ?? null,
+  });
+  const settings = input.settings;
+  const currentItem = input.currentItem;
+
+  if (!settings || !currentItem) {
+    return {
+      activeTransitionEffect: null,
+      transitionMode: 'fixed',
+      fallbackReason: null,
+    };
+  }
+
+  const resolvedLayout = resolveRenderableLayout(
+    settings.layout,
+    currentItem,
+    settings.video_multi_layout_policy ?? 'disallow',
+  );
+
+  if (getWallLayoutDefinition(resolvedLayout).kind !== 'single') {
+    return {
+      activeTransitionEffect: null,
+      transitionMode: 'fixed',
+      fallbackReason: null,
+    };
+  }
+
+  const transitionMode = resolveWallRuntimeTransitionMode(settings);
+  const operational = resolveOperationalTransitionEffect(
+    input.activeTransitionEffect ?? settings.transition_effect,
+    performanceTier === 'performance',
+    performanceTier,
+    input.runtimeProfile.prefers_reduced_motion === true,
+  );
+
+  return {
+    activeTransitionEffect: operational.effect,
+    transitionMode,
+    fallbackReason: operational.fallbackReason,
+  };
+}
+
 export function useWallPlayer(code: string) {
   const engine = useWallEngine(code);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -64,11 +132,19 @@ export function useWallPlayer(code: string) {
   const playerInstanceIdRef = useRef(getOrCreateWallPlayerInstanceId(code));
   const lastSyncAtRef = useRef<string | null>(lastSyncAt);
   const boardRuntimeTelemetryRef = useRef<WallBoardRuntimeTelemetry>(DEFAULT_BOARD_RUNTIME_TELEMETRY);
+  const transitionRandomPickCountRef = useRef(0);
+  const transitionFallbackCountRef = useRef(0);
+  const lastRandomTransitionSignatureRef = useRef<string | null>(null);
+  const lastTransitionFallbackSignatureRef = useRef<string | null>(null);
 
   useEffect(() => {
     playerInstanceIdRef.current = getOrCreateWallPlayerInstanceId(code);
     const stored = readWallHeartbeatMeta(code);
     setLastSyncAt(stored?.lastSyncAt ?? null);
+    transitionRandomPickCountRef.current = 0;
+    transitionFallbackCountRef.current = 0;
+    lastRandomTransitionSignatureRef.current = null;
+    lastTransitionFallbackSignatureRef.current = null;
   }, [code]);
 
   useEffect(() => {
@@ -126,6 +202,43 @@ export function useWallPlayer(code: string) {
     const counts = countAssetsByStatus(snapshot.state.items);
     const cacheDiagnostics = await getWallCacheDiagnostics();
     const runtimeProfile = resolveWallRuntimeProfile();
+    const transitionTelemetry = resolveTransitionRuntimeTelemetry({
+      settings: snapshot.state.settings,
+      currentItem: snapshot.currentItem,
+      activeTransitionEffect: snapshot.state.activeTransitionEffect,
+      runtimeProfile,
+    });
+    const randomTransitionSignature = (
+      transitionTelemetry.transitionMode === 'random'
+      && snapshot.currentItem?.id
+      && transitionTelemetry.activeTransitionEffect
+    )
+      ? `${snapshot.currentItem.id}:${snapshot.state.transitionAdvanceCount}:${transitionTelemetry.activeTransitionEffect}`
+      : null;
+
+    if (
+      randomTransitionSignature
+      && lastRandomTransitionSignatureRef.current !== randomTransitionSignature
+    ) {
+      transitionRandomPickCountRef.current += 1;
+      lastRandomTransitionSignatureRef.current = randomTransitionSignature;
+    }
+
+    const transitionFallbackSignature = (
+      transitionTelemetry.fallbackReason
+      && snapshot.currentItem?.id
+      && transitionTelemetry.activeTransitionEffect
+    )
+      ? `${snapshot.currentItem.id}:${snapshot.state.transitionAdvanceCount}:${transitionTelemetry.activeTransitionEffect}:${transitionTelemetry.fallbackReason}`
+      : null;
+
+    if (
+      transitionFallbackSignature
+      && lastTransitionFallbackSignatureRef.current !== transitionFallbackSignature
+    ) {
+      transitionFallbackCountRef.current += 1;
+      lastTransitionFallbackSignatureRef.current = transitionFallbackSignature;
+    }
 
     try {
       await sendWallHeartbeat(code, {
@@ -134,6 +247,11 @@ export function useWallPlayer(code: string) {
         connection_status: connectionStatusRef.current,
         current_item_id: snapshot.currentItem?.id ?? snapshot.state.currentItemId ?? null,
         current_item_started_at: snapshot.state.currentItemStartedAt ?? null,
+        active_transition_effect: transitionTelemetry.activeTransitionEffect,
+        transition_mode: transitionTelemetry.transitionMode,
+        transition_random_pick_count: transitionRandomPickCountRef.current,
+        transition_fallback_count: transitionFallbackCountRef.current,
+        transition_last_fallback_reason: transitionTelemetry.fallbackReason,
         current_sender_key: snapshot.currentItem?.senderKey ?? null,
         current_media_type: snapshot.currentItem?.type ?? null,
         current_video_phase: snapshot.state.videoPlayback.itemId ? snapshot.state.videoPlayback.phase : null,

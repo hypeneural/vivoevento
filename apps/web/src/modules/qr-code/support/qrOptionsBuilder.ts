@@ -1,5 +1,6 @@
 import type { Gradient, Options as QRCodeStylingOptions } from 'qr-code-styling';
 
+import { resolveQrAssetUrl } from './qrAssetUrl';
 import { applyQrGuardrails } from './qrGuardrails';
 import type { EventPublicLinkQrConfig, QrGradientConfig } from './qrTypes';
 
@@ -14,7 +15,7 @@ function resolveLogoUrl(config: EventPublicLinkQrConfig): string | undefined {
     return undefined;
   }
 
-  return config.logo.asset_url ?? undefined;
+  return resolveQrAssetUrl(config.logo.asset_path, config.logo.asset_url) ?? undefined;
 }
 
 function resolveCrossOrigin(url: string | undefined): string | undefined {
@@ -22,8 +23,18 @@ function resolveCrossOrigin(url: string | undefined): string | undefined {
     return undefined;
   }
 
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    return 'anonymous';
+  if (url.startsWith('blob:')) {
+    return undefined;
+  }
+
+  try {
+    const parsed = new URL(url, window.location.origin);
+
+    if (parsed.origin !== window.location.origin) {
+      return 'anonymous';
+    }
+  } catch {
+    return undefined;
   }
 
   return undefined;

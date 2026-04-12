@@ -37,11 +37,7 @@ export default function LoginPage() {
     forgotOtpSent,
     forgotOtpConfirmed,
     passwordResetSucceeded,
-    returnToMethod,
-    returnToLogin,
-    returnToRegister,
-    returnToForgotRequest,
-    returnToForgotCode,
+    goBack,
   } = useInvitationAuthFlow(initialStep);
 
   const [loginValue, setLoginValue] = useState('');
@@ -613,7 +609,7 @@ export default function LoginPage() {
                 >
                   <div className="space-y-1.5">
                     <button
-                      onClick={returnToMethod}
+                      onClick={goBack}
                       className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 -ml-0.5 mb-2"
                     >
                       <ArrowLeft className="h-3 w-3" />
@@ -722,7 +718,7 @@ export default function LoginPage() {
                     <button
                       onClick={() => {
                         resetRegisterState();
-                        returnToMethod();
+                        goBack();
                       }}
                       className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 -ml-0.5 mb-2"
                     >
@@ -815,7 +811,7 @@ export default function LoginPage() {
                   <OtpCodeStep
                     title="Valide seu WhatsApp"
                     description={`Enviamos um codigo de 6 digitos para ${registerMaskedPhone || 'seu numero'}.`}
-                    onBack={returnToRegister}
+                    onBack={goBack}
                     helper={
                       <AuthHelpHint>
                         O cadastro so continua quando esse numero for confirmado e ainda nao existir na base.
@@ -903,7 +899,7 @@ export default function LoginPage() {
                 >
                   <RecoveryRequestStep
                     description="Informe seu WhatsApp ou e-mail para receber um codigo de recuperacao"
-                    onBack={returnToLogin}
+                    onBack={goBack}
                     identityInputId={forgotIdentityInputId}
                     identityAriaLabel="WhatsApp ou E-mail"
                     identityValue={loginValue}
@@ -943,7 +939,7 @@ export default function LoginPage() {
                         : `Se encontrarmos uma conta vinculada a ${forgotDestinationMasked || 'este e-mail'}, enviaremos um codigo de 6 digitos por e-mail.`
                     }
                     secondaryDescription="Por seguranca, nao confirmamos se o contato informado esta cadastrado."
-                    onBack={returnToForgotRequest}
+                    onBack={goBack}
                     value={resetCode}
                     onChange={setResetCode}
                     inputId={forgotCodeInputId}
@@ -977,7 +973,7 @@ export default function LoginPage() {
                   <PasswordSetupStep
                     title="Nova senha"
                     description="Crie uma nova senha segura"
-                    onBack={returnToForgotCode}
+                    onBack={goBack}
                     passwordInputId={forgotPasswordInputId}
                     passwordAriaLabel="Nova senha"
                     password={password}

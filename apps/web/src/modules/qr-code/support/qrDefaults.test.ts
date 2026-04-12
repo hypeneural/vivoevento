@@ -35,4 +35,25 @@ describe('qrDefaults', () => {
       },
     });
   });
+
+  it('supports the new stylized skin presets with gradients and safe backgrounds', () => {
+    const luxo = buildQrConfigDefaults({
+      linkKey: 'gallery',
+      skinPreset: 'luxo_dourado',
+    });
+    const floresta = buildQrConfigDefaults({
+      linkKey: 'gallery',
+      skinPreset: 'floresta',
+    });
+
+    expect(luxo.skin_preset).toBe('luxo_dourado');
+    expect(luxo.style.dots.gradient?.type).toBe('linear');
+    expect(luxo.style.corners_square.type).toBe('extra-rounded');
+    expect(luxo.style.background.color).toBe('#fffaf0');
+
+    expect(floresta.skin_preset).toBe('floresta');
+    expect(floresta.style.dots.gradient?.type).toBe('linear');
+    expect(floresta.style.corners_square.gradient?.type).toBe('radial');
+    expect(floresta.style.background.color).toBe('#f7fee7');
+  });
 });

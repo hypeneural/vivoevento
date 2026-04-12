@@ -1642,6 +1642,7 @@ export type ApiWallTransition =
   | 'swipe-up'
   | 'none';
 export type ApiWallTransitionMode = 'fixed' | 'random';
+export type ApiWallTransitionFallbackReason = 'reduced_motion' | 'capability_tier' | 'effect_unavailable';
 export type ApiWallThemePreset = 'compact' | 'standard';
 export type ApiWallThemeAnchorMode = 'event_brand' | 'qr_prompt' | 'none';
 export type ApiWallThemeBurstIntensity = 'gentle' | 'normal';
@@ -1764,6 +1765,11 @@ export interface ApiWallHeartbeatPayload {
   connection_status: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error';
   current_item_id?: string | null;
   current_item_started_at?: string | null;
+  active_transition_effect?: ApiWallTransition | null;
+  transition_mode?: ApiWallTransitionMode | null;
+  transition_random_pick_count?: number;
+  transition_fallback_count?: number;
+  transition_last_fallback_reason?: ApiWallTransitionFallbackReason | null;
   current_sender_key?: string | null;
   current_media_type?: 'image' | 'video' | null;
   current_video_phase?: 'idle' | 'probing' | 'primed' | 'starting' | 'playing' | 'waiting' | 'stalled' | 'paused_by_wall' | 'completed' | 'capped' | 'interrupted' | 'failed_to_start' | null;
@@ -1835,6 +1841,11 @@ export interface ApiWallDiagnosticsPlayer {
   connection_status: ApiWallHeartbeatPayload['connection_status'];
   current_item_id?: string | null;
   current_item_started_at?: string | null;
+  active_transition_effect?: ApiWallTransition | null;
+  transition_mode?: ApiWallTransitionMode | null;
+  transition_random_pick_count: number;
+  transition_fallback_count: number;
+  transition_last_fallback_reason?: ApiWallTransitionFallbackReason | null;
   current_media_type?: ApiWallHeartbeatPayload['current_media_type'];
   current_video_phase?: ApiWallHeartbeatPayload['current_video_phase'];
   current_video_exit_reason?: ApiWallHeartbeatPayload['current_video_exit_reason'];

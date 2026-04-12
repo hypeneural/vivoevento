@@ -37,13 +37,14 @@ describe('qrPresetChooser', () => {
         onUsagePresetChange={() => undefined}
         availableStyles={[]}
         onCopyStyle={() => undefined}
+        onResetSection={() => undefined}
       />,
     );
 
     expect(screen.getByText('Telao')).toBeInTheDocument();
     expect(screen.getByText(/Melhor para exibicao/i)).toBeInTheDocument();
-    expect(screen.getByText(/Copiar estilo/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Aplicar estilo/i })).toBeInTheDocument();
+    expect(screen.getByText(/Copiar visual/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Usar este visual/i })).toBeInTheDocument();
     expect(screen.getAllByTestId('qr-code-mini-preview').length).toBeGreaterThan(0);
   });
 });

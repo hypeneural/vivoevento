@@ -53,6 +53,7 @@ export function usePerformanceMode() {
 
   return {
     reducedEffects,
+    prefersReducedMotion,
     performanceTier,
     runtimeBudget,
     modeLabel: reducedEffects ? 'Performance' : 'Premium',

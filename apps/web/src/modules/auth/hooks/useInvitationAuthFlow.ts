@@ -32,20 +32,12 @@ export function useInvitationAuthFlow(initialStep: LoginInitialStep) {
     () => dispatch({ type: 'PASSWORD_RESET_SUCCEEDED' }),
     [],
   );
-  const returnToMethod = useCallback(() => dispatch({ type: 'RETURN_TO_METHOD' }), []);
-  const returnToLogin = useCallback(() => dispatch({ type: 'RETURN_TO_LOGIN' }), []);
-  const returnToRegister = useCallback(() => dispatch({ type: 'RETURN_TO_REGISTER' }), []);
-  const returnToForgotRequest = useCallback(
-    () => dispatch({ type: 'RETURN_TO_FORGOT_REQUEST' }),
-    [],
-  );
-  const returnToForgotCode = useCallback(
-    () => dispatch({ type: 'RETURN_TO_FORGOT_CODE' }),
-    [],
-  );
+  const goBack = useCallback(() => dispatch({ type: 'GO_BACK' }), []);
 
   return {
     step: state.step,
+    history: state.history,
+    canGoBack: state.canGoBack,
     chooseLogin,
     chooseRegister,
     registerOtpSent,
@@ -54,10 +46,6 @@ export function useInvitationAuthFlow(initialStep: LoginInitialStep) {
     forgotOtpSent,
     forgotOtpConfirmed,
     passwordResetSucceeded,
-    returnToMethod,
-    returnToLogin,
-    returnToRegister,
-    returnToForgotRequest,
-    returnToForgotCode,
+    goBack,
   };
 }

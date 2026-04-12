@@ -23,6 +23,7 @@ export type WallTransition =
   | 'swipe-up'
   | 'none';
 export type WallTransitionMode = 'fixed' | 'random';
+export type WallTransitionFallbackReason = 'reduced_motion' | 'capability_tier' | 'effect_unavailable';
 export type WallLifecycleStatus = 'draft' | 'live' | 'paused' | 'stopped' | 'expired';
 export type WallPublicStatus = WallLifecycleStatus | 'disabled';
 export type WallSelectionMode = 'balanced' | 'live' | 'inclusive' | 'editorial' | 'custom';
@@ -203,6 +204,11 @@ export interface WallHeartbeatPayload {
   connection_status: 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error';
   current_item_id?: string | null;
   current_item_started_at?: string | null;
+  active_transition_effect?: WallTransition | null;
+  transition_mode?: WallTransitionMode | null;
+  transition_random_pick_count?: number;
+  transition_fallback_count?: number;
+  transition_last_fallback_reason?: WallTransitionFallbackReason | null;
   current_sender_key?: string | null;
   current_media_type?: WallMediaType | null;
   current_video_phase?: 'idle' | 'probing' | 'primed' | 'starting' | 'playing' | 'waiting' | 'stalled' | 'paused_by_wall' | 'completed' | 'capped' | 'interrupted' | 'failed_to_start' | null;
@@ -273,6 +279,11 @@ export interface WallDiagnosticsPlayer {
   runtime_status: WallHeartbeatPayload['runtime_status'];
   connection_status: WallHeartbeatPayload['connection_status'];
   current_item_id?: string | null;
+  active_transition_effect?: WallTransition | null;
+  transition_mode?: WallTransitionMode | null;
+  transition_random_pick_count: number;
+  transition_fallback_count: number;
+  transition_last_fallback_reason?: WallTransitionFallbackReason | null;
   current_media_type?: WallMediaType | null;
   current_video_phase?: WallHeartbeatPayload['current_video_phase'];
   current_video_exit_reason?: WallHeartbeatPayload['current_video_exit_reason'];

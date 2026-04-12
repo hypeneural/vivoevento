@@ -1,5 +1,5 @@
-import { useDeferredValue, useEffect, useMemo, useTransition } from 'react';
-import { Loader2, RefreshCcw, Save } from 'lucide-react';
+import { useDeferredValue, useEffect, useMemo, useState, useTransition } from 'react';
+import { Download, Loader2, RefreshCcw, Save, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { useForm, useWatch, type Control } from 'react-hook-form';
 
 import { Badge } from '@/components/ui/badge';
@@ -16,10 +16,12 @@ import { QrCodeExportPanel } from '@/modules/qr-code/components/QrCodeExportPane
 import { QrCodeLogoPanel } from '@/modules/qr-code/components/QrCodeLogoPanel';
 import { QrCodePreviewPane } from '@/modules/qr-code/components/QrCodePreviewPane';
 import { QrCodeStylePanel } from '@/modules/qr-code/components/QrCodeStylePanel';
+import { downloadEventPublicLinkQrCode } from '@/modules/qr-code/support/qrDownload';
 import { resolveQrCascadeExplanation } from '@/modules/qr-code/support/qrCascadeExplanation';
 import { applyQrCopyStyle } from '@/modules/qr-code/support/qrCopyStyle';
 import { buildQrCodeStylingOptions } from '@/modules/qr-code/support/qrOptionsBuilder';
 import { buildQrCascadeDefaults } from '@/modules/qr-code/support/qrPresetCascade';
+import { getQrReadabilityReport } from '@/modules/qr-code/support/qrReadability';
 import { resetQrSection, type QrSectionKey } from '@/modules/qr-code/support/qrSectionReset';
 import type { EventPublicLinkQrConfig } from '@/modules/qr-code/support/qrTypes';
 
@@ -85,6 +87,8 @@ function EditorBody({
   previewOptions,
   previewDraft,
   cascadeExplanation,
+  readability,
+  onDownload,
   onUsagePresetChange,
   onSkinPresetChange,
   onCopyStyle,
@@ -94,12 +98,15 @@ function EditorBody({
   isLoading = false,
   isSaving = false,
   isResetting = false,
+  isDownloading = false,
 }: {
   state: EventPublicLinkQrEditorState;
   availableStyles: EventPublicLinkQrEditorState[];
   previewOptions: ReturnType<typeof buildQrCodeStylingOptions>;
   previewDraft: EventPublicLinkQrConfig;
   cascadeExplanation: ReturnType<typeof resolveQrCascadeExplanation>;
+  readability: ReturnType<typeof getQrReadabilityReport>;
+  onDownload: () => void;
   onUsagePresetChange: (preset: EventPublicLinkQrConfig['usage_preset']) => void;
   onSkinPresetChange: (preset: EventPublicLinkQrConfig['skin_preset']) => void;
   onCopyStyle: (linkKey: EventPublicLinkQrEditorState['linkKey']) => void;
@@ -109,22 +116,31 @@ function EditorBody({
   isLoading?: boolean;
   isSaving?: boolean;
   isResetting?: boolean;
+  isDownloading?: boolean;
 }) {
   const previewValue = state.link.qr_value ?? state.link.url ?? '';
   const statusLabel = isSaving
     ? 'Salvando'
+    : isDownloading
+      ? 'Gerando arquivo'
     : isResetting
       ? 'Restaurando'
-      : isLoading
-        ? 'Sincronizando'
-        : 'Preview ativo';
+    : isLoading
+      ? 'Sincronizando'
+        : 'Visual pronto';
+
+  const readabilityToneClass = readability.tone === 'success'
+    ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+    : readability.tone === 'warning'
+      ? 'border-amber-200 bg-amber-50 text-amber-950'
+      : 'border-rose-200 bg-rose-50 text-rose-900';
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
       <Card className="border-slate-200 bg-slate-50/90 shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-3">
-            <CardTitle className="text-base">Preview ao vivo</CardTitle>
+            <CardTitle className="text-base">Pre-visualizacao ao vivo</CardTitle>
             <Badge variant="outline">
               {statusLabel}
             </Badge>
@@ -137,6 +153,21 @@ function EditorBody({
             unavailableLabel="QR indisponivel"
           />
 
+          <div className={`rounded-2xl border px-3 py-3 text-sm ${readabilityToneClass}`}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {readability.tone === 'danger' ? (
+                  <TriangleAlert className="h-4 w-4" />
+                ) : (
+                  <ShieldCheck className="h-4 w-4" />
+                )}
+                <p className="font-medium">{readability.label}</p>
+              </div>
+              <Badge variant="outline">{readability.score}/100</Badge>
+            </div>
+            <p className="mt-2 text-xs leading-5">{readability.reasons[0]}</p>
+          </div>
+
           <div className="space-y-2 text-sm text-muted-foreground">
             <div className="flex items-center justify-between gap-2">
               <span className="font-medium text-foreground">{state.link.label}</span>
@@ -146,9 +177,19 @@ function EditorBody({
               {previewValue || 'Link ainda indisponivel.'}
             </p>
             <p className="text-xs">
-              O visual persiste por link no backend, enquanto o conteudo encoded continua vindo do link publico atual do evento.
+              Voce salva a aparencia deste QR so neste link. O destino que ele abre continua sendo o link publico real do evento.
             </p>
           </div>
+
+          <Button
+            type="button"
+            className="w-full"
+            onClick={onDownload}
+            disabled={!previewValue || readability.blocksExport || isLoading || isSaving || isResetting || isDownloading}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Baixar QR agora
+          </Button>
         </CardContent>
       </Card>
 
@@ -157,7 +198,7 @@ function EditorBody({
           <TabsTrigger value="content">Conteudo</TabsTrigger>
           <TabsTrigger value="style">Estilo</TabsTrigger>
           <TabsTrigger value="logo">Logo</TabsTrigger>
-          <TabsTrigger value="export">Exportacao</TabsTrigger>
+          <TabsTrigger value="export">Baixar</TabsTrigger>
           <TabsTrigger value="advanced">Avancado</TabsTrigger>
         </TabsList>
 
@@ -199,6 +240,8 @@ function EditorBody({
         <TabsContent value="export" className="space-y-4" forceMount>
           <QrCodeExportPanel
             explanation={cascadeExplanation}
+            readability={readability}
+            onDownload={onDownload}
             onResetSection={() => onResetSection('export')}
           />
         </TabsContent>
@@ -231,6 +274,7 @@ export function EventPublicLinkQrEditorShell({
     reValidateMode: 'onChange',
   });
   const [isLocalResetPending, startLocalResetTransition] = useTransition();
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     form.reset(state.config);
@@ -248,14 +292,15 @@ export function EventPublicLinkQrEditorShell({
     linkKey: state.linkKey,
     branding: state.effectiveBranding ?? undefined,
   }), [previewDraft, state.effectiveBranding, state.linkKey]);
+  const readability = useMemo(() => getQrReadabilityReport(previewDraft), [previewDraft]);
 
-  const isBusy = isSaving || isResetting;
+  const isBusy = isSaving || isResetting || isDownloading;
   const canReset = state.hasSavedConfig || form.formState.isDirty;
   const title = 'Editar QR Code';
   const description = `${state.link.label} do evento`;
   const footer = (
     <>
-      <Button variant="outline" onClick={() => onOpenChange(false)}>
+      <Button variant="outline" autoFocus onClick={() => onOpenChange(false)}>
         Fechar
       </Button>
       <Button
@@ -275,9 +320,34 @@ export function EventPublicLinkQrEditorShell({
         {isResetting || isLocalResetPending ? 'Restaurando...' : 'Restaurar padrao'}
       </Button>
       <Button
+        type="button"
+        variant="secondary"
+        onClick={() => {
+          const values = form.getValues();
+
+          setIsDownloading(true);
+          void downloadEventPublicLinkQrCode({
+            config: values,
+            data: previewValue,
+            eventId: state.eventId,
+            linkKey: state.linkKey,
+          }).finally(() => {
+            setIsDownloading(false);
+          });
+        }}
+        disabled={!previewValue || readability.blocksExport || isBusy}
+      >
+        {isDownloading ? (
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        ) : (
+          <Download className="mr-2 h-4 w-4" />
+        )}
+        {isDownloading ? 'Gerando arquivo...' : 'Baixar QR'}
+      </Button>
+      <Button
         type="submit"
         form="event-public-link-qr-editor-form"
-        disabled={isBusy || !form.formState.isDirty}
+        disabled={isBusy || !form.formState.isDirty || readability.blocksSave}
       >
         {isSaving ? (
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -304,6 +374,7 @@ export function EventPublicLinkQrEditorShell({
       <form
         id="event-public-link-qr-editor-form"
         className="space-y-4"
+        aria-busy={isBusy}
         onSubmit={form.handleSubmit(async (values) => {
           await onSave(values);
         })}
@@ -314,6 +385,18 @@ export function EventPublicLinkQrEditorShell({
           previewOptions={previewOptions}
           previewDraft={previewDraft}
           cascadeExplanation={cascadeExplanation}
+          readability={readability}
+          onDownload={() => {
+            setIsDownloading(true);
+            void downloadEventPublicLinkQrCode({
+              config: form.getValues(),
+              data: previewValue,
+              eventId: state.eventId,
+              linkKey: state.linkKey,
+            }).finally(() => {
+              setIsDownloading(false);
+            });
+          }}
           onUsagePresetChange={(preset) => {
             const nextConfig = buildQrCascadeDefaults({
               linkKey: state.linkKey,
@@ -360,6 +443,7 @@ export function EventPublicLinkQrEditorShell({
           isLoading={isLoading}
           isSaving={isSaving}
           isResetting={isResetting || isLocalResetPending}
+          isDownloading={isDownloading}
         />
       </form>
     </Form>

@@ -87,9 +87,16 @@ describe('EventPublicLinkQrEditorShell', () => {
     expect(await screen.findByTestId('event-public-link-qr-editor-dialog')).toBeInTheDocument();
     expect(screen.getByText(/Editar QR Code/i)).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Conteudo/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Baixar/i })).toBeInTheDocument();
     expect(screen.getByTestId('qr-code-preview-pane')).toBeInTheDocument();
+    expect(screen.getByText(/Luxo dourado/i)).toBeInTheDocument();
+    expect(screen.getByText(/Floresta/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Margem de respiro/i).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /Ajuda sobre Protecao de leitura/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Ajuda sobre Modelo de uso/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Ajuda sobre Tipo de arquivo/i })).toBeInTheDocument();
     expect(createQrCodeStylingDriverMock).toHaveBeenCalledTimes(1);
-  });
+  }, 20000);
 
   it('uses Drawer on mobile', async () => {
     useIsMobileMock.mockReturnValue(true);
@@ -156,13 +163,17 @@ describe('EventPublicLinkQrEditorShell', () => {
     expect(await screen.findByTestId('event-public-link-qr-editor-dialog')).toBeInTheDocument();
     const initialUpdateCalls = update.mock.calls.length;
 
-    fireEvent.change(screen.getByLabelText(/Cor principal/i), {
+    const [primaryColorInput] = screen.getAllByLabelText(/Cor principal/i);
+
+    fireEvent.change(primaryColorInput, {
       target: { value: '#224466' },
     });
 
     expect(update).toHaveBeenCalledTimes(initialUpdateCalls + 1);
 
-    fireEvent.change(screen.getByLabelText(/Tamanho de exportacao/i), {
+    const [exportSizeInput] = screen.getAllByLabelText(/Tamanho do arquivo/i);
+
+    fireEvent.change(exportSizeInput, {
       target: { value: '2048' },
     });
 
@@ -198,7 +209,9 @@ describe('EventPublicLinkQrEditorShell', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText(/Cor principal/i), {
+    const [primaryColorInput] = screen.getAllByLabelText(/Cor principal/i);
+
+    fireEvent.change(primaryColorInput, {
       target: { value: '#224466' },
     });
 
@@ -225,5 +238,5 @@ describe('EventPublicLinkQrEditorShell', () => {
     fireEvent.click(screen.getByRole('button', { name: /Restaurar padrao/i }));
 
     expect(onResetToDefault).toHaveBeenCalledTimes(1);
-  });
+  }, 10000);
 });

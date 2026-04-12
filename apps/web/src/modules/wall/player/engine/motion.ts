@@ -9,7 +9,11 @@
  */
 
 import type { Transition } from 'framer-motion';
-import type { WallTransition } from '../types';
+import type {
+  WallPerformanceTier,
+  WallTransition,
+  WallTransitionFallbackReason,
+} from '../types';
 import type { WallMotionTokens } from '../themes/motion';
 import {
   getWallTransitionDefinition,
@@ -54,7 +58,9 @@ export function shouldShowNeonPulse(reducedMotion: boolean): boolean {
 }
 
 export interface ResolvedLayoutTransition {
+  requestedEffect: WallTransition;
   effect: WallTransition;
+  fallbackReason: WallTransitionFallbackReason | null;
   variants: {
     initial: Record<string, number>;
     animate: Record<string, number>;
@@ -63,23 +69,76 @@ export interface ResolvedLayoutTransition {
   transition: Transition;
 }
 
+export interface ResolvedOperationalTransitionEffect {
+  requestedEffect: WallTransition;
+  effect: WallTransition;
+  fallbackReason: WallTransitionFallbackReason | null;
+}
+
+export function resolveOperationalTransitionEffect(
+  transition: WallTransition | string | null | undefined,
+  disableMotion: boolean,
+  performanceTier: WallPerformanceTier = 'premium',
+  prefersReducedMotion = disableMotion,
+): ResolvedOperationalTransitionEffect {
+  const requestedDefinition = getWallTransitionDefinition(transition ?? 'fade');
+  const requestedEffect = requestedDefinition.id;
+  const effectWasUnavailable = typeof transition === 'string' && requestedEffect !== transition;
+
+  if (disableMotion) {
+    const effect = requestedDefinition.reducedMotionFallback;
+
+    return {
+      requestedEffect,
+      effect,
+      fallbackReason: effect !== requestedEffect
+        ? (prefersReducedMotion ? 'reduced_motion' : 'capability_tier')
+        : null,
+    };
+  }
+
+  if (
+    performanceTier === 'performance'
+    && requestedDefinition.performanceTierFallback
+    && requestedDefinition.performanceTierFallback !== requestedEffect
+  ) {
+    return {
+      requestedEffect,
+      effect: requestedDefinition.performanceTierFallback,
+      fallbackReason: 'capability_tier',
+    };
+  }
+
+  return {
+    requestedEffect,
+    effect: requestedEffect,
+    fallbackReason: effectWasUnavailable ? 'effect_unavailable' : null,
+  };
+}
+
 export function resolveLayoutTransition(
   transition: WallTransition,
   tokens: Pick<WallMotionTokens, 'enter' | 'visualDuration'>,
   reducedMotion: boolean,
+  performanceTier: WallPerformanceTier = 'premium',
+  prefersReducedMotion = reducedMotion,
 ): ResolvedLayoutTransition {
-  const requestedDefinition = getWallTransitionDefinition(transition);
-  const effect = reducedMotion
-    ? requestedDefinition.reducedMotionFallback
-    : requestedDefinition.id;
-  const resolvedDefinition = getWallTransitionDefinition(effect);
+  const operational = resolveOperationalTransitionEffect(
+    transition,
+    reducedMotion,
+    performanceTier,
+    prefersReducedMotion,
+  );
+  const resolvedDefinition = getWallTransitionDefinition(operational.effect);
   const context: WallTransitionContext = {
     tokens,
     reducedMotion,
   };
 
   return {
+    requestedEffect: operational.requestedEffect,
     effect: resolvedDefinition.id,
+    fallbackReason: operational.fallbackReason,
     variants: resolvedDefinition.buildVariants(context),
     transition: resolvedDefinition.buildTransition(context),
   };

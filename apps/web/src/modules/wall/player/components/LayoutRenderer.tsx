@@ -38,6 +38,7 @@ interface LayoutRendererProps {
   eventId?: string | number | null;
   performanceTier?: WallPerformanceTier;
   activeTransitionEffect?: WallTransition | null;
+  prefersReducedMotion?: boolean;
 }
 
 export function LayoutRenderer({
@@ -49,6 +50,7 @@ export function LayoutRenderer({
   eventId = null,
   performanceTier = reducedMotion ? 'performance' : 'premium',
   activeTransitionEffect = null,
+  prefersReducedMotion = reducedMotion,
 }: LayoutRendererProps) {
   const resolvedLayout = resolveRenderableLayout(
     settings.layout,
@@ -125,6 +127,8 @@ export function LayoutRenderer({
     activeTransitionEffect ?? settings.transition_effect,
     definition.motion,
     reducedMotion,
+    performanceTier,
+    prefersReducedMotion,
   );
 
   return (

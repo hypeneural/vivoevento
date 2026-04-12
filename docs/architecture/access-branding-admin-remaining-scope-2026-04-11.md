@@ -210,9 +210,9 @@ Fontes oficiais:
 
 Leitura aplicada:
 
-- os testes atuais de `LoginPage` continuam uteis, mas ainda usam `fireEvent` e `placeholder` como dependencia principal;
-- isso reduz um pouco a confianca em foco, digitacao, submit por Enter e acessibilidade do formulario;
-- esse e um ponto real de endurecimento do proximo escopo.
+- o nucleo de `LoginPage.test.tsx` ja migrou para `userEvent` com queries por `label` e `role`;
+- o uso residual de `fireEvent` ficou restrito a dois cenarios de borda com `fake timers` e callback imediato de `setTimeout`;
+- o endurecimento restante agora esta menos na migracao bruta de API de teste e mais em expandir a fidelidade de rota e reduzir mais estados auxiliares do fluxo.
 
 ### Vitest
 
@@ -549,13 +549,10 @@ O que ainda falta ou pode melhorar:
   - `essa mesma conta pode ser usada em varios eventos e convites`
 - explicar melhor, na UX do convite, que a mesma conta da plataforma pode servir para varios convites e varios eventos;
 - alinhar melhor o texto entre `Entrar para aceitar convite`, `Criar conta e aceitar convite` e `Redefinir senha` para reduzir duvida de usuario iniciante;
-- manter a evolucao dos testes de `LoginPage` para sair progressivamente de `fireEvent + placeholder` e subir ainda mais a confianca em:
-  - loading state;
-  - erro de request do OTP;
-  - erro de validacao do OTP;
-  - sessao OTP expirada;
+- manter a evolucao dos testes de `LoginPage` para subir ainda mais a confianca em:
   - reenvio com countdown;
-  - retorno ao proprio convite via `returnTo`.
+  - retorno ao proprio convite via `returnTo`;
+  - redirect encadeado com arvore de rotas mais fiel quando convite + aceite entrarem no mesmo contrato.
 
 Leitura:
 
@@ -605,10 +602,11 @@ Os pontos abaixo continuam como gap residual confirmado apos a execucao da Fase 
    - o backend agora ja entrega `invited_by.name`;
    - o que falta e refletir isso melhor na primeira dobra e no caminho de `requires_existing_login=true`.
 
-2. `LoginPage` ainda depende de estrategia de teste menos fiel do que o ideal
-   - os testes atuais agora cobrem `returnTo` e countdown de reenvio;
-   - mas ainda usam `fireEvent` e `placeholder` como base;
-   - isso precisa ser endurecido com `userEvent`, `getByRole` e `getByLabelText`.
+2. `LoginPage` ainda tem espaco para endurecimento estrutural do fluxo
+   - os testes atuais agora cobrem `returnTo`, countdown de reenvio, erro no request do OTP, erro na verificacao, sessao expirada e loading;
+   - o nucleo principal ja usa `userEvent`, `getByRole` e `getByLabelText`;
+   - continuam dois cenarios de borda com `fireEvent`, justificados hoje por temporizacao artificial;
+   - o gap real agora esta mais em reduzir estados auxiliares e ampliar os testes de rota com arvore real quando o aceite entrar mais forte na jornada.
 
 3. `workspace selector` e `/my-events` ja tem contratos verdes, mas ainda pedem fechamento de experiencia
    - agrupamento, filtros e badges ja estao provados;
@@ -640,15 +638,46 @@ Desde a abertura desta doc, os seguintes pontos ja deixaram de ser gap:
    - `AuthHelpHint`
    - `OtpCodeStep`
    - `PasswordSetupStep`
-9. o front agora prova explicitamente:
+9. a recuperacao inicial de senha e o estado final de sucesso tambem entraram na camada compartilhada por meio de:
+   - `RecoveryRequestStep`
+   - `AuthFlowSuccessState`
+10. o front agora prova explicitamente:
    - troca entre `Entrar` e `Criar conta` usando o rodape compartilhado
    - cadastro que avanca para `Valide seu WhatsApp`
-10. o `LoginPage` deixou de repetir blocos visuais equivalentes entre cadastro por OTP e reset por OTP
+11. o `LoginPage` deixou de repetir blocos visuais equivalentes entre cadastro por OTP e reset por OTP
+12. o reducer do fluxo agora absorve explicitamente as transicoes de recuperacao e sucesso, reduzindo mais `setStep` auxiliar fora da camada de fluxo
+13. a bateria focada desta Fase 2 ficou verde com:
+   - `npx.cmd vitest run src/modules/auth/LoginPage.test.tsx src/modules/auth/support/invitationAuthFlowReducer.test.ts src/modules/team-invitations/PublicOrganizationInvitationPage.test.tsx src/modules/event-invitations/PublicEventInvitationPage.test.tsx`
+   - resultado: `18 passed`
+14. o backend de suporte da jornada continua verde com:
+   - `php artisan test tests/Feature/Organizations/OrganizationTeamInvitationContractTest.php tests/Feature/EventTeam/EventTeamInvitationContractTest.php tests/Feature/Auth/PasswordResetOtpTest.php`
+   - resultado: `24 passed`, `262 assertions`
+15. o `type-check` do front continua verde:
+   - `npm run type-check`
+   - resultado: `ok`
+16. `LoginPage.test.tsx` agora cobre explicitamente:
+   - erro no request do OTP
+   - erro na verificacao do OTP
+   - sessao OTP expirada
+   - loading e botoes desabilitados durante request e verificacao
+17. `LoginPage.routing.test.tsx` passou a provar `returnTo` com arvore real de rotas:
+   - login -> `/plans`
+   - reset -> `/convites/equipe/:token`
+18. o reducer do fluxo agora carrega `history` e `canGoBack`, substituindo boa parte do backtracking manual por `goBack()` centralizado
+19. as paginas publicas de convite agora tambem possuem testes de rota com arvore real para:
+   - CTA de login com `returnTo`
+   - CTA de `Esqueci a senha` com `flow=forgot`
+   - `Usar outra conta` com navegacao efetiva para `/login`
+20. a rodada focada mais recente ficou verde com:
+   - `npx.cmd vitest run src/modules/auth/support/invitationAuthFlowReducer.test.ts src/modules/auth/LoginPage.test.tsx src/modules/auth/LoginPage.routing.test.tsx src/modules/team-invitations/PublicOrganizationInvitationPage.test.tsx src/modules/team-invitations/PublicOrganizationInvitationPage.routing.test.tsx src/modules/event-invitations/PublicEventInvitationPage.test.tsx src/modules/event-invitations/PublicEventInvitationPage.routing.test.tsx`
+   - resultado: `31 passed`
 
 Leitura pratica:
 
 - o maior gap residual de Fase 2 nao e mais a volta ao convite apos reset;
-- o maior gap residual agora ficou concentrado em aumentar a fidelidade dos testes de interacao, reduzir mais estados auxiliares do fluxo e decidir se o passo inicial de forgot/sucesso final tambem entram na camada compartilhada.
+- o maior gap residual agora saiu do auth basico;
+- depois desta rodada, o proximo eixo natural volta a ser `workspace` e `branding`;
+- no auth, fica apenas endurecimento futuro se as paginas publicas de convite passarem a combinar aceite + redirect encadeado mais pesado no mesmo contrato.
 
 ---
 
@@ -657,10 +686,8 @@ Leitura pratica:
 ## Escopo A - necessario agora
 
 1. Endurecer o fluxo `convite + auth + aceite` no nivel de interacao
-   - migrar o nucleo de `LoginPage.test.tsx` para `userEvent`;
-   - cobrir erro de request do OTP, erro de validacao do OTP e sessao expirada;
-   - cobrir loading/desabilitacao de botoes durante request;
-   - subir parte dos testes de rota para helper mais fiel quando `returnTo` e redirect pesarem mais.
+   - expandir os testes de rota mais fieis apenas quando aceite autenticado/publico entrar no mesmo contrato de redirect com mais estado local;
+   - revisar apenas se os dois cenarios residuais com `fireEvent` perderem a justificativa tecnica atual.
 
 2. Fechar as superficies de front ainda esperadas, mas nao totalmente provadas
    - `workspace selector`;
@@ -674,8 +701,9 @@ Leitura pratica:
    - microcopy menos tecnica.
 
 4. Decidir a convergencia final da camada compartilhada de auth
-   - avaliar se `Esqueci a senha` passo inicial vira componente compartilhado;
-   - avaliar se o estado de sucesso final tambem entra nessa base;
+   - o passo inicial de `Esqueci a senha` ja virou componente compartilhado;
+   - o estado de sucesso final do reset ja entrou nessa base;
+   - a proxima decisao aqui e se o reducer passa a carregar tambem mais intencao de redirect e backtracking da jornada;
    - manter `LoginPage` como orquestrador, nao como acumulador de markup.
 
 ## Escopo B - melhoria importante, mas nao bloqueante

@@ -26,6 +26,11 @@ function makePlayer(overrides: Partial<ApiWallDiagnosticsPlayer> = {}): ApiWallD
     cache_miss_count: 4,
     cache_stale_fallback_count: 0,
     cache_hit_rate: 86,
+    active_transition_effect: 'fade',
+    transition_mode: 'fixed',
+    transition_random_pick_count: 0,
+    transition_fallback_count: 0,
+    transition_last_fallback_reason: null,
     board_piece_count: 0,
     board_burst_count: 0,
     board_budget_downgrade_count: 0,
@@ -91,5 +96,27 @@ describe('WallPlayerRuntimeCard', () => {
     expect(screen.getByText(/Backlog decode 1/i)).toBeInTheDocument();
     expect(screen.getByText(/Reset board 3/i)).toBeInTheDocument();
     expect(screen.getByText(/Downgrade palco reduzido/i)).toBeInTheDocument();
+  });
+
+  it('mostra o modo rand e o efeito ativo que o runtime escolheu', () => {
+    render(<WallPlayerRuntimeCard player={makePlayer({
+      active_transition_effect: 'cross-zoom',
+      transition_mode: 'random',
+      transition_random_pick_count: 7,
+    })} />);
+
+    expect(screen.getByText(/Transicao Cross-zoom/i)).toBeInTheDocument();
+    expect(screen.getByText(/Modo rand \| picks 7x/i)).toBeInTheDocument();
+  });
+
+  it('explicita quando a tela caiu para fallback seguro de transicao', () => {
+    render(<WallPlayerRuntimeCard player={makePlayer({
+      active_transition_effect: 'none',
+      transition_fallback_count: 2,
+      transition_last_fallback_reason: 'reduced_motion',
+    })} />);
+
+    expect(screen.getByText(/Fallback motion reduzido \| 2x/i)).toBeInTheDocument();
+    expect(screen.getByText(/A tela esta rodando com motion reduzido/i)).toBeInTheDocument();
   });
 });

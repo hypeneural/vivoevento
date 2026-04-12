@@ -56,7 +56,7 @@ function buildCardPreviewConfig(config: EventPublicLinkQrConfig): EventPublicLin
     ...config,
     render: {
       ...config.render,
-      preview_size: 140,
+      preview_size: 112,
     },
   };
 }
@@ -78,7 +78,7 @@ export function PublicLinkCard({ eventId, effectiveBranding, link, qrState, onCo
 
   return (
     <Card className="border-white/70 bg-white/90 shadow-sm">
-      <CardContent className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_188px]">
+      <CardContent className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_156px]">
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
@@ -98,9 +98,9 @@ export function PublicLinkCard({ eventId, effectiveBranding, link, qrState, onCo
             </div>
           </div>
 
-          <div className="rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-sky-50 px-3 py-3">
+          <div className="rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-sky-50 px-3 py-2.5">
             <p className="text-xs font-medium uppercase tracking-[0.16em] text-emerald-700">Como este QR ajuda</p>
-            <p className="mt-2 text-sm text-slate-700">{helper.description}</p>
+            <p className="mt-1.5 text-sm text-slate-700">{helper.description}</p>
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
@@ -129,10 +129,10 @@ export function PublicLinkCard({ eventId, effectiveBranding, link, qrState, onCo
           </div>
         </div>
 
-        <div className="flex min-w-[160px] flex-col items-center justify-center gap-3 rounded-[28px] border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-3">
+        <div className="flex min-w-[144px] flex-col items-center justify-center gap-2 rounded-[24px] border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-2.5">
           <div className="space-y-1 text-center">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">Escaneie ou edite</p>
-            <p className="text-sm text-slate-700">O QR ja aparece aqui e abre o editor ao clicar.</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">Escaneie ou edite</p>
+            <p className="text-xs text-slate-700">Clique no QR para ajustar visual, logo e download.</p>
           </div>
           <EventPublicLinkQrTrigger
             eventId={eventId}

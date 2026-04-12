@@ -9,6 +9,7 @@ const sendWallHeartbeatMock = vi.fn();
 const useWallRealtimeMock = vi.fn();
 const clearWallAssetCachesMock = vi.fn();
 const getWallCacheDiagnosticsMock = vi.fn();
+const resolveWallRuntimeProfileMock = vi.fn();
 
 const engineMock = {
   state: {
@@ -54,6 +55,10 @@ const engineMock = {
     currentIndex: 0,
     currentItemId: 'media_1',
     currentItemStartedAt: '2026-04-09T03:10:05.000Z',
+    activeTransitionEffect: 'fade' as const,
+    lastTransitionEffect: null,
+    transitionAdvanceCount: 0,
+    settings: null as Record<string, unknown> | null,
     videoPlayback: {
       itemId: null,
       phase: 'idle' as const,
@@ -120,6 +125,10 @@ vi.mock('../engine/cache', () => ({
   getWallCacheDiagnostics: (...args: unknown[]) => getWallCacheDiagnosticsMock(...args),
 }));
 
+vi.mock('../runtime-profile', () => ({
+  resolveWallRuntimeProfile: (...args: unknown[]) => resolveWallRuntimeProfileMock(...args),
+}));
+
 vi.mock('./useWallEngine', () => ({
   useWallEngine: () => engineMock,
 }));
@@ -151,6 +160,9 @@ describe('useWallPlayer', () => {
     engineMock.state.adBaseItemId = null;
     engineMock.state.currentItemId = 'media_1';
     engineMock.state.currentItemStartedAt = '2026-04-09T03:10:05.000Z';
+    engineMock.state.activeTransitionEffect = 'fade';
+    engineMock.state.lastTransitionEffect = null;
+    engineMock.state.transitionAdvanceCount = 0;
     engineMock.currentItem = {
       id: 'media_1',
       senderKey: 'sender-maria',
@@ -184,6 +196,52 @@ describe('useWallPlayer', () => {
       lastExitReason: null,
       lastFailureReason: null,
     };
+    engineMock.state.settings = {
+      interval_ms: 8000,
+      queue_limit: 20,
+      selection_mode: 'balanced',
+      event_phase: 'flow',
+      selection_policy: {
+        max_eligible_items_per_sender: 4,
+        max_replays_per_item: 2,
+        low_volume_max_items: 6,
+        medium_volume_max_items: 12,
+        replay_interval_low_minutes: 8,
+        replay_interval_medium_minutes: 12,
+        replay_interval_high_minutes: 20,
+        sender_cooldown_seconds: 60,
+        sender_window_limit: 3,
+        sender_window_minutes: 10,
+        avoid_same_sender_if_alternative_exists: true,
+        avoid_same_duplicate_cluster_if_alternative_exists: true,
+      },
+      layout: 'fullscreen',
+      transition_effect: 'fade',
+      transition_mode: 'fixed',
+      transition_pool: null,
+      background_url: null,
+      partner_logo_url: null,
+      show_qr: true,
+      show_branding: true,
+      show_neon: false,
+      neon_text: null,
+      neon_color: '#ffffff',
+      show_sender_credit: false,
+      show_side_thumbnails: true,
+      accepted_orientation: 'all',
+      video_enabled: true,
+      video_playback_mode: 'play_to_end_if_short_else_cap',
+      video_max_seconds: 15,
+      video_resume_mode: 'resume_if_same_item_else_restart',
+      video_audio_policy: 'muted',
+      video_multi_layout_policy: 'disallow',
+      video_preferred_variant: 'wall_video_720p',
+      ad_mode: 'disabled',
+      ad_frequency: 5,
+      ad_interval_minutes: 3,
+      instructions_text: null,
+      theme_config: {},
+    };
 
     getWallBootMock.mockResolvedValue({
       event: {
@@ -215,6 +273,8 @@ describe('useWallPlayer', () => {
         },
         layout: 'auto',
         transition_effect: 'fade',
+        transition_mode: 'fixed',
+        transition_pool: null,
         background_url: null,
         partner_logo_url: null,
         show_qr: true,
@@ -246,6 +306,16 @@ describe('useWallPlayer', () => {
           position: 0,
         },
       ],
+    });
+    resolveWallRuntimeProfileMock.mockReturnValue({
+      hardware_concurrency: 8,
+      device_memory_gb: 16,
+      network_effective_type: '4g',
+      network_save_data: false,
+      network_downlink_mbps: 24.5,
+      network_rtt_ms: 68,
+      prefers_reduced_motion: false,
+      document_visibility_state: 'visible',
     });
     sendWallHeartbeatMock.mockResolvedValue(undefined);
     clearWallAssetCachesMock.mockResolvedValue(undefined);
@@ -299,6 +369,11 @@ describe('useWallPlayer', () => {
       cache_hit_count: 6,
       cache_miss_count: 2,
       cache_stale_fallback_count: 1,
+      active_transition_effect: 'fade',
+      transition_mode: 'fixed',
+      transition_random_pick_count: 0,
+      transition_fallback_count: 0,
+      transition_last_fallback_reason: null,
     }));
 
     const initialCallCount = sendWallHeartbeatMock.mock.calls.length;
@@ -385,6 +460,67 @@ describe('useWallPlayer', () => {
       decode_backlog_count: 1,
       board_reset_count: 3,
       board_budget_downgrade_reason: 'runtime_budget',
+    }));
+  });
+
+  it('reports the actually active random transition effect instead of only the configured base effect', async () => {
+    engineMock.state.settings = {
+      ...engineMock.state.settings,
+      layout: 'fullscreen',
+      transition_effect: 'fade',
+      transition_mode: 'random',
+      transition_pool: ['fade', 'swipe-up'],
+    };
+    engineMock.state.activeTransitionEffect = 'swipe-up';
+    engineMock.state.lastTransitionEffect = 'fade';
+    engineMock.state.transitionAdvanceCount = 1;
+
+    renderHook(() => useWallPlayer('ABCD1234'));
+
+    await flushAsyncWork();
+
+    const payload = sendWallHeartbeatMock.mock.calls.at(-1)?.[1];
+
+    expect(payload).toEqual(expect.objectContaining({
+      active_transition_effect: 'swipe-up',
+      transition_mode: 'random',
+      transition_random_pick_count: 1,
+      transition_fallback_count: 0,
+      transition_last_fallback_reason: null,
+    }));
+  });
+
+  it('increments the transition fallback counter when reduced motion forces a safe effect', async () => {
+    engineMock.state.settings = {
+      ...engineMock.state.settings,
+      layout: 'fullscreen',
+      transition_effect: 'flip',
+      transition_mode: 'fixed',
+    };
+    engineMock.state.activeTransitionEffect = 'flip';
+    resolveWallRuntimeProfileMock.mockReturnValue({
+      hardware_concurrency: 8,
+      device_memory_gb: 16,
+      network_effective_type: '4g',
+      network_save_data: false,
+      network_downlink_mbps: 24.5,
+      network_rtt_ms: 68,
+      prefers_reduced_motion: true,
+      document_visibility_state: 'visible',
+    });
+
+    renderHook(() => useWallPlayer('ABCD1234'));
+
+    await flushAsyncWork();
+
+    const payload = sendWallHeartbeatMock.mock.calls.at(-1)?.[1];
+
+    expect(payload).toEqual(expect.objectContaining({
+      active_transition_effect: 'none',
+      transition_mode: 'fixed',
+      transition_random_pick_count: 0,
+      transition_fallback_count: 1,
+      transition_last_fallback_reason: 'reduced_motion',
     }));
   });
 

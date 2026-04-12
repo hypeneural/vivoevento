@@ -87,7 +87,8 @@ Fontes oficiais:
 
 Aplicacao neste plano:
 
-- `LoginPage.test.tsx` e novos testes de convite devem migrar do eixo `fireEvent + placeholder` para `userEvent + labels/roles`.
+- `LoginPage.test.tsx` e novos testes de convite devem priorizar `userEvent + labels/roles`;
+- `fireEvent` deve ficar restrito a casos de baixo nivel em que `fake timers` ou callback imediato de `setTimeout` tornem o teste significativamente mais estavel e deterministico.
 
 ### Vitest
 
@@ -134,7 +135,7 @@ Aplicacao neste plano:
 ### Gaps confirmados por codigo
 
 1. as paginas publicas de convite ainda nao tem costura completa com `Esqueci a senha`
-2. `LoginPage.test.tsx` ainda usa `fireEvent` e `placeholder` como base predominante
+2. `LoginPage.test.tsx` ja migrou o nucleo de interacao para `userEvent`, mas ainda nao cobre todos os estados de erro, expiracao e loading do fluxo
 3. `workspace selector` e `/my-events` ja tem contratos verdes, mas ainda precisam de fechamento de UX
 4. `EventEditorPage` ja tem teste de UI dedicado, mas branding ainda nao deixa explicito onde cada arquivo aparece e se esta herdado ou sobrescrito
 
@@ -436,6 +437,31 @@ Fazer o usuario entender claramente:
    - forgot -> definicao de nova senha
 14. `LoginPage.test.tsx` agora prova a navegacao entre `Entrar` e `Criar conta` via rodape compartilhado
 15. `LoginPage.test.tsx` agora prova explicitamente o passo de cadastro que avanca para `Valide seu WhatsApp`
+16. o passo inicial de `Esqueci a senha` entrou na camada compartilhada via `RecoveryRequestStep`
+17. o estado final de sucesso do reset entrou na camada compartilhada via `AuthFlowSuccessState`
+18. o reducer/hook da jornada agora absorve explicitamente as transicoes de recuperacao e sucesso:
+   - `START_PASSWORD_RECOVERY`
+   - `FORGOT_OTP_SENT`
+   - `FORGOT_OTP_CONFIRMED`
+   - `PASSWORD_RESET_SUCCEEDED`
+   - retornos explicitos para `forgot`, `forgot-code`, `login` e `method`
+19. o nucleo de `LoginPage.test.tsx` migrou para `userEvent` com queries por `label` e `role`, mantendo `fireEvent` apenas em dois cenarios de borda:
+   - countdown deterministico com `fake timers`
+   - sucesso final do reset com callback imediato de `setTimeout`
+20. `LoginPage.test.tsx` agora cobre explicitamente:
+   - erro no request do OTP
+   - erro na verificacao do OTP
+   - sessao OTP expirada
+   - loading e botoes desabilitados durante request do OTP
+   - loading e botoes desabilitados durante verificacao do OTP
+21. a camada de rota sensivel a `returnTo` passou a ter teste com arvore real via `RouterProvider` em `LoginPage.routing.test.tsx`
+22. o redirect pos-login para `/plans` e o redirect pos-reset para o proprio convite agora estao provados sem depender apenas de `navigateMock`
+23. o reducer da jornada agora carrega `history` e `canGoBack`, deixando o backtracking menos espalhado em callbacks manuais
+24. `LoginPage` trocou os retornos especificos (`returnToLogin`, `returnToForgotCode`, etc.) por `goBack()` derivado do proprio fluxo
+25. as paginas publicas de convite organizacional e event-scoped agora tambem possuem testes de rota com arvore real para:
+   - CTA de login com `returnTo`
+   - CTA de `Esqueci a senha` com `flow=forgot`
+   - `Usar outra conta` com navegacao efetiva para `/login`
 
 ### Validacao executada nesta rodada
 
@@ -453,13 +479,30 @@ Fazer o usuario entender claramente:
    - resultado: `ok`
 7. `php artisan test tests/Feature/Organizations/OrganizationTeamInvitationContractTest.php tests/Feature/EventTeam/EventTeamInvitationContractTest.php tests/Feature/Auth/PasswordResetOtpTest.php`
    - resultado: `24 passed`, `262 assertions`
+8. `npx.cmd vitest run src/modules/auth/LoginPage.test.tsx src/modules/auth/support/invitationAuthFlowReducer.test.ts src/modules/team-invitations/PublicOrganizationInvitationPage.test.tsx src/modules/event-invitations/PublicEventInvitationPage.test.tsx`
+   - resultado: `18 passed`
+9. `npm run type-check`
+   - resultado: `ok`
+10. `php artisan test tests/Feature/Organizations/OrganizationTeamInvitationContractTest.php tests/Feature/EventTeam/EventTeamInvitationContractTest.php tests/Feature/Auth/PasswordResetOtpTest.php`
+   - resultado: `24 passed`, `262 assertions`
+11. `npx.cmd vitest run src/modules/auth/LoginPage.test.tsx src/modules/auth/LoginPage.routing.test.tsx src/modules/auth/support/invitationAuthFlowReducer.test.ts src/modules/team-invitations/PublicOrganizationInvitationPage.test.tsx src/modules/event-invitations/PublicEventInvitationPage.test.tsx`
+   - resultado: `25 passed`
+12. `npm run type-check`
+   - resultado: `ok`
+13. `php artisan test tests/Feature/Organizations/OrganizationTeamInvitationContractTest.php tests/Feature/EventTeam/EventTeamInvitationContractTest.php tests/Feature/Auth/PasswordResetOtpTest.php`
+   - resultado: `24 passed`, `262 assertions`
+14. `npx.cmd vitest run src/modules/auth/support/invitationAuthFlowReducer.test.ts src/modules/auth/LoginPage.test.tsx src/modules/auth/LoginPage.routing.test.tsx src/modules/team-invitations/PublicOrganizationInvitationPage.test.tsx src/modules/team-invitations/PublicOrganizationInvitationPage.routing.test.tsx src/modules/event-invitations/PublicEventInvitationPage.test.tsx src/modules/event-invitations/PublicEventInvitationPage.routing.test.tsx`
+   - resultado: `31 passed`
+15. `npm run type-check`
+   - resultado: `ok`
+16. `php artisan test tests/Feature/Organizations/OrganizationTeamInvitationContractTest.php tests/Feature/EventTeam/EventTeamInvitationContractTest.php tests/Feature/Auth/PasswordResetOtpTest.php`
+   - resultado: `24 passed`, `262 assertions`
 
 ### Pendencias reais dentro da Fase 2
 
-1. aprofundar o reducer para reduzir ainda mais estados auxiliares e transicoes espalhadas fora da camada de fluxo
-2. migrar progressivamente os testes principais de `fireEvent` para `user-event`
-3. subir os testes de rota mais sensiveis para uma abordagem mais fiel quando `returnTo`, guard e redirect passarem a pesar mais na jornada
-4. decidir se a proxima iteracao converte tambem o passo inicial de `Esqueci a senha` e o estado de sucesso final em componentes compartilhados
+1. se o aceite publico/autenticado das paginas de convite passar a combinar mais estado local e redirect encadeado, subir tambem esse trecho para testes de rota mais fieis
+2. manter os dois cenarios residuais com `fireEvent` como testes de baixo nivel justificados, revisitando isso apenas se a camada de temporizacao do fluxo mudar
+3. fora da Fase 2, o proximo eixo natural volta a ser `workspace` e `branding`, nao mais auth basico
 
 ### Criterio de aceite
 

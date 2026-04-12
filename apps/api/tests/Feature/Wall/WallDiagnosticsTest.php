@@ -257,6 +257,64 @@ it('persists board runtime counters and downgrade reason in diagnostics payloads
         ->and($runtimeStatus?->board_budget_downgrade_reason)->toBe('small_stage');
 });
 
+it('persists active transition telemetry and fallback reason in diagnostics payloads', function () {
+    [$user, $organization] = $this->actingAsManager();
+
+    $event = Event::factory()->active()->create([
+        'organization_id' => $organization->id,
+    ]);
+    enableWallModule($event);
+
+    $settings = EventWallSetting::factory()->live()->create([
+        'event_id' => $event->id,
+    ]);
+
+    $this->postJson("/api/v1/public/wall/{$settings->wall_code}/heartbeat", [
+        'player_instance_id' => 'player-transition-runtime',
+        'runtime_status' => 'playing',
+        'connection_status' => 'connected',
+        'current_item_id' => 'media_111',
+        'current_sender_key' => 'whatsapp:5511888888888',
+        'ready_count' => 6,
+        'loading_count' => 0,
+        'error_count' => 0,
+        'stale_count' => 0,
+        'cache_enabled' => true,
+        'persistent_storage' => 'indexeddb',
+        'cache_usage_bytes' => 1048576,
+        'cache_quota_bytes' => 8388608,
+        'cache_hit_count' => 18,
+        'cache_miss_count' => 2,
+        'cache_stale_fallback_count' => 0,
+        'active_transition_effect' => 'none',
+        'transition_mode' => 'random',
+        'transition_random_pick_count' => 5,
+        'transition_fallback_count' => 2,
+        'transition_last_fallback_reason' => 'reduced_motion',
+        'last_sync_at' => now()->toIso8601String(),
+        'last_fallback_reason' => null,
+    ])->assertOk();
+
+    $response = $this->apiGet("/events/{$event->id}/wall/diagnostics");
+
+    $this->assertApiSuccess($response);
+
+    $response->assertJsonPath('data.players.0.active_transition_effect', 'none')
+        ->assertJsonPath('data.players.0.transition_mode', 'random')
+        ->assertJsonPath('data.players.0.transition_random_pick_count', 5)
+        ->assertJsonPath('data.players.0.transition_fallback_count', 2)
+        ->assertJsonPath('data.players.0.transition_last_fallback_reason', 'reduced_motion');
+
+    $runtimeStatus = WallPlayerRuntimeStatus::query()->firstWhere('player_instance_id', 'player-transition-runtime');
+
+    expect($runtimeStatus)->not->toBeNull()
+        ->and($runtimeStatus?->active_transition_effect)->toBe('none')
+        ->and($runtimeStatus?->transition_mode)->toBe('random')
+        ->and($runtimeStatus?->transition_random_pick_count)->toBe(5)
+        ->and($runtimeStatus?->transition_fallback_count)->toBe(2)
+        ->and($runtimeStatus?->transition_last_fallback_reason)->toBe('reduced_motion');
+});
+
 it('broadcasts diagnostics updates on the private event wall channel when the aggregate changes', function () {
     $event = Event::factory()->active()->create();
     enableWallModule($event);

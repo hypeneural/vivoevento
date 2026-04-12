@@ -68,4 +68,21 @@ describe('qrOptionsBuilder', () => {
     expect(options.image).toBeUndefined();
     expect(options.imageOptions?.crossOrigin).toBeUndefined();
   });
+
+  it('prefers a same-origin storage path when the config has asset_path', () => {
+    const options = buildQrCodeStylingOptions({
+      config: normalizeEventPublicLinkQrConfig({
+        logo: {
+          mode: 'custom',
+          asset_path: 'events/branding/1/logo/arquivo.webp',
+          asset_url: 'http://localhost:8000/storage/events/branding/1/logo/arquivo.webp',
+        },
+      }),
+      data: 'https://app.eventovivo.com/e/evento/gallery',
+    });
+
+    expect(options.image).toContain('/storage/events/branding/1/logo/arquivo.webp');
+    expect(options.image).toContain(window.location.origin);
+    expect(options.imageOptions?.crossOrigin).toBeUndefined();
+  });
 });

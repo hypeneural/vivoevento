@@ -1,4 +1,9 @@
-import type { WallRuntimeItem, WallSettings, WallTransition } from '../types';
+import type {
+  WallRuntimeItem,
+  WallSettings,
+  WallTransition,
+  WallTransitionMode,
+} from '../types';
 import { getWallLayoutDefinition } from '../themes/registry';
 import {
   DEFAULT_RANDOM_WALL_TRANSITION_POOL,
@@ -36,6 +41,12 @@ function shouldUseRandomTransitionMode(settings?: WallSettings | null): boolean 
   return getWallLayoutDefinition(settings.layout).kind === 'single';
 }
 
+export function resolveWallRuntimeTransitionMode(
+  settings?: WallSettings | null,
+): WallTransitionMode {
+  return shouldUseRandomTransitionMode(settings) ? 'random' : 'fixed';
+}
+
 function sanitizeTransitionEffect(effect?: WallTransition | null): WallTransition {
   return getWallTransitionDefinition(effect ?? 'fade').id;
 }
@@ -50,7 +61,7 @@ export function resolveWallRuntimeTransitionEffect({
 }: ResolveWallRuntimeTransitionEffectInput): WallTransition {
   const baseEffect = sanitizeTransitionEffect(settings?.transition_effect ?? 'fade');
 
-  if (!settings || !currentItem || !shouldUseRandomTransitionMode(settings)) {
+  if (!settings || !currentItem || resolveWallRuntimeTransitionMode(settings) !== 'random') {
     return baseEffect;
   }
 

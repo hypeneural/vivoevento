@@ -55,7 +55,7 @@ Documento base:
 - [x] devolver foco ao trigger ao fechar editor
 - [x] rodar testes focados de `src/modules/events/qr`
 - [x] conectar prefetch/query a endpoint real de persistencia
-- [ ] fechar suite dedicada de acessibilidade do modal
+- [x] fechar suite dedicada de acessibilidade do modal
 - [x] trocar preview da shell pelo preview vivo com `qr-code-styling`
 
 ### Fase 3
@@ -107,6 +107,14 @@ Documento base:
 - [x] adicionar reset de secao no painel `Conteudo`
 - [x] integrar upload real de logo customizada via endpoint de branding assets
 - [x] substituir seletor tecnico de logo por fluxo guiado (`usar`, `enviar`, `remover`)
+
+### Fase 7
+
+- [x] implementar heuristica de leitura em tempo real no editor
+- [x] exibir badge de leitura com score e motivo principal
+- [x] bloquear save/export em configuracoes extremas de contraste
+- [x] cobrir acessibilidade do dialog com teste dedicado
+- [ ] adicionar decode opcional com `BarcodeDetector` como melhoria progressiva
 
 ### Resultado automatizado desta rodada
 
@@ -229,8 +237,6 @@ Resultado:
 
 ## Pendencias reais apos esta rodada
 
-- [ ] fechar suite dedicada de acessibilidade do modal/trigger com foco, trap e `Escape`
-- [ ] implementar heuristica de leitura em tempo real com guardrails fortes
 - [ ] adicionar decode opcional com `BarcodeDetector` como melhoria progressiva
 - [ ] instrumentar telemetria de UX e `performance.mark()/measure()`
 - [ ] avaliar `applyExtension` curado e assets server-side apenas nas fases seguintes
@@ -938,6 +944,7 @@ Acoplar o editor ao `EventDetailPage` e fazer a experiencia de salvar parecer in
 - `T5.3` concluida:
   - card exibe badge de `Estilo salvo` quando o override existe.
   - card ganhou copy mais humana para orientar uso do QR por publico leigo.
+  - trigger e card ficaram mais compactos para o QR ficar legivel na listagem.
 
 ## Tarefas
 
@@ -966,6 +973,7 @@ Subtarefas:
 - o card passa a renderizar preview salvo/default;
 - exibir indicador de preset ou modo atual;
 - manter CTA de copiar e abrir.
+- reduzir o box do trigger para priorizar visualizacao do QR na listagem.
 
 ## TDD obrigatorio da fase
 
@@ -1132,6 +1140,20 @@ Subtarefas:
 ## Objetivo
 
 Entregar seguranca de leitura sem transformar a V1 numa dependencia de APIs experimentais.
+
+## Status atual da fase em 2026-04-11
+
+- `T7.1` concluida no recorte base:
+  - heuristica de leitura implementada com score, label e motivos;
+  - badge `Otima leitura / Boa leitura / Leitura arriscada` visivel no preview;
+  - contraste virou criterio objetivo no relatorio.
+- `T7.2` concluida no recorte base:
+  - guardrails existentes continuam clampando quiet zone, logo e exportacao;
+  - save e download agora bloqueiam cenarios extremos de contraste.
+- acessibilidade concluida para esta fase:
+  - suite dedicada cobre abertura acessivel do dialog e fechamento por `Escape`.
+- `T7.3` continua pendente:
+  - decode real com `BarcodeDetector` segue como melhoria progressiva, nao dependencia da V1.
 
 ## Tarefas
 
@@ -1460,3 +1482,49 @@ A V1 pode ser considerada pronta quando:
 ## Proximo passo imediato
 
 Abrir a implementacao pela `Fase 1`, mas so depois de concluir o spike da `Fase 0` e travar a versao da lib com um wrapper minimo local.
+
+---
+
+## Atualizacao de execucao em 2026-04-11 - linguagem leiga e expansao do catalogo
+
+Itens efetivamente fechados nesta rodada:
+
+- [x] trocar termos tecnicos visiveis por linguagem de produto em portugues simples
+- [x] adicionar tooltips reutilizaveis para explicar campos principais do editor
+- [x] simplificar o texto do contrato:
+  - a aparencia fica salva por link;
+  - o destino do QR continua vindo do link publico real do evento
+- [x] ampliar o catalogo de skins no schema do produto e no backend
+- [x] manter a ampliacao estritamente dentro da superficie oficial da `qr-code-styling`
+- [x] cobrir tooltip, presets expandidos, shell do editor e schema backend com testes
+
+Catalogo atual de skins:
+
+- `classico`
+- `premium`
+- `minimalista`
+- `escuro`
+- `luxo_dourado`
+- `oceano`
+- `romantico`
+- `festa`
+- `grafite`
+- `terracota`
+- `floresta`
+- `lavanda`
+
+Correcao funcional relevante desta rodada:
+
+- [x] corrigir trigger da listagem para o QR nao ser encolhido por regra global de `svg` do componente `Button`
+- [x] adicionar teste de regressao para preview mini do QR dentro do trigger
+
+Comandos executados nesta rodada:
+
+```bash
+cd apps/web
+npx.cmd vitest run src/modules/qr-code/components/QrCodeHelp.test.tsx src/modules/qr-code/support/qrDefaults.test.ts src/modules/events/qr/qrPresetChooser.test.tsx src/modules/events/qr/EventPublicLinkQrEditorShell.test.tsx src/modules/qr-code/components/QrCodeLogoPanel.test.tsx
+npm run type-check
+
+cd ../api
+php artisan test tests/Feature/Events/EventPublicLinkQrConfigTest.php tests/Unit/Events/UpsertEventPublicLinkQrConfigActionTest.php
+```

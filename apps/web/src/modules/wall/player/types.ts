@@ -20,6 +20,7 @@ import type {
   WallStateData,
   WallStatusChangedPayload,
   WallTransition,
+  WallTransitionFallbackReason,
   WallTransitionMode,
 } from '@eventovivo/shared-types/wall';
 
@@ -44,6 +45,7 @@ export type {
   WallStateData,
   WallStatusChangedPayload,
   WallTransition,
+  WallTransitionFallbackReason,
   WallTransitionMode,
 };
 

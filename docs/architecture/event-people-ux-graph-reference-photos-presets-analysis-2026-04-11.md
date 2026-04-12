@@ -108,7 +108,7 @@ Validacao direta em `apps/api/app/Modules/EventPeople`:
 - `avatar_media_id` e `avatar_face_id` existem no modelo `EventPerson`;
 - `ConfirmEventPersonFaceAction` ja define avatar automaticamente na primeira confirmacao util;
 - `MergeEventPeopleAction` reaproveita avatar da pessoa origem quando faz sentido;
-- requests de store/update ainda nao expõem alteracao manual de avatar;
+- requests de store/update ainda nao expoem alteracao manual de avatar;
 - nao existe recurso dedicado para `reference photos` manuais.
 
 ## Testes atuais
@@ -206,6 +206,231 @@ Leitura pratica:
 - o sistema deve preferir `escolher da galeria` e usar upload manual como complemento;
 - `Fotos de referencia` nao devem ser qualquer anexo, e sim um conjunto curado.
 
+## 4. O maior risco agora e consistencia, nao escolha de lib
+
+As docs oficiais validam quatro pontos importantes:
+
+- `useTransition` nao serve para controlar input;
+- updates depois de `await` precisam de um novo `startTransition`;
+- `useDeferredValue` ajuda a manter a digitacao fluida, mas nao evita requests por si so;
+- TanStack Query recomenda fluxo explicito de `onMutate`, snapshot, rollback em `onError` e invalidacao em `onSettled` ou `onSuccess`;
+- Laravel fornece `afterCommit`, `ShouldBeUnique`, `WithoutOverlapping`, `RateLimited` e `ShouldBeEncrypted` exatamente para reduzir corrida, duplicidade e disputa entre jobs;
+- PostgreSQL deixa claro que partial indexes so ajudam quando o predicado real da query casa de forma reconhecivel com o indice, e `EXPLAIN` deve ser usado para validar o plano.
+
+Fontes oficiais:
+
+- React `useTransition`: https://react.dev/reference/react/useTransition
+- React `useDeferredValue`: https://react.dev/reference/react/useDeferredValue
+- TanStack Query optimistic updates: https://tanstack.com/query/latest/docs/framework/react/guides/optimistic-updates
+- TanStack Query invalidations from mutations: https://tanstack.com/query/v5/docs/framework/react/guides/invalidations-from-mutations
+- Laravel queues: https://laravel.com/docs/12.x/queues
+- PostgreSQL partial indexes: https://www.postgresql.org/docs/current/indexes-partial.html
+- PostgreSQL `EXPLAIN`: https://www.postgresql.org/docs/current/using-explain.html
+
+Leitura pratica:
+
+- o problema principal do modulo nao e mais "qual canvas usar";
+- o risco principal e espalhar verdade entre banco transacional, read models, fila, cache otimista e sync remoto;
+- sem contrato operacional rigido, qualquer grafo bonito vira custo de suporte e comportamento inconsistente.
+
+## 5. Cockpit operacional e requisito de acessibilidade caminham juntos
+
+WCAG define `status messages` como mensagens que informam sucesso, espera, progresso ou erro sem mudanca de contexto.
+
+Fonte oficial:
+
+- `Status Messages`: https://www.w3.org/WAI/WCAG21/Understanding/status-messages
+
+Leitura pratica:
+
+- o cockpit nao e so UX bonita;
+- ele tambem e requisito de acessibilidade operacional;
+- status persistentes na tela tem base tecnica e nao devem ser tratados como detalhe visual.
+
+---
+
+## Contrato obrigatorio antes do grafo
+
+Antes do `Mapa de relacoes`, o modulo `EventPeople` deve congelar estes contratos:
+
+1. maquina de estados do dominio;
+2. protocolo fixo de cache otimista e mutacoes;
+3. query objects das leituras quentes;
+4. plano validado das queries criticas com `EXPLAIN`;
+5. semantica imutavel de `avatar`, `foto principal`, `foto de referencia` e `representative face`;
+6. cockpit com status persistentes e semantica consistente.
+
+Sem isso:
+
+- a UI da ack local e depois "some";
+- as projecoes entram em atraso sem explicacao visivel;
+- o operador perde confianca;
+- o grafo nasce sobre dados que ainda oscilam demais.
+
+## Maquina de estados minima do dominio
+
+## 1. `review_item.status`
+
+Estados:
+
+- `pending`
+- `conflict`
+- `resolved`
+- `ignored`
+
+Transicoes permitidas:
+
+| De | Para | Gatilho |
+|---|---|---|
+| `pending` | `resolved` | confirmacao, criacao inline, mover para pessoa existente |
+| `pending` | `ignored` | ignorar |
+| `pending` | `conflict` | colisao de identidade, merge em disputa, reconciliacao divergente |
+| `conflict` | `resolved` | merge, confirmacao manual, correcao definitiva |
+| `conflict` | `ignored` | operador opta por nao agir agora |
+| `resolved` | `pending` | split, replay ou reabertura explicita |
+
+Regra:
+
+- `resolved -> pending` deve registrar motivo;
+- reabertura nao pode ser efeito colateral silencioso.
+
+## 2. `assignment.status`
+
+Estados:
+
+- `suggested`
+- `confirmed`
+- `rejected`
+
+Transicoes permitidas:
+
+| De | Para | Gatilho |
+|---|---|---|
+| `suggested` | `confirmed` | confirmacao humana |
+| `suggested` | `rejected` | rejeicao humana |
+| `confirmed` | `rejected` | correcao manual |
+| `rejected` | `suggested` | replay ou nova sugestao com chave distinta |
+
+Regra:
+
+- `split` nao deve virar gambiarra de status;
+- no split, a verdade operacional volta para `review_item.status = pending` e o assignment anterior sai do papel de verdade confirmada.
+
+## 3. `reference_photo.status`
+
+Estados:
+
+- `active`
+- `archived`
+- `invalid`
+
+Transicoes permitidas:
+
+| De | Para | Gatilho |
+|---|---|---|
+| `active` | `archived` | remocao humana, substituicao editorial, desativacao |
+| `active` | `invalid` | auditoria de qualidade, face nao utilizavel, upload rejeitado |
+| `archived` | `active` | restauracao humana explicita |
+
+Regra:
+
+- `reference_photo` guarda intencao humana;
+- ele nao deve ser sobrescrito por selecao tecnica automatica.
+
+## 4. `remote_sync_status`
+
+Estados:
+
+- `pending`
+- `synced`
+- `failed`
+- `skipped`
+
+Transicoes permitidas:
+
+| De | Para | Gatilho |
+|---|---|---|
+| `pending` | `synced` | sync remoto concluido |
+| `pending` | `failed` | erro transitivo ou funcional |
+| `pending` | `skipped` | item sem elegibilidade para sync |
+| `failed` | `pending` | retry explicito ou novo delta material |
+| `synced` | `pending` | mudanca material na identidade, referencias ou representatives |
+| `skipped` | `pending` | item volta a ficar elegivel |
+
+Regra:
+
+- `pending` local nao pode apagar o ack do operador;
+- fila atrasada e um status do sistema, nao erro do usuario.
+
+## 5. `person.status`
+
+Estados:
+
+- `draft`
+- `active`
+- `hidden`
+
+Transicoes permitidas:
+
+| De | Para | Gatilho |
+|---|---|---|
+| `draft` | `active` | pessoa passou a ter nome ou papel suficiente |
+| `active` | `hidden` | ocultacao manual |
+| `hidden` | `active` | reativacao manual |
+
+Regra:
+
+- `hidden` nao deve ser usado como lixeira tecnica;
+- limpeza, merge e arquivamento remoto seguem fluxos proprios.
+
+---
+
+## Protocolo fixo de mutacao no frontend
+
+Para o modulo `EventPeople`, o frontend deve seguir este contrato:
+
+1. `input` sempre urgente e isolado;
+2. lista derivada usa `useDeferredValue`;
+3. troca de aba, drawer, filtros grandes e mudanca de pessoa usam `useTransition`;
+4. qualquer update depois de `await` precisa de novo `startTransition`;
+5. toda mutacao humana usa `onMutate` com snapshot;
+6. toda mutacao falha faz rollback em `onError`;
+7. toda mutacao invalida leituras afetadas em `onSuccess` ou `onSettled`;
+8. o ack local do operador nao deve sumir so porque a projecao atrasou.
+
+Em termos de implementacao:
+
+- `onMutate` com snapshot do cache atual;
+- patch otimista local;
+- rollback em `onError`;
+- invalidacao dirigida das queries impactadas;
+- status persistente na UI para `na fila`, `sincronizando`, `falhou`, `atualizado`.
+
+Isso nao e opcional.
+
+E o protocolo fixo do modulo.
+
+## Query objects e leituras quentes
+
+As leituras quentes da pagina de pessoas nao devem ficar espalhadas em query builder solto.
+
+Elas devem nascer como query objects com:
+
+- shape estavel de resposta;
+- predicado congelado;
+- indices parciais compativeis com o `WHERE` real;
+- validacao com `EXPLAIN`;
+- cuidado extra com `EXPLAIN ANALYZE`, porque ele executa a query de fato.
+
+Leituras quentes obrigatorias:
+
+- busca de pessoas;
+- review queue;
+- filtros por status;
+- fotos da pessoa;
+- dados de sidebar do grafo;
+- autocomplete de pessoa e papel.
+
 ---
 
 ## Comparacao objetiva de abordagem para o grafo
@@ -229,6 +454,95 @@ Deixar `Cytoscape.js` como alternativa futura apenas se o produto passar a exigi
 - layout de rede muito mais automatico;
 - grafo maior e mais denso;
 - analise de vizinhanca e clustering como requisito principal.
+
+---
+
+## O que realmente vale o investimento agora
+
+## 1. Cockpit operacional da pagina de pessoas
+
+Para cerimonialista, noivo ou operador leigo, o ganho maior nao esta no grafo.
+
+O ganho maior esta em abrir a pagina e entender imediatamente:
+
+- o que ja esta resolvido;
+- o que esta pendente;
+- o que entrou em conflito;
+- o que depende dele agora;
+- o que o sistema esta processando sozinho.
+
+Isso significa que a pagina precisa priorizar:
+
+- status persistentes, nao so toasts;
+- contadores claros;
+- linguagem fixa e humana;
+- destaque para pendencia e conflito;
+- feedback continuo sem trocar de tela.
+
+## 2. Separar de vez os conceitos de imagem da pessoa
+
+Este e um ponto de alto retorno e baixo arrependimento.
+
+O dominio precisa diferenciar com rigidez:
+
+- `avatar`: imagem de navegacao do catalogo;
+- `foto principal`: melhor foto humana para UI;
+- `foto de referencia`: entrada curada escolhida por humano para matching e ancoragem;
+- `representative face`: conjunto tecnico derivado para sync remoto.
+
+Se esses quatro conceitos continuarem misturados, o backend mistura decisao editorial com decisao tecnica e a UX fica confusa.
+
+## 3. Refatorar presets para modelo real de evento
+
+Isso e muito mais util para usuario leigo do que abrir um grafo cedo.
+
+O retorno pratico e imediato:
+
+- a pessoa nao precisa "modelar o mundo";
+- o pacote inicial ja conversa com casamento, 15 anos, corporativo e formatura;
+- coverage e grupos futuros passam a nascer sobre semantica certa.
+
+## 4. Congelar contrato operacional antes do mapa rico
+
+Antes de investir em `GET /people/graph` e canvas mais elaborado, o modulo deve congelar:
+
+- maquina de estados;
+- query objects;
+- `EXPLAIN` das leituras quentes;
+- protocolo de cache otimista;
+- estados visiveis no cockpit.
+
+Esse investimento e menos vistoso, mas reduz muito mais custo de manutencao.
+
+---
+
+## O que nao compensa agora
+
+## 1. Tratar o grafo como tela principal
+
+Isso aumenta custo cognitivo para usuario leigo.
+
+O grafo deve entrar como vista complementar, nao como porta de entrada.
+
+## 2. Colocar foto em toda relacao do canvas
+
+Visualmente parece atrativo, mas:
+
+- polui a leitura;
+- piora performance;
+- nao ajuda quem precisa operar rapido.
+
+Foto do par faz mais sentido no painel lateral de detalhe.
+
+## 3. Introduzir uma nova lib de grafo so porque ela e mais "network native"
+
+No estado atual do projeto, o custo de integrar, testar e padronizar uma nova lib e maior que o ganho imediato.
+
+## 4. Continuar chamando o card de `Sugestoes prontas`
+
+Esse nome reduz uma decisao estrutural de produto a um atalho superficial.
+
+O nome certo agora e `Modelo do evento`.
 
 ---
 
@@ -461,6 +775,18 @@ Valores iniciais:
 - `purpose`: `avatar`, `matching`, `both`
 - `status`: `active`, `archived`
 
+## Regra adicional recomendada
+
+`representative_faces` deve continuar sendo read model tecnico.
+
+Ou seja:
+
+- nasce de selecao curada local;
+- pode usar `foto de referencia` como entrada;
+- mas nao vira a estrutura onde a intencao humana fica salva.
+
+Isso preserva separacao entre UX editorial e sync remoto.
+
 ---
 
 ## Melhor abordagem para `Sugestoes prontas`
@@ -529,6 +855,30 @@ E a copy real mostrada no front:
 - `Socio`
 
 Sem essa separacao, o preset vai continuar pobre ou vai explodir o enum de `type`.
+
+### `role_family`
+
+`role_family` nao deve ser so ajuda visual.
+
+Ele deve ser campo de negocio de primeira classe para:
+
+- ordenacao da UI;
+- cobertura importante;
+- agrupamento futuro;
+- semente de grupos;
+- posicao inicial do grafo;
+- regras de destaque e prioridade editorial.
+
+Valores iniciais recomendados:
+
+- `principal`
+- `familia`
+- `corte`
+- `amigos`
+- `fornecedor`
+- `equipe`
+- `academico`
+- `corporativo`
 
 ## Melhor UX para o card
 
@@ -806,6 +1156,49 @@ Mesmo que `groups` e `coverage_targets` ainda nao sejam usados na UI, eles ja de
 
 ---
 
+## Ordem de prioridade que realmente faz sentido
+
+## P0 - Consistencia e cockpit
+
+- documentar maquina de estados do dominio;
+- congelar protocolo de cache otimista com `onMutate`, rollback e invalidacao;
+- criar query objects das leituras quentes;
+- validar `EXPLAIN` das queries criticas;
+- reforcar status visiveis no cockpit da pagina de pessoas.
+
+Saida minima esperada em `P0`:
+
+- busca estavel;
+- review queue estavel;
+- imagens da pessoa com semantica correta;
+- presets reais;
+- status persistentes;
+- projecoes confiaveis.
+
+## P1 - Imagens da pessoa
+
+- separar `avatar`, `foto principal`, `foto de referencia` e `representative face`;
+- criar `event_person_reference_photos`;
+- permitir `Escolher da galeria`;
+- permitir `Enviar foto de referencia` com validacao de pessoa dominante.
+
+## P2 - Modelo do evento
+
+- refatorar presets para tipos reais de evento;
+- introduzir `role_key`, `role_label` e `role_family`;
+- preparar `groups` e `coverage_targets` como seeds do preset.
+
+## P3 - Mapa de relacoes
+
+- criar `GET /people/graph`;
+- montar a view em `React Flow`;
+- abrir detalhe da pessoa e do par no painel lateral;
+- manter o grafo como vista complementar.
+
+Esse e o melhor custo-beneficio porque primeiro reduz erro e atrito, depois aumenta impacto visual.
+
+---
+
 ## Bateria de testes recomendada
 
 ## Backend
@@ -839,8 +1232,13 @@ npx.cmd vitest run src/modules/event-people
 
 ## Criterios de aceite
 
+- o usuario leigo entende o que esta resolvido, pendente, em conflito e em processamento sem ler detalhes tecnicos;
 - o gestor entende a diferenca entre foto principal e foto de referencia;
+- a maquina de estados do dominio fica documentada e testavel;
+- `reference_photo` e `representative face` nao compartilham a mesma semantica nem a mesma responsabilidade;
+- `role_family` passa a dirigir ordenacao, coverage, agrupamento e semente de layout;
 - a pagina permite escolher referencia sem linguagem tecnica;
+- mutacoes humanas mantem ack imediato mesmo quando a reconciliacao assincrona ainda nao terminou;
 - o grafo abre rapido e nao substitui o fluxo operacional principal;
 - o node mostra avatar, nome e papel com leitura imediata;
 - a relacao selecionada abre fotos do par, nao so metadado;
@@ -856,12 +1254,12 @@ O melhor caminho para a UX/UI de pessoas nao e jogar uma lib de grafo em cima da
 O caminho forte e:
 
 1. usar `React Flow`, porque ele ja esta no projeto e encaixa melhor em nodes ricos com avatar e acoes;
-2. manter `Pessoas` como superficie operacional principal e `Mapa de relacoes` como vista complementar;
-3. separar `foto principal` de `fotos de referencia`;
-4. adicionar upload manual de referencia como fluxo secundario, nunca como fluxo unico;
-5. evoluir `Sugestoes prontas` para `Modelo do evento`, com presets reais por tipo de evento;
-6. separar `role_key` de `type`, para o front falar a lingua do evento sem destruir a modelagem.
+2. nao priorizar o grafo antes de fechar consistencia, status visiveis e leituras quentes;
+3. manter `Pessoas` como superficie operacional principal e `Mapa de relacoes` como vista complementar;
+4. separar `foto principal`, `foto de referencia`, `avatar` e `representative face`;
+5. adicionar upload manual de referencia como fluxo secundario, nunca como fluxo unico;
+6. evoluir `Sugestoes prontas` para `Modelo do evento`, com presets reais por tipo de evento e semantica de papel correta.
 
 Em uma frase:
 
-**a pagina de pessoas precisa sair de um CRUD com atalhos e virar um workspace visual com catalogo, referencia, mapa e papeis reais do evento.**
+**a pagina de pessoas precisa sair de um CRUD com atalhos e virar um cockpit operacional claro para usuario leigo, com estado confiavel, imagens bem separadas e mapa visual como complemento.**

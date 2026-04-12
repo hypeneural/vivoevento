@@ -7,19 +7,20 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { ApiEventPublicLink } from '@/lib/api-types';
 import { QrCodeMiniPreview } from '@/modules/events/qr/QrCodeMiniPreview';
+import { QrHelpTooltip } from '@/modules/qr-code/components/QrCodeHelp';
 import { buildQrCodeStylingOptions } from '@/modules/qr-code/support/qrOptionsBuilder';
 import { buildQrCascadeDefaults } from '@/modules/qr-code/support/qrPresetCascade';
-import { QR_USAGE_PRESETS } from '@/modules/qr-code/support/qrTypes';
 import { QR_USAGE_PRESET_METADATA } from '@/modules/qr-code/support/qrPresets';
-import type { EventPublicLinkQrConfig, QrUsagePreset } from '@/modules/qr-code/support/qrTypes';
 import type { QrCascadeExplanation } from '@/modules/qr-code/support/qrCascadeExplanation';
+import { QR_USAGE_PRESETS } from '@/modules/qr-code/support/qrTypes';
+import type { EventPublicLinkQrConfig } from '@/modules/qr-code/support/qrTypes';
 import type { ApiEventEffectiveBranding } from '@/lib/api-types';
 
 interface QrCodeContentPanelProps {
   link: ApiEventPublicLink;
   config: EventPublicLinkQrConfig;
   explanation: QrCascadeExplanation;
-  onUsagePresetChange: (preset: QrUsagePreset) => void;
+  onUsagePresetChange: (preset: EventPublicLinkQrConfig['usage_preset']) => void;
   availableStyles: Array<{ linkKey: ApiEventPublicLink['key']; link: ApiEventPublicLink }>;
   onCopyStyle: (linkKey: ApiEventPublicLink['key']) => void;
   effectiveBranding?: ApiEventEffectiveBranding | null;
@@ -33,7 +34,7 @@ function renderOriginBadge(origin: QrCascadeExplanation['usagePreset']) {
     case 'custom':
       return <Badge variant="secondary">Personalizado aqui</Badge>;
     default:
-      return <Badge variant="outline">Veio do preset</Badge>;
+      return <Badge variant="outline">Veio do modelo</Badge>;
   }
 }
 
@@ -58,23 +59,17 @@ export function QrCodeContentPanel({
       <CardContent className="space-y-3 p-4">
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Badge variant="secondary">Preset de uso</Badge>
+            <Badge variant="secondary">Modelo de uso</Badge>
+            <QrHelpTooltip
+              title="Modelo de uso"
+              description="Escolha primeiro onde esse QR vai aparecer. O editor adapta contraste, robustez e formato de arquivo para esse contexto."
+            />
             {renderOriginBadge(explanation.usagePreset)}
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {QR_USAGE_PRESETS.map((preset) => {
               const meta = QR_USAGE_PRESET_METADATA[preset];
               const active = config.usage_preset === preset;
-              const swatch = preset === 'telao'
-                ? 'bg-slate-900'
-                : preset === 'upload_rapido'
-                  ? 'bg-emerald-500'
-                  : preset === 'galeria_premium'
-                    ? 'bg-amber-500'
-                    : preset === 'impresso_pequeno'
-                      ? 'bg-slate-700'
-                      : 'bg-green-500';
-
               const presetConfig = buildQrCascadeDefaults({
                 linkKey: link.key,
                 usagePreset: preset,
@@ -105,7 +100,7 @@ export function QrCodeContentPanel({
                 >
                   <div className="flex items-center gap-2">
                     <QrCodeMiniPreview options={previewOptions} size={56} className="h-14 w-14 border-solid" />
-                    <span className={`h-6 w-6 rounded-lg ${swatch}`} />
+                    <span className={`h-6 w-6 rounded-lg ${meta.swatchClass}`} />
                     <p className="text-sm font-semibold">{meta.label}</p>
                   </div>
                   <p className="mt-1 text-[11px] text-muted-foreground">{meta.description}</p>
@@ -122,7 +117,11 @@ export function QrCodeContentPanel({
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Wand2 className="h-4 w-4 text-primary" />
-            <p className="text-sm font-medium">Copiar estilo de outro link</p>
+            <p className="text-sm font-medium">Copiar visual de outro link</p>
+            <QrHelpTooltip
+              title="Copiar visual de outro link"
+              description="Reaproveita apenas as cores, o modelo e a logo. O endereco que o QR abre continua sendo o deste link."
+            />
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Select
@@ -130,7 +129,7 @@ export function QrCodeContentPanel({
               onValueChange={(value) => setCopyFrom(value as ApiEventPublicLink['key'])}
             >
               <SelectTrigger className="sm:w-[240px]">
-                <SelectValue placeholder="Escolha um link" />
+                <SelectValue placeholder="Escolha de qual link copiar" />
               </SelectTrigger>
               <SelectContent>
                 {availableOptions.length === 0 ? (
@@ -157,23 +156,27 @@ export function QrCodeContentPanel({
                 onCopyStyle(copyFrom);
               }}
             >
-              Aplicar estilo
+              Usar este visual
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Copia apenas o visual salvo do link escolhido. O conteudo encoded continua sendo o link atual.
+            Copia apenas o visual salvo do link escolhido. O endereco aberto pelo QR continua sendo o deste link.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <QrCode className="h-4 w-4 text-primary" />
-          <p className="text-sm font-medium">Link publico usado como fonte de verdade</p>
+          <p className="text-sm font-medium">Endereco que o QR abre</p>
+          <QrHelpTooltip
+            title="Endereco que o QR abre"
+            description="O visual fica salvo por link, mas o destino lido pelo QR sempre acompanha o link publico atual do evento."
+          />
         </div>
         <p className="break-all rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-muted-foreground">
           {link.qr_value ?? link.url ?? 'Link indisponivel'}
         </p>
         <p className="text-xs text-muted-foreground">
-          Nesta fase o conteudo do QR continua vindo do link publico do evento. A edicao livre do payload nao entra na V1.
+          Por enquanto, voce edita so a aparencia. O destino do QR continua sendo o link publico real deste item.
         </p>
         {link.url ? (
           <div className="flex gap-2">

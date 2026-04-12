@@ -10,6 +10,9 @@ import {
   formatPercentLabel,
   formatPlayerHealthLabel,
   formatPlayerSituation,
+  formatTransitionEffect,
+  formatTransitionFallbackReason,
+  formatTransitionMode,
   formatTimestampLabel,
   formatVideoExitReason,
   formatVideoFailureReason,
@@ -104,6 +107,23 @@ export function WallPlayerRuntimeCard({
         <span className="rounded-full border border-border/60 bg-background px-3 py-1">
           Erros {player.error_count} | Em cache {player.stale_count}
         </span>
+        {player.active_transition_effect ? (
+          <span className="rounded-full border border-border/60 bg-background px-3 py-1">
+            Transicao {formatTransitionEffect(player.active_transition_effect)}
+          </span>
+        ) : null}
+        <span className="rounded-full border border-border/60 bg-background px-3 py-1">
+          Modo {formatTransitionMode(player.transition_mode)}
+          {player.transition_mode === 'random'
+            ? ` | picks ${player.transition_random_pick_count ?? 0}x`
+            : ''}
+        </span>
+        {player.transition_last_fallback_reason ? (
+          <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-amber-700">
+            Fallback {formatTransitionFallbackReason(player.transition_last_fallback_reason)}
+            {player.transition_fallback_count ? ` | ${player.transition_fallback_count}x` : ''}
+          </span>
+        ) : null}
         {player.board_piece_count ? (
           <span className="rounded-full border border-border/60 bg-background px-3 py-1">
             Board {player.board_piece_count} pecas

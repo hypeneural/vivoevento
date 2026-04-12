@@ -21,7 +21,20 @@ export const QR_USAGE_PRESETS = [
   'impresso_pequeno',
   'convite_whatsapp',
 ] as const;
-export const QR_SKIN_PRESETS = ['classico', 'premium', 'minimalista', 'escuro'] as const;
+export const QR_SKIN_PRESETS = [
+  'classico',
+  'premium',
+  'minimalista',
+  'escuro',
+  'luxo_dourado',
+  'oceano',
+  'romantico',
+  'festa',
+  'grafite',
+  'terracota',
+  'floresta',
+  'lavanda',
+] as const;
 export const QR_READABILITY_STATUSES = ['great', 'good', 'risky'] as const;
 export const QR_LOGO_MODES = ['none', 'event_logo', 'organization_logo', 'custom'] as const;
 

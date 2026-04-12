@@ -4,7 +4,7 @@ import { buildQrConfigDefaults, mergeQrConfig } from './qrDefaults';
 import { applyQrGuardrails } from './qrGuardrails';
 import type { EventPublicLinkQrConfig, QrLinkKey, QrSkinPreset, QrUsagePreset } from './qrTypes';
 
-type BrandingSeedInput = Pick<ApiEventEffectiveBranding, 'logo_url' | 'primary_color' | 'secondary_color'> | null | undefined;
+type BrandingSeedInput = Pick<ApiEventEffectiveBranding, 'logo_path' | 'logo_url' | 'primary_color' | 'secondary_color'> | null | undefined;
 
 export function buildQrBrandingSeed(branding?: BrandingSeedInput) {
   const hasVisualBranding = Boolean(branding?.logo_url || branding?.primary_color || branding?.secondary_color);
@@ -22,9 +22,10 @@ export function buildQrBrandingSeed(branding?: BrandingSeedInput) {
         color: branding?.secondary_color ?? branding?.primary_color ?? undefined,
       },
     },
-    logo: branding?.logo_url ? {
+    logo: branding?.logo_url || branding?.logo_path ? {
       mode: 'event_logo',
-      asset_url: branding.logo_url,
+      asset_path: branding?.logo_path ?? undefined,
+      asset_url: branding?.logo_url ?? undefined,
     } : undefined,
   } as const;
 }
