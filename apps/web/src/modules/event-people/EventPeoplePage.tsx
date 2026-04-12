@@ -69,6 +69,7 @@ import type {
 import { EventPeopleGraphView } from './components/EventPeopleGraphView';
 import { EventPeopleGroupsPanel } from './components/EventPeopleGroupsPanel';
 import { EventPeopleCoveragePanel } from './components/EventPeopleCoveragePanel';
+import { EventPeopleRelationalCollectionsPanel } from './components/EventPeopleRelationalCollectionsPanel';
 
 type MutationSnapshot = ReturnType<typeof snapshotEventPeopleCache>;
 type OperationTone = 'neutral' | 'success' | 'warning' | 'danger';
@@ -883,6 +884,11 @@ export default function EventPeoplePage() {
               />
               <EventPeopleCoveragePanel
                 eventId={eventId}
+                onStatusChange={setOperationStatus}
+              />
+              <EventPeopleRelationalCollectionsPanel
+                eventId={eventId}
+                selectedPerson={selectedPerson}
                 onStatusChange={setOperationStatus}
               />
               <Card className="border-border/60"><CardHeader><CardTitle className="flex items-center gap-2"><UserCircle2 className="h-4 w-4 text-primary" />Avatar e foto principal</CardTitle></CardHeader><CardContent className="space-y-3 text-sm"><div className="rounded-2xl border border-border/60 bg-background px-4 py-3"><p className="font-medium">Avatar do catalogo</p><p className="mt-1 text-muted-foreground">{selectedPerson?.avatar?.media_id ? `Foto #${selectedPerson.avatar.media_id} com ${avatarLabel.toLowerCase()}` : 'Nenhum avatar definido ainda.'}</p></div><div className="rounded-2xl border border-border/60 bg-background px-4 py-3"><p className="font-medium">Foto principal</p><p className="mt-1 text-muted-foreground">{selectedPerson?.primary_photo?.best_media_id ? primaryPhotoLabel : 'A melhor foto humana ainda nao foi definida.'}</p></div></CardContent></Card>

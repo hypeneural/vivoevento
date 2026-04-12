@@ -13,6 +13,7 @@ export const routeImports = {
   eventCreate: () => import('@/modules/events/CreateEventPage'),
   eventDetail: () => import('@/modules/events/EventDetailPage'),
   eventPeople: () => import('@/modules/event-people/EventPeoplePage'),
+  publicEventPeopleCollection: () => import('@/modules/event-people/PublicEventPeopleCollectionPage'),
   eventOperationsRoom: () => import('@/modules/event-operations/EventOperationsRoomPage'),
   eventJourneyBuilder: () => import('@/modules/events/pages/EventJourneyBuilderPage'),
   eventAccess: () => import('@/modules/event-team/EventAccessPage'),

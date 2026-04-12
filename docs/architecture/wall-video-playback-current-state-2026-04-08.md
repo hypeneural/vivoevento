@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Este documento registra o estado atual do telão em `2026-04-08`, com foco em:
+Este documento registra o estado atual do telÃ£o em `2026-04-08`, com foco em:
 
 - como a midia chega ao wall;
 - como a stack atual do wall esta organizada;
@@ -21,7 +21,7 @@ O documento foi revisado com:
 
 Plano de execucao derivado desta analise:
 
-- `docs/architecture/wall-video-playback-execution-plan-2026-04-08.md`
+- `docs/execution-plans/wall-video-playback-execution-plan-2026-04-08.md`
 
 ## Resumo executivo
 
@@ -119,12 +119,12 @@ Stack principal do backend do wall:
 - PHP 8.3
 - PostgreSQL
 - Redis / filas
-- Reverb para realtime compatível com protocolo Pusher
+- Reverb para realtime compatÃ­vel com protocolo Pusher
 
 Modulos principais envolvidos:
 
 - `Wall`
-  - configuracao do telão
+  - configuracao do telÃ£o
   - boot publico
   - eventos broadcastados
   - simulacao, diagnostico e comandos operacionais
@@ -586,7 +586,7 @@ Transicoes atuais:
 - existencia de caption
 - flag `is_featured`
 
-Isso ja e uma customizacao importante do telão.
+Isso ja e uma customizacao importante do telÃ£o.
 
 ### Layouts multi-item
 
@@ -605,7 +605,7 @@ Hoje:
 - cada slot faz sua propria transicao curta;
 - varios videos podem estar tocando ao mesmo tempo.
 
-## O que ja e personalizado no telão hoje
+## O que ja e personalizado no telÃ£o hoje
 
 Do ponto de vista de produto e UX, o player ja vai alem de um slideshow basico.
 
@@ -1084,7 +1084,7 @@ O que ainda falta nesta trilha:
 
 - agregar essas razoes de inelegibilidade com mais contexto por sessao/device na homologacao real;
 - na pratica, `recentItems`, timeline e live snapshot ja fazem a leitura por item; o que ainda falta e consolidar a leitura agregada.
-- decidir se vale subir uma superfície agregada adicional para operação, além das views por item já existentes.
+- decidir se vale subir uma superfÃ­cie agregada adicional para operaÃ§Ã£o, alÃ©m das views por item jÃ¡ existentes.
 
 ### 7. A admissao explicita de video agora ja governa o gate final com rollout por wall/canal
 
@@ -1158,7 +1158,7 @@ Efeito:
 
 - o player geralmente tenta tocar o arquivo original;
 - videos grandes, pesados ou com bitrate alto podem travar mais;
-- o navegador carrega mais do que deveria para um telão.
+- o navegador carrega mais do que deveria para um telÃ£o.
 
 ### 9. O cache atual ajuda, mas nao e um cache de playback de verdade
 
@@ -1571,7 +1571,7 @@ Observacao:
 
 ## Conclusao
 
-O telão atual ja tem uma base forte:
+O telÃ£o atual ja tem uma base forte:
 
 - realtime funcional
 - fairness de fila

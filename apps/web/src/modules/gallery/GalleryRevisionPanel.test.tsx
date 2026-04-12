@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  createGalleryBuilderOperationalFeedbackFixture,
   createGalleryBuilderRevisionFixture,
   createGalleryBuilderSettingsFixture,
 } from './gallery-builder';
@@ -26,6 +27,7 @@ describe('GalleryRevisionPanel', () => {
           }),
         ]}
         settings={createGalleryBuilderSettingsFixture()}
+        operationalFeedback={createGalleryBuilderOperationalFeedbackFixture()}
         onRestore={onRestore}
         onGeneratePreviewLink={onGeneratePreviewLink}
         isGeneratingPreview={false}
@@ -35,7 +37,7 @@ describe('GalleryRevisionPanel', () => {
     expect(screen.getByText('Draft v7')).toBeInTheDocument();
     expect(screen.getByText('Publicado v5')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /restaurar v6/i }));
+    await user.click(screen.getByRole('button', { name: /restaurar revisao 6/i }));
 
     expect(onRestore).toHaveBeenCalledWith(202);
   });

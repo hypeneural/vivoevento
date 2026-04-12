@@ -18,7 +18,7 @@ Ele cobre:
 
 O backlog detalhado de execucao desta estrategia esta em:
 
-- [docs/architecture/production-vps-execution-plan.md](./production-vps-execution-plan.md)
+- [docs/execution-plans/production-vps-execution-plan.md](../execution-plans/production-vps-execution-plan.md)
 - [docs/architecture/production-vps-command-sequence.md](./production-vps-command-sequence.md)
 
 ## Fontes base desta consolidacao
@@ -30,7 +30,7 @@ Este runbook foi montado a partir destas fontes internas:
 - [docs/flows/media-ingestion.md](../flows/media-ingestion.md)
 - [docs/flows/whatsapp-inbound.md](../flows/whatsapp-inbound.md)
 - [docs/architecture/event-media-intake-architecture.md](./event-media-intake-architecture.md)
-- [docs/architecture/photo-processing-ai-execution-plan.md](./photo-processing-ai-execution-plan.md)
+- [docs/execution-plans/photo-processing-ai-execution-plan.md](../execution-plans/photo-processing-ai-execution-plan.md)
 - [README.md](../../README.md)
 
 Quando houver divergencia entre documentacao antiga e o codigo atual, este

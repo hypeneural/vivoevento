@@ -19,7 +19,7 @@ O foco aqui nao e propor uma arquitetura generica. O foco e mostrar o que faz se
 
 Backlog detalhado de implementacao:
 
-- `docs/architecture/photo-processing-ai-execution-plan.md`
+- `docs/execution-plans/photo-processing-ai-execution-plan.md`
 
 ## Resumo executivo
 

@@ -9,10 +9,18 @@ export interface CTAFloatingProps {
   onInteraction?: (action: 'primary' | 'secondary' | 'close') => void;
 }
 
+const DISMISS_STORAGE_KEY = "ev_floating_cta_dismissed";
+
 export default function CTAFloating({ onInteraction }: CTAFloatingProps) {
   const { showFloatingCTA } = useScrollUI();
   const { utmParams } = useAttribution();
-  const [isDismissed, setIsDismissed] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return window.sessionStorage.getItem(DISMISS_STORAGE_KEY) === "true";
+  });
   const [isVisible, setIsVisible] = useState(false);
 
   // Show/hide based on scroll position and dismissal state
@@ -27,6 +35,9 @@ export default function CTAFloating({ onInteraction }: CTAFloatingProps) {
 
   const handleClose = () => {
     setIsVisible(false);
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem(DISMISS_STORAGE_KEY, "true");
+    }
     // Delay dismiss to allow exit animation
     setTimeout(() => setIsDismissed(true), 350);
     onInteraction?.('close');
@@ -81,7 +92,7 @@ export default function CTAFloating({ onInteraction }: CTAFloatingProps) {
           type="button"
           className={styles.closeButton}
           onClick={handleClose}
-          aria-label="Fechar"
+          aria-label="Fechar CTA flutuante"
         >
           <X size={16} aria-hidden="true" />
         </button>

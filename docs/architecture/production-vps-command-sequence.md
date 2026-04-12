@@ -8,7 +8,7 @@ comandos para a VPS Ubuntu 24.04.
 Fonte de verdade complementar:
 
 - [docs/architecture/production-vps-runbook.md](./production-vps-runbook.md)
-- [docs/architecture/production-vps-execution-plan.md](./production-vps-execution-plan.md)
+- [docs/execution-plans/production-vps-execution-plan.md](../execution-plans/production-vps-execution-plan.md)
 - [docs/architecture/production-vps-delivery-checklist.md](./production-vps-delivery-checklist.md)
 
 ## Premissas

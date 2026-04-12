@@ -11,7 +11,7 @@ Este documento consolida:
 
 Documento complementar:
 
-- ver `docs/architecture/billing-subscriptions-execution-plan.md` para a ordem detalhada de execucao, com tasks, subtasks, dependencias, criterios de aceite e primeira entrega recomendada.
+- ver `docs/execution-plans/billing-subscriptions-execution-plan.md` para a ordem detalhada de execucao, com tasks, subtasks, dependencias, criterios de aceite e primeira entrega recomendada.
 
 Contexto de produto assumido:
 
@@ -176,7 +176,7 @@ Conclusao:
 - o onboarding OTP ja foi reaproveitado como base;
 - agora ele precisa ser conectado as jornadas comerciais reais do produto.
 
-## 3. O evento ja tem embrião de snapshot comercial
+## 3. O evento ja tem embriÃ£o de snapshot comercial
 
 Hoje `events` ja tem:
 

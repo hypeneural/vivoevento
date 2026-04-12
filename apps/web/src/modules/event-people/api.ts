@@ -8,6 +8,8 @@ import type {
   EventPeopleCoverageResponse,
   EventPeopleGraphResponse,
   EventPeoplePresetsResponse,
+  EventPeoplePublicRelationalCollectionResponse,
+  EventPeopleRelationalCollectionsResponse,
   EventPeopleOperationalStatus,
   EventPeopleRelationPayload,
   EventPersonGroup,
@@ -68,6 +70,20 @@ export const eventPeopleApi = {
     return api.post<EventPeopleCoverageResponse>(`/events/${eventId}/people/coverage/refresh`, {
       body: {},
     });
+  },
+
+  async getRelationalCollections(eventId: number | string) {
+    return api.get<EventPeopleRelationalCollectionsResponse>(`/events/${eventId}/people/relational-collections`);
+  },
+
+  async refreshRelationalCollections(eventId: number | string) {
+    return api.post<EventPeopleRelationalCollectionsResponse>(`/events/${eventId}/people/relational-collections/refresh`, {
+      body: {},
+    });
+  },
+
+  async getPublicRelationalCollection(token: string) {
+    return api.get<EventPeoplePublicRelationalCollectionResponse>(`/public/people-collections/${token}`);
   },
 
   async listGroups(eventId: number | string, filters: Record<string, unknown> = {}) {

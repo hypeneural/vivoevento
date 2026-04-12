@@ -54,7 +54,7 @@ O foco aqui e responder:
 - `docs/architecture/wall-remote-control-pwa-analysis.md`
 - `docs/architecture/telao-ao-vivo-melhorias.md`
 - `docs/architecture/telao-ao-vivo-implementation.md`
-- `docs/architecture/telao-cockpit-sprint-implementation-plan-2026-04-08.md`
+- `docs/execution-plans/telao-cockpit-sprint-implementation-plan-2026-04-08.md`
 - `docs/architecture/wall-improvements-validation-2026-04-08.md`
 
 ## Resumo executivo
@@ -2141,7 +2141,7 @@ Com o cockpit atual estabilizado, o proximo bloco mais coerente deixa de ser reo
 
 Plano executavel detalhado desta continuidade:
 
-- `docs/architecture/telao-cockpit-sprint-implementation-plan-2026-04-08.md`
+- `docs/execution-plans/telao-cockpit-sprint-implementation-plan-2026-04-08.md`
   - secao `Plano executavel do bloco novo`
 
 ### 1. Monitor live mais autoritativo
@@ -2190,7 +2190,7 @@ Proximo passo:
 
 - ligar essa evolucao ao plano proprio de video em:
   - `docs/architecture/wall-video-playback-current-state-2026-04-08.md`
-  - `docs/architecture/wall-video-playback-execution-plan-2026-04-08.md`
+  - `docs/execution-plans/wall-video-playback-execution-plan-2026-04-08.md`
 - seguir com o bloco seguinte do plano de continuidade, caso o time queira levar o monitor para uma fase ainda mais autoritativa de playback e video.
 
 ## Revalidacao complementar executada em 2026-04-09

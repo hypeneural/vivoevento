@@ -13,7 +13,7 @@ Leitura complementar importante:
 - para o plano detalhado de integracao `AWS Rekognition` como opcao inicial, ver:
   - `docs/architecture/face-search-aws-rekognition-integration-plan-2026-04-08.md`
 - para o backlog executavel da trilha AWS com fases e bateria de testes, ver:
-  - `docs/architecture/face-search-aws-rekognition-execution-plan-2026-04-08.md`
+  - `docs/execution-plans/face-search-aws-rekognition-execution-plan-2026-04-08.md`
 
 ## Stack Atual Relevante
 
@@ -786,7 +786,7 @@ Leitura:
 
 Esta secao converte a analise tecnica em plano de aquisicao para o time.
 
-Critério usado:
+CritÃ©rio usado:
 
 - rota oficial com download direto;
 - ou loader oficial mantido;
@@ -875,7 +875,7 @@ Uso:
 
 Status de aquisicao:
 
-- o repositório oficial no GitHub esta ativo
+- o repositÃ³rio oficial no GitHub esta ativo
 - o README atual continua listando:
   - pasta do Google Drive
   - arquivo real do dataset no Google Drive
@@ -1613,7 +1613,7 @@ Recomendacao profissional neste ponto:
   - lanes reais do produto
 - tratar o resultado desta rodada assim:
   - `8-16` = faixa de preservacao de recall extremo
-  - `24` = ponto de compromisso mais defensavel se o time quiser conter ruído sem matar tanto recall
+  - `24` = ponto de compromisso mais defensavel se o time quiser conter ruÃ­do sem matar tanto recall
   - `32+` = alto risco de cortar deteccao demais em evento com grupo/crowd
 
 ### Homologacao final do default `min_face_size_px=24`

@@ -7,6 +7,8 @@ import type {
   GalleryBuilderRevision,
   GalleryBuilderSettings,
   GalleryBuilderShowResponse,
+  GalleryBuilderTelemetryPayload,
+  GalleryBuilderTelemetryResponse,
 } from './gallery-builder';
 
 export type GalleryBuilderSettingsUpdatePayload = Pick<
@@ -77,6 +79,15 @@ export function runEventGalleryAiProposals(
   },
 ) {
   return api.post<GalleryAiProposalsResponse>(`/events/${eventId}/gallery/ai/proposals`, {
+    body: payload,
+  });
+}
+
+export function trackEventGalleryBuilderTelemetry(
+  eventId: string | number,
+  payload: GalleryBuilderTelemetryPayload,
+) {
+  return api.post<GalleryBuilderTelemetryResponse>(`/events/${eventId}/gallery/telemetry`, {
     body: payload,
   });
 }

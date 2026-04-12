@@ -204,7 +204,7 @@ describe('wall theme architecture characterization', () => {
 
   it('keeps the puzzle execution plan aligned with the final video policy during implementation', () => {
     const executionPlanSource = fs.readFileSync(
-      path.resolve(__dirname, '../../../../../../docs/architecture/wall-puzzle-theme-execution-plan-2026-04-09.md'),
+      path.resolve(__dirname, '../../../../../../docs/execution-plans/wall-puzzle-theme-execution-plan-2026-04-09.md'),
       'utf8',
     );
     const videoPolicySource = fs.readFileSync(

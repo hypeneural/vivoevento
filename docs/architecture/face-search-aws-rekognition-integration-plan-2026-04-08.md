@@ -14,7 +14,7 @@ Este documento nao substitui:
 
 - `docs/architecture/face-search-dataset-calibration-analysis-2026-04-07.md`
 - `docs/architecture/face-search-stack-assessment-and-provider-strategy-2026-04-08.md`
-- `docs/architecture/face-search-aws-rekognition-execution-plan-2026-04-08.md`
+- `docs/execution-plans/face-search-aws-rekognition-execution-plan-2026-04-08.md`
 
 Ele detalha especificamente:
 

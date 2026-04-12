@@ -40,10 +40,56 @@ export interface GalleryBuilderEventSummary {
   slug: string;
 }
 
+export interface GalleryBuilderActorSummary {
+  id: number | null;
+  name: string | null;
+}
+
+export interface GalleryPresetOrigin {
+  origin_type: string | null;
+  key: string | null;
+  label: string | null;
+  applied_at: string | null;
+  applied_by: GalleryBuilderActorSummary | null;
+}
+
+export interface GalleryBuilderOperationalRevisionFeedback {
+  revision_id: number;
+  version_number: number;
+  occurred_at: string | null;
+  actor: GalleryBuilderActorSummary | null;
+  change_reason: string | null;
+  source_revision_id?: number | null;
+  source_version_number?: number | null;
+}
+
+export interface GalleryBuilderLastAiApplication {
+  run_id: number;
+  variation_id: string | null;
+  apply_scope: GalleryAiApplyScope | null;
+  prompt_text: string;
+  target_layer: GalleryAiTargetLayer;
+  occurred_at: string | null;
+  actor: GalleryBuilderActorSummary | null;
+}
+
+export interface GalleryBuilderOperationalFeedback {
+  current_preset_origin: GalleryPresetOrigin | null;
+  last_ai_application: GalleryBuilderLastAiApplication | null;
+  last_publish: GalleryBuilderOperationalRevisionFeedback | null;
+  last_restore: GalleryBuilderOperationalRevisionFeedback | null;
+}
+
+export interface GalleryOptimizedRendererTrigger {
+  item_count: number;
+  estimated_rendered_height_px: number;
+}
+
 export interface GalleryBuilderSettings extends GalleryBuilderExperienceLayers {
   id: number;
   event_id: number;
   is_enabled: boolean;
+  current_preset_origin: GalleryPresetOrigin | null;
   current_draft_revision_id: number | null;
   current_published_revision_id: number | null;
   preview_revision_id: number | null;
@@ -116,6 +162,8 @@ export interface GalleryBuilderShowResponse {
   settings: GalleryBuilderSettings;
   mobile_budget: typeof GALLERY_MOBILE_BUDGET;
   responsive_source_contract: GalleryBuilderResponsiveSourceContract;
+  optimized_renderer_trigger: GalleryOptimizedRendererTrigger;
+  operational_feedback: GalleryBuilderOperationalFeedback;
 }
 
 export interface GalleryBuilderPreviewLinkResponse {
@@ -129,6 +177,52 @@ export interface GalleryBuilderMutationResult {
   settings: GalleryBuilderSettings;
   revision?: GalleryBuilderRevision;
 }
+
+export type GalleryGridLayout = GalleryMediaBehavior['grid']['layout'];
+export type GalleryRenderMode = 'standard' | 'optimized';
+
+export interface GalleryBuilderTelemetryResponse {
+  current_preset_origin: GalleryPresetOrigin | null;
+  operational_feedback: GalleryBuilderOperationalFeedback;
+}
+
+export interface GalleryPresetAppliedTelemetryPayload {
+  event: 'preset_applied';
+  preset: {
+    origin_type: 'preset' | 'shortcut' | 'wizard';
+    key: string;
+    label: string;
+  };
+}
+
+export interface GalleryAiAppliedTelemetryPayload {
+  event: 'ai_applied';
+  run_id: number;
+  variation_id: string;
+  apply_scope: GalleryAiApplyScope;
+}
+
+export interface GalleryBuilderVitalsSnapshot {
+  lcp_ms: number | null;
+  inp_ms: number | null;
+  cls: number | null;
+}
+
+export interface GalleryBuilderVitalsSampleTelemetryPayload extends GalleryBuilderVitalsSnapshot {
+  event: 'vitals_sample';
+  viewport: GalleryBuilderViewport;
+  item_count: number;
+  layout: GalleryGridLayout;
+  density: GalleryDensity;
+  render_mode: GalleryRenderMode;
+  preview_latency_ms: number | null;
+  publish_latency_ms: number | null;
+}
+
+export type GalleryBuilderTelemetryPayload =
+  | GalleryPresetAppliedTelemetryPayload
+  | GalleryAiAppliedTelemetryPayload
+  | GalleryBuilderVitalsSampleTelemetryPayload;
 
 type DeepPartial<T> = {
   [K in keyof T]?: T[K] extends Array<unknown>
@@ -415,6 +509,7 @@ export function createGalleryBuilderSettingsFixture(
     id: 1,
     event_id: 42,
     is_enabled: true,
+    current_preset_origin: null,
     event_type_family: baseExperience.model_matrix.event_type_family,
     style_skin: baseExperience.model_matrix.style_skin,
     behavior_profile: baseExperience.model_matrix.behavior_profile,
@@ -435,6 +530,68 @@ export function createGalleryBuilderSettingsFixture(
     updated_by: 9,
     created_at: '2026-04-12T10:00:00Z',
     updated_at: '2026-04-12T12:00:00Z',
+    ...overrides,
+  };
+}
+
+export function createGalleryBuilderOperationalFeedbackFixture(
+  overrides: Partial<GalleryBuilderOperationalFeedback> = {},
+): GalleryBuilderOperationalFeedback {
+  return {
+    current_preset_origin: {
+      origin_type: 'preset',
+      key: 'wedding-premium-light',
+      label: 'Wedding premium light',
+      applied_at: '2026-04-12T12:10:00Z',
+      applied_by: {
+        id: 9,
+        name: 'Operador',
+      },
+    },
+    last_ai_application: {
+      run_id: 401,
+      variation_id: 'premium-album',
+      apply_scope: 'all',
+      prompt_text: 'quero uma galeria romantica em tons rose',
+      target_layer: 'mixed',
+      occurred_at: '2026-04-12T12:14:00Z',
+      actor: {
+        id: 9,
+        name: 'Operador',
+      },
+    },
+    last_publish: {
+      revision_id: 205,
+      version_number: 7,
+      occurred_at: '2026-04-12T12:18:00Z',
+      actor: {
+        id: 9,
+        name: 'Operador',
+      },
+      change_reason: 'Publicacao do draft',
+    },
+    last_restore: {
+      revision_id: 206,
+      version_number: 8,
+      occurred_at: '2026-04-12T12:22:00Z',
+      actor: {
+        id: 9,
+        name: 'Operador',
+      },
+      change_reason: 'Restaurado da versao 5',
+      source_revision_id: 202,
+      source_version_number: 5,
+    },
+    ...overrides,
+  };
+}
+
+export function createGalleryOptimizedRendererTriggerFixture(
+  overrides: Partial<GalleryOptimizedRendererTrigger> = {},
+): GalleryOptimizedRendererTrigger {
+  return {
+    item_count: 500,
+    estimated_rendered_height_px: 24000,
     ...overrides,
   };
 }
@@ -789,6 +946,92 @@ export function formatGalleryInterstitialPolicy(policy: GalleryInterstitialPolic
     : policy === 'story'
       ? 'Narrativa'
       : 'Patrocinios';
+}
+
+export function estimateGalleryRenderedHeightPx(options: {
+  itemCount: number;
+  layout: GalleryGridLayout;
+  density: GalleryDensity;
+  viewport: GalleryBuilderViewport;
+}) {
+  const itemCount = Math.max(0, options.itemCount);
+
+  if (itemCount === 0) {
+    return 0;
+  }
+
+  const columns = options.layout === 'rows'
+    ? 1
+    : options.viewport === 'mobile'
+      ? 2
+      : options.layout === 'columns'
+        ? 3
+        : 4;
+
+  const rowHeight = options.layout === 'rows'
+    ? (options.density === 'compact' ? 220 : options.density === 'immersive' ? 320 : 260)
+    : (options.density === 'compact' ? 240 : options.density === 'immersive' ? 360 : 300);
+
+  return Math.ceil(itemCount / columns) * rowHeight;
+}
+
+export function resolveGalleryRenderMode(options: {
+  itemCount: number;
+  estimatedRenderedHeightPx: number;
+  trigger: GalleryOptimizedRendererTrigger;
+}): GalleryRenderMode {
+  if (
+    options.itemCount >= options.trigger.item_count
+    || options.estimatedRenderedHeightPx >= options.trigger.estimated_rendered_height_px
+  ) {
+    return 'optimized';
+  }
+
+  return 'standard';
+}
+
+export function resolveGalleryRenderModeForBuilder(options: {
+  draft: Pick<GalleryBuilderSettings, 'media_behavior'>;
+  itemCount: number;
+  viewport: GalleryBuilderViewport;
+  trigger: GalleryOptimizedRendererTrigger;
+}) {
+  const estimatedRenderedHeightPx = estimateGalleryRenderedHeightPx({
+    itemCount: options.itemCount,
+    layout: options.draft.media_behavior.grid.layout,
+    density: options.draft.media_behavior.grid.density,
+    viewport: options.viewport,
+  });
+
+  return resolveGalleryRenderMode({
+    itemCount: options.itemCount,
+    estimatedRenderedHeightPx,
+    trigger: options.trigger,
+  });
+}
+
+export function buildGalleryBuilderVitalsTelemetryPayload(options: {
+  draft: Pick<GalleryBuilderSettings, 'media_behavior'>;
+  itemCount: number;
+  viewport: GalleryBuilderViewport;
+  renderMode: GalleryRenderMode;
+  vitals: GalleryBuilderVitalsSnapshot;
+  previewLatencyMs?: number | null;
+  publishLatencyMs?: number | null;
+}): GalleryBuilderVitalsSampleTelemetryPayload {
+  return {
+    event: 'vitals_sample',
+    viewport: options.viewport,
+    item_count: options.itemCount,
+    layout: options.draft.media_behavior.grid.layout,
+    density: options.draft.media_behavior.grid.density,
+    render_mode: options.renderMode,
+    lcp_ms: options.vitals.lcp_ms,
+    inp_ms: options.vitals.inp_ms,
+    cls: options.vitals.cls,
+    preview_latency_ms: options.previewLatencyMs ?? null,
+    publish_latency_ms: options.publishLatencyMs ?? null,
+  };
 }
 
 export const galleryExperienceFixtures = {

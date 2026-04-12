@@ -40,6 +40,7 @@ const EventsListPage = lazy(routeImports.eventsList);
 const CreateEventPage = lazy(routeImports.eventCreate);
 const EventDetailPage = lazy(routeImports.eventDetail);
 const EventPeoplePage = lazy(routeImports.eventPeople);
+const PublicEventPeopleCollectionPage = lazy(routeImports.publicEventPeopleCollection);
 const EventOperationsRoomPage = lazy(routeImports.eventOperationsRoom);
 const EventJourneyBuilderPage = lazy(routeImports.eventJourneyBuilder);
 const EventAccessPage = lazy(routeImports.eventAccess);
@@ -162,6 +163,7 @@ const router = createBrowserRouter(
       <Route path="/convites/equipe/:token" element={<PublicOrganizationInvitationPage />} />
       <Route path="/e/:slug" element={<PublicHubPage />} />
       <Route path="/e/:slug/gallery" element={<PublicGalleryPage />} />
+      <Route path="/momentos/:token" element={<PublicEventPeopleCollectionPage />} />
       <Route path="/e/:slug/find-me" element={<PublicFaceSearchPage />} />
       <Route path="/e/:slug/play" element={<PublicPlayHubPage />} />
       <Route path="/e/:slug/play/:gameSlug" element={<PublicGamePage />} />

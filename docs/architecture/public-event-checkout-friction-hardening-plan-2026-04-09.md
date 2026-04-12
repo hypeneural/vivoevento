@@ -5,7 +5,7 @@ Data: `2026-04-09`
 Documentos base:
 
 - `docs/architecture/public-event-checkout-ux-analysis-2026-04-08.md`
-- `docs/architecture/public-event-checkout-v2-implementation-plan-2026-04-08.md`
+- `docs/execution-plans/public-event-checkout-v2-implementation-plan-2026-04-08.md`
 
 ## Objetivo
 
@@ -151,7 +151,7 @@ Leitura confirmada:
 Impacto:
 
 - no celular, o fluxo principal de compra nao fica sempre ao alcance do polegar
-- o resumo esta melhor que antes, mas ainda nao e o melhor uso do espaço fixo
+- o resumo esta melhor que antes, mas ainda nao e o melhor uso do espaÃ§o fixo
 
 Decisao:
 
@@ -295,7 +295,7 @@ Red tests a escrever primeiro:
 
 Aceite:
 
-- o comprador nao consegue deixar o campo visualmente “sujo”
+- o comprador nao consegue deixar o campo visualmente â€œsujoâ€
 - o teclado mobile de telefone abre corretamente
 - o contrato enviado continua identico do ponto de vista do backend
 
@@ -477,7 +477,7 @@ Implementado:
 - `CheckoutHeroSimple.tsx`
   - hero mais baixo no mobile
   - heading menor na primeira dobra
-  - trust row escondida no mobile para reduzir ruído
+  - trust row escondida no mobile para reduzir ruÃ­do
 - `PublicCheckoutShell.tsx`
   - padding/gap mobile reduzidos sem afetar desktop
 - `MobileSelectedPackageSummary.tsx`

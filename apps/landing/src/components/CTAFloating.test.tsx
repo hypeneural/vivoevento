@@ -4,6 +4,11 @@ import CTAFloating from './CTAFloating';
 import { ScrollUIProvider } from '@/contexts/ScrollUIContext';
 import { AttributionProvider } from '@/contexts/AttributionContext';
 
+function clickWithoutNavigation(element: HTMLElement) {
+  element.addEventListener('click', (event) => event.preventDefault(), { once: true });
+  fireEvent.click(element);
+}
+
 // Mock contexts wrapper
 function TestWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -114,7 +119,7 @@ describe('CTAFloating', () => {
     );
 
     const primaryCTA = screen.getByRole('link', { name: /agendar demonstração/i });
-    fireEvent.click(primaryCTA);
+    clickWithoutNavigation(primaryCTA);
 
     expect(onInteraction).toHaveBeenCalledWith('primary');
   });
@@ -129,7 +134,7 @@ describe('CTAFloating', () => {
     );
 
     const secondaryCTA = screen.getByRole('link', { name: /falar no whatsapp/i });
-    fireEvent.click(secondaryCTA);
+    clickWithoutNavigation(secondaryCTA);
 
     expect(onInteraction).toHaveBeenCalledWith('secondary');
   });
@@ -184,7 +189,7 @@ describe('CTAFloating', () => {
     );
 
     const primaryCTA = screen.getByRole('link', { name: /agendar demonstração/i });
-    fireEvent.click(primaryCTA);
+    clickWithoutNavigation(primaryCTA);
 
     expect((window as any).gtag).toHaveBeenCalledWith('event', 'click', {
       event_category: 'CTA',
@@ -193,7 +198,7 @@ describe('CTAFloating', () => {
     });
 
     const secondaryCTA = screen.getByRole('link', { name: /falar no whatsapp/i });
-    fireEvent.click(secondaryCTA);
+    clickWithoutNavigation(secondaryCTA);
 
     expect((window as any).gtag).toHaveBeenCalledWith('event', 'click', {
       event_category: 'CTA',

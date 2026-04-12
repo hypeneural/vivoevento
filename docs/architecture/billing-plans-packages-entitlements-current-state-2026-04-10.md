@@ -16,9 +16,9 @@ Este documento consolida, em `2026-04-10`, a estrutura real de planos e pacotes 
 Documentos relacionados:
 
 - `docs/architecture/billing-pagarme-v5-recurring-subscriptions-2026-04-09.md`
-- `docs/architecture/billing-pagarme-v5-recurring-subscriptions-execution-plan-2026-04-09.md`
+- `docs/execution-plans/billing-pagarme-v5-recurring-subscriptions-execution-plan-2026-04-09.md`
 - `docs/architecture/billing-pagarme-v5-single-event-checkout.md`
-- `docs/architecture/public-event-checkout-v2-implementation-plan-2026-04-08.md`
+- `docs/execution-plans/public-event-checkout-v2-implementation-plan-2026-04-08.md`
 - `docs/architecture/billing-subscriptions-discovery.md`
 
 ## Stack relevante

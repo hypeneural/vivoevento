@@ -12,6 +12,23 @@ Galeria publica, curadoria administrativa e builder versionado da experiencia de
 - presets reutilizaveis por organizacao;
 - preview compartilhavel baseado em token e revisao draft.
 - assistente de IA guardrailed com `3` variacoes aplicaveis em JSON.
+- telemetry operacional do builder persistida em `analytics_events`.
+
+## Rollout da V1
+
+- o acesso ao builder segue controlado apenas por permissao `gallery.builder.manage`;
+- a V1 nao abre feature flag adicional para `Gallery`;
+- a publicacao da galeria continua independente da IA: o fluxo de preset, ajustes manuais, autosave, preview e publish funciona sem `gallery/ai/proposals`.
+
+## Budgets e operacao da V1
+
+- budget mobile da experiencia publica e do preview admin:
+  - `LCP <= 2500ms`
+  - `INP <= 200ms`
+  - `CLS <= 0.1`
+- o boot do builder expõe `optimized_renderer_trigger` como fonte de verdade do threshold para `render_mode = standard|optimized`;
+- o renderer usa virtualizacao reaproveitando o padrao de `MediaVirtualFeed` quando o volume do evento cruza o threshold;
+- a coleta de Web Vitals da Sprint 5 fica limitada ao builder admin e entra como telemetry leve, sem dashboard novo nesta fase.
 
 ## Rotas
 
@@ -39,6 +56,7 @@ Galeria publica, curadoria administrativa e builder versionado da experiencia de
 | POST | `/api/v1/events/{id}/gallery/hero-image` | Upload direto da imagem principal do hero |
 | POST | `/api/v1/events/{id}/gallery/banner-image` | Upload direto da imagem do banner/interstitial |
 | POST | `/api/v1/events/{id}/gallery/ai/proposals` | Gerar `3` propostas guardrailed e aplicaveis de IA |
+| POST | `/api/v1/events/{id}/gallery/telemetry` | Registrar telemetry operacional do builder (`preset`, `IA`, `vitals`) |
 | GET | `/api/v1/gallery/presets` | Listar presets da organizacao ativa |
 | POST | `/api/v1/gallery/presets` | Salvar preset reutilizavel da organizacao |
 
@@ -73,3 +91,11 @@ Galeria publica, curadoria administrativa e builder versionado da experiencia de
 - `GalleryBuilderPresetRegistry` centraliza defaults, matriz de modelos e normalizacao;
 - `GalleryRevisionManager` garante versionamento monotonicamente crescente por evento.
 - a IA do builder retorna JSON validado por schema e nunca HTML, CSS ou JSX livre.
+- `current_preset_origin_json` em `event_gallery_settings` preserva a origem persistida do preset/atalho atual e alimenta o feedback operacional da UI;
+- `GalleryBuilderOperationalFeedbackResolver` agrega `current_preset_origin`, `last_ai_application`, `last_publish` e `last_restore` para o boot do builder;
+- `AnalyticsTracker` registra eventos do builder em `analytics_events` com `channel = gallery_builder`:
+  - `gallery.builder_preset_applied`
+  - `gallery.builder_ai_applied`
+  - `gallery.builder_published`
+  - `gallery.builder_restored`
+  - `gallery.builder_vitals_sample`

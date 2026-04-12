@@ -26,7 +26,7 @@ vi.mock('@gsap/react', () => ({
 vi.mock('motion/react', () => ({
   motion: {
     div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-    span: ({ children, ...props }: any) => <span {...props}>{children}</span>,
+    span: ({ children, layoutId, ...props }: any) => <span {...props}>{children}</span>,
   },
   AnimatePresence: ({ children }: any) => <>{children}</>,
   useReducedMotion: () => false,

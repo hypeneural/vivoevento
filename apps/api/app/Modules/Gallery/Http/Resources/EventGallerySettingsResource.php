@@ -31,6 +31,7 @@ class EventGallerySettingsResource extends JsonResource
             'theme_tokens' => is_array($this->theme_tokens_json) ? $this->theme_tokens_json : [],
             'page_schema' => $pageSchema,
             'media_behavior' => is_array($this->media_behavior_json) ? $this->media_behavior_json : [],
+            'current_preset_origin' => $this->normalizePresetOrigin($this->current_preset_origin_json),
             'current_draft_revision_id' => $this->current_draft_revision_id,
             'current_published_revision_id' => $this->current_published_revision_id,
             'preview_revision_id' => $this->preview_revision_id,
@@ -43,6 +44,32 @@ class EventGallerySettingsResource extends JsonResource
             'updated_by' => $this->updated_by,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @param  mixed  $origin
+     * @return array<string, mixed>|null
+     */
+    private function normalizePresetOrigin(mixed $origin): ?array
+    {
+        if (! is_array($origin)) {
+            return null;
+        }
+
+        $appliedBy = is_array($origin['applied_by'] ?? null) ? $origin['applied_by'] : null;
+
+        return [
+            'origin_type' => isset($origin['origin_type']) ? (string) $origin['origin_type'] : null,
+            'key' => isset($origin['key']) ? (string) $origin['key'] : null,
+            'label' => isset($origin['label']) ? (string) $origin['label'] : null,
+            'applied_at' => isset($origin['applied_at']) ? (string) $origin['applied_at'] : null,
+            'applied_by' => $appliedBy
+                ? [
+                    'id' => isset($appliedBy['id']) ? (int) $appliedBy['id'] : null,
+                    'name' => isset($appliedBy['name']) ? (string) $appliedBy['name'] : null,
+                ]
+                : null,
         ];
     }
 }

@@ -1,4 +1,4 @@
-﻿# Event Realtime Virtual Office Analysis - 2026-04-11
+# Event Realtime Virtual Office Analysis - 2026-04-11
 
 ## Objetivo
 
@@ -1921,7 +1921,7 @@ Essa ordem entrega valor rapido sem comprometer a arquitetura.
 
 A execucao detalhada deve seguir o backlog por PR do plano complementar:
 
-- `docs/architecture/event-realtime-virtual-office-execution-plan-2026-04-11.md`
+- `docs/execution-plans/event-realtime-virtual-office-execution-plan-2026-04-11.md`
 
 Regra pratica:
 
@@ -1966,3 +1966,19 @@ Status inicial:
 - a API agora expoe `GET /api/v1/events/{event}/operations/room` e `GET /api/v1/events/{event}/operations/timeline`, com requests/resources/controlador proprios e autorizacao por `operations.view`;
 - o slice do PR-07 passou com `7` testes e `103` assertions, enquanto a suite completa de `EventOperations` backend passou com `20` testes e `183` assertions;
 - a regressao backend das fontes existentes passou novamente com `35` testes e `392` assertions, a suite completa de `src/modules/event-operations` passou novamente com `16` arquivos e `31` testes, a regressao frontend adjacente passou com `2` arquivos e `19` testes, e `npm run type-check` passou apos room/timeline e autorizacao.
+- `PR-08` foi iniciado e concluido em `2026-04-12`;
+- o backend agora tem `EventOperationsAttentionPriority`, `EventOperationsEventMapper` e projetores reais para intake, download, variants, moderation, gallery, wall e feedback, todos registrados no provider sem broadcast ainda;
+- o slice do PR-08 passou com `7` testes e `45` assertions, enquanto a suite completa de `EventOperations` backend passou com `27` testes e `228` assertions;
+- a regressao backend das fontes do PR-08 passou com `19` testes e `177` assertions em `MediaPipelineMetrics`, `ContentModerationPipeline` e `WallDiagnostics`, a suite completa de `src/modules/event-operations` passou novamente com `16` arquivos e `31` testes, a regressao frontend adjacente passou com `2` arquivos e `19` testes, e `npm run type-check` passou apos mapper, projetores e coerencia perceptiva minima.
+- `PR-09` foi iniciado e concluido em `2026-04-12`;
+- o backend agora expoe o canal privado `event.{eventId}.operations`, quatro broadcasts semanticamente pequenos (`station.delta`, `timeline.appended`, `alert.created`, `health.changed`) e uma politica explicita de cadencia para restringir `ShouldBroadcastNow` aos casos criticos;
+- o slice do PR-09 passou com `7` testes e `19` assertions, enquanto a suite completa de `EventOperations` backend passou com `34` testes e `247` assertions;
+- a regressao backend adjacente passou com `29` testes e `216` assertions em `MediaPipelineMetrics`, `ContentModerationPipeline`, `WallDiagnostics`, `WallAuthorization` e `NotificationRealtimeAuthorization`, a suite completa de `src/modules/event-operations` passou novamente com `16` arquivos e `31` testes, a regressao frontend adjacente passou com `2` arquivos e `19` testes, e `npm run type-check` passou apos canal realtime, after-commit e cadencia.
+- `PR-10` foi iniciado e concluido em `2026-04-12`;
+- o frontend agora consome `GET /api/v1/events/{event}/operations/room` e `GET /api/v1/events/{event}/operations/timeline` no boot dedicado, hidrata `roomStore`, `timelineStore` e `hudStore` com snapshots imutaveis e mantem Query fora do hot path da sala;
+- o slice do PR-10 passou com `4` arquivos e `9` testes, enquanto a suite completa de `src/modules/event-operations` passou com `19` arquivos e `38` testes;
+- a regressao frontend adjacente passou com `2` arquivos e `19` testes, a suite backend de `EventOperations` passou novamente com `34` testes e `247` assertions, a regressao backend lateral passou com `29` testes e `216` assertions, e `npm run type-check` passou apos boot dedicado, stores externas e Query contido.
+- `PR-11` foi iniciado e concluido em `2026-04-12`;
+- o frontend agora conecta `event.{eventId}.operations` via websocket privado, aplica deltas monotonicamente nas stores externas, descarta repeticoes, aceita mesmo `event_sequence` apenas quando o kind ainda nao foi processado, entra em polling leve quando degradado e faz resync por `snapshot_version`, gap de sequencia ou reconnect;
+- o slice do PR-11 passou com `4` arquivos e `10` testes, enquanto a suite completa de `src/modules/event-operations` passou com `23` arquivos e `49` testes;
+- a regressao frontend de realtime compartilhado passou com `3` arquivos e `11` testes em `src/lib/realtime`, `useWallRealtimeSync` e `useWallPollingFallback`, a regressao frontend adjacente passou com `2` arquivos e `19` testes, a suite backend de `EventOperations` passou novamente com `34` testes e `247` assertions, a regressao backend lateral passou com `29` testes e `216` assertions, e `npm run type-check` passou apos realtime, ordem monotona, idempotencia e resync.

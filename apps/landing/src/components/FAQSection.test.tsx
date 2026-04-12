@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import FAQSection from './FAQSection';
 import { faqs } from '@/data/landing';
@@ -87,8 +87,7 @@ describe('FAQSection - Accessibility and Functionality', () => {
   });
 
   describe('Keyboard Navigation', () => {
-    it('should navigate to next button with ArrowDown', async () => {
-      const user = userEvent.setup();
+    it('should navigate to next button with ArrowDown', () => {
       render(<FAQSection />);
 
       const buttons = screen.getAllByRole('button');
@@ -98,12 +97,11 @@ describe('FAQSection - Accessibility and Functionality', () => {
       expect(buttons[0]).toHaveFocus();
 
       // Press ArrowDown
-      await user.keyboard('{ArrowDown}');
+      fireEvent.keyDown(buttons[0], { key: 'ArrowDown' });
       expect(buttons[1]).toHaveFocus();
     });
 
-    it('should navigate to previous button with ArrowUp', async () => {
-      const user = userEvent.setup();
+    it('should navigate to previous button with ArrowUp', () => {
       render(<FAQSection />);
 
       const buttons = screen.getAllByRole('button');
@@ -113,12 +111,11 @@ describe('FAQSection - Accessibility and Functionality', () => {
       expect(buttons[1]).toHaveFocus();
 
       // Press ArrowUp
-      await user.keyboard('{ArrowUp}');
+      fireEvent.keyDown(buttons[1], { key: 'ArrowUp' });
       expect(buttons[0]).toHaveFocus();
     });
 
-    it('should wrap to first button when pressing ArrowDown on last button', async () => {
-      const user = userEvent.setup();
+    it('should wrap to first button when pressing ArrowDown on last button', () => {
       render(<FAQSection />);
 
       const buttons = screen.getAllByRole('button');
@@ -129,12 +126,11 @@ describe('FAQSection - Accessibility and Functionality', () => {
       expect(lastButton).toHaveFocus();
 
       // Press ArrowDown
-      await user.keyboard('{ArrowDown}');
+      fireEvent.keyDown(lastButton, { key: 'ArrowDown' });
       expect(buttons[0]).toHaveFocus();
     });
 
-    it('should wrap to last button when pressing ArrowUp on first button', async () => {
-      const user = userEvent.setup();
+    it('should wrap to last button when pressing ArrowUp on first button', () => {
       render(<FAQSection />);
 
       const buttons = screen.getAllByRole('button');
@@ -144,12 +140,11 @@ describe('FAQSection - Accessibility and Functionality', () => {
       expect(buttons[0]).toHaveFocus();
 
       // Press ArrowUp
-      await user.keyboard('{ArrowUp}');
+      fireEvent.keyDown(buttons[0], { key: 'ArrowUp' });
       expect(buttons[buttons.length - 1]).toHaveFocus();
     });
 
-    it('should navigate to first button with Home key', async () => {
-      const user = userEvent.setup();
+    it('should navigate to first button with Home key', () => {
       render(<FAQSection />);
 
       const buttons = screen.getAllByRole('button');
@@ -159,12 +154,11 @@ describe('FAQSection - Accessibility and Functionality', () => {
       expect(buttons[3]).toHaveFocus();
 
       // Press Home
-      await user.keyboard('{Home}');
+      fireEvent.keyDown(buttons[3], { key: 'Home' });
       expect(buttons[0]).toHaveFocus();
     });
 
-    it('should navigate to last button with End key', async () => {
-      const user = userEvent.setup();
+    it('should navigate to last button with End key', () => {
       render(<FAQSection />);
 
       const buttons = screen.getAllByRole('button');
@@ -174,7 +168,7 @@ describe('FAQSection - Accessibility and Functionality', () => {
       expect(buttons[0]).toHaveFocus();
 
       // Press End
-      await user.keyboard('{End}');
+      fireEvent.keyDown(buttons[0], { key: 'End' });
       expect(buttons[buttons.length - 1]).toHaveFocus();
     });
   });

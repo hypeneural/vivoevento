@@ -16,7 +16,7 @@ Este material foi feito por leitura de codigo. Ele nao substitui profiling de ru
 
 Plano derivado desta analise:
 
-- `docs/architecture/moderation-page-execution-plan-2026-04-09.md`
+- `docs/execution-plans/moderation-page-execution-plan-2026-04-09.md`
 
 ## Stack relevante
 
@@ -284,7 +284,7 @@ Quando o frontend faz merge local de itens com:
 - realtime;
 - optimistic update;
 - prepend de novas midias;
-- remoção local;
+- remoÃ§Ã£o local;
 
 ele usa `compareModerationMedia()`:
 
@@ -597,7 +597,7 @@ Isso e ruim para `/moderation` porque:
 Para o caso da screenshot, este ponto e especialmente relevante:
 
 - a tela mostra superficies cinzas com alt text aparente;
-- isso e compatível com midia lenta, quebrada ou sem tratamento de erro;
+- isso e compatÃ­vel com midia lenta, quebrada ou sem tratamento de erro;
 - a pagina hoje nao tem nenhuma camada de UX para amortecer esse estado.
 
 ### 7. Grade virtualizada
@@ -852,7 +852,7 @@ Impacto:
 
 - contadores podem nao bater com o feed visivel;
 - depois de algum refetch ou troca de filtro, eles "saltam".
-- arquiteturalmente, `stats` estao acopladas demais a uma `InfiniteQuery` mutavel e a pagina deveria tratá-las como leitura separada.
+- arquiteturalmente, `stats` estao acopladas demais a uma `InfiniteQuery` mutavel e a pagina deveria tratÃ¡-las como leitura separada.
 
 Isso tambem contribui para sensacao de tela instavel.
 
@@ -1419,7 +1419,7 @@ Estado atual:
 
 Impacto:
 
-- o operador consegue corrigir erro operacional rapido sem "caçar" o item de novo;
+- o operador consegue corrigir erro operacional rapido sem "caÃ§ar" o item de novo;
 - o undo fica tecnicamente correto, sem transformar desfazer em uma nova rejeicao;
 - a fila ganha seguranca operacional sem aumentar churn estrutural do feed.
 

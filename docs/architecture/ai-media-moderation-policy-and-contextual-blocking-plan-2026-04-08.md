@@ -22,8 +22,8 @@ Tambem fecha:
 
 Leitura complementar:
 
-- `docs/architecture/ia-respostas-automaticas-de-midia-execution-plan.md`
-- `docs/architecture/photo-processing-ai-hardening-execution-plan.md`
+- `docs/execution-plans/ia-respostas-automaticas-de-midia-execution-plan.md`
+- `docs/execution-plans/photo-processing-ai-hardening-execution-plan.md`
 
 ---
 
@@ -531,7 +531,7 @@ Motivo salvo:
 
 Conclusao:
 
-- hoje o operador pode interpretar esse caso como "moderação IA bloqueou";
+- hoje o operador pode interpretar esse caso como "moderaÃ§Ã£o IA bloqueou";
 - mas tecnicamente isso nao foi Safety;
 - foi contexto.
 
@@ -1320,7 +1320,7 @@ Leitura:
 
 ## 11. O Que Precisamos Implementar
 
-## IA-MOD-01 — Separar as duas camadas no produto
+## IA-MOD-01 â€” Separar as duas camadas no produto
 
 Objetivo:
 
@@ -1333,13 +1333,13 @@ Tarefas:
 - separar os historicos no painel;
 - ajustar a copy da UI.
 
-Critério de aceite:
+CritÃ©rio de aceite:
 
 - operador entende claramente por que a midia caiu:
   - safety
   - contexto
 
-## IA-MOD-02 — Criar configuracao global de Safety objetiva
+## IA-MOD-02 â€” Criar configuracao global de Safety objetiva
 
 Objetivo:
 
@@ -1352,12 +1352,12 @@ Tarefas:
 - criar endpoints administrativos em `IA`;
 - permitir override por evento.
 
-Critério de aceite:
+CritÃ©rio de aceite:
 
 - existe configuracao geral editavel;
 - evento pode herdar ou sobrepor.
 
-## IA-MOD-03 — Adicionar `analysis_scope`
+## IA-MOD-03 â€” Adicionar `analysis_scope`
 
 Objetivo:
 
@@ -1372,12 +1372,12 @@ Tarefas:
 - aplicar no builder contextual;
 - persistir no log o escopo efetivo.
 
-Critério de aceite:
+CritÃ©rio de aceite:
 
 - operador escolhe o escopo;
 - log mostra o escopo usado.
 
-## IA-MOD-04 — Trocar prompt bruto por politica estruturada
+## IA-MOD-04 â€” Trocar prompt bruto por politica estruturada
 
 Objetivo:
 
@@ -1395,11 +1395,11 @@ Tarefas:
 - criar prompt builder backend;
 - manter campo livre como complementar.
 
-Critério de aceite:
+CritÃ©rio de aceite:
 
 - operador nao depende mais de prompt livre para o caso basico.
 
-## IA-MOD-05 — Evoluir JSON schema contextual
+## IA-MOD-05 â€” Evoluir JSON schema contextual
 
 Objetivo:
 
@@ -1416,11 +1416,11 @@ Tarefas:
 - atualizar parser, DTO e persistencia;
 - ampliar o historico.
 
-Critério de aceite:
+CritÃ©rio de aceite:
 
 - rejeicao contextual aparece com motivo estruturado e filtravel.
 
-## IA-MOD-06 — Criar area de front em `IA > Moderacao de midia`
+## IA-MOD-06 â€” Criar area de front em `IA > Moderacao de midia`
 
 Objetivo:
 
@@ -1436,11 +1436,11 @@ Tarefas:
 - incluir configuracao global;
 - incluir seletor de evento para sobreposicao.
 
-Critério de aceite:
+CritÃ©rio de aceite:
 
 - nenhuma configuracao de moderacao por IA fica escondida em tela errada.
 
-## IA-MOD-07 — Historico operacional de bloqueios contextuais
+## IA-MOD-07 â€” Historico operacional de bloqueios contextuais
 
 Objetivo:
 
@@ -1453,11 +1453,11 @@ Tarefas:
 - thumbnail + caption + politica + decisao;
 - payload tecnico acessivel.
 
-Critério de aceite:
+CritÃ©rio de aceite:
 
 - operador consegue entender porque a IA bloqueou e em qual politica isso caiu.
 
-## IA-MOD-08 — Testes automatizados
+## IA-MOD-08 â€” Testes automatizados
 
 Objetivo:
 

@@ -417,7 +417,7 @@ Validacao adicional:
 O modulo WhatsApp ja tem:
 
 - `WhatsAppMessagingService::sendText(...)`
-- envio assíncrono por job
+- envio assÃ­ncrono por job
 - suporte a Z-API
 
 Portanto o que falta nao e o transporte.
@@ -557,4 +557,4 @@ Para atender o requisito pedido de verdade, o proximo passo correto nao e apenas
 
 Plano de execucao detalhado gerado em:
 
-- `docs/architecture/settings-branding-team-invite-execution-plan-2026-04-09.md`
+- `docs/execution-plans/settings-branding-team-invite-execution-plan-2026-04-09.md`

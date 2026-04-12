@@ -24,7 +24,7 @@ Leitura complementar importante:
 - para o desenho detalhado da integracao `AWS Rekognition` como opcao inicial, ver:
   - `docs/architecture/face-search-aws-rekognition-integration-plan-2026-04-08.md`
 - para o backlog executavel dessa trilha, com fases, tarefas e bateria de testes, ver:
-  - `docs/architecture/face-search-aws-rekognition-execution-plan-2026-04-08.md`
+  - `docs/execution-plans/face-search-aws-rekognition-execution-plan-2026-04-08.md`
 
 ---
 
@@ -275,7 +275,7 @@ Isso e insuficiente para separar:
 
 Resultado:
 
-- varias faces “aceitas” ainda sao embeddings ruins para identidade;
+- varias faces â€œaceitasâ€ ainda sao embeddings ruins para identidade;
 - varias faces entram no clustering com qualidade semantica baixa.
 
 ### 3. O crop para embedding ainda e simples demais
@@ -322,7 +322,7 @@ O que esta forte:
 O que ainda falta:
 
 - dataset supervisionado do proprio produto para `same-person across event gallery`;
-- labels reais de cluster no estilo “quem e quem” em 1 ou 2 eventos completos;
+- labels reais de cluster no estilo â€œquem e quemâ€ em 1 ou 2 eventos completos;
 - benchmark proprio de fragmentacao e sobre-fusao.
 
 Sem isso, o sistema melhora, mas continua cego no problema final.
@@ -422,7 +422,7 @@ Minimo necessario:
 - scores de confianca por cluster;
 - fila de revisao manual para clusters ambigos.
 
-Em termos práticos:
+Em termos prÃ¡ticos:
 
 - o comando local atual serve para experimento;
 - nao deve ser promovido como motor final de agrupamento automatico sem essa evolucao.
@@ -574,7 +574,7 @@ Para integrar direito, precisamos aceitar que no modo AWS a busca nao ficaria ma
 
 Ou seja:
 
-- `AWS` nao e apenas “mais um embedder”;
+- `AWS` nao e apenas â€œmais um embedderâ€;
 - ele e um `managed face search backend`.
 
 ### Minha leitura
@@ -672,7 +672,7 @@ Fazer primeiro:
 Mas leitura honesta:
 
 - isso melhora bastante;
-- porem dificilmente vai transformar o stack atual sozinho em um agrupador “profissional” de galeria inteira no curto prazo.
+- porem dificilmente vai transformar o stack atual sozinho em um agrupador â€œprofissionalâ€ de galeria inteira no curto prazo.
 
 ### Se a prioridade for confianca de producao rapidamente
 

@@ -82,6 +82,7 @@ export const queryKeys = {
     presets: (eventId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'presets'] as const,
     operationalStatus: (eventId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'operational-status'] as const,
     coverage: (eventId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'coverage'] as const,
+    relationalCollections: (eventId: number | string) => [...queryKeys.eventPeople.byEvent(eventId), 'relational-collections'] as const,
   },
 
   // Gallery

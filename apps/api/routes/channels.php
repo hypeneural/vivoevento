@@ -60,3 +60,8 @@ Broadcast::channel('event.{eventId}.play', function ($user, int $eventId) use ($
     return $user instanceof User
         && $authorizeEventChannel($user, $eventId, 'play.view');
 });
+
+Broadcast::channel('event.{eventId}.operations', function ($user, int $eventId) use ($authorizeEventChannel) {
+    return $user instanceof User
+        && $authorizeEventChannel($user, $eventId, 'operations.view');
+});

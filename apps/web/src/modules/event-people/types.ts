@@ -25,6 +25,9 @@ export type EventPersonGroupStatus = 'active' | 'archived';
 export type EventPersonGroupMembershipStatus = 'active' | 'archived';
 export type EventCoverageState = 'missing' | 'weak' | 'ok' | 'strong';
 export type EventCoverageTargetType = 'person' | 'pair' | 'group';
+export type EventRelationalCollectionType = 'person_best_of' | 'pair_best_of' | 'group_best_of' | 'family_moment' | 'must_have_delivery';
+export type EventRelationalCollectionStatus = 'draft' | 'active' | 'archived';
+export type EventRelationalCollectionVisibility = 'internal' | 'public_ready';
 
 export interface EventPersonMediaStat {
   media_count: number;
@@ -267,6 +270,94 @@ export interface EventPeopleCoverageResponse {
   summary: EventPeopleCoverageSummary;
   targets: EventCoverageTarget[];
   alerts: EventCoverageAlert[];
+}
+
+export interface EventRelationalCollectionPersonSummary {
+  id: number;
+  display_name: string;
+  type: string | null;
+}
+
+export interface EventRelationalCollectionGroupSummary {
+  id: number;
+  display_name: string;
+  slug: string;
+  group_type: string | null;
+}
+
+export interface EventRelationalCollectionMediaSummary {
+  id: number;
+  caption: string | null;
+  preview_url: string | null;
+  thumbnail_url: string | null;
+  original_url: string | null;
+  publication_status: string | null;
+  moderation_status: string | null;
+  created_at: string | null;
+}
+
+export interface EventRelationalCollectionItem {
+  id: number;
+  event_media_id: number;
+  sort_order: number;
+  match_score: number;
+  matched_people_count: number;
+  is_published: boolean;
+  media?: EventRelationalCollectionMediaSummary | null;
+}
+
+export interface EventRelationalCollection {
+  id: number;
+  collection_key: string;
+  collection_type: EventRelationalCollectionType | string;
+  source_type: string;
+  display_name: string;
+  status: EventRelationalCollectionStatus | string;
+  visibility: EventRelationalCollectionVisibility | string;
+  share_token: string | null;
+  public_url?: string | null;
+  public_api_url?: string | null;
+  item_count: number;
+  published_item_count: number;
+  person_a?: EventRelationalCollectionPersonSummary | null;
+  person_b?: EventRelationalCollectionPersonSummary | null;
+  group?: EventRelationalCollectionGroupSummary | null;
+  metadata: Record<string, unknown>;
+  generated_at: string | null;
+  published_at: string | null;
+  items: EventRelationalCollectionItem[];
+}
+
+export interface EventPeopleRelationalCollectionsSummary {
+  total_collections: number;
+  public_ready_collections: number;
+  internal_collections: number;
+  must_have_deliveries: number;
+  last_generated_at: string | null;
+}
+
+export interface EventPeopleRelationalCollectionsResponse {
+  summary: EventPeopleRelationalCollectionsSummary;
+  collections: EventRelationalCollection[];
+}
+
+export interface EventPeoplePublicRelationalCollectionEvent {
+  id: number;
+  title: string;
+  slug: string;
+  event_type: string | null;
+  starts_at: string | null;
+  location_name: string | null;
+  public_gallery_url: string | null;
+  public_hub_url: string | null;
+}
+
+export interface EventPeoplePublicRelationalCollectionResponse {
+  event: EventPeoplePublicRelationalCollectionEvent;
+  collection: Pick<
+    EventRelationalCollection,
+    'id' | 'collection_key' | 'collection_type' | 'display_name' | 'metadata' | 'items' | 'person_a' | 'person_b' | 'group' | 'item_count'
+  >;
 }
 
 export interface EventPersonGroup {

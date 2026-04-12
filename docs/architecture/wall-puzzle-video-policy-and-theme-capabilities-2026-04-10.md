@@ -14,7 +14,7 @@ Documentos base:
 
 - `docs/architecture/wall-puzzle-theme-analysis-2026-04-09.md`
 - `docs/architecture/wall-puzzle-video-and-theme-extensibility-analysis-2026-04-09.md`
-- `docs/architecture/wall-puzzle-theme-execution-plan-2026-04-09.md`
+- `docs/execution-plans/wall-puzzle-theme-execution-plan-2026-04-09.md`
 
 ---
 

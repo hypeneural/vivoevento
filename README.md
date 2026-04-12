@@ -42,6 +42,7 @@ O produto hoje combina:
 - camada de `ContentModeration` com provider OpenAI e thresholds por evento
 - camada de `MediaIntelligence` com VLM, `enrich_only` e `gate`
 - `FaceSearch` com indexacao por rosto, `pgvector` e busca publica por selfie
+- `EventPeople` com grafo relacional, grupos, coverage intelligence e entregas emocionais por vinculo
 - `Wall` com manager administrativo, player publico, fila `broadcasts`, boot/state publicos e contrato compartilhado em `packages/shared-types`
 - `Play` com jogos `memory` e `puzzle`, sessoes, ranking, analytics e runtime PWA
 - `Hub` com builder de hot site, presets por organizacao, hero, logos de patrocinador e tracking publico de CTA
@@ -191,6 +192,7 @@ Hoje a API ja entrega:
 | `MediaProcessing` | variantes, moderacao final, publish, reprocessamento e metricas do pipeline |
 | `ContentModeration` | safety moderation por evento via provider dedicado |
 | `FaceSearch` | indexacao facial e busca por selfie |
+| `EventPeople` | identidade social do evento, grafo de relacoes, grupos, coverage e entregas por vinculo |
 | `MediaIntelligence` | VLM para caption, tags e decisao semantica |
 | `Gallery` | curadoria e publicacao para galeria |
 | `Wall` | telao realtime, manager, player e diagnosticos |
@@ -285,6 +287,16 @@ Entregas atuais do dominio:
 - embeddings armazenados em `pgvector`
 - busca no backoffice e busca publica por selfie
 - retention e consentimento por evento
+
+`EventPeople`:
+
+- modelagem em grafo, nao so arvore genealogica ou lista de nomes
+- pessoa canonica, relacoes declaradas, grupos locais e coocorrencia inferida
+- `Mapa de relacoes` complementar em `React Flow` para navegacao visual
+- presets inteligentes por tipo de evento, com seeds de pessoas, grupos e coverage
+- `coverage intelligence` para monitorar pares e grupos obrigatorios ao vivo
+- colecoes relacionais prontas como `person_best_of`, `pair_best_of`, `group_best_of`, `family_moment` e `must_have_delivery`
+- trilha guest-facing tokenizada para entregas publicas por vinculo em `/momentos/:token`
 
 #### Wall realtime
 
@@ -546,12 +558,18 @@ Ele ja contem o contrato do wall em `packages/shared-types/src/wall.ts`, cobrind
 
 - PHP 8.3+
 - Composer 2+
-- Node.js 24 LTS
+- Node.js 22 LTS
 - PostgreSQL 16 com `pgvector`
 - Redis 7
 - opcionalmente Docker Desktop para a infraestrutura local
 
 ### 1. Subir a infraestrutura local
+
+Versao oficial do repositorio para Node:
+
+```bash
+nvm use
+```
 
 ```bash
 docker-compose up -d
@@ -656,7 +674,7 @@ Templates versionados para:
 ### Documentacao operacional mais importante
 
 - `docs/architecture/production-vps-runbook.md`
-- `docs/architecture/production-vps-execution-plan.md`
+- `docs/execution-plans/production-vps-execution-plan.md`
 - `docs/architecture/production-vps-command-sequence.md`
 - `docs/architecture/landing-page-deployment.md`
 - `docs/api/queues.md`
@@ -704,12 +722,12 @@ Para entender o estado atual do produto, estes arquivos sao os mais importantes:
 - `docs/api/queues.md`
 - `docs/flows/media-ingestion.md`
 - `docs/flows/whatsapp-inbound.md`
-- `docs/architecture/billing-pagarme-v5-execution-plan.md`
-- `docs/architecture/whatsapp-zapi-webhook-execution-plan.md`
+- `docs/execution-plans/billing-pagarme-v5-execution-plan.md`
+- `docs/execution-plans/whatsapp-zapi-webhook-execution-plan.md`
 - `docs/architecture/play-games-discovery.md`
 - `docs/architecture/telao-ao-vivo-implementation.md`
 - `docs/architecture/production-vps-runbook.md`
-- `docs/architecture/production-vps-execution-plan.md`
+- `docs/execution-plans/production-vps-execution-plan.md`
 - `docs/architecture/production-vps-command-sequence.md`
 
 ## Leitura honesta do estado atual

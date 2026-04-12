@@ -41,12 +41,14 @@ describe('scene-runtime', () => {
     expect(runtime.layers).toEqual(['background', 'stations', 'agents', 'effects']);
     expect(runtime.calm_state).toBe(true);
     expect(runtime.macro_reading.title).toBe('Operacao saudavel');
-    expect(runtime.meso_reading.title).toBe('Sem gargalo dominante agora');
+    expect(runtime.direction.attention.kind).toBe('visible_progress');
+    expect(runtime.meso_reading.title).toBe('Galeria');
     expect(runtime.agents.map((agent) => agent.role)).toEqual(
       expect.arrayContaining(['coordinator', 'dispatcher', 'runner', 'reviewer', 'operator']),
     );
     expect(runtime.stations.find((station) => station.station_key === 'intake')?.current_gesture_label)
       .toContain('fila simbolica');
+    expect(runtime.stations.find((station) => station.station_key === 'gallery')?.attention_band).toBe('progress');
   });
 
   it('promotes the bottleneck and switches to reduced-motion gestures when requested', () => {
@@ -58,7 +60,10 @@ describe('scene-runtime', () => {
 
     expect(runtime.calm_state).toBe(false);
     expect(runtime.meso_reading.title).toBe('Moderacao humana');
+    expect(runtime.direction.attention.kind).toBe('dominant_bottleneck');
+    expect(runtime.direction.backpressure_active).toBe(true);
     expect(runtime.stations.find((station) => station.station_key === 'human_review')?.emphasis).toBe('dominant');
+    expect(runtime.stations.find((station) => station.station_key === 'human_review')?.pressure_mode).toBe('counter');
     expect(runtime.stations.find((station) => station.station_key === 'intake')?.current_gesture_label)
       .toContain('contagem');
     expect(runtime.stations.find((station) => station.station_key === 'wall')?.current_gesture_label)

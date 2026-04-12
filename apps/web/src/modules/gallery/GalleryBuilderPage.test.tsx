@@ -6,9 +6,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createGalleryAiProposalsFixture,
+  createGalleryBuilderOperationalFeedbackFixture,
   createGalleryBuilderPresetFixture,
   createGalleryBuilderRevisionFixture,
   createGalleryBuilderSettingsFixture,
+  createGalleryOptimizedRendererTriggerFixture,
   galleryContractCatalog,
 } from './gallery-builder';
 import GalleryBuilderPage from './GalleryBuilderPage';
@@ -22,6 +24,7 @@ const publishEventGalleryDraftMock = vi.fn();
 const restoreEventGalleryRevisionMock = vi.fn();
 const createEventGalleryPreviewLinkMock = vi.fn();
 const runEventGalleryAiProposalsMock = vi.fn();
+const trackEventGalleryBuilderTelemetryMock = vi.fn();
 const getEventDetailMock = vi.fn();
 const listEventMediaMock = vi.fn();
 
@@ -35,6 +38,7 @@ vi.mock('./api', () => ({
   restoreEventGalleryRevision: (...args: unknown[]) => restoreEventGalleryRevisionMock(...args),
   createEventGalleryPreviewLink: (...args: unknown[]) => createEventGalleryPreviewLinkMock(...args),
   runEventGalleryAiProposals: (...args: unknown[]) => runEventGalleryAiProposalsMock(...args),
+  trackEventGalleryBuilderTelemetry: (...args: unknown[]) => trackEventGalleryBuilderTelemetryMock(...args),
 }));
 
 vi.mock('@/modules/events/api', () => ({
@@ -89,6 +93,13 @@ describe('GalleryBuilderPage', () => {
         required_variant_fields: ['variant_key', 'src', 'width', 'height', 'mime_type'],
         target_widths: [320, 480, 768, 1024, 1440],
       },
+      optimized_renderer_trigger: createGalleryOptimizedRendererTriggerFixture(),
+      operational_feedback: createGalleryBuilderOperationalFeedbackFixture({
+        current_preset_origin: null,
+        last_ai_application: null,
+        last_publish: null,
+        last_restore: null,
+      }),
     });
     listGalleryPresetsMock.mockResolvedValue([createGalleryBuilderPresetFixture()]);
     listEventGalleryRevisionsMock.mockResolvedValue([
@@ -128,6 +139,30 @@ describe('GalleryBuilderPage', () => {
       revision: createGalleryBuilderRevisionFixture(),
     });
     runEventGalleryAiProposalsMock.mockResolvedValue(createGalleryAiProposalsFixture());
+    trackEventGalleryBuilderTelemetryMock.mockResolvedValue({
+      current_preset_origin: {
+        origin_type: 'shortcut',
+        key: 'weddingPremiumLight',
+        label: 'Premium light',
+        applied_at: '2026-04-12T13:10:00Z',
+        applied_by: {
+          id: 9,
+          name: 'Operador',
+        },
+      },
+      operational_feedback: createGalleryBuilderOperationalFeedbackFixture({
+        current_preset_origin: {
+          origin_type: 'shortcut',
+          key: 'weddingPremiumLight',
+          label: 'Premium light',
+          applied_at: '2026-04-12T13:10:00Z',
+          applied_by: {
+            id: 9,
+            name: 'Operador',
+          },
+        },
+      }),
+    });
     getEventDetailMock.mockResolvedValue({
       id: 42,
       title: 'Casamento Ana e Leo',
@@ -210,6 +245,7 @@ describe('GalleryBuilderPage', () => {
     expect(screen.getAllByText('Draft v7').length).toBeGreaterThan(0);
     expect(screen.getByTestId('gallery-preview-frame')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /modo rapido/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText(/Nenhum publish registrado ainda./i)).toBeInTheDocument();
   });
 
   it('switches to professional mode and exposes preset tooling', async () => {
@@ -264,7 +300,36 @@ describe('GalleryBuilderPage', () => {
       expect(autosaveEventGalleryDraftMock).toHaveBeenCalledWith('42');
     });
 
+    await waitFor(() => {
+      expect(trackEventGalleryBuilderTelemetryMock).toHaveBeenCalledWith('42', expect.objectContaining({
+        event: 'ai_applied',
+        variation_id: 'romantic-soft',
+        apply_scope: 'theme_tokens',
+      }));
+    });
+
     expect(screen.getByRole('button', { name: 'Publicar' })).toBeDisabled();
     expect(screen.getByText(/Gere um preview compartilhavel apos aplicar uma variacao de IA./i)).toBeInTheDocument();
+  }, 10000);
+
+  it('tracks preset application telemetry and surfaces persisted operational feedback', async () => {
+    const user = userEvent.setup();
+
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'Gallery Builder' });
+    await user.click(screen.getByRole('button', { name: /premium light/i }));
+
+    await waitFor(() => {
+      expect(trackEventGalleryBuilderTelemetryMock).toHaveBeenCalledWith('42', expect.objectContaining({
+        event: 'preset_applied',
+        preset: expect.objectContaining({
+          origin_type: 'shortcut',
+          key: 'weddingPremiumLight',
+        }),
+      }));
+    });
+
+    expect(screen.getByText(/Origem persistida: Premium light/i)).toBeInTheDocument();
   });
 });

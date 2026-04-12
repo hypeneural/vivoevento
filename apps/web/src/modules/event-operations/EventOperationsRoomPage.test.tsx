@@ -7,6 +7,8 @@ import EventOperationsRoomPage from './EventOperationsRoomPage';
 import type { EventOperationsV0Room } from './types';
 
 const useEventOperationsBootMock = vi.fn();
+const useEventOperationsRealtimeMock = vi.fn();
+const useEventOperationsFallbackMock = vi.fn();
 const getContextMock = vi.fn(() => ({
   clearRect: vi.fn(),
   fillRect: vi.fn(),
@@ -23,6 +25,14 @@ const getContextMock = vi.fn(() => ({
 
 vi.mock('./hooks/useEventOperationsBoot', () => ({
   useEventOperationsBoot: (...args: unknown[]) => useEventOperationsBootMock(...args),
+}));
+
+vi.mock('./hooks/useEventOperationsRealtime', () => ({
+  useEventOperationsRealtime: (...args: unknown[]) => useEventOperationsRealtimeMock(...args),
+}));
+
+vi.mock('./hooks/useEventOperationsFallback', () => ({
+  useEventOperationsFallback: (...args: unknown[]) => useEventOperationsFallbackMock(...args),
 }));
 
 function makeRoom(): EventOperationsV0Room {
@@ -64,6 +74,20 @@ describe('EventOperationsRoomPage', () => {
       data: makeRoom(),
       isLoading: false,
       isError: false,
+      timelineQuery: {
+        isError: false,
+      },
+      timeline: makeRoom().timeline,
+    });
+    useEventOperationsRealtimeMock.mockReturnValue({
+      connectionState: 'connected',
+      statusMessage: null,
+      lastResyncCompletedAt: null,
+    });
+    useEventOperationsFallbackMock.mockReturnValue({
+      isPollingFallbackActive: false,
+      roomIntervalMs: false,
+      timelineIntervalMs: false,
     });
   });
 
@@ -81,5 +105,24 @@ describe('EventOperationsRoomPage', () => {
     expect(screen.getByText('Casamento Ana e Bruno')).toBeInTheDocument();
     expect(screen.getByRole('log', { name: 'Timeline da operacao' })).toBeInTheDocument();
     expect(screen.queryByText(/dashboard/i)).not.toBeInTheDocument();
+  });
+
+  it('surfaces the realtime recovery state when the room is reconnecting or polling in fallback', () => {
+    useEventOperationsRealtimeMock.mockReturnValue({
+      connectionState: 'resyncing',
+      statusMessage: 'Sincronizando a sala...',
+      lastResyncCompletedAt: null,
+    });
+    useEventOperationsFallbackMock.mockReturnValue({
+      isPollingFallbackActive: true,
+      roomIntervalMs: 15000,
+      timelineIntervalMs: 20000,
+    });
+
+    renderPage();
+
+    expect(screen.getByText('Realtime')).toBeInTheDocument();
+    expect(screen.getByText('Sincronizando a sala...')).toBeInTheDocument();
+    expect(screen.getByText(/Realtime degradado; room e timeline voltaram para polling leve/i)).toBeInTheDocument();
   });
 });

@@ -27,7 +27,7 @@ Escopo desta discovery:
 Documento complementar:
 
 - ver
-  [billing-admin-customer-onboarding-execution-plan.md](./billing-admin-customer-onboarding-execution-plan.md)
+  [billing-admin-customer-onboarding-execution-plan.md](../execution-plans/billing-admin-customer-onboarding-execution-plan.md)
   para a ordem detalhada de execucao em TDD.
 
 ## Referencias oficiais confirmadas

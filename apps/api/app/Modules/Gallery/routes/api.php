@@ -20,6 +20,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('events/{event}/gallery/hero-image', [\App\Modules\Gallery\Http\Controllers\GalleryBuilderController::class, 'uploadHeroImage']);
     Route::post('events/{event}/gallery/banner-image', [\App\Modules\Gallery\Http\Controllers\GalleryBuilderController::class, 'uploadBannerImage']);
     Route::post('events/{event}/gallery/ai/proposals', [\App\Modules\Gallery\Http\Controllers\GalleryBuilderController::class, 'aiProposals']);
+    Route::post('events/{event}/gallery/telemetry', [\App\Modules\Gallery\Http\Controllers\GalleryBuilderController::class, 'telemetry']);
 });
 
 // Public gallery (no auth)

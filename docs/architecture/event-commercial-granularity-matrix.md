@@ -14,9 +14,9 @@ Este documento consolida:
 
 Este arquivo deve ser lido junto com:
 
-- `docs/architecture/billing-subscriptions-execution-plan.md`
-- `docs/architecture/event-whatsapp-commercial-execution-plan.md`
-- `docs/architecture/whatsapp-zapi-webhook-execution-plan.md`
+- `docs/execution-plans/billing-subscriptions-execution-plan.md`
+- `docs/execution-plans/event-whatsapp-commercial-execution-plan.md`
+- `docs/execution-plans/whatsapp-zapi-webhook-execution-plan.md`
 - `docs/architecture/event-media-intake-architecture.md`
 
 ## Evidencia validada

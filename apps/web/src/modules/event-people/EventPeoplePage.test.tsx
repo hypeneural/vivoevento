@@ -22,6 +22,8 @@ vi.mock('./api', () => ({
     getPresets: vi.fn(),
     getCoverage: vi.fn(),
     refreshCoverage: vi.fn(),
+    getRelationalCollections: vi.fn(),
+    refreshRelationalCollections: vi.fn(),
     listGroups: vi.fn(),
     createGroup: vi.fn(),
     updateGroup: vi.fn(),
@@ -259,6 +261,36 @@ describe('EventPeoplePage', () => {
       targets: [],
       alerts: [],
     });
+    vi.mocked(eventPeopleApi.getRelationalCollections).mockResolvedValue({
+      summary: {
+        total_collections: 3,
+        public_ready_collections: 1,
+        internal_collections: 2,
+        must_have_deliveries: 1,
+        last_generated_at: '2026-04-12T18:00:00Z',
+      },
+      collections: [{
+        id: 1,
+        collection_key: 'pair-best-of:7:8',
+        collection_type: 'pair_best_of',
+        source_type: 'relation',
+        display_name: 'Mae da noiva + Noivo',
+        status: 'active',
+        visibility: 'internal',
+        share_token: null,
+        public_url: null,
+        public_api_url: null,
+        item_count: 2,
+        published_item_count: 1,
+        person_a: { id: 7, display_name: 'Mae da noiva', type: 'mother' },
+        person_b: { id: 8, display_name: 'Noivo', type: 'groom' },
+        group: null,
+        metadata: {},
+        generated_at: '2026-04-12T18:00:00Z',
+        published_at: null,
+        items: [],
+      }],
+    });
     vi.mocked(eventPeopleApi.createGroup).mockRejectedValue(new Error('not used'));
     vi.mocked(eventPeopleApi.updateGroup).mockRejectedValue(new Error('not used'));
     vi.mocked(eventPeopleApi.deleteGroup).mockResolvedValue(undefined);
@@ -298,6 +330,7 @@ describe('EventPeoplePage', () => {
     expect(screen.getByText('Modelo do evento')).toBeInTheDocument();
     expect(screen.getByText('Grupos do evento')).toBeInTheDocument();
     expect(screen.getByText('Cobertura importante')).toBeInTheDocument();
+    expect(screen.getByText('Momentos e entregas')).toBeInTheDocument();
     expect(screen.getByText('Pessoas principais')).toBeInTheDocument();
     expect(screen.getByText('1 grupos sementes e 1 alvos de cobertura preparados para as proximas fases.')).toBeInTheDocument();
   }, 15_000);

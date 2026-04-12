@@ -1,6 +1,13 @@
-import type { EventOperationsConnectionSummary, EventOperationsHealthStatus, EventOperationsWallSummary } from '@eventovivo/shared-types/event-operations';
+import { useSyncExternalStore } from 'react';
 
-import type { EventOperationsV0Room } from '../types';
+import type {
+  EventOperationsConnectionSummary,
+  EventOperationsHealthStatus,
+  EventOperationsRoomSnapshot,
+  EventOperationsWallSummary,
+} from '@eventovivo/shared-types/event-operations';
+
+type Listener = () => void;
 
 export interface EventOperationsHudState {
   event_title: string;
@@ -14,6 +21,16 @@ export interface EventOperationsHudState {
   human_queue_label: string;
   human_queue_tone: 'healthy' | 'attention' | 'critical' | 'neutral';
 }
+
+export interface EventOperationsHudStoreSnapshot {
+  room_snapshot_version: number | null;
+  hud: EventOperationsHudState | null;
+}
+
+const EMPTY_HUD_SNAPSHOT: EventOperationsHudStoreSnapshot = {
+  room_snapshot_version: null,
+  hud: null,
+};
 
 function formatServerClock(value: string): string {
   try {
@@ -42,23 +59,19 @@ function mapHealthTone(status: EventOperationsHealthStatus): EventOperationsHudS
 }
 
 function formatConnectionLabel(connection: EventOperationsConnectionSummary): string {
-  if (!connection.realtime_connected) {
-    return 'Polling read-only';
-  }
-
   switch (connection.status) {
     case 'connected':
-      return 'Conectado';
+      return connection.realtime_connected ? 'Conectado' : 'Polling read-only';
     case 'connecting':
       return 'Reconectando...';
     case 'resyncing':
       return 'Sincronizando a sala...';
     case 'degraded':
-      return 'Sala degradada';
+      return 'Sala degradada: dados ao vivo indisponiveis';
     case 'offline':
       return 'Offline';
     default:
-      return connection.status;
+      return connection.realtime_connected ? connection.status : 'Polling read-only';
   }
 }
 
@@ -66,7 +79,7 @@ function formatWallLabel(wall: EventOperationsWallSummary): string {
   return `${wall.online_players} online / ${wall.degraded_players} degradado / ${wall.offline_players} offline`;
 }
 
-export function buildOperationsHudState(room: EventOperationsV0Room): EventOperationsHudState {
+export function buildOperationsHudState(room: EventOperationsRoomSnapshot): EventOperationsHudState {
   return {
     event_title: room.event.title,
     global_status_label: room.health.status === 'healthy'
@@ -83,4 +96,50 @@ export function buildOperationsHudState(room: EventOperationsV0Room): EventOpera
     human_queue_label: `${room.counters.human_review_pending} pendente(s)`,
     human_queue_tone: room.counters.human_review_pending > 0 ? 'attention' : 'healthy',
   };
+}
+
+class EventOperationsHudStore {
+  private snapshot: EventOperationsHudStoreSnapshot = EMPTY_HUD_SNAPSHOT;
+
+  private readonly listeners = new Set<Listener>();
+
+  subscribe = (listener: Listener) => {
+    this.listeners.add(listener);
+
+    return () => {
+      this.listeners.delete(listener);
+    };
+  };
+
+  getSnapshot = () => this.snapshot;
+
+  getServerSnapshot = () => this.snapshot;
+
+  setRoom(room: EventOperationsRoomSnapshot) {
+    this.snapshot = {
+      room_snapshot_version: room.snapshot_version,
+      hud: buildOperationsHudState(room),
+    };
+
+    this.emit();
+  }
+
+  reset() {
+    this.snapshot = EMPTY_HUD_SNAPSHOT;
+    this.emit();
+  }
+
+  private emit() {
+    this.listeners.forEach((listener) => listener());
+  }
+}
+
+export const eventOperationsHudStore = new EventOperationsHudStore();
+
+export function useEventOperationsHudSnapshot() {
+  return useSyncExternalStore(
+    eventOperationsHudStore.subscribe,
+    eventOperationsHudStore.getSnapshot,
+    eventOperationsHudStore.getServerSnapshot,
+  );
 }

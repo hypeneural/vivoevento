@@ -3,8 +3,14 @@
 namespace App\Modules\EventOperations\Actions;
 
 use App\Modules\EventOperations\Data\EventOperationsDeltaData;
+use App\Modules\EventOperations\Events\EventOperationsAlertCreatedBroadcast;
+use App\Modules\EventOperations\Events\EventOperationsHealthChangedBroadcast;
+use App\Modules\EventOperations\Events\EventOperationsStationDeltaBroadcast;
+use App\Modules\EventOperations\Events\EventOperationsTimelineAppendedBroadcast;
 use App\Modules\EventOperations\Models\EventOperationEvent;
 use App\Modules\EventOperations\Models\EventOperationSnapshot;
+use App\Modules\EventOperations\Support\EventOperationsAttentionPriority;
+use App\Modules\EventOperations\Support\EventOperationsBroadcastPriority;
 use App\Modules\EventOperations\Support\EventOperationsSequenceService;
 use App\Modules\Events\Models\Event;
 use Illuminate\Support\Carbon;
@@ -15,6 +21,7 @@ class AppendEventOperationEventAction
     public function __construct(
         private readonly EventOperationsSequenceService $sequenceService,
         private readonly RebuildEventOperationsSnapshotAction $rebuildSnapshot,
+        private readonly EventOperationsBroadcastPriority $broadcastPriority,
     ) {}
 
     /**
@@ -73,11 +80,14 @@ class AppendEventOperationEventAction
             ]);
 
             $snapshot = $this->rebuildSnapshot->execute($event);
+            $delta = $this->buildDelta($entry, $snapshot);
+
+            $this->dispatchRealtime($event, $delta);
 
             return [
                 'entry' => $entry,
                 'snapshot' => $snapshot,
-                'delta' => $this->buildDelta($entry, $snapshot),
+                'delta' => $delta,
                 'was_idempotent' => false,
             ];
         });
@@ -149,13 +159,32 @@ class AppendEventOperationEventAction
     private function resolveBroadcastPriority(string $severity, string $urgency): string
     {
         if ($severity === 'critical' || $urgency === 'critical') {
-            return 'critical_immediate';
+            return EventOperationsAttentionPriority::CRITICAL_IMMEDIATE;
         }
 
         if ($severity === 'warning' || $urgency === 'high') {
-            return 'operational_normal';
+            return EventOperationsAttentionPriority::OPERATIONAL_NORMAL;
         }
 
-        return 'timeline_coalescible';
+        return EventOperationsAttentionPriority::TIMELINE_COALESCIBLE;
+    }
+
+    private function dispatchRealtime(Event $event, EventOperationsDeltaData $delta): void
+    {
+        if ($this->broadcastPriority->shouldBroadcastStationDelta($delta)) {
+            event(new EventOperationsStationDeltaBroadcast($event->id, $delta));
+        }
+
+        if ($this->broadcastPriority->shouldBroadcastTimeline($delta)) {
+            event(new EventOperationsTimelineAppendedBroadcast($event->id, $delta));
+        }
+
+        if ($this->broadcastPriority->shouldBroadcastAlert($delta)) {
+            event(new EventOperationsAlertCreatedBroadcast($event->id, $delta));
+        }
+
+        if ($this->broadcastPriority->shouldBroadcastHealth($delta)) {
+            event(new EventOperationsHealthChangedBroadcast($event->id, $delta));
+        }
     }
 }

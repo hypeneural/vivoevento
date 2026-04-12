@@ -1,0 +1,59 @@
+name: API Suite
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/api/**'
+      - 'packages/**'
+      - '.github/workflows/api-suite.yml'
+  pull_request:
+    paths:
+      - 'apps/api/**'
+      - 'packages/**'
+      - '.github/workflows/api-suite.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Full API Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/api
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_sqlite, sqlite3, bcmath, fileinfo, curl, openssl
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.composer/cache/files
+            apps/api/vendor
+          key: ${{ runner.os }}-php-8.3-composer-${{ hashFiles('apps/api/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-8.3-composer-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --ansi
+          php artisan config:clear --ansi
+
+      - name: Run full API suite
+        run: php artisan test --compact

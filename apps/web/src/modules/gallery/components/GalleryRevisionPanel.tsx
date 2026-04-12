@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import type {
+  GalleryBuilderOperationalFeedback,
   GalleryBuilderRevision,
   GalleryBuilderSettings,
 } from '../gallery-builder';
@@ -10,6 +11,7 @@ import type {
 interface GalleryRevisionPanelProps {
   revisions: GalleryBuilderRevision[];
   settings: GalleryBuilderSettings;
+  operationalFeedback: GalleryBuilderOperationalFeedback;
   previewUrl?: string | null;
   previewExpiresAt?: string | null;
   onRestore: (revisionId: number) => void;
@@ -21,6 +23,7 @@ interface GalleryRevisionPanelProps {
 export function GalleryRevisionPanel({
   revisions,
   settings,
+  operationalFeedback,
   previewUrl,
   previewExpiresAt,
   onRestore,
@@ -28,8 +31,11 @@ export function GalleryRevisionPanel({
   isRestoringId,
   isGeneratingPreview,
 }: GalleryRevisionPanelProps) {
+  const lastRestore = operationalFeedback.last_restore;
+  const lastAi = operationalFeedback.last_ai_application;
+
   return (
-    <Card className="rounded-[28px] border-border/60">
+    <Card className="rounded-[28px] border-border/60" role="region" aria-label="Historico de revisoes e preview compartilhavel">
       <CardHeader>
         <CardTitle>Revisoes e preview</CardTitle>
       </CardHeader>
@@ -37,6 +43,25 @@ export function GalleryRevisionPanel({
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">Draft v{settings.draft_version}</Badge>
           <Badge variant="outline">Publicado v{settings.published_version}</Badge>
+        </div>
+
+        <div className="grid gap-3 rounded-2xl border border-border/60 bg-muted/40 p-4 text-sm md:grid-cols-2">
+          <div>
+            <p className="font-medium">Ultimo restore</p>
+            <p className="text-muted-foreground">
+              {lastRestore
+                ? `v${lastRestore.version_number}${lastRestore.source_version_number ? ` ← v${lastRestore.source_version_number}` : ''}`
+                : 'Nenhum restore executado ainda.'}
+            </p>
+          </div>
+          <div>
+            <p className="font-medium">Ultima IA aplicada</p>
+            <p className="text-muted-foreground">
+              {lastAi
+                ? `${lastAi.variation_id ?? 'variacao'} · ${lastAi.apply_scope ?? 'all'}`
+                : 'Nenhuma aplicacao de IA registrada ainda.'}
+            </p>
+          </div>
         </div>
 
         <div className="space-y-2 rounded-2xl border border-border/60 bg-muted/40 p-4">
@@ -50,6 +75,7 @@ export function GalleryRevisionPanel({
             <Button
               type="button"
               variant="outline"
+              aria-label="Gerar preview compartilhavel da revisao draft"
               onClick={onGeneratePreviewLink}
               disabled={isGeneratingPreview}
             >
@@ -59,7 +85,7 @@ export function GalleryRevisionPanel({
 
           {previewUrl ? (
             <div className="space-y-2">
-              <Input readOnly value={previewUrl} />
+              <Input readOnly value={previewUrl} aria-label="Link do preview compartilhavel" />
               {previewExpiresAt ? (
                 <p className="text-xs text-muted-foreground">Expira em {new Date(previewExpiresAt).toLocaleString('pt-BR')}</p>
               ) : null}
@@ -87,6 +113,7 @@ export function GalleryRevisionPanel({
               <Button
                 type="button"
                 variant="outline"
+                aria-label={`Restaurar revisao ${revision.version_number}`}
                 onClick={() => onRestore(revision.id)}
                 disabled={isRestoringId === revision.id}
               >

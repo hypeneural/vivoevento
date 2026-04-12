@@ -7,7 +7,9 @@ import {
 
 export {
   eventOperationsAlertDeltaFixture,
+  eventOperationsHealthSameSequenceDeltaFixture,
   eventOperationsGapDeltaFixture,
+  eventOperationsStationDeltaFixture,
 } from './operations-deltas.fixture';
 
 const serverTime = '2026-04-11T18:42:15Z';

@@ -15,7 +15,7 @@ Este material foi produzido por leitura direta do codigo frontend e backend do m
 
 Plano derivado desta analise:
 
-- `docs/architecture/wall-puzzle-theme-execution-plan-2026-04-09.md`
+- `docs/execution-plans/wall-puzzle-theme-execution-plan-2026-04-09.md`
 
 Analise complementar desta rodada:
 

@@ -22,6 +22,8 @@ Use each layer for one job only:
   - repo-wide agent contract
 - `.github/instructions/**/*.instructions.md`
   - stack-specific guidance
+- `code_review.md`
+  - review contract for review-oriented work
 - `docs/active/<feature>/`
   - live feature context
 - `docs/execution-plans/`
@@ -48,6 +50,7 @@ If multiple artifacts disagree, prefer:
 - Prefer existing module patterns before inventing new structure.
 - For long, ambiguous, or multi-step work, start with a plan before editing.
 - Update docs when behavior, contracts, workflows, or operator-facing procedures change.
+- For review tasks, follow `code_review.md`.
 
 ## Repository Map
 

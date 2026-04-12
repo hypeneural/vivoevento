@@ -83,9 +83,13 @@ it('extracts video metadata from ffprobe output when hints are incomplete', func
     ]);
 
     Process::assertRan(function ($process, $result) {
-        return $process->command[0] === 'ffprobe'
-            && in_array('-show_streams', $process->command, true)
-            && in_array('-show_format', $process->command, true)
+        $command = is_array($process->command)
+            ? implode(' ', $process->command)
+            : (string) $process->command;
+
+        return str_contains($command, 'ffprobe')
+            && str_contains($command, '-show_streams')
+            && str_contains($command, '-show_format')
             && $result->successful();
     });
 });
@@ -147,7 +151,11 @@ it('uses the configured ffprobe binary path when probing video metadata', functi
     );
 
     Process::assertRan(function ($process, $result) {
-        return $process->command[0] === 'C:\\tools\\ffprobe.exe'
+        $command = is_array($process->command)
+            ? implode(' ', $process->command)
+            : (string) $process->command;
+
+        return str_contains($command, 'C:\\tools\\ffprobe.exe')
             && $result->successful();
     });
 });

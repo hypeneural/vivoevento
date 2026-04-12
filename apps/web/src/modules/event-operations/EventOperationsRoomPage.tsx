@@ -10,24 +10,45 @@ import { OperationsRoomCanvas } from './components/OperationsRoomCanvas';
 import { OperationsStatusPill } from './components/OperationsStatusPill';
 import { OperationsTimelineRail } from './components/OperationsTimelineRail';
 import { useControlRoomLifecycle } from './hooks/useControlRoomLifecycle';
+import { useEventOperationsFallback } from './hooks/useEventOperationsFallback';
 import { useEventOperationsBoot } from './hooks/useEventOperationsBoot';
+import { useEventOperationsRealtime } from './hooks/useEventOperationsRealtime';
 import { useReducedControlRoomMotion } from './hooks/useReducedControlRoomMotion';
+import { buildOperationsHudState, useEventOperationsHudSnapshot } from './stores/hud-store';
+import { useEventOperationsRoomSnapshot } from './stores/room-store';
+import { useEventOperationsTimelineSnapshot } from './stores/timeline-store';
 
 export default function EventOperationsRoomPage() {
   const { id } = useParams<{ id: string }>();
   const roomRef = useRef<HTMLElement | null>(null);
   const lifecycle = useControlRoomLifecycle({ targetRef: roomRef });
   const motion = useReducedControlRoomMotion();
-  const bootQuery = useEventOperationsBoot(id ?? '');
+  const realtime = useEventOperationsRealtime(id ?? '');
+  const fallback = useEventOperationsFallback(realtime.connectionState);
+  const bootQuery = useEventOperationsBoot(id ?? '', fallback);
+  const storedRoom = useEventOperationsRoomSnapshot();
+  const storedTimeline = useEventOperationsTimelineSnapshot();
+  const storedHud = useEventOperationsHudSnapshot();
+
+  const room = storedRoom ?? bootQuery.data ?? null;
+  const timelineEntries = storedTimeline.entries.length > 0
+    ? storedTimeline.entries
+    : bootQuery.timeline ?? room?.timeline ?? [];
+  const hud = storedHud.hud ?? (room ? buildOperationsHudState(room) : null);
 
   const lifecycleLabel = lifecycle.lifecycleMode === 'hidden'
     ? 'Pausada'
     : lifecycle.lifecycleMode === 'degraded'
       ? 'Degradada'
       : 'Ativa';
-  const dominantStation = bootQuery.data?.stations.find(
-    (station) => station.station_key === bootQuery.data?.health.dominant_station_key,
+  const dominantStation = room?.stations.find(
+    (station) => station.station_key === room?.health.dominant_station_key,
   );
+  const realtimeTone = realtime.connectionState === 'degraded' || realtime.connectionState === 'offline'
+    ? 'critical'
+    : realtime.connectionState === 'reconnecting' || realtime.connectionState === 'resyncing'
+      ? 'attention'
+      : 'neutral';
 
   return (
     <main
@@ -69,20 +90,28 @@ export default function EventOperationsRoomPage() {
               value={motion.prefersReducedMotion ? 'Reduzido' : 'Completo'}
               tone={motion.prefersReducedMotion ? 'attention' : 'neutral'}
             />
+            {realtime.statusMessage ? (
+              <OperationsStatusPill
+                label="Realtime"
+                value={realtime.statusMessage}
+                tone={realtimeTone}
+                urgent={realtimeTone === 'critical'}
+              />
+            ) : null}
           </div>
         </header>
 
-        {bootQuery.data ? (
+        {room && hud ? (
           <div className="mt-6">
-            <OperationsHud room={bootQuery.data} />
+            <OperationsHud room={room} hud={hud} />
           </div>
         ) : null}
 
         <div className="mt-6 grid gap-6 xl:grid-cols-[1.35fr_0.85fr]">
           <section className="space-y-6">
-            {bootQuery.data ? (
+            {room ? (
               <OperationsRoomCanvas
-                room={bootQuery.data}
+                room={room}
                 motionMode={motion.motionMode}
                 stationGestures={motion.stationGestures}
               />
@@ -101,16 +130,20 @@ export default function EventOperationsRoomPage() {
 
               {bootQuery.isError ? (
                 <div className="mt-4 rounded-2xl border border-amber-300/40 bg-amber-300/10 p-4 text-sm text-amber-100">
-                  Sala degradada: nao foi possivel combinar o snapshot read-only.
+                  Sala degradada: nao foi possivel carregar o boot dedicado da sala.
                 </div>
               ) : null}
 
-              {bootQuery.data ? (
+              {room ? (
                 <div className="mt-4 space-y-4">
                   <div>
-                    <p className="text-sm font-semibold text-white">{bootQuery.data.health.summary}</p>
+                    <p className="text-sm font-semibold text-white">{room.health.summary}</p>
                     <p className="mt-1 text-sm text-slate-300">
-                      {bootQuery.data.v0.journey_summary_text}
+                      {bootQuery.timelineQuery?.isError
+                        ? 'Boot dedicado da sala carregado; rail historico dedicado indisponivel, usando o trilho do snapshot materializado.'
+                        : fallback.isPollingFallbackActive
+                          ? 'Realtime degradado; room e timeline voltaram para polling leve enquanto a sala tenta recuperar o live.'
+                          : 'Boot dedicado carregado a partir de /operations/room, com rail inicial vindo de /operations/timeline e live incremental no websocket.'}
                     </p>
                   </div>
 
@@ -123,19 +156,19 @@ export default function EventOperationsRoomPage() {
                         {dominantStation?.label ?? 'Sem gargalo dominante agora'}
                       </p>
                       <p className="mt-1 text-sm text-slate-300">
-                        {bootQuery.data.v0.dominant_station_reason ?? 'A operacao segue sem um ponto unico de pressao.'}
+                        {dominantStation?.dominant_reason ?? 'A operacao segue sem um ponto unico de pressao.'}
                       </p>
                     </div>
 
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                        Entradas ativas
+                        Snapshot materializado
                       </p>
                       <p className="mt-2 text-base font-semibold text-white">
-                        {bootQuery.data.v0.active_entry_channels.join(' / ') || 'Sem canais ativos'}
+                        v{room.snapshot_version} | {room.timeline_cursor ?? 'sem cursor'}
                       </p>
                       <p className="mt-1 text-sm text-slate-300">
-                        V0 em polling read-only combinando endpoints existentes.
+                        Query fora do hot path: room store, timeline store e hud store recebem snapshots imutaveis.
                       </p>
                     </div>
                   </div>
@@ -146,10 +179,10 @@ export default function EventOperationsRoomPage() {
                         Wall atual
                       </p>
                       <p className="mt-2 text-base font-semibold text-white">
-                        {bootQuery.data.wall.current_item_id ?? 'Sem item atual'}
+                        {room.wall.current_item_id ?? 'Sem item atual'}
                       </p>
                       <p className="mt-1 text-sm text-slate-300">
-                        Proximo: {bootQuery.data.wall.next_item_id ?? 'sem previsao'} | Confianca {bootQuery.data.wall.confidence}
+                        Proximo: {room.wall.next_item_id ?? 'sem previsao'} | Confianca {room.wall.confidence}
                       </p>
                     </div>
 
@@ -158,10 +191,10 @@ export default function EventOperationsRoomPage() {
                         Pipeline tecnico
                       </p>
                       <p className="mt-2 text-base font-semibold text-white">
-                        {bootQuery.data.counters.processing_failures} falha(s) / {bootQuery.data.counters.backlog_total} backlog
+                        {room.counters.processing_failures} falha(s) / {room.counters.backlog_total} backlog
                       </p>
                       <p className="mt-1 text-sm text-slate-300">
-                        A Query entra apenas no boot e no polling leve desta V0.
+                        Room em polling leve; timeline dedicada fica livre para history e patches imutaveis.
                       </p>
                     </div>
                   </div>
@@ -169,8 +202,8 @@ export default function EventOperationsRoomPage() {
               ) : null}
             </article>
 
-            {bootQuery.data ? (
-              <OperationsTimelineRail entries={bootQuery.data.timeline} />
+            {timelineEntries.length > 0 ? (
+              <OperationsTimelineRail entries={timelineEntries} />
             ) : null}
           </section>
 
@@ -180,7 +213,7 @@ export default function EventOperationsRoomPage() {
               fullscreenError={lifecycle.fullscreenError}
             />
 
-            <OperationsAlertStack alerts={bootQuery.data?.alerts ?? []} />
+            <OperationsAlertStack alerts={room?.alerts ?? []} />
           </aside>
         </div>
       </div>

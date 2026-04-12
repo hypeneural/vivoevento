@@ -7,7 +7,7 @@ use App\Modules\MediaProcessing\Models\EventMedia;
 function seedEventOperationsTimeline(Event $event): void
 {
     $append = app(AppendEventOperationEventAction::class);
-    $eventMedia = EventMedia::factory()->create([
+    $eventMedia = EventMedia::factory()->createQuietly([
         'event_id' => $event->id,
     ]);
 

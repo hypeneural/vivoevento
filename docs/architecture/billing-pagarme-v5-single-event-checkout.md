@@ -26,7 +26,7 @@ Jornada relacionada, mas separada deste escopo:
 - o onboarding comercial administrativo sem `Event`, com Pix avulso e
   associacao futura a evento, fica documentado em:
   - [billing-admin-customer-onboarding-discovery.md](./billing-admin-customer-onboarding-discovery.md)
-  - [billing-admin-customer-onboarding-execution-plan.md](./billing-admin-customer-onboarding-execution-plan.md)
+  - [billing-admin-customer-onboarding-execution-plan.md](../execution-plans/billing-admin-customer-onboarding-execution-plan.md)
 
 Fora de escopo nesta fase:
 
@@ -1362,7 +1362,7 @@ Achados reais da conta de homologacao, validados em `2026-04-05`:
 - nesse cenario de antifraude, a Pagar.me retornou
   `last_transaction.status = not_authorized` e
   `antifraud_response.status = reproved`, mesmo com
-  `acquirer_message = "Transação aprovada com sucesso"`;
+  `acquirer_message = "TransaÃ§Ã£o aprovada com sucesso"`;
 - por isso, suporte e UX nao devem confiar apenas em `acquirer_message` quando
   o status final local/gateway estiver `failed`.
 
@@ -1733,7 +1733,7 @@ O `eventovivo` ja entrega mais contexto do que a tela publica atual consome:
 Conclusao pratica:
 
 - o cadastro do usuario ja esta integrado ao checkout;
-- a rodada atual ja expôs esse onboarding na pagina publica, com CTA para abrir
+- a rodada atual ja expÃ´s esse onboarding na pagina publica, com CTA para abrir
   o painel do evento e ramo de login quando a identidade ja existe;
 - a retomada apos autenticacao agora esta fechada de forma segura:
   - Pix pode ser retomado automaticamente com a conta autenticada

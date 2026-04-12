@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   MasonryPhotoAlbum,
   RowsPhotoAlbum,
@@ -10,6 +10,9 @@ import { Play } from 'lucide-react';
 import type { ApiEventMediaItem } from '@/lib/api-types';
 import type { GalleryExperienceConfig } from '@eventovivo/shared-types';
 import { cn } from '@/lib/utils';
+import { MediaVirtualFeed } from '@/modules/media/components/MediaVirtualFeed';
+import type { GalleryRenderMode } from '../gallery-builder';
+import { useGalleryReducedMotion } from '../hooks/useGalleryReducedMotion';
 import { GalleryPhotoLightbox, type GalleryLightboxPhoto } from './GalleryPhotoLightbox';
 import { GalleryVideoModal } from './GalleryVideoModal';
 
@@ -19,6 +22,7 @@ interface GalleryRendererProps {
   media: ApiEventMediaItem[];
   experience?: GalleryExperienceConfig | null;
   className?: string;
+  renderMode?: GalleryRenderMode;
 }
 
 interface GalleryPhoto extends Photo {
@@ -28,9 +32,17 @@ interface GalleryPhoto extends Photo {
   lightboxIndex: number | null;
 }
 
-export function GalleryRenderer({ media, experience, className }: GalleryRendererProps) {
+export function GalleryRenderer({
+  media,
+  experience,
+  className,
+  renderMode = 'standard',
+}: GalleryRendererProps) {
   const [activePhotoIndex, setActivePhotoIndex] = useState<number | null>(null);
   const [activeVideo, setActiveVideo] = useState<ApiEventMediaItem | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const respectUserPreference = experience?.theme_tokens.motion.respect_user_preference ?? true;
+  const { shouldReduceMotion } = useGalleryReducedMotion(respectUserPreference);
 
   const { photos, lightboxPhotos } = useMemo(() => {
     const nextLightboxPhotos: GalleryLightboxPhoto[] = [];
@@ -86,6 +98,11 @@ export function GalleryRenderer({ media, experience, className }: GalleryRendere
     };
   }, [media]);
 
+  const photosByMediaId = useMemo(
+    () => new Map(photos.map((photo) => [photo.media.id, photo])),
+    [photos],
+  );
+
   if (photos.length === 0) {
     return (
       <div className={cn('rounded-3xl border border-white/10 bg-white/5 py-14 text-center text-sm text-white/65', className)}>
@@ -95,6 +112,15 @@ export function GalleryRenderer({ media, experience, className }: GalleryRendere
   }
 
   const layout = normalizeLayout(experience?.media_behavior.grid.layout);
+  const imageClassName = shouldReduceMotion
+    ? 'h-full w-full object-cover'
+    : 'h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]';
+  const contentVisibilityStyle = experience?.media_behavior.loading.content_visibility === 'auto'
+    ? {
+        contentVisibility: 'auto' as const,
+        containIntrinsicSize: '900px 1800px',
+      }
+    : undefined;
   const albumProps = {
     photos,
     spacing: 12,
@@ -110,7 +136,7 @@ export function GalleryRenderer({ media, experience, className }: GalleryRendere
     },
     componentsProps: {
       container: {
-        className: 'content-visibility-auto',
+        style: contentVisibilityStyle,
       },
       button: ({ photo }: { photo: GalleryPhoto }) => ({
         type: 'button' as const,
@@ -121,7 +147,7 @@ export function GalleryRenderer({ media, experience, className }: GalleryRendere
         loading: index < FIRST_BAND_COUNT ? 'eager' as const : 'lazy' as const,
         decoding: 'async' as const,
         sizes: photo.responsiveSizes,
-        className: 'h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]',
+        className: imageClassName,
       }),
     },
     render: {
@@ -145,14 +171,64 @@ export function GalleryRenderer({ media, experience, className }: GalleryRendere
     },
   };
 
+  const renderVirtualizedCard = (item: ApiEventMediaItem) => {
+    const photo = photosByMediaId.get(item.id);
+
+    if (!photo) {
+      return null;
+    }
+
+    return (
+      <button
+        type="button"
+        key={item.id}
+        aria-label={`Abrir ${photo.alt ?? 'midia da galeria'}`}
+        className="group relative block overflow-hidden rounded-3xl border border-white/10 bg-white/5 text-left shadow-none"
+        onClick={() => {
+          if (photo.mediaType === 'video') {
+            setActiveVideo(photo.media);
+
+            return;
+          }
+
+          setActivePhotoIndex(photo.lightboxIndex);
+        }}
+      >
+        <img
+          src={photo.src}
+          alt={photo.alt}
+          loading="lazy"
+          decoding="async"
+          sizes={photo.responsiveSizes}
+          className={imageClassName}
+        />
+        {photo.mediaType === 'video' ? (
+          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur">
+            <Play className="h-3 w-3 fill-current" />
+            Video
+          </span>
+        ) : null}
+      </button>
+    );
+  };
+
   return (
     <div
       data-testid="gallery-renderer"
       data-layout={layout}
-      data-respect-reduced-motion={String(experience?.theme_tokens.motion.respect_user_preference ?? true)}
+      data-render-mode={renderMode}
+      data-reduced-motion={String(shouldReduceMotion)}
+      data-respect-reduced-motion={String(respectUserPreference)}
       className={className}
     >
-      {layout === 'rows' ? (
+      {renderMode === 'optimized' ? (
+        <MediaVirtualFeed
+          items={media}
+          view="grid"
+          loadMoreRef={loadMoreRef}
+          renderItem={renderVirtualizedCard}
+        />
+      ) : layout === 'rows' ? (
         <RowsPhotoAlbum {...albumProps} targetRowHeight={260} />
       ) : layout === 'columns' ? (
         <ColumnsPhotoAlbum {...albumProps} columns={(containerWidth) => (containerWidth < 640 ? 2 : 3)} />

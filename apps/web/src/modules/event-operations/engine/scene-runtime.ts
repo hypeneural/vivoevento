@@ -131,7 +131,7 @@ function resolveMesoSummary(room: EventOperationsV0Room): { title: string; summa
   return {
     title: dominantStation.label,
     summary: dominantStation.dominant_reason
-      ?? room.v0.dominant_station_reason
+      ?? room.v0?.dominant_station_reason
       ?? 'A sala promove essa estacao como foco principal agora.',
   };
 }
@@ -222,7 +222,8 @@ export function buildOperationsSceneRuntime({
     size: OPERATIONS_CANVAS_SIZE,
     calm_state: calmState,
     scene_mode_label: resolveMacroSummary(room, calmState),
-    narrative_summary: room.v0.journey_summary_text,
+    narrative_summary: room.v0?.journey_summary_text
+      ?? 'Boot dedicado da sala com snapshot coarse-grained e rail historico separado.',
     macro_reading: {
       title: room.health.summary,
       summary: resolveMacroSummary(room, calmState),

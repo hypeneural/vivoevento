@@ -5,6 +5,66 @@ import {
 
 const serverTime = '2026-04-11T18:42:20Z';
 
+export const eventOperationsStationDeltaFixture: EventOperationsDelta = {
+  schema_version: EVENT_OPERATIONS_SCHEMA_VERSION,
+  snapshot_version: 1,
+  timeline_cursor: 'evt_000101',
+  event_sequence: 101,
+  server_time: serverTime,
+  kind: 'station.delta',
+  broadcast_priority: 'operational_normal',
+  station_delta: {
+    station_key: 'human_review',
+    patch: {
+      health: 'attention',
+      backlog_count: 3,
+      queue_depth: 3,
+      station_load: 0.42,
+      throughput_per_minute: 6,
+      animation_hint: 'review_backlog',
+      dominant_reason: 'Tres itens chegaram na fila humana.',
+      updated_at: serverTime,
+    },
+  },
+  timeline_entry: {
+    id: 'evt_000101',
+    event_sequence: 101,
+    station_key: 'human_review',
+    event_key: 'media.moderation.pending',
+    severity: 'warning',
+    urgency: 'high',
+    title: 'Fila humana crescendo',
+    summary: 'Tres midias aguardam decisao humana.',
+    occurred_at: serverTime,
+    render_group: 'review',
+    animation_hint: 'review_backlog',
+  },
+  health: {
+    status: 'attention',
+    dominant_station_key: 'human_review',
+    summary: 'Atencao em Moderacao humana',
+    updated_at: serverTime,
+  },
+  resync_required: false,
+};
+
+export const eventOperationsHealthSameSequenceDeltaFixture: EventOperationsDelta = {
+  schema_version: EVENT_OPERATIONS_SCHEMA_VERSION,
+  snapshot_version: 1,
+  timeline_cursor: 'evt_000101',
+  event_sequence: 101,
+  server_time: serverTime,
+  kind: 'health.changed',
+  broadcast_priority: 'critical_immediate',
+  health: {
+    status: 'attention',
+    dominant_station_key: 'human_review',
+    summary: 'Atencao em Moderacao humana',
+    updated_at: serverTime,
+  },
+  resync_required: false,
+};
+
 export const eventOperationsAlertDeltaFixture: EventOperationsDelta = {
   schema_version: EVENT_OPERATIONS_SCHEMA_VERSION,
   snapshot_version: 3,
@@ -35,6 +95,13 @@ export const eventOperationsAlertDeltaFixture: EventOperationsDelta = {
     render_group: 'wall',
     animation_hint: 'critical_alert',
   },
+  health: {
+    status: 'risk',
+    dominant_station_key: 'wall',
+    summary: 'Risco em Telao',
+    updated_at: serverTime,
+  },
+  resync_required: false,
 };
 
 export const eventOperationsGapDeltaFixture: EventOperationsDelta = {

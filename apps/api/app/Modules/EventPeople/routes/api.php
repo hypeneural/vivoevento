@@ -3,12 +3,16 @@
 use App\Modules\EventPeople\Http\Controllers\EventMediaPeopleController;
 use App\Modules\EventPeople\Http\Controllers\EventPeopleController;
 use App\Modules\EventPeople\Http\Controllers\EventPeopleCoverageController;
+use App\Modules\EventPeople\Http\Controllers\EventPeopleRelationalCollectionsController;
 use App\Modules\EventPeople\Http\Controllers\EventPeoplePresetsController;
 use App\Modules\EventPeople\Http\Controllers\EventPeopleReviewQueueController;
 use App\Modules\EventPeople\Http\Controllers\EventPersonGroupsController;
+use App\Modules\EventPeople\Http\Controllers\PublicEventRelationalCollectionsController;
 use App\Modules\EventPeople\Http\Controllers\EventPersonReferencePhotosController;
 use App\Modules\EventPeople\Http\Controllers\EventPersonRelationsController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('public/people-collections/{token}', [PublicEventRelationalCollectionsController::class, 'show']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('events/{event}/people', [EventPeopleController::class, 'index']);
@@ -18,6 +22,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('events/{event}/people/presets', [EventPeoplePresetsController::class, 'show']);
     Route::get('events/{event}/people/coverage', [EventPeopleCoverageController::class, 'index']);
     Route::post('events/{event}/people/coverage/refresh', [EventPeopleCoverageController::class, 'refresh']);
+    Route::get('events/{event}/people/relational-collections', [EventPeopleRelationalCollectionsController::class, 'index']);
+    Route::post('events/{event}/people/relational-collections/refresh', [EventPeopleRelationalCollectionsController::class, 'refresh']);
     Route::get('events/{event}/people/groups', [EventPersonGroupsController::class, 'index']);
     Route::post('events/{event}/people/groups', [EventPersonGroupsController::class, 'store']);
     Route::post('events/{event}/people/groups/apply-preset', [EventPersonGroupsController::class, 'applyPreset']);

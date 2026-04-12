@@ -111,13 +111,11 @@ Enquanto essa divisao nao existir de forma nativa no IDE e no Codex, o risco e c
 
 ### O que esta atrapalhando mais do que deveria
 
-- `.github/` ainda nao tem `copilot-instructions`, `instructions`, `prompts` ou `agents`.
-- `.vscode/settings.json` estava vazio.
-- Nao existe `.code-workspace` multi-root.
-- Nao existe `.codex/config.toml` no root.
-- `docs/architecture/` virou o deposito principal de analises, planos, imagens de validacao e runbooks; hoje ha `123` arquivos ali.
+- `.github/` ja tem `copilot-instructions`, `instructions`, `prompts`, `agents` e um workflow dedicado para a suite completa da API, mas esse trilho ainda precisa virar habito operacional do time.
+- o baseline do workspace ja foi melhorado com `.vscode/settings.json`, `eventovivo.code-workspace` e `.codex/config.toml`, mas a observabilidade dessas camadas ainda nao esta institucionalizada.
+- `docs/architecture/` ainda concentra muita referencia historica, imagens de validacao e analises; hoje ha `92` arquivos ali e `31` planos ja foram separados para `docs/execution-plans/`.
 - O repo raiz esta com artefatos temporarios e copias de release/deploy que poluem busca e contexto.
-- Nao existe arquivo de versao de Node como `.nvmrc`, `.node-version` ou `.tool-versions`.
+- o contrato oficial de Node ja foi formalizado, mas ainda precisa ser mantido alinhado em futuras mudancas de CI e onboarding.
 - A CI em `.github/workflows/moderation.yml` cobre apenas uma fatia do produto, nao o monorepo inteiro.
 
 ---
@@ -138,9 +136,7 @@ Veredito:
 
 - a stack backend nao e gargalo para vibecoding;
 - o problema esta mais em contrato operacional e descoberta de contexto do que em tecnologia;
-- o maior drift aqui hoje e documental:
-  - `AGENTS.md` ainda fala Laravel `12`;
-  - `apps/api/README.md` ainda e o README padrao do Laravel.
+- o maior drift aqui era documental e ja foi parcialmente corrigido com um README operacional em `apps/api/README.md`.
 
 ### 2. Painel admin e experiencias web
 
@@ -216,12 +212,13 @@ Em resumo:
 
 ### 1. Stack documentada com drift
 
-- `AGENTS.md` ainda fala em Laravel `12`, mas `apps/api/composer.json` ja esta em Laravel `13.3.0`.
-- `apps/api/README.md` ainda e o README padrao do Laravel, entao ele nao representa o backend real do produto.
-- `README.md` pede Node `24 LTS`, mas:
+- `apps/api/README.md` ja foi substituido por um README operacional do backend.
+- `apps/api/composer.json` ainda carrega `name`, `description` e `keywords` do skeleton Laravel, entao ainda existe um resto pequeno de identidade desatualizada no manifesto da API.
+- o contrato oficial de Node agora foi fechado em `22 LTS` com `.nvmrc`, `README.md` e CI alinhados.
+- antes desse ajuste, o repo estava assim:
   - a CI de `apps/web` usa Node `22`;
   - o ambiente local validado nesta auditoria estava em Node `22.14.0`;
-  - nao existe arquivo declarando oficialmente a versao suportada.
+  - o `README.md` ainda pedia Node `24 LTS`.
 
 ### 2. Contexto persistente bom, mas grande demais
 
@@ -232,16 +229,16 @@ Em resumo:
 
 ### 3. Estrutura de docs pouco amigavel para descoberta automatica
 
-Hoje o padrao mais comum esta assim:
+Antes da separacao, o padrao mais comum estava assim:
 
 - `docs/architecture/<analysis>.md`
 - `docs/architecture/<execution-plan>.md`
 
-Funciona para humano, mas para agente a descoberta fica mais ambigua porque:
+O ajuste melhorou a descoberta, mas ainda nao esta completo porque:
 
-- analise, execucao, runbook e evidencias visuais ficam no mesmo bucket;
-- nao existe um lugar canonico para estado ativo de feature;
-- nao existe separacao entre doc historica e doc operacional viva.
+- ainda nao existe um lugar canonico adotado para estado ativo de feature;
+- parte do historico ainda referencia o bucket antigo;
+- `docs/active/` ainda nao foi institucionalizado como contexto vivo.
 
 ### 4. Dois sistemas de contexto ativos
 
@@ -273,6 +270,11 @@ No estado atual da auditoria havia no topo do repo:
 
 Esses artefatos aumentam o ruido de busca e fazem agentes encontrarem caminhos duplicados com mais facilidade.
 
+Estado atual:
+
+- os padroes principais desses artefatos ja foram adicionados ao `.gitignore`;
+- a limpeza fisica desses arquivos pode continuar sendo feita sem risco, mas o ruido de busca e de `git status` ja caiu.
+
 ---
 
 ## Testes Rodados em 2026-04-12
@@ -284,24 +286,38 @@ Esses artefatos aumentam o ruido de busca e fazem agentes encontrarem caminhos d
   - `8` arquivos
   - `44` testes passando
 - `apps/landing`: `npm run type-check`
-
-### Falhou
-
 - `apps/landing`: `npm run test`
-  - `FinalCTASection.test.tsx` falha porque o componente espera `SmoothScroller`;
-  - `CTAFloating.test.tsx` falha por drift de acessibilidade (`aria-label` esperado nao bate com o atual);
-  - `TestimonialsSection.test.tsx` falha por drift entre copy/estrutura real e assercoes antigas.
+  - `16` arquivos
+  - `157` testes passando
+- `apps/api`: `php artisan test tests/Unit/Modules/MediaProcessing/VideoMetadataExtractorServiceTest.php`
+  - `4` testes
+  - `51` assertions
+
+### Corrigido nesta rodada
+
+- `apps/landing`
+  - `FinalCTASection.test.tsx` passou a mockar `useSmoothScroll` e ficou alinhado ao componente real;
+  - `CTAFloating.test.tsx` voltou a refletir o contrato de acessibilidade e persistencia em `sessionStorage`;
+  - `TestimonialsSection.test.tsx` e `TestimonialsSection.fallback.test.tsx` foram reescritos para o layout e o fallback atuais;
+  - `FAQSection.test.tsx` ficou deterministico com `matchMedia` no setup e `fireEvent.keyDown` nas assercoes de teclado.
+
+- `apps/api`
+  - `Tests\\Unit\\Modules\\MediaProcessing\\VideoMetadataExtractorServiceTest` voltou a passar com assercao tolerante a `command` serializado como array ou string.
+
+### Nao concluido localmente
 
 - `apps/api`: `php artisan test --stop-on-failure`
-  - `316` testes passaram;
-  - `1` teste falhou antes de continuar:
-    - `Tests\\Unit\\Modules\\MediaProcessing\\VideoMetadataExtractorServiceTest`
-    - falha: `An expected process was not invoked.`
+  - a suite completa excedeu o timeout local de aproximadamente `304s`;
+  - o teste que falhava antes foi corrigido e validado isoladamente, mas a revalidacao completa ainda precisa de uma janela maior ou de CI dedicada.
 
 ### Sinal adicional
 
 - O subset de testes do `apps/web` emite warnings de migracao futura do React Router v7.
 - Isso nao quebra agora, mas ja e um lembrete de backlog tecnico.
+- `apps/landing` ainda emite warnings nao bloqueantes:
+  - `Dart Sass legacy-js-api` deprecado;
+  - `layoutId` passando para DOM no mock de `ExperienceModulesSection.test.tsx`;
+  - `Not implemented: navigation to another Document` nos cliques reais de link em `CTAFloating.test.tsx`.
 
 ---
 
@@ -408,7 +424,12 @@ Regra:
 
 ### 5. Configuracao explicita do Codex por projeto
 
-O repo precisa de um `.codex/config.toml` no root.
+O repo precisa manter um `.codex/config.toml` no root.
+
+Estado atual:
+
+- a base inicial desse arquivo ja foi criada no P0;
+- os proximos ajustes devem ser pequenos e guiados por uso real, nao por especulacao.
 
 Validacao oficial:
 
@@ -596,31 +617,21 @@ Regra:
 
 Padrao recomendado:
 
-- escolher oficialmente Node `22 LTS` ou `24 LTS`;
+- manter Node `22 LTS` como versao oficial atual;
 - registrar isso em `.nvmrc` ou equivalente;
-- alinhar README, CI e dev local na mesma versao;
+- manter README, CI e dev local alinhados na mesma versao;
 - manter smoke tests por app + checks de typecheck/lint.
 
 ---
 
 ## Ordem Recomendada de Melhoria
 
-### P0 - Ajustes imediatos
+### P0 - Ajustes imediatos restantes
 
 Prioridade alta, baixo risco:
 
-1. Slimar `AGENTS.md` raiz para o estritamente transversal.
-2. Atualizar o drift documental mais gritante:
-   - Laravel `13` em vez de `12`;
-   - trocar o `apps/api/README.md` padrao por um README real do modulo API;
-   - alinhar a historia oficial de Node entre README, CI e dev local.
-3. Criar `.github/copilot-instructions.md`.
-4. Criar `.github/instructions/`.
-5. Criar `.codex/config.toml`.
-6. Separar `docs/execution-plans` de `docs/architecture`.
-7. Criar arquivos de versao do ambiente (`.nvmrc` ou equivalente).
-8. Tirar artefatos temporarios da raiz ou isolar em pasta scratch ignorada.
-9. Consertar os testes quebrados em `apps/landing` e o teste quebrado em `apps/api`.
+1. Tirar artefatos temporarios da raiz ou isolar em pasta scratch ignorada.
+2. Revalidar a suite completa de `apps/api` em janela maior ou CI, ja que o teste quebrado foi corrigido mas a execucao total excedeu o timeout local.
 
 ### P1 - Produtividade
 
@@ -648,7 +659,7 @@ Depois do baseline acima:
 
 ## Quick Wins Aplicados Nesta Rodada
 
-Foram aplicados dois quick wins de baixo risco:
+Foram aplicados quick wins de baixo risco e a base do P0:
 
 1. `eventovivo.code-workspace`
    - workspace multi-root para API, web, landing, packages, docs e scripts.
@@ -658,10 +669,50 @@ Foram aplicados dois quick wins de baixo risco:
    - melhora legibilidade com `workbench.editor.labelFormat = medium`;
    - reduz ruido visual e de busca de artefatos temporarios locais.
 
+3. `AGENTS.md`
+   - slimado para virar contrato curto de repo.
+
+4. `.github/copilot-instructions.md`
+   - baseline sempre-on do workspace no VS Code.
+
+5. `.github/instructions/`
+   - regras por stack para backend, frontend, docs e testes.
+
+6. `.codex/config.toml`
+   - defaults seguros de projeto para modelo, aprovacao e sandbox.
+
+7. `apps/api/AGENTS.override.md`, `apps/web/AGENTS.override.md`, `apps/landing/AGENTS.override.md` e `docs/AGENTS.override.md`
+   - especializacao local por area, mais proxima do codigo.
+
+8. `.nvmrc` + `README.md`
+   - contrato oficial de Node fechado em `22 LTS`.
+
+9. `docs/execution-plans/`
+   - planos executaveis separados do bucket historico de `docs/architecture`.
+
+10. `apps/api/README.md`
+   - README padrao do Laravel substituido por README operacional do backend.
+
+11. testes de `apps/landing` e do caso quebrado de `apps/api`
+   - suites quebradas alinhadas ao comportamento real atual.
+
+12. `.github/prompts/` e `.github/agents/`
+   - slash commands e papeis especializados agora existem no repo.
+
+13. `code_review.md`
+   - contrato de review separado do prompt solto e referenciado por `AGENTS.md`.
+
+14. `.github/workflows/api-suite.yml`
+   - workflow dedicado para a suite completa da API, cobrindo o gap entre validacao local parcial e revalidacao em CI.
+
+15. `docs/active/_template/` e `docs/active/vibecoding-agent-friendly-repo/`
+   - institucionalizacao do padrao `STATUS.md`, `DECISIONS.md` e `VERIFY.md` com um caso real em uso.
+
 Observacao importante:
 
-- estes quick wins melhoram descoberta e reduzem ruido imediatamente;
-- a proxima rodada correta ja pode criar `copilot-instructions`, `prompt files` e `custom agents`, desde que o `AGENTS.md` raiz seja slimado primeiro.
+- estes ajustes ja melhoram descoberta, precedencia e previsibilidade do agente;
+- o baseline e o primeiro trilho de produtividade ja existem;
+- a proxima rodada correta passa a ser endurecimento de uso: `VERIFY.md`, `docs/active/<feature>/STATUS.md`, rotina de diagnostico de customizacoes e validacao recorrente em CI.
 
 ---
 
@@ -732,15 +783,10 @@ Observacao importante:
 
 Se a proxima rodada for de execucao, eu faria nesta ordem:
 
-1. slim do `AGENTS.md` raiz;
-2. criacao de `.github/copilot-instructions.md`;
-3. criacao de `apps/api/AGENTS.override.md`, `apps/web/AGENTS.override.md`, `apps/landing/AGENTS.override.md` e `docs/AGENTS.override.md`;
-4. criacao de `.github/instructions/`;
-5. criacao de `.codex/config.toml`;
-6. criacao dos cinco prompt files principais;
-7. criacao dos tres custom agents;
-8. adocao de `code_review.md`;
-9. separacao real de `docs/execution-plans/` e `docs/active/`;
-10. validacao do carregamento de instructions, agents e overrides;
-11. correcoes dos testes quebrados em `apps/landing` e do teste falhando em `apps/api`;
-12. so depois criacao das cinco skills iniciais em escopo estreito.
+1. criacao dos cinco prompt files principais;
+2. criacao dos tres custom agents;
+3. adocao de `code_review.md`;
+4. separacao real de `docs/execution-plans/` e `docs/active/`;
+5. validacao rotineira do carregamento de instructions, agents e overrides;
+6. correcoes dos testes quebrados em `apps/landing` e do teste falhando em `apps/api`;
+7. so depois criacao das cinco skills iniciais em escopo estreito.

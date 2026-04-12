@@ -46,7 +46,7 @@ export function GalleryAiVariationsPanel({
   onApplyVariation,
 }: GalleryAiVariationsPanelProps) {
   return (
-    <Card className="rounded-[28px] border-border/60">
+    <Card className="rounded-[28px] border-border/60" role="region" aria-label="Assistente de IA da galeria">
       <CardHeader>
         <CardTitle>Assistente de IA</CardTitle>
       </CardHeader>
@@ -71,6 +71,8 @@ export function GalleryAiVariationsPanel({
                 type="button"
                 variant={targetLayer === option.value ? 'default' : 'outline'}
                 className="rounded-full"
+                aria-pressed={targetLayer === option.value}
+                aria-label={`Aplicar IA na camada ${option.label}`}
                 onClick={() => onTargetLayerChange(option.value)}
               >
                 {option.label}
@@ -133,6 +135,7 @@ export function GalleryAiVariationsPanel({
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
+                  aria-label={`Aplicar tudo na variacao ${variation.label}`}
                   onClick={() => onApplyVariation(variation, 'all')}
                   disabled={isApplyingVariationId === variation.id}
                 >
@@ -143,6 +146,7 @@ export function GalleryAiVariationsPanel({
                   <Button
                     type="button"
                     variant="outline"
+                    aria-label={`Aplicar so paleta na variacao ${variation.label}`}
                     onClick={() => onApplyVariation(variation, 'theme_tokens')}
                     disabled={isApplyingVariationId === variation.id}
                   >
@@ -154,6 +158,7 @@ export function GalleryAiVariationsPanel({
                   <Button
                     type="button"
                     variant="outline"
+                    aria-label={`Aplicar so hero e blocos na variacao ${variation.label}`}
                     onClick={() => onApplyVariation(variation, 'page_schema')}
                     disabled={isApplyingVariationId === variation.id}
                   >
@@ -165,6 +170,7 @@ export function GalleryAiVariationsPanel({
                   <Button
                     type="button"
                     variant="outline"
+                    aria-label={`Aplicar so media behavior na variacao ${variation.label}`}
                     onClick={() => onApplyVariation(variation, 'media_behavior')}
                     disabled={isApplyingVariationId === variation.id}
                   >

@@ -29,6 +29,7 @@ class EventGallerySettingFactory extends Factory
             'theme_tokens_json' => $experience['theme_tokens'],
             'page_schema_json' => $experience['page_schema'],
             'media_behavior_json' => $experience['media_behavior'],
+            'current_preset_origin_json' => null,
             'draft_version' => null,
             'published_version' => null,
         ];

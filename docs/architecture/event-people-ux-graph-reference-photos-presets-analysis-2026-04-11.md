@@ -12,12 +12,35 @@ Consolidar a melhor abordagem de UX/UI e logica de produto para a pagina `events
 Este documento complementa:
 
 - `docs/architecture/event-people-identity-relations-aws-strategy-2026-04-10.md`
-- `docs/architecture/event-people-identity-relations-execution-plan-2026-04-10.md`
-- `docs/architecture/event-people-governance-groups-coverage-moments-execution-plan-2026-04-11.md`
+- `docs/execution-plans/event-people-identity-relations-execution-plan-2026-04-10.md`
+- `docs/execution-plans/event-people-governance-groups-coverage-moments-execution-plan-2026-04-11.md`
 
 ---
 
 ## Veredito executivo
+
+Antes de discutir canvas, drawer ou upload, a doc precisa deixar uma coisa explicita:
+
+o diferencial comercial real do `EventPeople` nao e "buscar rostos".
+
+O diferencial e transformar identidade + relacoes + grupos + cobertura em entregas emocionais prontas por vinculo.
+
+### O que a tecnologia realmente esta modelando
+
+Ela precisa ser tratada como um grafo social do evento, nao como uma arvore genealogica nem como uma lista plana de nomes.
+
+Esse grafo mistura:
+
+- relacoes declaradas, como `noiva + noivo`, `aniversariante + avos`, `palestrante + patrocinador`;
+- grupos e tribos, como `familia da noiva`, `padrinhos`, `diretoria`, `imprensa`;
+- coocorrencia inferida, isto e, quem de fato aparece junto repetidamente ao longo do evento;
+- coverage importante, para saber o que ainda nao foi bem capturado;
+- publicacao de midia, para virar entrega real.
+
+Leitura pratica:
+
+- o sistema nao esta construindo uma "arvore";
+- ele esta construindo uma rede viva de proximidade, papel e valor comercial.
 
 ### 1. A melhor abordagem para o grafo hoje e `React Flow`, nao uma lib nova
 
@@ -88,6 +111,26 @@ Conclusao:
 - a pagina nao deve continuar com um card generico de atalho;
 - ela precisa mostrar `Modelo do evento`;
 - o backend precisa separar `papel de negocio` de `tipo tecnico`.
+
+### 5. O valor final precisa aparecer como colecoes relacionais prontas
+
+O ponto de produto que precisa ficar preservado daqui para frente e:
+
+- melhores fotos de uma pessoa;
+- melhores fotos de um par;
+- melhores fotos de um grupo;
+- momentos familiares;
+- entregas obrigatorias que nao podem faltar.
+
+Esses formatos nao sao detalhe de implementacao. Eles sao a embalagem comercial da tecnologia:
+
+- `person_best_of`
+- `pair_best_of`
+- `group_best_of`
+- `family_moment`
+- `must_have_delivery`
+
+Sem isso, o modulo volta a parecer apenas uma busca facial melhorada.
 
 ---
 
@@ -493,6 +536,12 @@ Isso significa que a pagina precisa priorizar:
 - destaque para pendencia e conflito;
 - feedback continuo sem trocar de tela.
 
+Mas esse cockpit so faz sentido se ele estiver a servico de tres perguntas de produto:
+
+- quais vinculos importantes este evento realmente tem;
+- quais tribos ou pares ainda estao mal cobertos;
+- quais entregas emocionais ja podem ser abertas sem curadoria manual pesada.
+
 ## 2. Separar de vez os conceitos de imagem da pessoa
 
 Este e um ponto de alto retorno e baixo arrependimento.
@@ -515,6 +564,13 @@ O retorno pratico e imediato:
 - a pessoa nao precisa "modelar o mundo";
 - o pacote inicial ja conversa com casamento, 15 anos, corporativo e formatura;
 - coverage e grupos futuros passam a nascer sobre semantica certa.
+
+E isso precisa ser lido como pacote unico:
+
+- presets inteligentes aceleram a modelagem;
+- coocorrencia inferida preenche lacunas sociais sem exigir cadastro manual de tudo;
+- coverage intelligence transforma a camada de pessoas em assistente ao vivo;
+- colecoes relacionais convertem essa inteligencia em entrega percebida pelo cliente.
 
 ## 4. Congelar contrato operacional antes do mapa rico
 

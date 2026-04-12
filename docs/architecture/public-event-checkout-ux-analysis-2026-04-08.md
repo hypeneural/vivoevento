@@ -4,7 +4,7 @@ Data: `2026-04-08`
 
 Plano detalhado complementar:
 
-- `docs/architecture/public-event-checkout-v2-implementation-plan-2026-04-08.md`
+- `docs/execution-plans/public-event-checkout-v2-implementation-plan-2026-04-08.md`
 - `docs/architecture/public-event-checkout-friction-hardening-plan-2026-04-09.md`
 
 Validacao complementar executada em:
@@ -84,10 +84,10 @@ Achados reais desta rodada:
 
 - o checkout publico V2 passou em Pix e cartao usando a API real da Pagar.me
 - o webhook real continuou entrando por `https://webhooks-local.eventovivo.com.br/api/v1/webhooks/billing/pagarme`
-- o primeiro Pix real expôs um problema de schema local:
+- o primeiro Pix real expÃ´s um problema de schema local:
   - faltava aplicar `2026_04_09_193000_add_recurring_fields_to_billing_gateway_events_table.php`
   - sem essa migration, o webhook falhava ao tentar persistir `hook_id` em `billing_gateway_events`
-- a rodada real tambem expôs um problema de robustez no resolver do webhook:
+- a rodada real tambem expÃ´s um problema de robustez no resolver do webhook:
   - `ProcessBillingWebhookAction` tentava consultar `billing_orders.uuid` com `code` nao-UUID vindo da Pagar.me
   - isso foi endurecido para consultar por UUID so quando o valor realmente e UUID e cair para `gateway_order_id` nos demais casos
 

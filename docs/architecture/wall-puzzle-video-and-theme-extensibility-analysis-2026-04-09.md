@@ -22,7 +22,7 @@ Documentos base desta leitura:
 
 - `docs/architecture/wall-puzzle-theme-analysis-2026-04-09.md`
 - `docs/architecture/wall-video-playback-current-state-2026-04-08.md`
-- `docs/architecture/wall-puzzle-theme-execution-plan-2026-04-09.md`
+- `docs/execution-plans/wall-puzzle-theme-execution-plan-2026-04-09.md`
 
 Policy derivada desta leitura:
 

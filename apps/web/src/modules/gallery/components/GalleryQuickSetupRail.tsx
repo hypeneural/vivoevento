@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   formatGalleryModelMatrix,
   galleryExperienceFixtures,
+  type GalleryBuilderOperationalFeedback,
   type GalleryBuilderSettings,
 } from '../gallery-builder';
 
@@ -18,7 +19,7 @@ interface GalleryQuickSetupRailProps {
     percentile: number;
   };
   responsiveSizes: string;
-  lastAppliedPresetName: string | null;
+  operationalFeedback: GalleryBuilderOperationalFeedback;
   onApplyShortcut: (fixtureKey: GalleryFixtureKey) => void;
 }
 
@@ -26,7 +27,7 @@ export function GalleryQuickSetupRail({
   draft,
   mobileBudget,
   responsiveSizes,
-  lastAppliedPresetName,
+  operationalFeedback,
   onApplyShortcut,
 }: GalleryQuickSetupRailProps) {
   return (
@@ -76,7 +77,14 @@ export function GalleryQuickSetupRail({
         <div className="rounded-2xl border border-border/60 bg-background/80 p-4 text-sm">
           <p className="font-medium">Base atual</p>
           <p className="text-muted-foreground">
-            {lastAppliedPresetName ? `Ultimo preset aplicado: ${lastAppliedPresetName}` : 'Ainda sem preset aplicado manualmente.'}
+            {operationalFeedback.current_preset_origin?.label
+              ? `Origem persistida: ${operationalFeedback.current_preset_origin.label}`
+              : 'Ainda sem origem persistida para o preset atual.'}
+          </p>
+          <p className="mt-2 text-muted-foreground">
+            {operationalFeedback.last_ai_application
+              ? `Ultima IA: ${operationalFeedback.last_ai_application.variation_id ?? 'variacao'}`
+              : 'Nenhuma variacao de IA aplicada ainda.'}
           </p>
         </div>
       </CardContent>

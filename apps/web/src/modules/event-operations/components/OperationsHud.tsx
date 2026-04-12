@@ -1,13 +1,16 @@
+import type { EventOperationsRoomSnapshot } from '@eventovivo/shared-types/event-operations';
+
 import { OperationsStatusPill } from './OperationsStatusPill';
 import { buildOperationsHudState } from '../stores/hud-store';
-import type { EventOperationsV0Room } from '../types';
+import type { EventOperationsHudState } from '../stores/hud-store';
 
 interface OperationsHudProps {
-  room: EventOperationsV0Room;
+  room: EventOperationsRoomSnapshot;
+  hud?: EventOperationsHudState | null;
 }
 
-export function OperationsHud({ room }: OperationsHudProps) {
-  const hud = buildOperationsHudState(room);
+export function OperationsHud({ room, hud: providedHud }: OperationsHudProps) {
+  const hud = providedHud ?? buildOperationsHudState(room);
 
   return (
     <section

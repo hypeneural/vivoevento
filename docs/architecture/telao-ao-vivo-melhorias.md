@@ -17,7 +17,7 @@ Este documento tambem assume um recorte importante: o produto precisa funcionar 
 
 - estrategia e melhorias: `docs/architecture/telao-ao-vivo-melhorias.md`
 - implementacao alvo: `docs/architecture/telao-ao-vivo-implementation.md`
-- plano de execucao: `docs/architecture/telao-ao-vivo-execution-plan.md`
+- plano de execucao: `docs/execution-plans/telao-ao-vivo-execution-plan.md`
 
 Nota da sprint atual:
 
@@ -979,7 +979,7 @@ Itens ja implementados nesta primeira leva:
 - o replay agora reage ao volume da fila com regras diferentes para fila baixa, media e alta;
 - o selector agora formaliza `max_replays_per_item`, com fallback de continuidade quando toda a fila ja estourou esse budget;
 - os thresholds do replay adaptativo por volume agora sao parte da policy persistida do wall;
-- o manager do wall agora expõe presets e controles de replay adaptativo no painel;
+- o manager do wall agora expÃµe presets e controles de replay adaptativo no painel;
 - o reconnect agora preserva o item atual quando ele ainda existe na nova fila;
 - a remocao do item atual durante reproducao agora troca para o proximo item justo;
 - o replay apos a primeira rodada completa agora esta coberto por teste;
@@ -1068,7 +1068,7 @@ Ao revisar a documentacao depois desta sprint, os pontos abaixo ainda merecem fo
 1. o payload ainda nao formaliza `highlight_score`, `published_at` obrigatorio ou `published_sequence`, que vao fazer diferenca na fase editorial e de freshness;
 2. a doc ainda nao fecha como a policy adaptativa por fase do evento vai sobrescrever ou combinar com os presets;
 3. a simulacao do wall ja esta integrada ao manager, e o gap remanescente desta frente esta em enriquecer thresholds operacionais, historico do diagnostico e presets automativos por fase;
-4. o critério de “volume” ainda e baseado em quantidade de itens, e nao em volume por remetente ou recencia da festa.
+4. o critÃ©rio de â€œvolumeâ€ ainda e baseado em quantidade de itens, e nao em volume por remetente ou recencia da festa.
 
 ---
 

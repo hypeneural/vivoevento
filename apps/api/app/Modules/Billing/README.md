@@ -48,7 +48,7 @@ Assinaturas, jornadas publicas de trial e compra por evento, catalogo avulso, gr
 - quando o cancelamento ocorre ao fim do ciclo, os entitlements da conta continuam ativos ate `ends_at`;
 - `BillingGatewayInterface`, `BillingGatewayManager` e `ManualBillingGateway` ja isolam o provider do dominio;
 - `PagarmeBillingGateway` ja cobre Pix, cartao, webhook, refund/cancel, refresh administrativo e retry operacional seguro do mesmo `BillingOrder`;
-- a pagina publica `/checkout/evento` agora ja expõe onboarding visivel, CTA para abrir o painel do evento e CTA de login quando o checkout encontra uma identidade ja cadastrada;
+- a pagina publica `/checkout/evento` agora ja expÃµe onboarding visivel, CTA para abrir o painel do evento e CTA de login quando o checkout encontra uma identidade ja cadastrada;
 - o billing agora deduplica notificacoes de `pix_generated`, `payment_paid`, `payment_failed` e `payment_refunded` em `billing_order_notifications`, sempre a partir do estado local reconciliado;
 - essas notificacoes usam `WhatsAppMessagingService` e gravam contexto do pedido tambem em `whatsapp_messages.payload_json.context`;
 - no caso de `pix_generated`, o checkout agora envia `send-text` com resumo do pedido e, quando a instancia resolvida usa `zapi`, tambem tenta um segundo outbound `send-button-pix` usando o valor copia-e-cola retornado no `qr_code` da cobranca;
@@ -62,4 +62,4 @@ Assinaturas, jornadas publicas de trial e compra por evento, catalogo avulso, gr
 - o proximo endurecimento do modulo ficou concentrado na homologacao real de cancelamento/estorno e no dossie da divergencia do simulador de cartao.
 - a nova jornada administrativa de Pix avulso sem `Event`, para onboarding comercial e associacao futura a um evento, ainda e planejada e esta documentada em:
   - `docs/architecture/billing-admin-customer-onboarding-discovery.md`
-  - `docs/architecture/billing-admin-customer-onboarding-execution-plan.md`
+  - `docs/execution-plans/billing-admin-customer-onboarding-execution-plan.md`

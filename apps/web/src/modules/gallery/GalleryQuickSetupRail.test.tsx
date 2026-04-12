@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  createGalleryBuilderOperationalFeedbackFixture,
   createGalleryBuilderSettingsFixture,
   galleryContractCatalog,
 } from './gallery-builder';
@@ -18,7 +19,18 @@ describe('GalleryQuickSetupRail', () => {
         draft={createGalleryBuilderSettingsFixture()}
         mobileBudget={galleryContractCatalog.mobileBudget}
         responsiveSizes={galleryContractCatalog.publicResponsiveSizes}
-        lastAppliedPresetName="Casamento premium"
+        operationalFeedback={createGalleryBuilderOperationalFeedbackFixture({
+          current_preset_origin: {
+            origin_type: 'preset',
+            key: 'casamento-premium',
+            label: 'Casamento premium',
+            applied_at: '2026-04-12T12:00:00Z',
+            applied_by: {
+              id: 9,
+              name: 'Operador',
+            },
+          },
+        })}
         onApplyShortcut={onApplyShortcut}
       />,
     );

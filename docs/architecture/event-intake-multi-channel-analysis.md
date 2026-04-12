@@ -1139,7 +1139,7 @@ Essa abordagem preserva a regra principal do repositorio:
 
 ## Documento complementar de execucao
 
-- plano detalhado: `docs/architecture/telegram-private-direct-intake-execution-plan.md`
+- plano detalhado: `docs/execution-plans/telegram-private-direct-intake-execution-plan.md`
 
 ## Nota operacional importante
 

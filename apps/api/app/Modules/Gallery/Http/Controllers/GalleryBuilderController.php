@@ -2,6 +2,7 @@
 
 namespace App\Modules\Gallery\Http\Controllers;
 
+use App\Modules\Analytics\Services\AnalyticsTracker;
 use App\Modules\Events\Models\Event;
 use App\Modules\Gallery\Actions\AutosaveEventGalleryDraftAction;
 use App\Modules\Gallery\Actions\PublishEventGalleryDraftAction;
@@ -11,13 +12,16 @@ use App\Modules\Gallery\Actions\UploadEventGalleryAssetAction;
 use App\Modules\Gallery\Actions\UpdateEventGallerySettingsAction;
 use App\Modules\Gallery\Http\Requests\RunGalleryBuilderPromptRequest;
 use App\Modules\Gallery\Http\Requests\ShowEventGallerySettingsRequest;
+use App\Modules\Gallery\Http\Requests\StoreGalleryBuilderTelemetryRequest;
 use App\Modules\Gallery\Http\Requests\UploadEventGalleryAssetRequest;
 use App\Modules\Gallery\Http\Requests\UpdateEventGallerySettingsRequest;
 use App\Modules\Gallery\Http\Resources\EventGalleryRevisionResource;
 use App\Modules\Gallery\Http\Resources\EventGallerySettingsResource;
 use App\Modules\Gallery\Models\EventGalleryRevision;
 use App\Modules\Gallery\Models\EventGallerySetting;
+use App\Modules\Gallery\Models\GalleryBuilderPromptRun;
 use App\Modules\Gallery\Queries\ListEventGalleryRevisionsQuery;
+use App\Modules\Gallery\Support\GalleryBuilderOperationalFeedbackResolver;
 use App\Modules\Gallery\Support\GalleryBuilderPresetRegistry;
 use App\Modules\Gallery\Support\GalleryBuilderSchemaRegistry;
 use App\Shared\Http\BaseController;
@@ -46,6 +50,8 @@ class GalleryBuilderController extends BaseController
             'settings' => (new EventGallerySettingsResource($settings))->resolve(),
             'mobile_budget' => $schemaRegistry->mobileBudget(),
             'responsive_source_contract' => $schemaRegistry->responsiveSourceContract(),
+            'optimized_renderer_trigger' => $schemaRegistry->optimizedRendererTrigger(),
+            'operational_feedback' => $this->feedback($settings, app(GalleryBuilderOperationalFeedbackResolver::class)),
         ]);
     }
 
@@ -88,16 +94,31 @@ class GalleryBuilderController extends BaseController
         Event $event,
         GalleryBuilderPresetRegistry $registry,
         PublishEventGalleryDraftAction $action,
+        AnalyticsTracker $analytics,
     ): JsonResponse {
         abort_unless($request->user()?->can('gallery.builder.manage'), 403);
         $this->authorize('update', $event);
 
         $settings = $this->ensureSettings($event, $request->user(), $registry);
         $result = $action->execute($settings, $request->user());
+        $revision = $result['revision'];
+
+        $analytics->trackEvent(
+            $event,
+            'gallery.builder_published',
+            $request,
+            [
+                'revision_id' => $revision->id,
+                'version_number' => $revision->version_number,
+                'draft_version' => $result['settings']->draft_version,
+                'published_version' => $result['settings']->published_version,
+            ],
+            channel: 'gallery_builder',
+        );
 
         return $this->success([
             'settings' => (new EventGallerySettingsResource($result['settings']))->resolve(),
-            'revision' => (new EventGalleryRevisionResource($result['revision']))->resolve(),
+            'revision' => (new EventGalleryRevisionResource($revision))->resolve(),
         ]);
     }
 
@@ -123,6 +144,7 @@ class GalleryBuilderController extends BaseController
         EventGalleryRevision $revision,
         GalleryBuilderPresetRegistry $registry,
         RestoreEventGalleryRevisionAction $action,
+        AnalyticsTracker $analytics,
     ): JsonResponse {
         abort_unless($request->user()?->can('gallery.builder.manage'), 403);
         $this->authorize('update', $event);
@@ -130,10 +152,35 @@ class GalleryBuilderController extends BaseController
 
         $settings = $this->ensureSettings($event, $request->user(), $registry);
         $result = $action->execute($settings, $revision, $request->user());
+        $restoredSettings = $result['settings'];
+        $restoredRevision = $result['revision'];
+
+        $restoredSettings->forceFill([
+            'current_preset_origin_json' => $this->makePresetOrigin(
+                originType: 'restore',
+                key: 'revision:'.$revision->id,
+                label: 'Restaurado da versao '.$revision->version_number,
+                user: $request->user(),
+            ),
+        ])->save();
+        $restoredSettings = $restoredSettings->fresh(['currentDraftRevision', 'currentPublishedRevision', 'previewRevision']);
+
+        $analytics->trackEvent(
+            $event,
+            'gallery.builder_restored',
+            $request,
+            [
+                'revision_id' => $restoredRevision->id,
+                'version_number' => $restoredRevision->version_number,
+                'restored_from_revision_id' => $revision->id,
+                'restored_from_version_number' => $revision->version_number,
+            ],
+            channel: 'gallery_builder',
+        );
 
         return $this->success([
-            'settings' => (new EventGallerySettingsResource($result['settings']))->resolve(),
-            'revision' => (new EventGalleryRevisionResource($result['revision']))->resolve(),
+            'settings' => (new EventGallerySettingsResource($restoredSettings))->resolve(),
+            'revision' => (new EventGalleryRevisionResource($restoredRevision))->resolve(),
         ]);
     }
 
@@ -272,6 +319,115 @@ class GalleryBuilderController extends BaseController
         ]);
     }
 
+    public function telemetry(
+        StoreGalleryBuilderTelemetryRequest $request,
+        Event $event,
+        GalleryBuilderPresetRegistry $registry,
+        AnalyticsTracker $analytics,
+        GalleryBuilderOperationalFeedbackResolver $feedbackResolver,
+    ): JsonResponse {
+        $this->authorize('update', $event);
+
+        $settings = $this->ensureSettings($event, $request->user(), $registry);
+        $payload = $request->validated();
+
+        if ($payload['event'] === 'preset_applied') {
+            $origin = [
+                'origin_type' => $payload['preset']['origin_type'],
+                'key' => $payload['preset']['key'],
+                'label' => $payload['preset']['label'],
+                'applied_at' => now()->toIso8601String(),
+                'applied_by' => $request->user()
+                    ? [
+                        'id' => $request->user()->id,
+                        'name' => $request->user()->name,
+                    ]
+                    : null,
+            ];
+
+            $settings->forceFill([
+                'current_preset_origin_json' => $origin,
+                'updated_by' => $request->user()?->id ?? $settings->updated_by,
+            ])->save();
+
+            $analytics->trackEvent(
+                $event,
+                'gallery.builder_preset_applied',
+                $request,
+                [
+                    'origin_type' => $origin['origin_type'],
+                    'origin_key' => $origin['key'],
+                    'origin_label' => $origin['label'],
+                ],
+                channel: 'gallery_builder',
+            );
+        }
+
+        if ($payload['event'] === 'ai_applied') {
+            $run = GalleryBuilderPromptRun::query()->firstWhere('id', $payload['run_id']);
+            abort_unless($run instanceof GalleryBuilderPromptRun && $run->event_id === $event->id, 404);
+
+            $responsePayload = is_array($run->response_payload_json) ? $run->response_payload_json : [];
+            $responsePayload['selected_variation'] = [
+                'id' => $payload['variation_id'],
+                'apply_scope' => $payload['apply_scope'],
+                'applied_at' => now()->toIso8601String(),
+                'applied_by' => $request->user()
+                    ? [
+                        'id' => $request->user()->id,
+                        'name' => $request->user()->name,
+                    ]
+                    : null,
+            ];
+
+            $run->forceFill([
+                'selected_variation_id' => $payload['variation_id'],
+                'response_payload_json' => $responsePayload,
+            ])->save();
+
+            $analytics->trackEvent(
+                $event,
+                'gallery.builder_ai_applied',
+                $request,
+                [
+                    'run_id' => $run->id,
+                    'variation_id' => $payload['variation_id'],
+                    'apply_scope' => $payload['apply_scope'],
+                    'target_layer' => $run->target_layer,
+                ],
+                channel: 'gallery_builder',
+            );
+        }
+
+        if ($payload['event'] === 'vitals_sample') {
+            $analytics->trackEvent(
+                $event,
+                'gallery.builder_vitals_sample',
+                $request,
+                [
+                    'viewport' => $payload['viewport'] ?? null,
+                    'item_count' => $payload['item_count'] ?? null,
+                    'layout' => $payload['layout'] ?? null,
+                    'density' => $payload['density'] ?? null,
+                    'render_mode' => $payload['render_mode'] ?? null,
+                    'lcp_ms' => $payload['lcp_ms'] ?? null,
+                    'inp_ms' => $payload['inp_ms'] ?? null,
+                    'cls' => $payload['cls'] ?? null,
+                    'preview_latency_ms' => $payload['preview_latency_ms'] ?? null,
+                    'publish_latency_ms' => $payload['publish_latency_ms'] ?? null,
+                ],
+                channel: 'gallery_builder',
+            );
+        }
+
+        $settings = $settings->fresh(['currentDraftRevision', 'currentPublishedRevision', 'previewRevision']);
+
+        return $this->success([
+            'current_preset_origin' => (new EventGallerySettingsResource($settings))->resolve()['current_preset_origin'] ?? null,
+            'operational_feedback' => $this->feedback($settings, $feedbackResolver),
+        ]);
+    }
+
     private function ensureSettings(
         Event $event,
         ?\App\Modules\Users\Models\User $user,
@@ -296,7 +452,41 @@ class GalleryBuilderController extends BaseController
             'theme_tokens_json' => $defaults['theme_tokens'],
             'page_schema_json' => $defaults['page_schema'],
             'media_behavior_json' => $defaults['media_behavior'],
+            'current_preset_origin_json' => null,
             'updated_by' => $user?->id,
         ])->loadMissing(['currentDraftRevision', 'currentPublishedRevision', 'previewRevision']);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function feedback(
+        EventGallerySetting $settings,
+        GalleryBuilderOperationalFeedbackResolver $resolver,
+    ): array {
+        return $resolver->resolve($settings);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function makePresetOrigin(
+        string $originType,
+        ?string $key,
+        ?string $label,
+        ?\App\Modules\Users\Models\User $user,
+    ): array {
+        return [
+            'origin_type' => $originType,
+            'key' => $key,
+            'label' => $label,
+            'applied_at' => now()->toIso8601String(),
+            'applied_by' => $user
+                ? [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                ]
+                : null,
+        ];
     }
 }

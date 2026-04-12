@@ -15,7 +15,7 @@ Esta analise foi feita por leitura direta do codigo e por testes locais do front
 
 Plano derivado desta analise:
 
-- `docs/architecture/wall-qr-overlay-execution-plan-2026-04-11.md`
+- `docs/execution-plans/wall-qr-overlay-execution-plan-2026-04-11.md`
 
 ---
 
@@ -515,7 +515,7 @@ Hoje ele:
 Em resumo:
 
 - existe uma base de experimento;
-- mas ela ainda nao resolve o caso de uso de operacao real do telão.
+- mas ela ainda nao resolve o caso de uso de operacao real do telÃ£o.
 
 ---
 

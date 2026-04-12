@@ -8,7 +8,7 @@ o que ainda falta fazer para subir a VPS de producao do Evento Vivo.
 Ela complementa:
 
 - [docs/architecture/production-vps-runbook.md](./production-vps-runbook.md)
-- [docs/architecture/production-vps-execution-plan.md](./production-vps-execution-plan.md)
+- [docs/execution-plans/production-vps-execution-plan.md](../execution-plans/production-vps-execution-plan.md)
 
 ## Como ler
 

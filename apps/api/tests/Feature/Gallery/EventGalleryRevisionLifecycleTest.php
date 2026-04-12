@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Analytics\Models\AnalyticsEvent;
 use App\Modules\Events\Models\Event;
 use App\Modules\Gallery\Models\EventGalleryRevision;
 use App\Modules\Gallery\Support\GalleryBuilderSchemaRegistry;
@@ -83,6 +84,15 @@ it('creates autosave and published revisions and restores a previous gallery rev
         ->assertJsonPath('data.settings.draft_version', 2)
         ->assertJsonPath('data.settings.published_version', 2);
 
+    $publishAnalytics = AnalyticsEvent::query()
+        ->where('event_id', $event->id)
+        ->where('event_name', 'gallery.builder_published')
+        ->first();
+
+    expect($publishAnalytics)->not->toBeNull()
+        ->and($publishAnalytics?->channel)->toBe('gallery_builder')
+        ->and($publishAnalytics?->metadata_json['version_number'] ?? null)->toBe(2);
+
     $revisions = $this->apiGet("/events/{$event->id}/gallery/revisions");
 
     $this->assertApiSuccess($revisions);
@@ -101,7 +111,19 @@ it('creates autosave and published revisions and restores a previous gallery rev
         ->assertJsonPath('data.settings.event_type_family', 'wedding')
         ->assertJsonPath('data.settings.draft_version', 3)
         ->assertJsonPath('data.settings.published_version', 2)
+        ->assertJsonPath('data.settings.current_preset_origin.origin_type', 'restore')
+        ->assertJsonPath('data.settings.current_preset_origin.key', 'revision:'.$firstRevisionId)
         ->assertJsonPath('data.settings.updated_by', $user->id);
+
+    $restoreAnalytics = AnalyticsEvent::query()
+        ->where('event_id', $event->id)
+        ->where('event_name', 'gallery.builder_restored')
+        ->first();
+
+    expect($restoreAnalytics)->not->toBeNull()
+        ->and($restoreAnalytics?->channel)->toBe('gallery_builder')
+        ->and($restoreAnalytics?->metadata_json['restored_from_revision_id'] ?? null)->toBe($firstRevisionId)
+        ->and($restoreAnalytics?->metadata_json['version_number'] ?? null)->toBe(3);
 
     $this->assertDatabaseHas('event_gallery_revisions', [
         'event_id' => $event->id,

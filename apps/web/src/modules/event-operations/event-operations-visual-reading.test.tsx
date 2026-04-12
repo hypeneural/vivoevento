@@ -28,6 +28,22 @@ vi.mock('./hooks/useEventOperationsBoot', () => ({
   useEventOperationsBoot: (...args: unknown[]) => useEventOperationsBootMock(...args),
 }));
 
+vi.mock('./hooks/useEventOperationsRealtime', () => ({
+  useEventOperationsRealtime: () => ({
+    connectionState: 'connected',
+    statusMessage: null,
+    lastResyncCompletedAt: null,
+  }),
+}));
+
+vi.mock('./hooks/useEventOperationsFallback', () => ({
+  useEventOperationsFallback: () => ({
+    isPollingFallbackActive: false,
+    roomIntervalMs: false,
+    timelineIntervalMs: false,
+  }),
+}));
+
 function makeRoom(snapshot = eventOperationsHealthySnapshotFixture): EventOperationsV0Room {
   return {
     ...snapshot,
