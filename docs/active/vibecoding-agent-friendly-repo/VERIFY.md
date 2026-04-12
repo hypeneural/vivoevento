@@ -20,6 +20,7 @@ cd c:/laragon/www/eventovivo && git diff --check
 cd apps/api && php artisan key:generate --ansi
 cd apps/api && php artisan config:clear --ansi
 $env:REDIS_CLIENT='predis'; $env:CACHE_STORE='array'; $env:SESSION_DRIVER='array'; $env:QUEUE_CONNECTION='sync'; $env:BROADCAST_CONNECTION='log'; cd apps/api; php artisan test tests/Unit/Modules/MediaProcessing/VideoMetadataExtractorServiceTest.php --compact
+$env:REDIS_CLIENT='predis'; $env:CACHE_STORE='array'; $env:SESSION_DRIVER='array'; $env:QUEUE_CONNECTION='sync'; $env:BROADCAST_CONNECTION='log'; cd apps/api; Copy-Item .env.example .env -Force; php artisan key:generate --ansi; php artisan test --compact --stop-on-failure
 git push origin codex/agent-native-p1
 ```
 
@@ -38,17 +39,23 @@ git push origin codex/agent-native-p1
 - the follow-up `API Suite` run was triggered automatically on branch push:
   - run id: `24316230270`
   - URL: `https://github.com/hypeneural/vivoevento/actions/runs/24316230270`
-  - current status at the time of this update: `in_progress`
+  - final status for commit `722d1b4`: `failure`
+  - bootstrap passed; the failure moved to `Run full API suite`
 - local exact reproduction of the workflow bootstrap is not possible on this machine because `ext-redis` is not installed locally
 - the focused API unit test still passes with env overrides that avoid local Redis-extension coupling
+- the full local API suite completed successfully after isolating the rollback FaceSearch test and giving the testing context a stable `APP_KEY`
+  - `1220` passed
+  - `7` skipped
+  - `2` todos
+  - duration `549.13s`
 
 ## Not Validated
 
-- the complete `apps/api` test suite did not finish locally within the available timeout window
 - the latest remote `API Suite` run for commit `722d1b4` has not yet finished from this environment
+- the latest code changes after the local full-suite fix have not yet been rerun remotely on GitHub Actions
 
 ## Follow-up
 
-- inspect the final result of `https://github.com/hypeneural/vivoevento/actions/runs/24316230270`
-- if it fails again, capture the next concrete failing step and fix it directly
-- once it passes, record the remote run URL and final status here
+- push the latest API test-stability fixes
+- inspect the next `API Suite` run on GitHub Actions
+- once it passes, record the final run URL and status here

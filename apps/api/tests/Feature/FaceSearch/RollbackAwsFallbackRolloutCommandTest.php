@@ -1,12 +1,19 @@
 <?php
 
 use App\Modules\Events\Models\Event;
+use App\Modules\FaceSearch\Jobs\EnsureAwsCollectionJob;
+use App\Modules\FaceSearch\Jobs\BackfillEventFaceSearchGalleryJob;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Bus;
 
 it('restores the previous face-search settings from a rollout report', function () {
     $reportDir = storage_path('app/testing/face-search-rollout/rollback');
     File::deleteDirectory($reportDir);
     File::ensureDirectoryExists($reportDir);
+    Bus::fake([
+        EnsureAwsCollectionJob::class,
+        BackfillEventFaceSearchGalleryJob::class,
+    ]);
 
     $event = Event::factory()->active()->create([
         'title' => 'FaceSearch rollback target',
@@ -42,6 +49,9 @@ it('restores the previous face-search settings from a rollout report', function 
     $this->artisan('face-search:rollback-aws-fallback', [
         '--report' => $reportPath,
     ])->assertSuccessful();
+
+    Bus::assertDispatched(EnsureAwsCollectionJob::class, fn (EnsureAwsCollectionJob $job) => $job->eventId === $event->id);
+    Bus::assertNotDispatched(BackfillEventFaceSearchGalleryJob::class);
 
     $this->assertDatabaseHas('event_face_search_settings', [
         'event_id' => $event->id,
