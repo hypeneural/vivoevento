@@ -16,18 +16,23 @@ Transform the monorepo from documentation-heavy into a repo with clear agent-fac
 - `apps/landing` tests are green again
 - the previously failing API unit test is fixed
 - prompt files, custom agents, `code_review.md`, `docs/active/`, and an API-suite CI workflow now exist in the repo
+- the API-suite workflow was pushed to `codex/agent-native-p1` and executed remotely
+- the first remote run failed in bootstrap before tests, and the failure was traced to:
+  - an unquoted value with spaces in `apps/api/.env.example`
+  - missing `redis` extension in the GitHub Actions PHP setup
+- both CI bootstrap issues are fixed and pushed; the next remote run is the one that matters for full-suite proof
 - full local revalidation of the entire API suite is still pending because the local run exceeded the available timeout window
 
 ## Next Steps
 
-1. publish the agent-native changes on an isolated branch
-2. trigger `api-suite.yml` in CI and inspect the full API-suite result
-3. start using `docs/active/<feature>/STATUS.md` and `VERIFY.md` for long-running product work
+1. inspect the latest remote `API Suite` result for commit `722d1b4`
+2. if the run passes, treat CI as the current proof point for full API-suite validation
+3. start using `docs/active/<feature>/STATUS.md` and `VERIFY.md` for long-running product work beyond this repo-hardening initiative
 
 ## Risks
 
 - the repo still has unrelated local changes in the working tree, so publish scope must stay explicit
-- the API full suite currently has proof in CI design, not yet in a completed remote run
+- the API full suite still lacks a confirmed successful remote completion from this environment
 
 ## Updated
 
