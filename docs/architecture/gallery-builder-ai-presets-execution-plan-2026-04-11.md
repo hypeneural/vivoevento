@@ -49,7 +49,7 @@ Referencias internas obrigatorias para a trilha:
 
 ## Status da execucao em 2026-04-11
 
-Nenhuma fase de implementacao do builder da galeria foi aberta ainda.
+Sprint 0 foi iniciada e concluida em `2026-04-12`.
 
 O que ja esta validado antes de iniciar:
 
@@ -71,6 +71,16 @@ Leitura pratica:
 - a trilha nasce sobre base estavel;
 - o risco maior esta em produto/contrato e nao em pipeline de midia;
 - o primeiro valor vem de melhorar renderer e experience, nao de arrastar bloco visualmente.
+
+Implementacao Sprint 0 em `2026-04-12`:
+
+- contratos compartilhados criados em `packages/shared-types/src/gallery-builder.ts`;
+- contratos frontend e fixtures criados em `apps/web/src/modules/gallery/gallery-builder.ts`;
+- shell inicial do builder criada em `/events/:id/gallery/builder`;
+- `gallery.builder.manage` adicionada ao backend, frontend e mocks;
+- `queryKeys.gallery` estendido para `settings`, `presets`, `revisions` e `preview`;
+- registries/guards de contrato criados em `apps/api/app/Modules/Gallery/Support`;
+- bateria TDD de Sprint 0 criada e executada.
 
 ---
 
@@ -395,6 +405,26 @@ Abrir a fundacao da trilha antes de mexer no renderer publico ou no editor:
 - rotas e tipos planejados;
 - TDD de contrato criado.
 
+### Status da Sprint 0 em 2026-04-12
+
+- [x] `S0-T1` contrato das tres camadas criado em shared-types e espelhado no frontend/backend
+- [x] `S0-T1.1` contrato de midia responsiva congelado com `responsive_sources`, `srcset`, `sizes` e variantes por largura
+- [x] `S0-T2` permissao `gallery.builder.manage` adicionada em seeder, constantes frontend e mocks
+- [x] `S0-T3` rota `/events/:id/gallery/builder`, preload e query keys planejadas/criadas
+- [x] `S0-T4` fixtures de experience e matriz de modelos criadas
+- [x] `S0-T5` budget mobile e gatilho inicial de renderer otimizado congelados em contrato
+- [x] bateria TDD da Sprint 0 executada com regressao de `Gallery`, `Hub`, `MediaProcessing`, `qrReadability`, `runtime-profile` e `MediaAutomaticReplies`
+
+Arquivos principais entregues:
+
+- `packages/shared-types/src/gallery-builder.ts`
+- `apps/web/src/modules/gallery/gallery-builder.ts`
+- `apps/web/src/modules/gallery/GalleryBuilderPage.tsx`
+- `apps/api/app/Modules/Gallery/Support/GalleryBuilderSchemaRegistry.php`
+- `apps/api/app/Modules/Gallery/Support/GalleryModelMatrixRegistry.php`
+- `apps/api/app/Modules/Gallery/Support/GalleryThemeTokenResolver.php`
+- `apps/api/app/Modules/Gallery/Support/GalleryAccessibilityGuardService.php`
+
 ### Tarefas da sprint
 
 ### `S0-T1` Congelar o contrato das tres camadas
@@ -500,6 +530,14 @@ Frontend:
 - `apps/web/src/modules/gallery/gallery-builder.fixtures.test.ts`
 - `apps/web/src/modules/gallery/public-gallery-responsive-contract.test.ts`
 - `apps/web/src/modules/gallery/gallery-mobile-budget.contract.test.ts`
+
+Resultado executado em `2026-04-12`:
+
+- backend Sprint 0: `13` testes passaram, `103` assertions;
+- frontend Sprint 0: `5` arquivos passaram, `11` testes passaram;
+- regressao backend `Gallery + MediaProcessing + Hub`: `30` testes passaram, `313` assertions;
+- regressao frontend adjacente: `6` arquivos passaram, `25` testes passaram;
+- `npm run type-check`: passou.
 
 ### Definicao de pronto da sprint
 

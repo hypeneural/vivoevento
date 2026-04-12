@@ -123,9 +123,13 @@ export interface EventPersonRelation {
 export interface EventPeoplePresetPerson {
   key: string;
   label: string;
+  role_key?: string;
+  role_label?: string;
+  role_family?: string;
   type: string;
   side: string;
   importance_rank: number;
+  description?: string | null;
 }
 
 export interface EventPeoplePresetRelation {
@@ -134,10 +138,30 @@ export interface EventPeoplePresetRelation {
   directionality: string;
 }
 
+export interface EventPeoplePresetGroup {
+  key: string;
+  label: string;
+  role_family: string;
+  member_role_keys: string[];
+  importance_rank: number;
+}
+
+export interface EventPeopleCoverageTargetSeed {
+  key: string;
+  label: string;
+  target_type: string;
+  role_keys: string[];
+  group_key: string | null;
+  priority: number;
+}
+
 export interface EventPeoplePresetsResponse {
   event_type: string | null;
+  model_key?: string | null;
   people: EventPeoplePresetPerson[];
   relations: EventPeoplePresetRelation[];
+  groups?: EventPeoplePresetGroup[];
+  coverage_targets?: EventPeopleCoverageTargetSeed[];
 }
 
 export interface EventPerson {

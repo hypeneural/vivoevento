@@ -51,6 +51,7 @@ import {
   formatEventPersonReferencePurpose,
   formatEventPersonReferenceStatus,
   formatEventPersonRelationType,
+  formatEventPersonRoleFamily,
   formatEventPersonStatus,
   formatEventPersonSyncStatus,
 } from './labels';
@@ -187,6 +188,26 @@ export default function EventPeoplePage() {
   const referenceCandidates = referenceCandidatesQuery.data ?? [];
   const otherPeople = allPeople.filter((person) => person.id !== selectedPerson?.id);
   const operationalStatus = operationalStatusQuery.data;
+  const presetPeopleGroups = useMemo(() => {
+    const order = ['principal', 'familia', 'corte', 'amigos', 'corporativo', 'academico', 'equipe', 'fornecedor'];
+    const groups = new Map<string, typeof presetsQuery.data.people>();
+
+    (presetsQuery.data?.people ?? []).forEach((preset) => {
+      const family = preset.role_family ?? 'outros';
+      groups.set(family, [...(groups.get(family) ?? []), preset]);
+    });
+
+    return [...groups.entries()].sort(([familyA], [familyB]) => {
+      const indexA = order.indexOf(familyA);
+      const indexB = order.indexOf(familyB);
+
+      return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+    });
+  }, [presetsQuery.data?.people]);
+  const existingPresetNames = useMemo(
+    () => new Set(allPeople.map((person) => person.display_name.trim().toLowerCase())),
+    [allPeople],
+  );
 
   useEffect(() => {
     if (!isCreating && selectedPersonId === null && people.length > 0) setSelectedPersonId(people[0].id);

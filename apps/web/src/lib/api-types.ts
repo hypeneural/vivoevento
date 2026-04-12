@@ -1,3 +1,5 @@
+import type { GalleryExperienceConfig, GalleryResponsiveSources } from '@eventovivo/shared-types';
+
 /**
  * API Types — TypeScript contracts aligned 1:1 with backend Resources.
  *
@@ -2216,6 +2218,7 @@ export interface ApiEventMediaItem {
   width?: number | null;
   height?: number | null;
   orientation?: 'portrait' | 'landscape' | 'square' | string | null;
+  responsive_sources?: GalleryResponsiveSources | null;
 }
 
 export interface ApiEventMediaVariant {
@@ -2384,6 +2387,27 @@ export interface PublicFaceSearchBootstrap {
 }
 
 export interface ApiPublicGalleryResponse {
+  success?: boolean;
+  event?: {
+    id: number;
+    title: string;
+    slug: string;
+    event_type: string | null;
+    starts_at?: string | null;
+    location_name?: string | null;
+    description?: string | null;
+    branding: {
+      logo_url: string | null;
+      cover_image_url: string | null;
+      primary_color: string | null;
+      secondary_color: string | null;
+      source?: string | null;
+    };
+    public_url?: string | null;
+  };
+  experience?: GalleryExperienceConfig & {
+    published_version?: number | null;
+  };
   data: ApiEventMediaItem[];
   meta: {
     page: number;

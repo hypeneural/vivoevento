@@ -192,15 +192,30 @@ it('returns presets and allows creating, updating and deleting manual relations'
 
     $this->assertApiSuccess($presetsResponse);
     $presetsResponse->assertJsonPath('data.event_type', 'wedding')
+        ->assertJsonPath('data.model_key', 'wedding')
         ->assertJsonFragment([
             'key' => 'bride',
             'label' => 'Noiva',
+            'role_key' => 'bride',
+            'role_label' => 'Noiva',
+            'role_family' => 'principal',
             'type' => 'bride',
         ])
         ->assertJsonFragment([
             'type' => 'spouse_of',
             'label' => 'Conjuge de',
             'directionality' => 'undirected',
+        ])
+        ->assertJsonFragment([
+            'key' => 'couple',
+            'label' => 'Casal',
+            'role_family' => 'principal',
+        ])
+        ->assertJsonFragment([
+            'key' => 'couple_portrait',
+            'label' => 'Casal junto',
+            'target_type' => 'group',
+            'group_key' => 'couple',
         ]);
 
     $createRelationResponse = $this->apiPost("/events/{$event->id}/people/relations", [

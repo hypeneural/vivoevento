@@ -1212,6 +1212,23 @@ Saida minima esperada em `P0`:
 - [x] permitir `Enviar foto de referencia` com validacao de pessoa dominante
 - [x] permitir `Definir foto principal` por acao humana
 
+### Validacao de regressao total em 2026-04-12
+
+- [x] backend `EventPeople`: `42` testes passaram, `339` assertions
+- [x] frontend `src/modules/event-people`: `3` arquivos passaram, `6` testes passaram
+
+Comandos executados:
+
+```bash
+cd apps/api
+php artisan test tests/Feature/EventPeople tests/Unit/EventPeople
+```
+
+```bash
+cd apps/web
+npx.cmd vitest run src/modules/event-people
+```
+
 ## P2 - Modelo do evento
 
 - refatorar presets para tipos reais de evento;

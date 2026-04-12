@@ -69,6 +69,29 @@ export function formatEventPersonMeta(input: { type?: string | null; side?: stri
   return parts.length > 0 ? parts.join(' - ') : fallback;
 }
 
+export function formatEventPersonRoleFamily(value?: string | null) {
+  switch (value) {
+    case 'principal':
+      return 'Pessoas principais';
+    case 'familia':
+      return 'Familia';
+    case 'corte':
+      return 'Corte ou padrinhos';
+    case 'amigos':
+      return 'Amigos';
+    case 'fornecedor':
+      return 'Equipe e fornecedores';
+    case 'equipe':
+      return 'Equipe';
+    case 'academico':
+      return 'Academico';
+    case 'corporativo':
+      return 'Corporativo';
+    default:
+      return 'Outros papeis';
+  }
+}
+
 export function formatEventPersonRelationType(value?: string | null) {
   switch (value) {
     case 'spouse_of':

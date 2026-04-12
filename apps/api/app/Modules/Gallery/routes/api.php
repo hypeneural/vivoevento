@@ -12,3 +12,4 @@ Route::middleware('auth:sanctum')->group(function () {
 
 // Public gallery (no auth)
 Route::get('public/events/{event:slug}/gallery', [\App\Modules\Gallery\Http\Controllers\PublicGalleryController::class, 'index']);
+Route::get('public/events/{event:slug}/gallery/media', [\App\Modules\Gallery\Http\Controllers\PublicGalleryController::class, 'media']);

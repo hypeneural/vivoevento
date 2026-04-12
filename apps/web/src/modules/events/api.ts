@@ -227,6 +227,14 @@ export function getPublicGallery(slug: string) {
   return api.get<ApiPublicGalleryResponse>(`/public/events/${slug}/gallery`);
 }
 
+export function getPublicGalleryMedia(slug: string, page = 1) {
+  return api.get<ApiPublicGalleryResponse>(`/public/events/${slug}/gallery/media`, {
+    params: {
+      page,
+    },
+  });
+}
+
 export function upsertEventIntakeBlacklistEntry(
   eventId: string | number,
   payload: UpsertEventIntakeBlacklistEntryPayload,
