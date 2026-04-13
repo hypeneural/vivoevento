@@ -98,13 +98,16 @@ rg "actions/(checkout|cache)@|setup-node@" .github/workflows -n
   - `actions/cache@v5`
   - `actions/setup-node@v6`
 - local workflows were updated to these current majors
+- run `24323890981` for commit `104eb15` completed as `failure`
+  - failed step: `Run full API suite`
+  - public page no longer shows the Node 20 action-runtime warning
+  - public page still requires sign-in to view detailed logs
 
 ## Not Validated
 
 - the root cause for remote run `24316799489` is still not visible from this environment because the public run page exposes only summary status
 - the latest branch head still lacks a confirmed successful remote completion of the full API suite
 - detailed GitHub Actions logs are still not validated because `gh` is installed but not authenticated
-- the workflow action-major update still needs a pushed CI run
 
 ## Follow-up
 

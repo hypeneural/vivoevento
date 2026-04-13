@@ -44,6 +44,10 @@ Transform the monorepo from documentation-heavy into a repo with clear agent-fac
   - `actions/checkout@v6`
   - `actions/cache@v5`
   - `actions/setup-node@v6` in the moderation workflow
+- run `24323890981` for commit `104eb15` confirms the action-major update removed the public Node 20 warning
+  - public status: `failure`
+  - failed step: `Run full API suite`
+  - public annotations still expose only `Process completed with exit code 2`
 - the exact workflow sequence was revalidated locally without extra env overrides:
   - `1222` passed
   - `7` skipped
@@ -55,7 +59,7 @@ Transform the monorepo from documentation-heavy into a repo with clear agent-fac
 
 ## Next Steps
 
-1. inspect the latest failing API Suite run with authenticated GitHub Actions logs instead of the public summary only
+1. inspect run `24323890981` with authenticated GitHub Actions logs instead of the public summary only
 2. use the diagnostics runbook after each customization change or CI parity check
 3. start using `docs/active/<feature>/STATUS.md` and `VERIFY.md` for long-running product work beyond this repo-hardening initiative
 
