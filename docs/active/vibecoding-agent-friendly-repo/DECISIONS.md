@@ -64,3 +64,26 @@ Why:
 Impact:
 
 - `.github/workflows/api-suite.yml`
+
+### `2026-04-12` - Make customization diagnostics a first-class runbook
+
+Context:
+
+- the repo now has root instructions, overrides, prompt files, agents, skills, and project config
+- after this point, the main failure mode shifts from missing context to wrong precedence or missing visibility
+
+Decision:
+
+- add a canonical diagnostics runbook for Codex customizations and CI parity checks
+
+Why:
+
+- the team needs one repeatable way to confirm what Codex is loading
+- `codex debug prompt-input` is useful, but only if its use is standardized
+- CI failures are now harder to inspect than to reproduce locally
+
+Impact:
+
+- `docs/runbooks/codex-customizations-diagnostics-runbook.md`
+- `docs/active/vibecoding-agent-friendly-repo/STATUS.md`
+- `docs/active/vibecoding-agent-friendly-repo/VERIFY.md`

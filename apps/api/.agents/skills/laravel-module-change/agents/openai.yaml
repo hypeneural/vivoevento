@@ -1,0 +1,4 @@
+interface:
+  display_name: "Laravel Module Change"
+  short_description: "Apply scoped changes inside Laravel modules."
+  default_prompt: "Use this skill for surgical backend changes in apps/api/app/Modules with proper boundaries and validation."

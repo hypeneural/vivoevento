@@ -55,3 +55,17 @@ jobs:
 
       - name: Run full API suite
         run: php artisan test --compact
+
+      - name: Dump Laravel logs on failure
+        if: failure()
+        run: |
+          if [ -d storage/logs ]; then
+            echo "== storage/logs =="
+            ls -lah storage/logs
+            for file in storage/logs/*.log; do
+              if [ -f "$file" ]; then
+                echo "== tail: $file =="
+                tail -n 200 "$file"
+              fi
+            done
+          fi

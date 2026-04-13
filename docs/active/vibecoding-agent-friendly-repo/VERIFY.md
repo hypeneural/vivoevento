@@ -8,6 +8,8 @@
 - landing test stabilization
 - fix for the previously failing API unit test
 - prompt files, custom agents, review contract, and API-suite CI workflow
+- first narrow skill set and execution-plan template
+- diagnostics runbook and exact workflow-parity revalidation for the API suite
 
 ## Commands Run
 
@@ -22,6 +24,21 @@ cd apps/api && php artisan config:clear --ansi
 $env:REDIS_CLIENT='predis'; $env:CACHE_STORE='array'; $env:SESSION_DRIVER='array'; $env:QUEUE_CONNECTION='sync'; $env:BROADCAST_CONNECTION='log'; cd apps/api; php artisan test tests/Unit/Modules/MediaProcessing/VideoMetadataExtractorServiceTest.php --compact
 $env:REDIS_CLIENT='predis'; $env:CACHE_STORE='array'; $env:SESSION_DRIVER='array'; $env:QUEUE_CONNECTION='sync'; $env:BROADCAST_CONNECTION='log'; cd apps/api; Copy-Item .env.example .env -Force; php artisan key:generate --ansi; php artisan test --compact --stop-on-failure
 git push origin codex/agent-native-p1
+codex --help
+codex debug --help
+codex debug prompt-input "check"
+cd apps/api && codex debug prompt-input "check"
+cd docs && codex debug prompt-input "check"
+$headers = @{ 'User-Agent' = 'Codex' }; $uri = 'https://api.github.com/repos/hypeneural/vivoevento/actions/workflows/api-suite.yml/runs?branch=codex/agent-native-p1&per_page=5'; (Invoke-RestMethod -Uri $uri -Headers $headers).workflow_runs | Select-Object id,status,conclusion,head_sha,html_url
+cd apps/api && Copy-Item .env.example .env -Force
+cd apps/api && php artisan key:generate --ansi
+cd apps/api && php artisan config:clear --ansi
+cd apps/api && php artisan test --compact
+winget install --id GitHub.cli -e --source winget --accept-source-agreements --accept-package-agreements --silent
+gh --version
+gh auth status
+gh run view 24316799489 --repo hypeneural/vivoevento --json name,workflowName,conclusion,status,url,event,headBranch,headSha,jobs
+gh run view 24316799489 --repo hypeneural/vivoevento --log
 ```
 
 ## Result
@@ -52,14 +69,32 @@ git push origin codex/agent-native-p1
 - the next `API Suite` run was triggered automatically on branch push:
   - run id: `24316799489`
   - URL: `https://github.com/hypeneural/vivoevento/actions/runs/24316799489`
-  - current status at the time of this update: `in_progress`
+  - final public status: `failure`
+  - public annotations expose only `Process completed with exit code 2`
+- Codex CLI diagnostics are now validated locally for this repo:
+  - root `codex debug prompt-input "check"` shows the root `AGENTS.md` and shared root skills
+  - `apps/api` shows `API Override` and `laravel-module-change`
+  - `docs` shows `Docs Override` and `verify-and-close`
+- the canonical execution-plan template now exists at `docs/execution-plans/_template/EXECUTION-PLAN.md`
+- the diagnostics runbook now exists at `docs/runbooks/codex-customizations-diagnostics-runbook.md`
+- the exact API workflow sequence now also passes locally without extra env overrides:
+  - `1222` passed
+  - `7` skipped
+  - `2` todos
+  - `9995` assertions
+  - duration `727.33s`
+- GitHub CLI was installed successfully with `winget`
+- `gh --version` reports `2.89.0`
+- `gh auth status` reports no authenticated GitHub hosts
+- unauthenticated `gh run view` is blocked and asks for `gh auth login` or `GH_TOKEN`
 
 ## Not Validated
 
-- the latest remote `API Suite` run for commit `722d1b4` has not yet finished from this environment
-- the latest code changes after the local full-suite fix have not yet finished remotely on GitHub Actions
+- the root cause for remote run `24316799489` is still not visible from this environment because the public run page exposes only summary status
+- the latest branch head still lacks a confirmed successful remote completion of the full API suite
+- detailed GitHub Actions logs are still not validated because `gh` is installed but not authenticated
 
 ## Follow-up
 
-- inspect the final result of `https://github.com/hypeneural/vivoevento/actions/runs/24316799489`
-- once it passes, record the final run URL and status here
+- inspect `https://github.com/hypeneural/vivoevento/actions/runs/24316799489` with authenticated logs or `gh run view --log`
+- if the remote failure persists, compare its log against the now-successful exact local workflow sequence

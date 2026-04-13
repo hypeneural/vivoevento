@@ -1,0 +1,4 @@
+interface:
+  display_name: "React Module Change"
+  short_description: "Apply scoped changes inside web modules."
+  default_prompt: "Use this skill for focused apps/web module work with accessibility, TanStack Query, and local validation."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Verify and Close"
+  short_description: "Record validation and closure evidence."
+  default_prompt: "Use this skill to update STATUS.md and VERIFY.md with exact commands, results, and remaining gaps before closing work."

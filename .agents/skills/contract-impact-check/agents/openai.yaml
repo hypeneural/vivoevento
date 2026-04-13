@@ -1,0 +1,4 @@
+interface:
+  display_name: "Contract Impact Check"
+  short_description: "Check backend/frontend contract changes."
+  default_prompt: "Use this skill to review API, payload, schema, event, queue, and shared-type impact before closing a change."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Feature Delivery"
+  short_description: "Drive feature work from plan to verification."
+  default_prompt: "Use this skill to turn a feature request into an execution plan, active docs, and a verification-ready delivery flow."

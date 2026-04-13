@@ -112,11 +112,13 @@ Enquanto essa divisao nao existir de forma nativa no IDE e no Codex, o risco e c
 ### O que esta atrapalhando mais do que deveria
 
 - `.github/` ja tem `copilot-instructions`, `instructions`, `prompts`, `agents` e um workflow dedicado para a suite completa da API, mas esse trilho ainda precisa virar habito operacional do time.
-- o baseline do workspace ja foi melhorado com `.vscode/settings.json`, `eventovivo.code-workspace` e `.codex/config.toml`, mas a observabilidade dessas camadas ainda nao esta institucionalizada.
+- `.agents/skills/` e as skills locais por area ja foram materializados como camada de workflows especializados; o gap restante agora e calibrar discovery e uso real sem inflar contexto.
+- o baseline do workspace ja foi melhorado com `.vscode/settings.json`, `eventovivo.code-workspace` e `.codex/config.toml`, e agora ja existe um runbook canonico para diagnostico dessas camadas; o gap restante e transformar isso em habito operacional do time.
 - `docs/architecture/` ainda concentra muita referencia historica, imagens de validacao e analises; hoje ha `92` arquivos ali e `31` planos ja foram separados para `docs/execution-plans/`.
 - O repo raiz esta com artefatos temporarios e copias de release/deploy que poluem busca e contexto.
 - o contrato oficial de Node ja foi formalizado, mas ainda precisa ser mantido alinhado em futuras mudancas de CI e onboarding.
 - A CI em `.github/workflows/moderation.yml` cobre apenas uma fatia do produto, nao o monorepo inteiro.
+- `gh` ja foi instalado neste ambiente, mas ainda nao esta autenticado; a inspeccao detalhada de GitHub Actions ainda depende de `gh auth login`, `GH_TOKEN` ou outra sessao autenticada.
 
 ---
 
@@ -304,11 +306,32 @@ Estado atual:
 - `apps/api`
   - `Tests\\Unit\\Modules\\MediaProcessing\\VideoMetadataExtractorServiceTest` voltou a passar com assercao tolerante a `command` serializado como array ou string.
 
-### Nao concluido localmente
+### Revalidado localmente depois do baseline
 
-- `apps/api`: `php artisan test --stop-on-failure`
-  - a suite completa excedeu o timeout local de aproximadamente `304s`;
-  - o teste que falhava antes foi corrigido e validado isoladamente, mas a revalidacao completa ainda precisa de uma janela maior ou de CI dedicada.
+- `apps/api`: `php artisan test --compact --stop-on-failure`
+  - `1220` testes passando
+  - `7` skipped
+  - `2` todos
+  - `9985` assertions
+  - duracao de `549.13s`
+
+- `apps/api`: sequencia exata do workflow remoto
+  - `Copy-Item .env.example .env -Force`
+  - `php artisan key:generate --ansi`
+  - `php artisan config:clear --ansi`
+  - `php artisan test --compact`
+  - resultado:
+    - `1222` testes passando
+    - `7` skipped
+    - `2` todos
+    - `9995` assertions
+    - duracao de `727.33s`
+
+Implicacao pratica:
+
+- a suite completa da API ja tem prova local forte;
+- a CI agora serve para repetir esse resultado no GitHub Actions, nao mais para descobrir se o baseline minimo funciona;
+- se o run remoto continuar falhando, o proximo gargalo e visibilidade de log, nao baseline local.
 
 ### Sinal adicional
 
@@ -542,6 +565,11 @@ docs/.agents/skills/
   verify-and-close/
 ```
 
+Estado atual:
+
+- a primeira leva dessas `5` skills agora existe exatamente nesses caminhos;
+- elas nasceram sem scripts nem assets para manter escopo estreito e seguir a recomendacao oficial de adicionar automacao apenas quando houver repeticao real.
+
 Regra:
 
 - nao usar skill para regra de estilo, convencao de naming ou ownership;
@@ -631,25 +659,25 @@ Padrao recomendado:
 Prioridade alta, baixo risco:
 
 1. Tirar artefatos temporarios da raiz ou isolar em pasta scratch ignorada.
-2. Revalidar a suite completa de `apps/api` em janela maior ou CI, ja que o teste quebrado foi corrigido mas a execucao total excedeu o timeout local.
+2. Revalidar a suite completa de `apps/api` em CI para ter uma prova remota repetivel alem da prova local.
 
 ### P1 - Produtividade
 
-Depois do baseline acima:
+Estado atual:
 
-1. Criar os prompt files principais.
-2. Criar `planner`, `implementer` e `reviewer`.
-3. Adotar `code_review.md`.
-4. Institucionalizar `VERIFY.md` em features longas.
-5. Separar de forma canonica `docs/active/` de `docs/architecture/`.
-6. Formalizar o uso de `/plan` nas tarefas grandes.
-7. Adotar uma rotina fixa de diagnostico das customizacoes carregadas.
+1. os prompt files principais ja existem;
+2. `planner`, `implementer` e `reviewer` ja existem;
+3. `code_review.md` ja foi adotado;
+4. `VERIFY.md` e `STATUS.md` ja tem template e caso real em `docs/active/`;
+5. `docs/execution-plans/` ja foi separado de `docs/architecture/`;
+6. a suite completa de `apps/api` ja foi validada localmente em janela maior;
+7. o gap restante aqui e operar essas camadas de forma previsivel, nao mais cria-las.
 
 ### P2 - Operacao e extensao
 
-1. Adotar `docs/active/<feature>/STATUS.md`.
-2. Padronizar um template unico para execution plan.
-3. Criar apenas um conjunto inicial de `5` skills estreitas.
+1. Padronizar um template unico para execution plan.
+2. Criar apenas um conjunto inicial de `5` skills estreitas.
+3. Adotar uma rotina fixa de diagnostico das customizacoes carregadas.
 4. Introduzir dois hooks minimos e bem controlados.
 5. Introduzir MCP apenas onde o contexto estiver fora do repo ou mudar com frequencia.
 6. Avaliar subagents apenas quando a tarefa justificar paralelismo real.
@@ -708,11 +736,20 @@ Foram aplicados quick wins de baixo risco e a base do P0:
 15. `docs/active/_template/` e `docs/active/vibecoding-agent-friendly-repo/`
    - institucionalizacao do padrao `STATUS.md`, `DECISIONS.md` e `VERIFY.md` com um caso real em uso.
 
+16. `docs/execution-plans/_template/EXECUTION-PLAN.md`
+   - template unico e canonico para novos planos executaveis.
+
+17. `.agents/skills/`, `apps/api/.agents/skills/`, `apps/web/.agents/skills/` e `docs/.agents/skills/`
+   - primeira leva de skills estreitas e portateis, sem scripts ou assets prematuros.
+
+18. `docs/runbooks/codex-customizations-diagnostics-runbook.md`
+   - rotina canonica para verificar precedencia, skills descobertas, configuracao do Codex e paridade local da API.
+
 Observacao importante:
 
 - estes ajustes ja melhoram descoberta, precedencia e previsibilidade do agente;
 - o baseline e o primeiro trilho de produtividade ja existem;
-- a proxima rodada correta passa a ser endurecimento de uso: `VERIFY.md`, `docs/active/<feature>/STATUS.md`, rotina de diagnostico de customizacoes e validacao recorrente em CI.
+- a proxima rodada correta passa a ser endurecimento de uso: diagnostico de customizacoes, validacao recorrente em CI com log acessivel e iteracao das skills a partir de uso real.
 
 ---
 
@@ -783,10 +820,8 @@ Observacao importante:
 
 Se a proxima rodada for de execucao, eu faria nesta ordem:
 
-1. criacao dos cinco prompt files principais;
-2. criacao dos tres custom agents;
-3. adocao de `code_review.md`;
-4. separacao real de `docs/execution-plans/` e `docs/active/`;
-5. validacao rotineira do carregamento de instructions, agents e overrides;
-6. correcoes dos testes quebrados em `apps/landing` e do teste falhando em `apps/api`;
-7. so depois criacao das cinco skills iniciais em escopo estreito.
+1. validar o routing das novas skills em uso real e ajustar descricao quando houver ativacao errada ou ausente;
+2. usar o runbook de diagnostico sempre que houver rodada grande de customizacao ou divergencia entre local e CI;
+3. autenticar o `gh` local ou fornecer `GH_TOKEN` para fechar o gap de visibilidade do run remoto da API;
+4. so depois experimentar `hooks` minimos e bem controlados em workflows de alto valor;
+5. manter MCP como passo posterior, apenas quando houver contexto realmente externo ao repo.

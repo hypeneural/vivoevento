@@ -10,6 +10,7 @@ Core stack:
 - `apps/web`: React 18 + TypeScript + Vite 5
 - `apps/landing`: React 18 + TypeScript + Vite 5
 - `packages/*`: shared contracts and types
+- `.agents/skills`: shared Codex skills for repeatable workflows
 - `docs/*`: architecture, execution plans, runbooks, and active feature context
 
 ## Source Of Truth
@@ -28,6 +29,8 @@ Use each layer for one job only:
   - live feature context
 - `docs/execution-plans/`
   - executable plans
+- `.agents/skills/`
+  - shared workflow skills, loaded on demand
 - `docs/architecture/`
   - historical analysis and reference, not the default active spec
 - `.kiro/specs/*`
@@ -64,6 +67,8 @@ If multiple artifacts disagree, prefer:
   - formal contract/codegen reserve
 - `packages/shared-types`
   - shared runtime types
+- `.agents/skills`
+  - shared team skills for repeatable agent workflows
 - `scripts`
   - setup, deploy, ops, smoke, and automation scripts
 - `docs`

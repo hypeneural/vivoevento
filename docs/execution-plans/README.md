@@ -26,6 +26,7 @@ Convencao recomendada:
 
 - `<feature>-execution-plan-YYYY-MM-DD.md`
 - `<feature>-implementation-plan-YYYY-MM-DD.md` apenas quando o nome ja estiver consolidado assim
+- usar `docs/execution-plans/_template/EXECUTION-PLAN.md` como ponto de partida
 
 Checklist minimo de um plano bom:
 
@@ -38,3 +39,7 @@ Checklist minimo de um plano bom:
 7. criterio de aceite
 8. riscos
 9. fallback ou rollback
+
+Template canonico:
+
+- `docs/execution-plans/_template/EXECUTION-PLAN.md`
