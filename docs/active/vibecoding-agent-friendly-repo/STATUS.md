@@ -36,6 +36,14 @@ Transform the monorepo from documentation-heavy into a repo with clear agent-fac
 - the latest remote validation for commit `29b05a5` completed as run `24316799489`
   - public status: `failure`
   - public annotations expose only `Process completed with exit code 2`
+- run `24323766957` for commit `e46501d` also failed in `Run full API suite`
+  - the new `Dump Laravel logs on failure` step ran successfully
+  - unauthenticated public access still hides the detailed step log
+  - the public page also exposed a GitHub Actions Node 20 deprecation warning for `actions/checkout@v4` and `actions/cache@v4`
+- workflows were updated to use current Node 24 action majors:
+  - `actions/checkout@v6`
+  - `actions/cache@v5`
+  - `actions/setup-node@v6` in the moderation workflow
 - the exact workflow sequence was revalidated locally without extra env overrides:
   - `1222` passed
   - `7` skipped
@@ -47,7 +55,7 @@ Transform the monorepo from documentation-heavy into a repo with clear agent-fac
 
 ## Next Steps
 
-1. inspect run `24316799489` with authenticated GitHub Actions logs instead of the public summary only
+1. inspect the latest failing API Suite run with authenticated GitHub Actions logs instead of the public summary only
 2. use the diagnostics runbook after each customization change or CI parity check
 3. start using `docs/active/<feature>/STATUS.md` and `VERIFY.md` for long-running product work beyond this repo-hardening initiative
 

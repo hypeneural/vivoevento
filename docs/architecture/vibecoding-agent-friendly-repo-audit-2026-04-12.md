@@ -341,6 +341,10 @@ Implicacao pratica:
   - `Dart Sass legacy-js-api` deprecado;
   - `layoutId` passando para DOM no mock de `ExperienceModulesSection.test.tsx`;
   - `Not implemented: navigation to another Document` nos cliques reais de link em `CTAFloating.test.tsx`.
+- GitHub Actions expos warning de runtime Node 20 para actions oficiais antigas:
+  - `actions/checkout@v4`;
+  - `actions/cache@v4`;
+  - isso foi alinhado para majors atuais com runtime Node 24 em `checkout@v6`, `cache@v5` e `setup-node@v6`.
 
 ---
 

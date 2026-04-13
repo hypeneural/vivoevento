@@ -39,6 +39,7 @@ gh --version
 gh auth status
 gh run view 24316799489 --repo hypeneural/vivoevento --json name,workflowName,conclusion,status,url,event,headBranch,headSha,jobs
 gh run view 24316799489 --repo hypeneural/vivoevento --log
+rg "actions/(checkout|cache)@|setup-node@" .github/workflows -n
 ```
 
 ## Result
@@ -87,12 +88,23 @@ gh run view 24316799489 --repo hypeneural/vivoevento --log
 - `gh --version` reports `2.89.0`
 - `gh auth status` reports no authenticated GitHub hosts
 - unauthenticated `gh run view` is blocked and asks for `gh auth login` or `GH_TOKEN`
+- run `24323766957` for commit `e46501d` completed as `failure`
+  - failed step: `Run full API suite`
+  - `Dump Laravel logs on failure` completed successfully
+  - public page still requires sign-in to view logs
+- public Actions page exposed a Node 20 deprecation warning for `actions/checkout@v4` and `actions/cache@v4`
+- official GitHub action release pages confirm current Node 24 majors:
+  - `actions/checkout@v6`
+  - `actions/cache@v5`
+  - `actions/setup-node@v6`
+- local workflows were updated to these current majors
 
 ## Not Validated
 
 - the root cause for remote run `24316799489` is still not visible from this environment because the public run page exposes only summary status
 - the latest branch head still lacks a confirmed successful remote completion of the full API suite
 - detailed GitHub Actions logs are still not validated because `gh` is installed but not authenticated
+- the workflow action-major update still needs a pushed CI run
 
 ## Follow-up
 
